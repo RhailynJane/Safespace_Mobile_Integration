@@ -12,6 +12,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography } from '../../constants/theme';
+import BottomNavigation from '../../components/BottomNavigation';
 
 interface JournalEntry {
   id: string;
@@ -43,100 +44,108 @@ export default function JournalScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>Journal</Text>
-          
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
-            <View style={styles.notificationBadge} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuButton}>
-            <Ionicons name="grid-outline" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Main Content */}
-        <View style={styles.content}>
-          <Text style={styles.subText}>Express your thoughts and feelings</Text>
-
-          {/* Create Journal Card */}
-          <TouchableOpacity 
-            style={styles.createCard}
-            onPress={handleCreateJournal}
-          >
-            <View style={styles.createCardContent}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="book" size={32} color={Colors.warning} />
-              </View>
-              
-              <View style={styles.createTextContainer}>
-                <Text style={styles.createTitle}>Create Journal</Text>
-                <Text style={styles.createSubtitle}>
-                  Set up a journal based on your current mood & conditions
-                </Text>
-              </View>
-              
-              <TouchableOpacity style={styles.createButton}>
-                <Ionicons name="add-circle-outline" size={28} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-
-          {/* Recent Journal Entries */}
-          <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
             
-            <View style={styles.recentContainer}>
-              {journalEntries.length > 0 ? (
-                <>
-                  {journalEntries.slice(0, 2).map((entry) => (
-                    <TouchableOpacity key={entry.id} style={styles.entryCard}>
-                      <View style={styles.entryHeader}>
-                        <Text style={styles.entryEmoji}>{entry.emoji}</Text>
-                        <View style={styles.entryInfo}>
-                          <Text style={styles.entryTitle}>{entry.title}</Text>
-                          <Text style={styles.entryDate}>{entry.date}</Text>
+            <Text style={styles.headerTitle}>Journal</Text>
+            
+            <TouchableOpacity style={styles.notificationButton}>
+              <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+              <View style={styles.notificationBadge} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.menuButton}>
+              <Ionicons name="grid-outline" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Main Content */}
+          <View style={styles.content}>
+            <Text style={styles.subText}>Express your thoughts and feelings</Text>
+
+            {/* Create Journal Card */}
+            <TouchableOpacity 
+              style={styles.createCard}
+              onPress={handleCreateJournal}
+            >
+              <View style={styles.createCardContent}>
+                <View style={styles.iconContainer}>
+                  <Ionicons name="book" size={32} color={Colors.warning} />
+                </View>
+                
+                <View style={styles.createTextContainer}>
+                  <Text style={styles.createTitle}>Create Journal</Text>
+                  <Text style={styles.createSubtitle}>
+                    Set up a journal based on your current mood & conditions
+                  </Text>
+                </View>
+                
+                <TouchableOpacity 
+                  style={styles.createButton}
+                  onPress={handleCreateJournal}
+                >
+                  <Ionicons name="add-circle-outline" size={28} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+
+            {/* Recent Journal Entries */}
+            <View style={styles.recentSection}>
+              <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
+              
+              <View style={styles.recentContainer}>
+                {journalEntries.length > 0 ? (
+                  <>
+                    {journalEntries.slice(0, 2).map((entry) => (
+                      <TouchableOpacity key={entry.id} style={styles.entryCard}>
+                        <View style={styles.entryHeader}>
+                          <Text style={styles.entryEmoji}>{entry.emoji}</Text>
+                          <View style={styles.entryInfo}>
+                            <Text style={styles.entryTitle}>{entry.title}</Text>
+                            <Text style={styles.entryDate}>{entry.date}</Text>
+                          </View>
                         </View>
-                      </View>
-                      <Text style={styles.entryPreview} numberOfLines={2}>
-                        {entry.content}
-                      </Text>
+                        <Text style={styles.entryPreview} numberOfLines={2}>
+                          {entry.content}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    
+                    <TouchableOpacity 
+                      style={styles.viewAllButton}
+                      onPress={handleViewAllEntries}
+                    >
+                      <Text style={styles.viewAllText}>View Journal Entries</Text>
                     </TouchableOpacity>
-                  ))}
-                  
-                  <TouchableOpacity 
-                    style={styles.viewAllButton}
-                    onPress={handleViewAllEntries}
-                  >
-                    <Text style={styles.viewAllText}>View Journal Entries</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.noEntriesText}>No entries recorded</Text>
-                  
-                  <TouchableOpacity 
-                    style={styles.viewAllButton}
-                    onPress={handleViewAllEntries}
-                  >
-                    <Text style={styles.viewAllText}>View Journal Entries</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.noEntriesText}>No entries recorded</Text>
+                    
+                    <TouchableOpacity 
+                      style={styles.viewAllButton}
+                      onPress={handleViewAllEntries}
+                    >
+                      <Text style={styles.viewAllText}>View Journal Entries</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+        
+        {/* Bottom Navigation */}
+        <BottomNavigation activeTab="home" />
+      </View>
     </SafeAreaView>
   );
 }
@@ -149,6 +158,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xl, // Add padding for bottom navigation
   },
   header: {
     flexDirection: 'row',

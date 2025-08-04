@@ -1,6 +1,6 @@
 // File: app/(app)/_layout.tsx
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { Redirect } from 'expo-router';
 
@@ -14,11 +14,18 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // If the user IS signed in, show the tab navigator.
+  // Use Stack instead of Tabs to remove the built-in tab navigation
+  // We're using our custom BottomNavigation component instead
   return (
-      <Tabs screenOptions={{ headerShown: false }}>
-        <Tabs.Screen name="index" options={{ title: 'Home' }} />
-        {/* Add your other main app tabs here */}
-      </Tabs>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="mood" />
+      <Stack.Screen name="mood-logging" />
+      <Stack.Screen name="mood-history" />
+      <Stack.Screen name="journal" />
+      <Stack.Screen name="journal-create" />
+      <Stack.Screen name="journal-history" />
+      {/* Add any future app screens here */}
+    </Stack>
   );
 }

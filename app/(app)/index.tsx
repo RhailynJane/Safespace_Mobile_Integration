@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import SafeSpaceLogo from '../../components/SafeSpaceLogo';
+import BottomNavigation from '../../components/BottomNavigation';
 import { router } from 'expo-router';
 
 export default function HomeScreen() {
@@ -128,6 +129,9 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+      
+      {/* Bottom Navigation */}
+      <BottomNavigation activeTab="home" />
     </SafeAreaView>
   );
 }

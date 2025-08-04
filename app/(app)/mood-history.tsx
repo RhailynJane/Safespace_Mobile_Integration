@@ -13,6 +13,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography } from '../../constants/theme';
+import BottomNavigation from '../../components/BottomNavigation';
 
 interface MoodEntry {
   id: string;
@@ -158,6 +159,9 @@ export default function MoodHistoryScreen() {
           </View>
         )}
       </ScrollView>
+      
+      {/* Bottom Navigation */}
+      <BottomNavigation activeTab="home" />
     </SafeAreaView>
   );
 }

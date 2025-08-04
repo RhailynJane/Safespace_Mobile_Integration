@@ -16,6 +16,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography } from '../../constants/theme';
+import BottomNavigation from '../../components/BottomNavigation';
 
 type EmotionType = 'very-sad' | 'sad' | 'neutral' | 'happy' | 'very-happy';
 type CreateStep = 'create' | 'success';
@@ -289,6 +290,9 @@ export default function JournalCreateScreen() {
           
           {renderActionButtons()}
         </ScrollView>
+        
+        {/* Bottom Navigation */}
+        <BottomNavigation activeTab="home" />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
