@@ -15,6 +15,7 @@ import {
 import { router } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import SafeSpaceLogo from '../../components/SafeSpaceLogo';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -52,10 +53,7 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <View style={styles.heartLeft} />
-            <View style={styles.heartRight} />
-          </View>
+          <SafeSpaceLogo size={80} />
         </View>
 
         {/* Title */}
@@ -196,31 +194,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginBottom: 30,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    position: 'relative',
-  },
-  heartLeft: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    backgroundColor: '#7FDBDA',
-    borderRadius: 15,
-    top: 0,
-    left: 0,
-    transform: [{ rotate: '-45deg' }],
-  },
-  heartRight: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    backgroundColor: '#F7A399',
-    borderRadius: 15,
-    top: 0,
-    right: 0,
-    transform: [{ rotate: '45deg' }],
   },
   title: {
     fontSize: 24,

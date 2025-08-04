@@ -9,6 +9,7 @@ import {
   StyleSheet 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SafeSpaceLogo from './SafeSpaceLogo';
 
 type TherapyType = 'adult' | 'minor' | 'guardian' | null;
 
@@ -66,10 +67,7 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
         
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <View style={styles.heartLeft} />
-            <View style={styles.heartRight} />
-          </View>
+          <SafeSpaceLogo size={60} />
         </View>
       </View>
 
@@ -192,31 +190,6 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    position: 'relative',
-  },
-  heartLeft: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    backgroundColor: '#7FDBDA',
-    borderRadius: 15,
-    top: 0,
-    left: 0,
-    transform: [{ rotate: '-45deg' }],
-  },
-  heartRight: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    backgroundColor: '#F7A399',
-    borderRadius: 15,
-    top: 0,
-    right: 0,
-    transform: [{ rotate: '45deg' }],
   },
   title: {
     fontSize: 24,

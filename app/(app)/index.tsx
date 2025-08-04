@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import SafeSpaceLogo from '../../components/SafeSpaceLogo';
+import { router } from 'expo-router';
 
 export default function HomeScreen() {
   const { user, signOut } = useAuth();
@@ -35,10 +37,7 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <View style={styles.heartLeft} />
-              <View style={styles.heartRight} />
-            </View>
+            <SafeSpaceLogo size={50} />
           </View>
           
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -84,7 +83,10 @@ export default function HomeScreen() {
               <Text style={styles.actionSubtitle}>Write thoughts</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => router.push('/(app)/mood')}
+            >
               <View style={[styles.actionIcon, { backgroundColor: '#F3E5F5' }]}>
                 <Ionicons name="heart-outline" size={24} color="#9C27B0" />
               </View>
@@ -146,31 +148,6 @@ const styles = StyleSheet.create({
   logoContainer: {
     flex: 1,
     alignItems: 'center',
-  },
-  logo: {
-    width: 40,
-    height: 40,
-    position: 'relative',
-  },
-  heartLeft: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    backgroundColor: '#7FDBDA',
-    borderRadius: 10,
-    top: 0,
-    left: 0,
-    transform: [{ rotate: '-45deg' }],
-  },
-  heartRight: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    backgroundColor: '#F7A399',
-    borderRadius: 10,
-    top: 0,
-    right: 0,
-    transform: [{ rotate: '45deg' }],
   },
   logoutButton: {
     padding: 8,
