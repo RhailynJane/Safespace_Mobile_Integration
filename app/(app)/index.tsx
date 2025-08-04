@@ -75,7 +75,10 @@ export default function HomeScreen() {
               <Text style={styles.actionSubtitle}>Message therapist</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => router.push('/(app)/journal')}
+            >
               <View style={[styles.actionIcon, { backgroundColor: '#FFF3E0' }]}>
                 <Ionicons name="journal-outline" size={24} color="#FF9800" />
               </View>
