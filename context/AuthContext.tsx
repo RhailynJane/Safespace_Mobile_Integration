@@ -8,13 +8,15 @@ import {
   sendEmailVerification,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "../lib/firebase"; // Adjust the import path as necessary
-import { router } from "expo-router";
+import { auth } from "../lib/firebase";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ user?: User; error?: string }>;
   signUp: (
     email: string,
     password: string,
@@ -41,17 +43,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      setLoading(true);
       const result = await signInWithEmailAndPassword(auth, email, password);
-      console.log("Sign in successful, redirecting to tabs...");
-      // Force redirect to tabs after successful sign in
-      router.replace("/(app)/(tabs)");
-      return {};
+      return { user: result.user }; // success
     } catch (error: any) {
-      console.error("Sign in error:", error);
+      console.log("Firebase signIn error:", error);
       return { error: mapFirebaseAuthError(error) };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -102,17 +98,20 @@ export const useAuth = () => {
 };
 
 const mapFirebaseAuthError = (error: any): string => {
+  console.log("Mapping error code:", error.code);
   switch (error.code) {
     case "auth/email-already-in-use":
       return "Email is already in use.";
     case "auth/invalid-email":
       return "Invalid email address.";
     case "auth/user-not-found":
-      return "User not found.";
+      return "Email doesn't exist";
     case "auth/wrong-password":
       return "Wrong password.";
     case "auth/weak-password":
       return "Password is too weak.";
+    case "auth/invalid-credential":
+      return "Email or password is incorrect.";
     default:
       return "An unknown error occurred.";
   }
