@@ -1,19 +1,16 @@
-"use client";
-
 import { Stack } from "expo-router";
-import { useAuth } from "../../context/AuthContext";
-import { Redirect } from "expo-router";
 
 export default function AppLayout() {
-  const { user } = useAuth();
-
-  if (!user) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
+      {/* Onboarding Flow - Available to all users */}
+      <Stack.Screen name="splash" />
+      <Stack.Screen name="loading" />
+      <Stack.Screen name="quote" />
+      <Stack.Screen name="onboarding" />
+
+      {/* Main App with Tabs */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     </Stack>
   );
 }

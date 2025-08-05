@@ -1,5 +1,3 @@
-"use client";
-
 import { router } from "expo-router";
 import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -76,7 +74,7 @@ export default function OnboardingFlow() {
     if (currentStep < onboardingSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      router.replace("/(auth)/login");
+      router.replace("../(auth)/login"); // Navigate to login screen after last step
     }
   };
 

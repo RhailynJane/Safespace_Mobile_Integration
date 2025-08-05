@@ -1,7 +1,4 @@
-"use client";
-
 import type React from "react";
-
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   type User,
@@ -12,7 +9,9 @@ import {
   sendEmailVerification,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
+import { router } from "expo-router";
 
 interface AuthContextType {
   user: User | null;
@@ -36,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth state changed:", firebaseUser?.email || "No user");
       setUser(firebaseUser ?? null);
       setLoading(false);
     });
@@ -45,10 +45,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      setLoading(true);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log("Sign in successful, redirecting to tabs...");
+      // Force redirect to tabs after successful sign in
+      router.replace("/(app)/(tabs)");
       return {};
     } catch (error: any) {
+      console.error("Sign in error:", error);
       return { error: mapFirebaseAuthError(error) };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     lastName?: string
   ) => {
     try {
+      setLoading(true);
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -66,21 +74,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       const user = userCredential.user;
 
+      // Update the user's display name
       if (firstName || lastName) {
         await updateProfile(user, {
           displayName: `${firstName ?? ""} ${lastName ?? ""}`.trim(),
         });
       }
 
+      // Store additional user data in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        firstName: firstName || "",
+        lastName: lastName || "",
+        displayName: `${firstName ?? ""} ${lastName ?? ""}`.trim(),
+        emailVerified: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isActive: true,
+      });
+
+      // Send email verification
       await sendEmailVerification(user);
       return {};
     } catch (error: any) {
+      console.error("Sign up error:", error);
       return { error: mapFirebaseAuthError(error) };
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+      // Redirect to splash screen after logout
+      router.replace("/(app)/splash");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   return (
@@ -119,6 +151,8 @@ function mapFirebaseAuthError(error: any): string {
       return "Wrong password.";
     case "auth/weak-password":
       return "Password is too weak.";
+    case "auth/invalid-credential":
+      return "Invalid email or password.";
     default:
       return "An unknown error occurred.";
   }
