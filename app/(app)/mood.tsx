@@ -14,6 +14,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography } from '../../constants/theme';
+import BottomNavigation from '../../components/BottomNavigation';
 
 type MoodType = 'very-happy' | 'happy' | 'neutral' | 'sad' | 'very-sad';
 
@@ -146,6 +147,9 @@ export default function MoodTrackingScreen() {
           </View>
         </View>
       </ScrollView>
+      
+      {/* Bottom Navigation */}
+      <BottomNavigation activeTab="home" />
     </SafeAreaView>
   );
 }

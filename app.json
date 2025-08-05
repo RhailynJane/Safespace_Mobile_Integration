@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme": "my-cool-app",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "plugins": [["expo-router"

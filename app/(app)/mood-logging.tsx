@@ -15,6 +15,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Typography } from '../../constants/theme';
+import BottomNavigation from '../../components/BottomNavigation';
 
 type MoodType = 'very-happy' | 'happy' | 'neutral' | 'sad' | 'very-sad';
 type LoggingStep = 'intensity' | 'factors' | 'notes' | 'complete';
@@ -326,6 +327,9 @@ export default function MoodLoggingScreen() {
         
         {renderActionButtons()}
       </ScrollView>
+      
+      {/* Bottom Navigation */}
+      <BottomNavigation activeTab="home" />
     </SafeAreaView>
   );
 }

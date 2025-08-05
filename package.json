@@ -10,19 +10,28 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
-    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/slider": "^4.5.7",
+    "@react-native-firebase/app": "^22.4.0",
+    "@react-native-firebase/auth": "^22.4.0",
+    "@react-native-firebase/firestore": "^22.4.0",
     "@react-navigation/bottom-tabs": "^7.3.15",
     "@supabase/supabase-js": "^2.52.0",
-    "expo": "~53.0.11",
+    "expo": "53.0.20",
     "expo-linear-gradient": "~14.1.5",
-    "expo-router": "^5.1.0",
+    "expo-router": "~5.1.4",
     "expo-status-bar": "~2.2.3",
+    "firebase": "^12.0.0",
     "react": "19.0.0",
-    "react-native": "0.79.3"
+    "react-dom": "19.0.0",
+    "react-native": "0.79.3",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-web": "^0.20.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/firebase": "^2.4.32",
     "@types/react": "~19.0.10",
     "typescript": "~5.8.3"
   },
