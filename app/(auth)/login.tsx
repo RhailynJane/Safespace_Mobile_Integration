@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,21 +23,47 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [generalError, setGeneralError] = useState("");
+
   const { signIn } = useAuth();
 
   const handleSignIn = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
+    setEmailError("");
+    setPasswordError("");
+    setGeneralError("");
+
+    // Check for missing fields
+    if (!email.trim()) {
+      setEmailError("Email is missing, please input to login");
+      return;
+    }
+    if (!password.trim()) {
+      setPasswordError("Password is missing, please input to login");
       return;
     }
 
     setLoading(true);
-    const result = await signIn(email, password);
+    const result = await signIn(email.trim(), password);
 
-    if (result?.error) {
-      Alert.alert("Sign In Error", result.error);
-    }
     setLoading(false);
+
+    if (result.error) {
+      if (result.error === "Invalid email address.") {
+        setEmailError(result.error);
+      } else if (result.error === "Email or password is incorrect.") {
+        // Show as general error since Firebase doesn't distinguish for security
+        setGeneralError(result.error);
+      } else {
+        setGeneralError(result.error);
+      }
+      return; // stop here, no navigation
+    }
+
+    // Navigate only on successful login
+    router.replace("/(app)/(tabs)");
   };
 
   return (
@@ -50,15 +75,12 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Logo */}
           <View style={styles.logoContainer}>
             <SafeSpaceLogo size={80} />
           </View>
 
-          {/* Title */}
           <Text style={styles.title}>Sign In To SafeSpace</Text>
 
-          {/* Toggle Buttons */}
           <View style={styles.toggleContainer}>
             <View style={[styles.toggleButton, styles.activeToggle]}>
               <Text style={styles.activeToggleText}>Sign In</Text>
@@ -71,7 +93,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Form */}
           <View style={styles.formContainer}>
             <Text style={styles.inputLabel}>Email Address</Text>
             <View style={styles.inputWrapper}>
@@ -85,12 +106,18 @@ export default function LoginScreen() {
                 style={styles.input}
                 placeholder="Enter your email address"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setEmailError("");
+                }}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!loading}
               />
             </View>
+            {emailError ? (
+              <Text style={styles.errorText}>{emailError}</Text>
+            ) : null}
 
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.inputWrapper}>
@@ -104,7 +131,10 @@ export default function LoginScreen() {
                 style={styles.input}
                 placeholder="Enter your password..."
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setPasswordError("");
+                }}
                 secureTextEntry={!showPassword}
                 editable={!loading}
               />
@@ -119,6 +149,13 @@ export default function LoginScreen() {
                 />
               </TouchableOpacity>
             </View>
+            {passwordError ? (
+              <Text style={styles.errorText}>{passwordError}</Text>
+            ) : null}
+
+            {generalError ? (
+              <Text style={styles.errorText}>{generalError}</Text>
+            ) : null}
 
             <TouchableOpacity
               style={[styles.signInButton, loading && styles.disabledButton]}
@@ -306,5 +343,11 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     marginTop: 5,
+  },
+  errorText: {
+    color: "#FF6B6B",
+    marginTop: 4,
+    marginLeft: 8,
+    fontSize: 13,
   },
 });
