@@ -1,6 +1,7 @@
+// lib/firebase.ts
 import { initializeApp } from "firebase/app";
-import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -13,11 +14,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  localCache: persistentLocalCache(),
-});
-
 export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+// DO NOT enable offline persistence in web/Expo Router (causes transport errors)
+// import { enableIndexedDbPersistence } from "firebase/firestore";
+// if (typeof window !== "undefined") {
+//   enableIndexedDbPersistence(db).catch((err) => {
+//     console.warn("Offline persistence error:", err.code);
+//   });
+// }
 
 export default app;
