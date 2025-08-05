@@ -11,12 +11,8 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// TEMP DEBUG LOGGING
-console.log("FIREBASE CONFIG:", firebaseConfig);
-
 const app = initializeApp(firebaseConfig);
 
-// Fix for Firestore WebChannel errors on Expo Web
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
   localCache: persistentLocalCache(),

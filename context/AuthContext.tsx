@@ -1,6 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+"use client";
+
+import type React from "react";
+
+import { createContext, useContext, useEffect, useState } from "react";
 import {
-  User,
+  type User,
   onAuthStateChanged,
   signOut,
   signInWithEmailAndPassword,
@@ -8,10 +12,11 @@ import {
   sendEmailVerification,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "../lib/firebase"; // Adjust the import path as necessary
+import { auth } from "../lib/firebase";
 
 interface AuthContextType {
   user: User | null;
+  session: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (
@@ -25,7 +30,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -79,21 +84,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, logout }}>
-      {!loading && children}
+    <AuthContext.Provider
+      value={{
+        user,
+        session: user,
+        loading,
+        signIn,
+        signUp,
+        logout,
+      }}
+    >
+      {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used inside an AuthProvider");
   }
   return context;
-};
+}
 
-const mapFirebaseAuthError = (error: any): string => {
+function mapFirebaseAuthError(error: any): string {
   switch (error.code) {
     case "auth/email-already-in-use":
       return "Email is already in use.";
@@ -108,4 +122,4 @@ const mapFirebaseAuthError = (error: any): string => {
     default:
       return "An unknown error occurred.";
   }
-};
+}
