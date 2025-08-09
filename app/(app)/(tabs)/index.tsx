@@ -34,14 +34,14 @@ export default function HomeScreen() {
       title: "Track Mood",
       icon: "😊",
       color: "#FFE5B4",
-      onPress: () => console.log("Track Mood"),
+      onPress: () => router.push("../mood"),
     },
     {
       id: "journal",
       title: "Journal",
       icon: "📝",
       color: "#E5D4FF",
-      onPress: () => console.log("Journal"),
+      onPress: () => router.push("../journal"),
     },
     {
       id: "resources",

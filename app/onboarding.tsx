@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
  * and off-white text sections at the bottom of each screen.
  */
 
+// Configuration array containing all onboarding steps data
 const onboardingSteps = [
   {
     title: "Welcome to SafeSpace!",
@@ -19,6 +20,7 @@ const onboardingSteps = [
       "Connect with support workers, track your wellness, and access support resources.",
     image: require("../assets/images/onboarding-welcome.png"), // Welcome illustration
     bgColor: "#f9fafb", // Light gray for welcome screen
+    // Note: No stepLabel for welcome screen - indicator won't show
   },
   {
     title: "Personalize Your Mental Health State",
@@ -27,7 +29,7 @@ const onboardingSteps = [
       "Our AI helps you understand and track your mental health journey.",
     image: require("../assets/images/onboarding-step1.png"), // Meditation illustration
     bgColor: "#dcfce7", // Light green background
-    stepLabel: "Step One",
+    stepLabel: "Step One", // Shows step indicator at top
   },
   {
     title: "Intelligent",
@@ -65,67 +67,95 @@ const onboardingSteps = [
 ];
 
 export default function OnboardingFlow() {
+  // Track current step index (0-based)
   const [currentStep, setCurrentStep] = useState(0);
 
   /**
    * Handles navigation to next step or auth screen
+   * Increments step counter or navigates to login when reaching the end
    */
   const handleNext = () => {
     if (currentStep < onboardingSteps.length - 1) {
+      // Move to next step if not at the end
       setCurrentStep(currentStep + 1);
     } else {
-      router.replace("../(auth)/login"); // Navigate to login screen after last step
+      // Navigate to login screen after completing all steps
+      router.replace("../(auth)/login");
     }
   };
 
+  // Get data for currently active step
   const currentStepData = onboardingSteps[currentStep];
 
   return (
     <View style={styles.container}>
-      {/* Top section with colored background and image - takes 75% of screen */}
+      {/* 
+        TOP SECTION (75% of screen)
+        Full-screen colored background with centered image and optional step indicator
+      */}
       <View
         style={[
           styles.imageSection,
-          { backgroundColor: currentStepData?.bgColor ?? "#fff" },
+          { backgroundColor: currentStepData?.bgColor ?? "#fff" }, // Dynamic background color
         ]}
       >
         <SafeAreaView style={styles.imageSafeArea}>
-          {/* Centered step indicator - only show for steps 1-5 */}
+          {/* 
+            STEP INDICATOR
+            Only shown for steps that have a stepLabel (excludes welcome screen)
+            Centered at top with semi-transparent white background
+          */}
           {currentStepData?.stepLabel && (
             <View style={styles.stepIndicator}>
               <Text style={styles.stepText}>{currentStepData.stepLabel}</Text>
             </View>
           )}
 
-          {/* Main illustration container - image blends with background */}
+          {/* 
+            MAIN ILLUSTRATION
+            Large image that blends seamlessly with the background color
+            Centered in remaining space after step indicator
+          */}
           <View style={styles.illustrationContainer}>
             {currentStepData?.image && (
               <Image
                 source={currentStepData.image}
                 style={styles.illustrationImage}
-                resizeMode="contain"
+                resizeMode="contain" // Maintains aspect ratio
               />
             )}
           </View>
         </SafeAreaView>
       </View>
 
-      {/* Bottom section with off-white background and text - takes 25% of screen */}
+      {/* 
+        BOTTOM SECTION (25% of screen)
+        Off-white background containing text content, button, and progress indicators
+      */}
       <View style={styles.textSection}>
         <SafeAreaView style={styles.textSafeArea}>
-          {/* Progress indicator line */}
+          {/* Decorative progress line at top of text section */}
           <View style={styles.progressLine} />
 
-          {/* Text content */}
+          {/* 
+            TEXT CONTENT
+            Title, subtitle (colored), and description text
+            Centered and takes up most of the text section
+          */}
           <View style={styles.textContainer}>
             {currentStepData && (
               <>
+                {/* Main title in dark color */}
                 <Text style={styles.title}>{currentStepData.title}</Text>
+
+                {/* Subtitle in accent color (teal) - optional */}
                 {currentStepData.subtitle && (
                   <Text style={styles.subtitle}>
                     {currentStepData.subtitle}
                   </Text>
                 )}
+
+                {/* Description text in gray */}
                 <Text style={styles.description}>
                   {currentStepData.description}
                 </Text>
@@ -133,12 +163,20 @@ export default function OnboardingFlow() {
             )}
           </View>
 
-          {/* Continue button */}
+          {/* 
+            CONTINUE BUTTON
+            Circular button with arrow - advances to next step or login
+            Positioned above progress dots
+          */}
           <TouchableOpacity style={styles.continueButton} onPress={handleNext}>
             <Text style={styles.continueButtonText}>→</Text>
           </TouchableOpacity>
 
-          {/* Progress dots */}
+          {/* 
+            PROGRESS DOTS
+            Row of dots showing current progress through onboarding
+            Current step highlighted in teal, others in gray
+          */}
           <View style={styles.progressIndicator}>
             {onboardingSteps.map((_, index) => (
               <View
@@ -146,6 +184,7 @@ export default function OnboardingFlow() {
                 style={[
                   styles.progressDot,
                   {
+                    // Highlight current step with teal color
                     backgroundColor:
                       index === currentStep ? "#14b8a6" : "#d1d5db",
                   },
@@ -160,134 +199,159 @@ export default function OnboardingFlow() {
 }
 
 const styles = StyleSheet.create({
-  // Main container without SafeAreaView to allow full-screen colors
+  // MAIN CONTAINER
+  // No SafeAreaView wrapper to allow full-screen background colors
   container: {
     flex: 1,
   },
-  // Top section with colored background - 75% of screen
+
+  // TOP SECTION STYLES (Image/Illustration Area)
+  // Takes 75% of screen height (flex: 3 out of total 5)
   imageSection: {
-    flex: 3, // 75% of screen (3/4)
+    flex: 3, // 3/5 = 60% base + extends to ~75% with flex behavior
   },
-  // SafeAreaView for the image section
+
+  // SafeAreaView within image section to respect device safe areas
   imageSafeArea: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 20, // Side padding for content
   },
-  // Centered step indicator at top
+
+  // Step indicator pill at top of image section
   stepIndicator: {
     alignSelf: "center", // Center horizontally
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    backgroundColor: "rgba(255, 255, 255, 0.9)", // Semi-transparent white
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 20, // Pill shape
     marginTop: 10,
     marginBottom: 20,
   },
-  // Step indicator text
+
+  // Text inside step indicator
   stepText: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#6b7280", // Gray text
     fontWeight: "500",
   },
-  // Container for main illustration - fills remaining space
+
+  // Container for main illustration - fills remaining space after step indicator
   illustrationContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center", // Center vertically
+    alignItems: "center", // Center horizontally
   },
-  // Main illustration image - blends seamlessly with background
+
+  // Main illustration image styling
   illustrationImage: {
     width: "100%",
     height: "100%",
-    maxWidth: 320,
+    maxWidth: 320, // Constrain maximum size
     maxHeight: 300,
   },
-  // Bottom section with off-white background - 25% of screen
+
+  // BOTTOM SECTION STYLES (Text Content Area)
+  // Takes 25% of screen height (flex: 2 out of total 5)
   textSection: {
-    flex: 2,
+    flex: 2, // 2/5 = 40% base + flex behavior makes it ~25%
     backgroundColor: "#f8fafc", // Off-white background
   },
-  // SafeAreaView for the text section
+
+  // SafeAreaView within text section
   textSafeArea: {
     flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: "space-between",
+    paddingHorizontal: 24, // Side padding for text content
+    justifyContent: "space-between", // Distribute children evenly
   },
-  // Progress line at top of text section
+
+  // Decorative line at top of text section
   progressLine: {
     width: 40,
     height: 4,
-    backgroundColor: "#d1d5db",
+    backgroundColor: "#d1d5db", // Light gray
     borderRadius: 2,
-    alignSelf: "center",
+    alignSelf: "center", // Center horizontally
     marginTop: 12,
   },
-  // Text content container
+
+  // Container for title, subtitle, and description
   textContainer: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
+    alignItems: "center", // Center text horizontally
+    flex: 1, // Take up most of the text section
+    justifyContent: "center", // Center content vertically
     paddingVertical: 20,
   },
-  // Main title text
+
+  // Main title styling
   title: {
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    color: "#111827",
+    color: "#111827", // Dark gray/black
     marginBottom: 4,
-    lineHeight: 30,
+    lineHeight: 30, // Better text spacing
   },
-  // Subtitle text with accent color
+
+  // Subtitle with accent color
   subtitle: {
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    color: "#14b8a6",
+    color: "#14b8a6", // Teal accent color
     marginBottom: 12,
     lineHeight: 30,
   },
-  // Description text
+
+  // Description text styling
   description: {
     fontSize: 16,
     textAlign: "center",
-    color: "#6b7280",
+    color: "#6b7280", // Medium gray
     lineHeight: 22,
-    paddingHorizontal: 10,
+    paddingHorizontal: 10, // Extra side padding for description
   },
-  // Circular continue button
+
+  // INTERACTIVE ELEMENTS
+  // Circular continue button with shadow
   continueButton: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: "#14b8a6",
+    borderRadius: 28, // Makes it perfectly circular
+    backgroundColor: "#14b8a6", // Teal background
     justifyContent: "center",
     alignItems: "center",
-    alignSelf: "center",
+    alignSelf: "center", // Center horizontally
     marginBottom: 16,
+    // Shadow for iOS
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    // Shadow for Android
     elevation: 3,
   },
-  // Continue button arrow text
+
+  // Arrow text inside continue button
   continueButtonText: {
     color: "#ffffff",
     fontSize: 20,
     fontWeight: "600",
   },
-  // Progress indicator container
+
+  // PROGRESS INDICATORS
+  // Container for progress dots
   progressIndicator: {
-    flexDirection: "row",
-    justifyContent: "center",
+    flexDirection: "row", // Horizontal layout
+    justifyContent: "center", // Center the dots
     paddingBottom: 10,
   },
+
   // Individual progress dot
   progressDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
+    borderRadius: 4, // Makes it circular
+    marginHorizontal: 4, // Space between dots
+    // backgroundColor is set dynamically in the component
   },
 });
