@@ -10,71 +10,71 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
+import { supabase } from "../lib/supabase";
 
-// Define the shape of our authentication context
+export type TherapyType = "adult" | "minor" | "guardian";
+
 interface AuthContextType {
-  user: User | null; // Current authenticated user or null if not signed in
-  loading: boolean; // Whether auth state is still being determined
+  user: User | null;
+  loading: boolean;
   signIn: (
     email: string,
     password: string
-  ) => Promise<{ user?: User; error?: string }>; // Sign in function with email/password
+  ) => Promise<{ user?: User; error?: string }>;
   signUp: (
     email: string,
     password: string,
     firstName?: string,
-    lastName?: string
-  ) => Promise<{ error?: string }>; // Sign up function with optional name fields
-  resetPassword: (email: string) => Promise<{ error?: string }>; // Password reset function
-  logout: () => Promise<void>; // Sign out function
+    lastName?: string,
+    therapyType?: TherapyType | null,
+    phoneNumber?: string,
+    age?: string
+  ) => Promise<{ error?: string }>;
+  resetPassword: (email: string) => Promise<{ error?: string }>;
+  logout: () => Promise<void>;
 }
 
-// Create the authentication context with undefined as default
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// AuthProvider component that wraps the app and provides auth state
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  // State to store the current user
   const [user, setUser] = useState<User | null>(null);
-  // State to track if we're still loading the initial auth state
   const [loading, setLoading] = useState(true);
 
-  // Effect to listen for auth state changes
   useEffect(() => {
-    // Set up Firebase auth state listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Update user state when auth state changes
+      if (firebaseUser) {
+        try {
+          await syncUserProfile(firebaseUser);
+        } catch (error) {
+          console.error("Profile sync failed:", error);
+        }
+      }
       setUser(firebaseUser ?? null);
-      // Set loading to false once we have the initial auth state
       setLoading(false);
     });
-
-    // Cleanup function to unsubscribe from the listener
     return unsubscribe;
   }, []);
 
-  // Function to sign in with email and password
   const signIn = async (email: string, password: string) => {
     try {
-      // Attempt to sign in with Firebase
       const result = await signInWithEmailAndPassword(auth, email, password);
-      return { user: result.user }; // Return user on success
+      return { user: result.user };
     } catch (error: any) {
-      console.log("Firebase signIn error:", error);
-      // Return mapped error message on failure
       return { error: mapFirebaseAuthError(error) };
     }
   };
 
-  // Function to create a new user account
   const signUp = async (
     email: string,
     password: string,
     firstName?: string,
-    lastName?: string
+    lastName?: string,
+    therapyType?: TherapyType | null,
+    phoneNumber?: string,
+    age?: string
   ) => {
     try {
-      // Create new user account with Firebase
+      // 1. Firebase account creation
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -82,64 +82,71 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       );
       const user = userCredential.user;
 
-      // Update user profile with display name if first/last name provided
+      // 2. Update Firebase profile
       if (firstName || lastName) {
         await updateProfile(user, {
           displayName: `${firstName ?? ""} ${lastName ?? ""}`.trim(),
         });
       }
 
-      // Send email verification to new user
+      // 3. Create/Update Supabase profile with all fields
+      const { error } = await supabase.from("clients").upsert(
+        {
+          firebase_uid: user.uid,
+          email: user.email,
+          first_name: firstName,
+          last_name: lastName,
+          client_type: therapyType,
+          phone: phoneNumber,
+          age: age ? parseInt(age) : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "firebase_uid" }
+      );
+
+      if (error) throw error;
+
+      // 4. Send verification email
       await sendEmailVerification(user);
-      return {}; // Return empty object on success
+      return {};
     } catch (error: any) {
-      // Return mapped error message on failure
+      console.error("Signup error:", error);
       return { error: mapFirebaseAuthError(error) };
     }
   };
 
-  // Function to send password reset email
   const resetPassword = async (email: string) => {
     try {
-      // Send password reset email via Firebase
       await sendPasswordResetEmail(auth, email);
-      return {}; // Return empty object on success
+      return {};
     } catch (error: any) {
-      console.log("Firebase resetPassword error:", error);
-      // Return mapped error message on failure
       return { error: mapFirebaseAuthError(error) };
     }
   };
 
-  // Function to sign out the current user
   const logout = async () => {
     await signOut(auth);
   };
 
-  // Render the context provider with auth state and functions
   return (
     <AuthContext.Provider
       value={{ user, loading, signIn, signUp, resetPassword, logout }}
     >
-      {/* Only render children once loading is complete */}
       {!loading && children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to access the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  // Throw error if hook is used outside of AuthProvider
   if (!context) {
     throw new Error("useAuth must be used inside an AuthProvider");
   }
   return context;
 };
 
-// Helper function to map Firebase auth errors to user-friendly messages
 const mapFirebaseAuthError = (error: any): string => {
-  console.log("Mapping error code:", error.code);
   switch (error.code) {
     case "auth/email-already-in-use":
       return "Email is already in use.";
@@ -154,7 +161,32 @@ const mapFirebaseAuthError = (error: any): string => {
     case "auth/invalid-credential":
       return "Email or password is incorrect.";
     default:
-      // Fallback for any unmapped error codes
       return "An unknown error occurred.";
   }
 };
+
+async function syncUserProfile(firebaseUser: User) {
+  if (!firebaseUser) return;
+
+  const { data: existingUser, error: fetchError } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("firebase_uid", firebaseUser.uid)
+    .single();
+
+  if (!existingUser) {
+    const displayName = firebaseUser.displayName || "";
+    const [firstName, ...rest] = displayName.split(" ");
+    const lastName = rest.join(" ") || null;
+
+    await supabase.from("clients").upsert({
+      firebase_uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      first_name: firstName || null,
+      last_name: lastName,
+      updated_at: new Date().toISOString(),
+    });
+  } else if (fetchError && fetchError.code !== "PGRST116") {
+    throw fetchError;
+  }
+}
