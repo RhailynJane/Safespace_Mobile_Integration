@@ -1,150 +1,321 @@
-// File: context/AuthContext.tsx
+import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  User as FirebaseUser,
+  onAuthStateChanged,
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../lib/firebase";
+import { supabase } from "../lib/supabase";
+import { useRouter } from "expo-router";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
-// Mock types to replace Supabase types
-interface MockUser {
-  id: string;
+interface AuthUser {
+  uid: string;
   email: string;
-  user_metadata: {
-    first_name: string;
-    last_name: string;
-  };
+  displayName: string;
+  emailVerified: boolean;
+  firebaseUser: FirebaseUser;
 }
 
-interface MockSession {
-  user: MockUser;
-  access_token: string;
+interface ClientProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  clientType: "adult" | "minor" | "guardian";
+  phone?: string;
 }
 
-// Define the shape of the context value
 interface AuthContextType {
-  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
-  user: MockUser | null;
-  session: MockSession | null;
+  user: AuthUser | null;
+  profile: ClientProfile | null;
   loading: boolean;
+  signIn: (email: string, password: string) => Promise<AuthResult>;
+  signUp: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    clientType: "adult" | "minor" | "guardian",
+    phone?: string
+  ) => Promise<AuthResult>;
+  logout: () => Promise<void>;
+  sendVerificationEmail: () => Promise<boolean>;
+  checkEmailVerification: () => Promise<boolean>;
+  updateDemographics: (data: any) => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error?: string }>;
 }
 
-// Create the context with a default undefined value
+interface AuthResult {
+  success: boolean;
+  error?: string;
+  user?: AuthUser;
+  profile?: ClientProfile;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Custom hook to use the AuthContext
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-// Mock user database (in real app, this would be your backend)
-const mockUsers: { [email: string]: { password: string; firstName: string; lastName: string } } = {
-  'test@example.com': {
-    password: 'password123',
-    firstName: 'John',
-    lastName: 'Doe'
-  }
-};
-
-// AuthProvider component
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<MockUser | null>(null);
-  const [session, setSession] = useState<MockSession | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
+  const transformFirebaseUser = (firebaseUser: FirebaseUser): AuthUser => ({
+    uid: firebaseUser.uid,
+    email: firebaseUser.email || "",
+    displayName: firebaseUser.displayName || "",
+    emailVerified: firebaseUser.emailVerified,
+    firebaseUser: firebaseUser,
+  });
+
+  // Initialize user and profile
   useEffect(() => {
-    // Simulate checking for existing session on app start
-    const checkExistingSession = async () => {
-      // Simulate a small delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For demo purposes, we'll start with no session
-      // In a real app, you might check AsyncStorage here
-      setLoading(false);
-    };
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const authUser = transformFirebaseUser(firebaseUser);
+        setUser(authUser);
 
-    checkExistingSession();
+        // Load profile from Supabase
+        const { data, error } = await supabase
+          .from("clients")
+          .select("id, first_name, last_name, client_type, phone")
+          .eq("firebase_uid", firebaseUser.uid)
+          .single();
+
+        if (data && !error) {
+          setProfile({
+            id: data.id,
+            firstName: data.first_name,
+            lastName: data.last_name,
+            clientType: data.client_type,
+            phone: data.phone,
+          });
+        }
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
-  const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  const signIn = async (
+    email: string,
+    password: string
+  ): Promise<AuthResult> => {
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const authUser = transformFirebaseUser(result.user);
+      setUser(authUser);
 
-    // Basic validation
-    if (password.length < 6) {
-      return { error: 'Password must be at least 6 characters long' };
+      // Load profile
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, client_type, phone")
+        .eq("firebase_uid", result.user.uid)
+        .single();
+
+      if (error) throw error;
+
+      const clientProfile = {
+        id: data.id,
+        firstName: data.first_name,
+        lastName: data.last_name,
+        clientType: data.client_type,
+        phone: data.phone,
+      };
+      setProfile(clientProfile);
+
+      return { success: true, user: authUser, profile: clientProfile };
+    } catch (error: any) {
+      return { success: false, error: mapFirebaseAuthError(error) };
     }
-
-    if (mockUsers[email]) {
-      return { error: 'User already exists with this email' };
-    }
-
-    // "Save" the user to our mock database
-    mockUsers[email] = { password, firstName, lastName };
-
-    console.log('Mock user created:', { email, firstName, lastName });
-    return { error: null };
   };
 
-  const signIn = async (email: string, password: string) => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  const signUp = async (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
+    clientType: "adult" | "minor" | "guardian",
+    phone?: string
+  ): Promise<AuthResult> => {
+    try {
+      // 1. Create Firebase user
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const firebaseUser = userCredential.user;
 
-    const mockUser = mockUsers[email];
-    
-    if (!mockUser) {
-      return { error: 'No account found with this email address' };
+      // 2. Update Firebase profile
+      await updateProfile(firebaseUser, {
+        displayName: `${firstName} ${lastName}`.trim(),
+      });
+
+      // 3. Create Supabase client record
+      const { data: clientData, error: clientError } = await supabase
+        .from("clients")
+        .insert({
+          firebase_uid: firebaseUser.uid,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          client_type: clientType,
+          phone,
+        })
+        .select("id, first_name, last_name, client_type, phone")
+        .single();
+
+      if (clientError) throw clientError;
+
+      // 4. Initialize empty demographics record
+      await supabase.from("client_demographics").insert({
+        client_id: clientData.id,
+      });
+
+      // 5. Send verification email
+      await sendEmailVerification(firebaseUser);
+
+      // 6. Update local state
+      const authUser = transformFirebaseUser(firebaseUser);
+      const clientProfile = {
+        id: clientData.id,
+        firstName,
+        lastName,
+        clientType: clientData.client_type,
+        phone,
+      };
+
+      setUser(authUser);
+      setProfile(clientProfile);
+
+      return { success: true, user: authUser, profile: clientProfile };
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      return { success: false, error: mapFirebaseAuthError(error) };
     }
-
-    if (mockUser.password !== password) {
-      return { error: 'Incorrect password' };
-    }
-
-    // Create mock session
-    const newUser: MockUser = {
-      id: Math.random().toString(36).substring(7),
-      email: email,
-      user_metadata: {
-        first_name: mockUser.firstName,
-        last_name: mockUser.lastName,
-      }
-    };
-
-    const newSession: MockSession = {
-      user: newUser,
-      access_token: 'mock_token_' + Math.random().toString(36).substring(7),
-    };
-
-    setUser(newUser);
-    setSession(newSession);
-
-    console.log('Mock user signed in:', { email, firstName: mockUser.firstName });
-    return { error: null };
   };
 
-  const signOut = async () => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setUser(null);
-    setSession(null);
-    console.log('Mock user signed out');
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      // Clear all user-related state
+      setUser(null);
+      setProfile(null);
+
+      // Redirect to login screen
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      throw error; // Re-throw to allow handling in components
+    }
   };
 
-  const value = {
-    signUp,
-    signIn,
-    signOut,
-    user,
-    session,
-    loading,
+  const sendVerificationEmail = async (): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      await sendEmailVerification(user.firebaseUser);
+      return true;
+    } catch (error) {
+      console.error("Verification email error:", error);
+      return false;
+    }
+  };
+
+  const checkEmailVerification = async (): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      await user.firebaseUser.reload();
+      return user.firebaseUser.emailVerified;
+    } catch (error) {
+      console.error("Verification check error:", error);
+      return false;
+    }
+  };
+
+  const updateDemographics = async (data: any) => {
+    if (!profile) return;
+    await supabase
+      .from("client_demographics")
+      .update({
+        ...data,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("client_id", profile.id);
+  };
+
+  const resetPassword = async (email: string): Promise<{ error?: string }> => {
+    try {
+      // Import sendPasswordResetEmail from firebase/auth
+      const { sendPasswordResetEmail } = await import("firebase/auth");
+
+      await sendPasswordResetEmail(auth, email);
+      return {}; // No error means success
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      return { error: mapFirebaseAuthError(error) };
+    }
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        loading,
+        signIn,
+        signUp,
+        logout,
+        sendVerificationEmail,
+        checkEmailVerification,
+        updateDemographics,
+        resetPassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-}
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
+
+const mapFirebaseAuthError = (error: any): string => {
+  switch (error.code) {
+    case "auth/email-already-in-use":
+      return "Email is already in use.";
+    case "auth/invalid-email":
+      return "Invalid email address.";
+    case "auth/weak-password":
+      return "Password should be at least 6 characters.";
+    case "auth/user-not-found":
+      return "No account found with this email.";
+    case "auth/wrong-password":
+      return "Incorrect password.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please try again later.";
+    case "auth/user-not-found":
+      return "No account found with this email. Please check the email address.";
+    case "auth/invalid-email":
+      return "The email address is badly formatted.";
+    case "auth/missing-email":
+      return "Please provide an email address.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please try again later.";
+    default:
+      console.error("Auth error:", error);
+      return "An error occurred. Please try again.";
+  }
+};

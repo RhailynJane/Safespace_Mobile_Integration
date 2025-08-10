@@ -1,6 +1,4 @@
-// File: app/(app)/mood-logging.tsx
-
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,326 +8,373 @@ import {
   ScrollView,
   TextInput,
   Alert,
-} from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import Slider from '@react-native-community/slider';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Typography } from '../../constants/theme';
-import BottomNavigation from '../../components/BottomNavigation';
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  Dimensions,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import Slider from "@react-native-community/slider";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../../context/AuthContext";
+import { MoodService } from "../../lib/supabase";
 
-type MoodType = 'very-happy' | 'happy' | 'neutral' | 'sad' | 'very-sad';
-type LoggingStep = 'intensity' | 'factors' | 'notes' | 'complete';
+const { width } = Dimensions.get("window");
 
-interface MoodData {
-  type: MoodType;
-  emoji: string;
-  label: string;
-  intensity: number;
-  factors: string[];
-  notes: string;
-}
+type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad";
 
 const moodConfig = {
-  'very-happy': { emoji: '😄', label: 'Very Happy' },
-  'happy': { emoji: '🙂', label: 'Happy' },
-  'neutral': { emoji: '😐', label: 'Neutral' },
-  'sad': { emoji: '🙁', label: 'Sad' },
-  'very-sad': { emoji: '😢', label: 'Very Sad' },
+  "very-happy": { emoji: "😄", label: "Very Happy" },
+  happy: { emoji: "🙂", label: "Happy" },
+  neutral: { emoji: "😐", label: "Neutral" },
+  sad: { emoji: "🙁", label: "Sad" },
+  "very-sad": { emoji: "😢", label: "Very Sad" },
 };
 
 const moodFactors = [
-  'Family', 'Health Concerns', 'Sleep Quality', 'Social Interaction',
-  'Financial Stress', 'Physical Activity', 'Work/School Stress', 'Weather'
+  "Family",
+  "Health Concerns",
+  "Sleep Quality",
+  "Social Interaction",
+  "Financial Stress",
+  "Physical Activity",
+  "Work/School Stress",
+  "Weather",
+];
+
+const tabs = [
+  { id: "home", name: "Home", icon: "home" },
+  { id: "community-forum", name: "Community", icon: "people" },
+  { id: "appointments", name: "Appointments", icon: "calendar" },
+  { id: "messages", name: "Messages", icon: "chatbubbles" },
+  { id: "profile", name: "Profile", icon: "person" },
 ];
 
 export default function MoodLoggingScreen() {
+  const { user, profile, logout } = useAuth();
   const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
-  const [currentStep, setCurrentStep] = useState<LoggingStep>('intensity');
-  const [moodData, setMoodData] = useState<MoodData>({
-    type: selectedMood,
-    emoji: moodConfig[selectedMood]?.emoji || '🙂',
-    label: moodConfig[selectedMood]?.label || 'Happy',
+  const [moodData, setMoodData] = useState({
+    type: selectedMood as MoodType,
     intensity: 3,
-    factors: [],
-    notes: '',
+    factors: [] as string[],
+    notes: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState("mood");
+
+  const sideMenuItems = [
+    {
+      icon: "home",
+      title: "Dashboard",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.replace("/(app)/(tabs)/home");
+      },
+    },
+    {
+      icon: "person",
+      title: "Profile",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/profile");
+      },
+    },
+    {
+      icon: "bar-chart",
+      title: "Self-Assessment",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/self-assessment");
+      },
+    },
+    {
+      icon: "happy",
+      title: "Mood Tracking",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/mood-tracking");
+      },
+    },
+    {
+      icon: "journal",
+      title: "Journaling",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/journaling");
+      },
+    },
+    {
+      icon: "library",
+      title: "Resources",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/resources");
+      },
+    },
+    {
+      icon: "help-circle",
+      title: "Crisis Support",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/crisis-support");
+      },
+    },
+    {
+      icon: "chatbubble",
+      title: "Messages",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/messages");
+      },
+    },
+    {
+      icon: "calendar",
+      title: "Appointments",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/appointments");
+      },
+    },
+    {
+      icon: "people",
+      title: "Community Forum",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/community-forum");
+      },
+    },
+    {
+      icon: "videocam",
+      title: "Video Consultations",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/video-consultations");
+      },
+    },
+    {
+      icon: "log-out",
+      title: "Sign Out",
+      onPress: async () => {
+        setSideMenuVisible(false);
+        await logout();
+      },
+    },
+  ];
+
+  const getDisplayName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
+  };
 
   const handleIntensityChange = (value: number) => {
-    setMoodData(prev => ({ ...prev, intensity: value }));
+    setMoodData((prev) => ({ ...prev, intensity: value }));
   };
 
   const handleFactorToggle = (factor: string) => {
-    setMoodData(prev => ({
+    setMoodData((prev) => ({
       ...prev,
       factors: prev.factors.includes(factor)
-        ? prev.factors.filter(f => f !== factor)
-        : [...prev.factors, factor]
+        ? prev.factors.filter((f) => f !== factor)
+        : [...prev.factors, factor],
     }));
   };
 
   const handleNotesChange = (text: string) => {
-    setMoodData(prev => ({ ...prev, notes: text }));
+    setMoodData((prev) => ({ ...prev, notes: text }));
   };
 
-  const handleNext = () => {
-    switch (currentStep) {
-      case 'intensity':
-        setCurrentStep('factors');
-        break;
-      case 'factors':
-        setCurrentStep('notes');
-        break;
-      case 'notes':
-        setCurrentStep('complete');
-        break;
-      case 'complete':
-        // Save mood data and navigate back
-        saveMoodEntry();
-        break;
+  const handleSubmit = async () => {
+    if (!profile?.id) {
+      Alert.alert("Error", "No user profile found");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await MoodService.logMood(profile.id, {
+        type: moodData.type,
+        intensity: moodData.intensity,
+        factors: moodData.factors,
+        notes: moodData.notes,
+      });
+
+      Alert.alert("Mood Logged!", "Your mood has been saved successfully.", [
+        { text: "OK", onPress: () => router.replace("/(app)/mood-history") },
+      ]);
+    } catch (error) {
+      console.error("Error saving mood:", error);
+      Alert.alert("Error", "Failed to save mood entry. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleBack = () => {
-    switch (currentStep) {
-      case 'intensity':
-        router.back();
-        break;
-      case 'factors':
-        setCurrentStep('intensity');
-        break;
-      case 'notes':
-        setCurrentStep('factors');
-        break;
-      case 'complete':
-        setCurrentStep('notes');
-        break;
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
     }
-  };
-
-  const saveMoodEntry = () => {
-    // In a real app, this would save to your backend/local storage
-    console.log('Saving mood entry:', moodData);
-    
-    Alert.alert(
-      'Mood Logged!',
-      'Your mood has been saved successfully.',
-      [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/(app)/mood')
-        }
-      ]
-    );
-  };
-
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-        <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-      </TouchableOpacity>
-      
-      <Text style={styles.headerTitle}>Mood</Text>
-      
-      <TouchableOpacity style={styles.notificationButton}>
-        <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
-        <View style={styles.notificationBadge} />
-      </TouchableOpacity>
-      
-      <TouchableOpacity style={styles.menuButton}>
-        <Ionicons name="grid-outline" size={24} color={Colors.textPrimary} />
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderIntensityStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.questionText}>How are you feeling this day?</Text>
-      
-      <View style={styles.moodDisplay}>
-        <Text style={styles.largeMoodEmoji}>{moodData.emoji}</Text>
-        <Text style={styles.moodLabel}>{moodData.label}</Text>
-      </View>
-
-      <View style={styles.intensitySection}>
-        <Text style={styles.intensityLabel}>Intensity (1 - 5)</Text>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>Low</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={1}
-            maximumValue={5}
-            step={1}
-            value={moodData.intensity}
-            onValueChange={handleIntensityChange}
-            minimumTrackTintColor={Colors.primary}
-            maximumTrackTintColor={Colors.disabled}
-            thumbTintColor={Colors.primary}
-          />
-          <Text style={styles.sliderLabel}>High</Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderFactorsStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.questionText}>How are you feeling this day?</Text>
-      
-      <View style={styles.moodDisplay}>
-        <Text style={styles.largeMoodEmoji}>{moodData.emoji}</Text>
-        <Text style={styles.moodLabel}>{moodData.label}</Text>
-      </View>
-
-      <View style={styles.intensitySection}>
-        <Text style={styles.intensityLabel}>Intensity (1 - 5)</Text>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>Low</Text>
-          <View style={styles.intensityIndicator}>
-            <View style={styles.intensityDot} />
-            <Text style={styles.intensityValue}>{moodData.intensity}</Text>
-          </View>
-          <Text style={styles.sliderLabel}>High</Text>
-        </View>
-      </View>
-
-      <View style={styles.factorsSection}>
-        <Text style={styles.factorsLabel}>What factors are affecting your mood?</Text>
-        <View style={styles.factorsGrid}>
-          {moodFactors.map((factor) => (
-            <TouchableOpacity
-              key={factor}
-              style={[
-                styles.factorButton,
-                moodData.factors.includes(factor) && styles.factorButtonSelected
-              ]}
-              onPress={() => handleFactorToggle(factor)}
-            >
-              <Text style={[
-                styles.factorText,
-                moodData.factors.includes(factor) && styles.factorTextSelected
-              ]}>
-                {factor}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderNotesStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.questionText}>How are you feeling this day?</Text>
-      
-      <View style={styles.moodDisplay}>
-        <Text style={styles.largeMoodEmoji}>{moodData.emoji}</Text>
-        <Text style={styles.moodLabel}>{moodData.label}</Text>
-      </View>
-
-      <View style={styles.intensitySection}>
-        <Text style={styles.intensityLabel}>Intensity (1 - 5)</Text>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>Low</Text>
-          <View style={styles.intensityIndicator}>
-            <View style={styles.intensityDot} />
-            <Text style={styles.intensityValue}>{moodData.intensity}</Text>
-          </View>
-          <Text style={styles.sliderLabel}>High</Text>
-        </View>
-      </View>
-
-      <View style={styles.factorsSection}>
-        <Text style={styles.factorsLabel}>What factors are affecting your mood?</Text>
-        <View style={styles.selectedFactorsContainer}>
-          {moodData.factors.map((factor) => (
-            <View key={factor} style={styles.selectedFactor}>
-              <Text style={styles.selectedFactorText}>{factor}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.notesSection}>
-        <Text style={styles.notesLabel}>Notes: (Optional)</Text>
-        <TextInput
-          style={styles.notesInput}
-          placeholder="Start typing..."
-          value={moodData.notes}
-          onChangeText={handleNotesChange}
-          multiline
-          textAlignVertical="top"
-        />
-      </View>
-    </View>
-  );
-
-  const renderCompleteStep = () => (
-    <View style={styles.completeContainer}>
-      <Text style={styles.questionText}>How are you feeling?</Text>
-      <Text style={styles.subText}>Tap an emoji to quickly log your mood</Text>
-
-      <View style={styles.moodGrid}>
-        <View style={styles.completeMoodDisplay}>
-          <Text style={styles.completeMoodEmoji}>{moodData.emoji}</Text>
-        </View>
-      </View>
-
-      <View style={styles.successMessage}>
-        <Text style={styles.successTitle}>Mood Logged!</Text>
-        <Text style={styles.successSubtitle}>Your mood has been saved</Text>
-        
-        <TouchableOpacity style={styles.closeButton} onPress={() => router.replace('/(app)/mood')}>
-          <Text style={styles.closeButtonText}>Close</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.recentEntryPreview}>
-        <Text style={styles.recentEntryEmoji}>{moodData.emoji}</Text>
-        <Text style={styles.recentEntryLabel}>{moodData.label}</Text>
-        <Text style={styles.recentEntryDate}>Today, 9:41 AM</Text>
-      </View>
-    </View>
-  );
-
-  const renderActionButtons = () => {
-    if (currentStep === 'complete') return null;
-
-    return (
-      <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={styles.cancelButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.saveButton}
-          onPress={handleNext}
-        >
-          <Text style={styles.saveButtonText}>
-            {currentStep === 'notes' ? 'Save' : 'Save'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+          <Ionicons name="menu" size={28} color="#4CAF50" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Log Mood</Text>
+        <TouchableOpacity onPress={() => router.push("/notifications")}>
+          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {renderHeader()}
-        
-        {currentStep === 'intensity' && renderIntensityStep()}
-        {currentStep === 'factors' && renderFactorsStep()}
-        {currentStep === 'notes' && renderNotesStep()}
-        {currentStep === 'complete' && renderCompleteStep()}
-        
-        {renderActionButtons()}
+        <View style={styles.moodDisplay}>
+          <Text style={styles.moodEmoji}>
+            {moodConfig[moodData.type].emoji}
+          </Text>
+          <Text style={styles.moodLabel}>
+            {moodConfig[moodData.type].label}
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Intensity (1-5)</Text>
+          <View style={styles.sliderContainer}>
+            <Text>1</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={1}
+              maximumValue={5}
+              step={1}
+              value={moodData.intensity}
+              onValueChange={handleIntensityChange}
+              minimumTrackTintColor="#4CAF50"
+              maximumTrackTintColor="#E0E0E0"
+              thumbTintColor="#4CAF50"
+            />
+            <Text>5</Text>
+          </View>
+          <Text style={styles.intensityValue}>
+            Current: {moodData.intensity}
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Factors</Text>
+          <View style={styles.factorsContainer}>
+            {moodFactors.map((factor) => (
+              <TouchableOpacity
+                key={factor}
+                style={[
+                  styles.factorButton,
+                  moodData.factors.includes(factor) &&
+                    styles.selectedFactorButton,
+                ]}
+                onPress={() => handleFactorToggle(factor)}
+              >
+                <Text
+                  style={[
+                    styles.factorText,
+                    moodData.factors.includes(factor) &&
+                      styles.selectedFactorText,
+                  ]}
+                >
+                  {factor}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notes</Text>
+          <TextInput
+            style={styles.notesInput}
+            placeholder="Add any notes about your mood..."
+            value={moodData.notes}
+            onChangeText={handleNotesChange}
+            multiline
+          />
+        </View>
+
+        <TouchableOpacity
+          style={styles.submitButton}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.submitButtonText}>Save Mood Entry</Text>
+          )}
+        </TouchableOpacity>
       </ScrollView>
-      
+
+      {/* Side Menu */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={sideMenuVisible}
+        onRequestClose={() => setSideMenuVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setSideMenuVisible(false)}
+          />
+          <View style={styles.sideMenu}>
+            <View style={styles.sideMenuHeader}>
+              <Text style={styles.profileName}>{getDisplayName()}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
+            </View>
+            <ScrollView style={styles.sideMenuContent}>
+              {sideMenuItems.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.sideMenuItem}
+                  onPress={item.onPress}
+                >
+                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Bottom Navigation */}
-      <BottomNavigation activeTab="home" />
+      <View style={styles.bottomNav}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.id}
+            style={styles.navButton}
+            onPress={() => handleTabPress(tab.id)}
+          >
+            <Ionicons
+              name={tab.icon as any}
+              size={24}
+              color={activeTab === tab.id ? "#4CAF50" : "#666"}
+            />
+            <Text
+              style={[
+                styles.navButtonText,
+                { color: activeTab === tab.id ? "#4CAF50" : "#666" },
+              ]}
+            >
+              {tab.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </SafeAreaView>
   );
 }
@@ -337,270 +382,172 @@ export default function MoodLoggingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.xl,
+    backgroundColor: "#FFFFFF",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    backgroundColor: Colors.primary + '30',
-    marginHorizontal: -Spacing.xl,
-    paddingHorizontal: Spacing.xl,
-  },
-  backButton: {
-    padding: Spacing.sm,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    paddingTop: 10,
+    backgroundColor: "#FFFFFF",
   },
   headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    ...Typography.title,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D32",
   },
-  notificationButton: {
-    padding: Spacing.sm,
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    backgroundColor: Colors.secondary,
-    borderRadius: 4,
-  },
-  menuButton: {
-    padding: Spacing.sm,
-  },
-  stepContainer: {
-    flex: 1,
-    paddingTop: Spacing.xxl,
-  },
-  questionText: {
-    ...Typography.title,
-    textAlign: 'center',
-    marginBottom: Spacing.xxl,
-  },
-  subText: {
-    ...Typography.caption,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
+  scrollContainer: {
+    padding: 20,
+    paddingBottom: 80,
   },
   moodDisplay: {
-    alignItems: 'center',
-    marginBottom: Spacing.xxl,
+    alignItems: "center",
+    marginVertical: 24,
   },
-  largeMoodEmoji: {
-    fontSize: 80,
-    marginBottom: Spacing.md,
+  moodEmoji: {
+    fontSize: 64,
+    marginBottom: 8,
   },
   moodLabel: {
-    ...Typography.title,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
   },
-  intensitySection: {
-    marginBottom: Spacing.xxl,
-  },
-  intensityLabel: {
-    ...Typography.subtitle,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  sliderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-  },
-  sliderLabel: {
-    ...Typography.caption,
-    minWidth: 30,
-  },
-  slider: {
-    flex: 1,
-    height: 40,
-    marginHorizontal: Spacing.lg,
-  },
-  intensityIndicator: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: Spacing.lg,
-  },
-  intensityDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.primary,
-    marginRight: Spacing.sm,
-  },
-  intensityValue: {
-    ...Typography.body,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  factorsSection: {
-    marginBottom: Spacing.xxl,
-  },
-  factorsLabel: {
-    ...Typography.subtitle,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  factorsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: Spacing.md,
-  },
-  factorButton: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.disabled,
-  },
-  factorButtonSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  factorText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  factorTextSelected: {
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  selectedFactorsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-  },
-  selectedFactor: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-  },
-  selectedFactorText: {
-    color: Colors.surface,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  notesSection: {
-    marginBottom: Spacing.xxl,
-  },
-  notesLabel: {
-    ...Typography.subtitle,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  notesInput: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: Spacing.lg,
-    height: 120,
-    ...Typography.body,
-    borderWidth: 1,
-    borderColor: Colors.disabled,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.xl,
-    gap: Spacing.lg,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: Colors.disabled,
-    borderRadius: 12,
-    paddingVertical: Spacing.lg,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    ...Typography.button,
-    color: Colors.textSecondary,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: Spacing.lg,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    ...Typography.button,
-  },
-  completeContainer: {
-    flex: 1,
-    paddingTop: Spacing.xxl,
-    alignItems: 'center',
-  },
-  moodGrid: {
-    marginVertical: Spacing.xxl,
-  },
-  completeMoodDisplay: {
-    alignItems: 'center',
-  },
-  completeMoodEmoji: {
-    fontSize: 80,
-  },
-  successMessage: {
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: Spacing.xl,
-    margin: Spacing.lg,
-    shadowColor: '#000',
+  section: {
+    marginBottom: 24,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  successTitle: {
-    ...Typography.title,
-    marginBottom: Spacing.sm,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
   },
-  successSubtitle: {
-    ...Typography.caption,
-    marginBottom: Spacing.lg,
+  sliderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
   },
-  closeButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
+  slider: {
+    flex: 1,
+    height: 40,
+    marginHorizontal: 12,
   },
-  closeButtonText: {
-    ...Typography.button,
+  intensityValue: {
+    textAlign: "center",
+    marginTop: 8,
+    color: "#666",
   },
-  recentEntryPreview: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    marginTop: Spacing.xl,
-    minWidth: 200,
+  factorsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
-  recentEntryEmoji: {
-    fontSize: 24,
-    marginBottom: Spacing.sm,
+  factorButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: "#EEE",
+    borderWidth: 1,
+    borderColor: "#DDD",
   },
-  recentEntryLabel: {
-    ...Typography.body,
-    fontWeight: '600',
-    marginBottom: 2,
+  selectedFactorButton: {
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
   },
-  recentEntryDate: {
-    ...Typography.caption,
+  factorText: {
+    color: "#333",
+  },
+  selectedFactorText: {
+    color: "#FFF",
+  },
+  notesInput: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 8,
+    padding: 12,
+    textAlignVertical: "top",
+  },
+  submitButton: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  submitButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  sideMenu: {
+    width: "75%",
+    backgroundColor: "#FFFFFF",
+    height: "100%",
+  },
+  sideMenuHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    alignItems: "center",
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: "#757575",
+  },
+  sideMenuContent: {
+    padding: 10,
+  },
+  sideMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  sideMenuItemText: {
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 15,
+  },
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+    backgroundColor: "#FFFFFF",
+  },
+  navButton: {
+    alignItems: "center",
+    padding: 8,
+  },
+  navButtonText: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });
