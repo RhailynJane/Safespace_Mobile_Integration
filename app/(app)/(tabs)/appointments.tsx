@@ -1,88 +1,312 @@
-import { View, Text, StyleSheet, SafeAreaView } from "react-native";
+import { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Dimensions,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useAuth } from "../../../context/AuthContext";
+import BottomNavigation from "../../../components/BottomNavigation";
 
-/**
- * AppointmentsScreen Component
- *
- * A placeholder screen for the appointments feature in the SafeSpace app.
- * Currently displays a simple centered message indicating where upcoming
- * appointments will be shown. This serves as a foundation for future
- * appointment management functionality.
- *
- * Features:
- * - Clean, centered layout with placeholder content
- * - Consistent styling with app theme (light gray background)
- * - Clear messaging about future functionality
- * - Safe area handling for different device screens
- *
- * Future Implementation:
- * - List of upcoming appointments with therapists
- * - Appointment scheduling interface
- * - Calendar integration
- * - Appointment details and management options
- * - Past appointment history
- */
+const { width } = Dimensions.get("window");
 export default function AppointmentsScreen() {
+  const { user, profile, logout } = useAuth();
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("appointments");
+
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
+  const sideMenuItems = [
+    {
+      icon: "home",
+      title: "Dashboard",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.replace("/(app)/(tabs)/home");
+      },
+    },
+    {
+      icon: "person",
+      title: "Profile",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/profile");
+      },
+    },
+    {
+      icon: "bar-chart",
+      title: "Self-Assessment",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/self-assessment");
+      },
+    },
+    {
+      icon: "happy",
+      title: "Mood Tracking",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/mood-tracking");
+      },
+    },
+    {
+      icon: "journal",
+      title: "Journaling",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/journaling");
+      },
+    },
+    {
+      icon: "library",
+      title: "Resources",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/resources");
+      },
+    },
+    {
+      icon: "help-circle",
+      title: "Crisis Support",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/crisis-support");
+      },
+    },
+    {
+      icon: "chatbubble",
+      title: "Messages",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/messages");
+      },
+    },
+    {
+      icon: "calendar",
+      title: "Appointments",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/appointments");
+      },
+    },
+    {
+      icon: "people",
+      title: "Community Forum",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/community-forum");
+      },
+    },
+    {
+      icon: "videocam",
+      title: "Video Consultations",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/video-consultations");
+      },
+    },
+    {
+      icon: "log-out",
+      title: "Sign Out",
+      onPress: async () => {
+        setSideMenuVisible(false);
+        await logout();
+      },
+    },
+  ];
+
+  const getDisplayName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* 
-        MAIN CONTENT CONTAINER
-        Centers the placeholder content both horizontally and vertically
-        Takes up the full screen space within the safe area
-      */}
-      <View style={styles.content}>
-        {/* 
-          SCREEN TITLE
-          Large, bold text clearly identifying the appointments section
-          Uses dark gray for good contrast against light background
-        */}
-        <Text style={styles.title}>Appointments</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+          <Ionicons name="menu" size={28} color="#4CAF50" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Appointments</Text>
+        <TouchableOpacity onPress={() => router.push("/notifications")}>
+          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
+        </TouchableOpacity>
+      </View>
 
-        {/* 
-          PLACEHOLDER MESSAGE
-          Informative subtitle explaining what will appear in this screen
-          Uses medium gray for secondary text hierarchy
-          Centered text alignment for balanced appearance
-        */}
+      {/* Main Content */}
+      <View style={styles.content}>
+        <Text style={styles.title}>Appointments Coming Soon</Text>
         <Text style={styles.subtitle}>
-          Your upcoming appointments will appear here
+          We're working on building a supportive Appointments space for you.
         </Text>
       </View>
+
+      {/* Side Menu */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={sideMenuVisible}
+        onRequestClose={() => setSideMenuVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setSideMenuVisible(false)}
+          />
+          <View style={styles.sideMenu}>
+            <View style={styles.sideMenuHeader}>
+              <Text style={styles.profileName}>{getDisplayName()}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
+            </View>
+            <ScrollView style={styles.sideMenuContent}>
+              {sideMenuItems.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.sideMenuItem}
+                  onPress={item.onPress}
+                >
+                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <BottomNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  // MAIN CONTAINER
-  // Full-screen container with safe area handling
   container: {
-    flex: 1, // Take full available height
-    backgroundColor: "#F5F5F5", // Light gray background matching app theme
+    flex: 1,
+    backgroundColor: "#FFFFFF",
   },
-
-  // CONTENT WRAPPER
-  // Centers content both horizontally and vertically on screen
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    paddingTop: 10,
+    backgroundColor: "#FFFFFF",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D32",
+  },
   content: {
-    flex: 1, // Take full container height
-    justifyContent: "center", // Center content vertically
-    alignItems: "center", // Center content horizontally
-    paddingHorizontal: 20, // Side padding for text readability
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
-
-  // TITLE TEXT STYLING
-  // Primary heading for the screen
   title: {
-    fontSize: 24, // Large text for screen identification
-    fontWeight: "bold", // Bold weight for prominence
-    color: "#333", // Dark gray for good contrast and readability
-    marginBottom: 10, // Small space between title and subtitle
+    fontSize: 22,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+    textAlign: "center",
   },
-
-  // SUBTITLE TEXT STYLING
-  // Secondary descriptive text explaining the screen purpose
   subtitle: {
-    fontSize: 16, // Medium text size for readability
-    color: "#666", // Medium gray for secondary text hierarchy
-    textAlign: "center", // Center alignment for balanced appearance
-    // No additional margins needed due to centered parent container
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  modalContainer: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  sideMenu: {
+    width: "75%",
+    backgroundColor: "#FFFFFF",
+    height: "100%",
+  },
+  sideMenuHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    alignItems: "center",
+  },
+  menuProfileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 10,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: "#757575",
+  },
+  sideMenuContent: {
+    padding: 10,
+  },
+  sideMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  sideMenuItemText: {
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 15,
   },
 });

@@ -94,7 +94,7 @@ export default function LoginScreen() {
     }
 
     // SUCCESSFUL LOGIN: Navigate to main app
-    router.replace("/(app)/(tabs)");
+    router.replace("/(app)/(tabs)/home");
   };
 
   return (

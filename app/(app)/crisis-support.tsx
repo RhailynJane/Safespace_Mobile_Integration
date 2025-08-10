@@ -13,15 +13,15 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import { useAuth } from "../../context/AuthContext";
+import BottomNavigation from "../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
-export default function MessagesScreen() {
+export default function CrisisScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("messages");
+  const [activeTab, setActiveTab] = useState("crisis");
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -160,7 +160,7 @@ export default function MessagesScreen() {
         <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
           <Ionicons name="menu" size={28} color="#4CAF50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Messages</Text>
+        <Text style={styles.headerTitle}>Crisis Support</Text>
         <TouchableOpacity onPress={() => router.push("/notifications")}>
           <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
         </TouchableOpacity>
@@ -168,9 +168,9 @@ export default function MessagesScreen() {
 
       {/* Main Content */}
       <View style={styles.content}>
-        <Text style={styles.title}>Messages Coming Soon</Text>
+        <Text style={styles.title}>Crisis Support Coming Soon</Text>
         <Text style={styles.subtitle}>
-          We're working on building a supportive Messages space for you.
+          We're working on building a supportive Crisis Support space for you.
         </Text>
       </View>
 

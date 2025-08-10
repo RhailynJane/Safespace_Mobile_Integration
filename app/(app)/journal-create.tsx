@@ -1,6 +1,6 @@
 // File: app/(app)/journal-create.tsx
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,14 +12,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Typography } from '../../constants/theme';
-import BottomNavigation from '../../components/BottomNavigation';
+} from "react-native";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors, Spacing, Typography } from "../../constants/theme";
 
-type EmotionType = 'very-sad' | 'sad' | 'neutral' | 'happy' | 'very-happy';
-type CreateStep = 'create' | 'success';
+type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
+type CreateStep = "create" | "success";
 
 interface EmotionOption {
   id: EmotionType;
@@ -28,11 +27,11 @@ interface EmotionOption {
 }
 
 const emotionOptions: EmotionOption[] = [
-  { id: 'very-sad', emoji: '😢', label: 'Very Sad' },
-  { id: 'sad', emoji: '🙁', label: 'Sad' },
-  { id: 'neutral', emoji: '😐', label: 'Neutral' },
-  { id: 'happy', emoji: '🙂', label: 'Happy' },
-  { id: 'very-happy', emoji: '😄', label: 'Very Happy' },
+  { id: "very-sad", emoji: "😢", label: "Very Sad" },
+  { id: "sad", emoji: "🙁", label: "Sad" },
+  { id: "neutral", emoji: "😐", label: "Neutral" },
+  { id: "happy", emoji: "🙂", label: "Happy" },
+  { id: "very-happy", emoji: "😄", label: "Very Happy" },
 ];
 
 interface JournalData {
@@ -43,94 +42,103 @@ interface JournalData {
 }
 
 export default function JournalCreateScreen() {
-  const [currentStep, setCurrentStep] = useState<CreateStep>('create');
+  const [currentStep, setCurrentStep] = useState<CreateStep>("create");
   const [journalData, setJournalData] = useState<JournalData>({
-    title: '',
-    content: '',
+    title: "",
+    content: "",
     emotion: null,
-    emoji: '',
+    emoji: "",
   });
   const [loading, setLoading] = useState(false);
 
   const handleTitleChange = (text: string) => {
-    setJournalData(prev => ({ ...prev, title: text }));
+    setJournalData((prev) => ({ ...prev, title: text }));
   };
 
   const handleContentChange = (text: string) => {
-    setJournalData(prev => ({ ...prev, content: text }));
+    setJournalData((prev) => ({ ...prev, content: text }));
   };
 
   const handleEmotionSelect = (emotion: EmotionOption) => {
-    setJournalData(prev => ({ 
-      ...prev, 
-      emotion: emotion.id, 
-      emoji: emotion.emoji 
+    setJournalData((prev) => ({
+      ...prev,
+      emotion: emotion.id,
+      emoji: emotion.emoji,
     }));
   };
 
   const handleSave = async () => {
     if (!journalData.title.trim()) {
-      Alert.alert('Missing Title', 'Please enter a title for your journal entry.');
+      Alert.alert(
+        "Missing Title",
+        "Please enter a title for your journal entry."
+      );
       return;
     }
 
     if (!journalData.content.trim()) {
-      Alert.alert('Missing Content', 'Please write something in your journal.');
+      Alert.alert("Missing Content", "Please write something in your journal.");
       return;
     }
 
     if (!journalData.emotion) {
-      Alert.alert('Missing Emotion', 'Please select how you are feeling.');
+      Alert.alert("Missing Emotion", "Please select how you are feeling.");
       return;
     }
 
     setLoading(true);
 
     // Simulate saving delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
     // In a real app, you would save to backend/local storage here
-    console.log('Saving journal entry:', journalData);
+    console.log("Saving journal entry:", journalData);
 
     setLoading(false);
-    setCurrentStep('success');
+    setCurrentStep("success");
   };
 
   const handleCancel = () => {
     Alert.alert(
-      'Discard Entry?',
-      'Are you sure you want to discard this journal entry?',
+      "Discard Entry?",
+      "Are you sure you want to discard this journal entry?",
       [
-        { text: 'Keep Writing', style: 'cancel' },
-        { 
-          text: 'Discard', 
-          style: 'destructive',
-          onPress: () => router.back()
-        }
+        { text: "Keep Writing", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: () => router.back(),
+        },
       ]
     );
   };
 
   const handleClose = () => {
-    router.replace('/(app)/journal');
+    router.replace("/(app)/journal");
   };
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={() => currentStep === 'create' ? handleCancel() : handleClose()}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() =>
+          currentStep === "create" ? handleCancel() : handleClose()
+        }
       >
         <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
       </TouchableOpacity>
-      
+
       <Text style={styles.headerTitle}>Journal</Text>
-      
+
       <TouchableOpacity style={styles.notificationButton}>
-        <Ionicons name="notifications-outline" size={24} color={Colors.textPrimary} />
+        <Ionicons
+          name="notifications-outline"
+          size={24}
+          color={Colors.textPrimary}
+        />
         <View style={styles.notificationBadge} />
       </TouchableOpacity>
-      
+
       <TouchableOpacity style={styles.menuButton}>
         <Ionicons name="grid-outline" size={24} color={Colors.textPrimary} />
       </TouchableOpacity>
@@ -140,7 +148,9 @@ export default function JournalCreateScreen() {
   const renderCreateStep = () => (
     <View style={styles.createContainer}>
       <Text style={styles.pageTitle}>Add New Journal</Text>
-      <Text style={styles.pageSubtitle}>Express your thoughts and feelings</Text>
+      <Text style={styles.pageSubtitle}>
+        Express your thoughts and feelings
+      </Text>
 
       {/* Journal Title */}
       <View style={styles.fieldContainer}>
@@ -177,7 +187,8 @@ export default function JournalCreateScreen() {
               key={emotion.id}
               style={[
                 styles.emotionButton,
-                journalData.emotion === emotion.id && styles.emotionButtonSelected
+                journalData.emotion === emotion.id &&
+                  styles.emotionButtonSelected,
               ]}
               onPress={() => handleEmotionSelect(emotion)}
             >
@@ -199,16 +210,20 @@ export default function JournalCreateScreen() {
           <View style={styles.iconContainer}>
             <Ionicons name="book" size={32} color={Colors.warning} />
           </View>
-          
+
           <View style={styles.createTextContainer}>
             <Text style={styles.createTitle}>Create Journal</Text>
             <Text style={styles.createSubtitle}>
               Set up a journal based on your current mood & conditions
             </Text>
           </View>
-          
+
           <View style={styles.createButton}>
-            <Ionicons name="add-circle-outline" size={28} color={Colors.textSecondary} />
+            <Ionicons
+              name="add-circle-outline"
+              size={28}
+              color={Colors.textSecondary}
+            />
           </View>
         </View>
       </View>
@@ -219,7 +234,7 @@ export default function JournalCreateScreen() {
         <Text style={styles.successSubtitle}>
           Your journal entry has been saved successfully
         </Text>
-        
+
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <Text style={styles.closeButtonText}>Close</Text>
         </TouchableOpacity>
@@ -228,7 +243,7 @@ export default function JournalCreateScreen() {
       {/* Recent Journal Entries Preview */}
       <View style={styles.recentSection}>
         <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
-        
+
         <View style={styles.recentContainer}>
           <View style={styles.entryCard}>
             <View style={styles.entryHeader}>
@@ -242,7 +257,7 @@ export default function JournalCreateScreen() {
               {journalData.content}
             </Text>
           </View>
-          
+
           <TouchableOpacity style={styles.viewAllButton}>
             <Text style={styles.viewAllText}>View Journal Entries</Text>
           </TouchableOpacity>
@@ -252,24 +267,21 @@ export default function JournalCreateScreen() {
   );
 
   const renderActionButtons = () => {
-    if (currentStep === 'success') return null;
+    if (currentStep === "success") return null;
 
     return (
       <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={styles.cancelButton}
-          onPress={handleCancel}
-        >
+        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.saveButton, loading && styles.disabledButton]}
           onPress={handleSave}
           disabled={loading}
         >
           <Text style={styles.saveButtonText}>
-            {loading ? 'Saving...' : 'Save'}
+            {loading ? "Saving..." : "Save"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -278,21 +290,18 @@ export default function JournalCreateScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.container} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {renderHeader()}
-          
-          {currentStep === 'create' && renderCreateStep()}
-          {currentStep === 'success' && renderSuccessStep()}
-          
+
+          {currentStep === "create" && renderCreateStep()}
+          {currentStep === "success" && renderSuccessStep()}
+
           {renderActionButtons()}
         </ScrollView>
-        
-        {/* Bottom Navigation */}
-        <BottomNavigation activeTab="home" />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -308,12 +317,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
-    backgroundColor: Colors.primary + '30',
+    backgroundColor: Colors.primary + "30",
     marginHorizontal: -Spacing.xl,
     paddingHorizontal: Spacing.xl,
   },
@@ -322,16 +331,16 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: "center",
     ...Typography.title,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   notificationButton: {
     padding: Spacing.sm,
-    position: 'relative',
+    position: "relative",
   },
   notificationBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
     width: 8,
@@ -348,12 +357,12 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     ...Typography.title,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Spacing.md,
   },
   pageSubtitle: {
     ...Typography.caption,
-    textAlign: 'center',
+    textAlign: "center",
     color: Colors.textSecondary,
     marginBottom: Spacing.xxl,
   },
@@ -362,31 +371,31 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...Typography.subtitle,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: Spacing.md,
   },
   titleInput: {
-    backgroundColor: Colors.primary + '20',
+    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: "transparent",
   },
   contentInput: {
-    backgroundColor: Colors.primary + '20',
+    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
     height: 150,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: "transparent",
   },
   emotionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
   },
   emotionButton: {
@@ -394,9 +403,9 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -406,7 +415,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   emotionButtonSelected: {
-    backgroundColor: Colors.primary + '30',
+    backgroundColor: Colors.primary + "30",
     borderWidth: 2,
     borderColor: Colors.primary,
   },
@@ -414,8 +423,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingVertical: Spacing.xl,
     gap: Spacing.lg,
   },
@@ -424,7 +433,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.disabled,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButtonText: {
     ...Typography.button,
@@ -435,7 +444,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
-    alignItems: 'center',
+    alignItems: "center",
   },
   disabledButton: {
     opacity: 0.6,
@@ -453,7 +462,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     marginBottom: Spacing.xl,
     opacity: 0.6,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -463,16 +472,16 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   createCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   iconContainer: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: Colors.warning + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: Colors.warning + "20",
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: Spacing.lg,
   },
   createTextContainer: {
@@ -480,7 +489,7 @@ const styles = StyleSheet.create({
   },
   createTitle: {
     ...Typography.subtitle,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 4,
   },
   createSubtitle: {
@@ -491,12 +500,12 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   successMessage: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.xl,
     marginBottom: Spacing.xl,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -508,7 +517,7 @@ const styles = StyleSheet.create({
   },
   successSubtitle: {
     ...Typography.caption,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Spacing.lg,
     color: Colors.textSecondary,
   },
@@ -526,11 +535,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...Typography.subtitle,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: Spacing.lg,
   },
   recentContainer: {
-    backgroundColor: Colors.primary + '20',
+    backgroundColor: Colors.primary + "20",
     borderRadius: 16,
     padding: Spacing.xl,
   },
@@ -541,8 +550,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   entryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.md,
   },
   entryEmoji: {
@@ -554,7 +563,7 @@ const styles = StyleSheet.create({
   },
   entryTitle: {
     ...Typography.body,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 2,
   },
   entryDate: {
@@ -567,10 +576,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   viewAllButton: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   viewAllText: {
     ...Typography.link,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
 });
