@@ -1,5 +1,3 @@
-// File: app/(app)/journal-create.tsx
-
 import React, { useState } from "react";
 import {
   View,
@@ -16,6 +14,10 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, Typography } from "../../constants/theme";
+import { useAuth } from "../../context/AuthContext";
+import { JournalService, supabase } from "../../lib/supabase";
+import { AppHeader } from "../../components/AppHeader";
+import BottomNavigation from "../../components/BottomNavigation";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 type CreateStep = "create" | "success";
@@ -41,7 +43,17 @@ interface JournalData {
   emoji: string;
 }
 
+const tabs = [
+  { id: "home", name: "Home", icon: "home" },
+  { id: "community-forum", name: "Community", icon: "people" },
+  { id: "appointments", name: "Appointments", icon: "calendar" },
+  { id: "messages", name: "Messages", icon: "chatbubbles" },
+  { id: "profile", name: "Profile", icon: "person" },
+];
+
 export default function JournalCreateScreen() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
   const [journalData, setJournalData] = useState<JournalData>({
     title: "",
@@ -67,35 +79,50 @@ export default function JournalCreateScreen() {
     }));
   };
 
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
+
   const handleSave = async () => {
-    if (!journalData.title.trim()) {
-      Alert.alert(
-        "Missing Title",
-        "Please enter a title for your journal entry."
-      );
-      return;
-    }
-
-    if (!journalData.content.trim()) {
-      Alert.alert("Missing Content", "Please write something in your journal.");
-      return;
-    }
-
-    if (!journalData.emotion) {
-      Alert.alert("Missing Emotion", "Please select how you are feeling.");
+    if (
+      !journalData.title.trim() ||
+      !journalData.content.trim() ||
+      !journalData.emotion
+    ) {
+      Alert.alert("Missing Fields", "Please fill all fields before saving");
       return;
     }
 
     setLoading(true);
 
-    // Simulate saving delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const { data: clientData, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("firebase_uid", user!.uid)
+        .single();
 
-    // In a real app, you would save to backend/local storage here
-    console.log("Saving journal entry:", journalData);
+      if (clientError || !clientData)
+        throw clientError || new Error("Client not found");
 
-    setLoading(false);
-    setCurrentStep("success");
+      const entryId = await JournalService.createEntry(clientData.id, {
+        title: journalData.title,
+        content: journalData.content,
+        mood_type: journalData.emotion,
+      });
+
+      setCurrentStep("success");
+    } catch (error) {
+      console.error("Error saving journal entry:", error);
+      Alert.alert("Error", "Failed to save journal entry");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -114,36 +141,8 @@ export default function JournalCreateScreen() {
   };
 
   const handleClose = () => {
-    router.replace("/(app)/journal");
+    router.replace("/(app)/journaling");
   };
-
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() =>
-          currentStep === "create" ? handleCancel() : handleClose()
-        }
-      >
-        <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-      </TouchableOpacity>
-
-      <Text style={styles.headerTitle}>Journal</Text>
-
-      <TouchableOpacity style={styles.notificationButton}>
-        <Ionicons
-          name="notifications-outline"
-          size={24}
-          color={Colors.textPrimary}
-        />
-        <View style={styles.notificationBadge} />
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.menuButton}>
-        <Ionicons name="grid-outline" size={24} color={Colors.textPrimary} />
-      </TouchableOpacity>
-    </View>
-  );
 
   const renderCreateStep = () => (
     <View style={styles.createContainer}>
@@ -152,7 +151,6 @@ export default function JournalCreateScreen() {
         Express your thoughts and feelings
       </Text>
 
-      {/* Journal Title */}
       <View style={styles.fieldContainer}>
         <Text style={styles.fieldLabel}>Journal Title</Text>
         <TextInput
@@ -164,7 +162,6 @@ export default function JournalCreateScreen() {
         />
       </View>
 
-      {/* Write Entry */}
       <View style={styles.fieldContainer}>
         <Text style={styles.fieldLabel}>Write your Entry</Text>
         <TextInput
@@ -178,7 +175,6 @@ export default function JournalCreateScreen() {
         />
       </View>
 
-      {/* Select Emotion */}
       <View style={styles.fieldContainer}>
         <Text style={styles.fieldLabel}>Select your Emotion</Text>
         <View style={styles.emotionsContainer}>
@@ -204,7 +200,6 @@ export default function JournalCreateScreen() {
     <View style={styles.successContainer}>
       <Text style={styles.pageTitle}>Express your thoughts and feelings</Text>
 
-      {/* Create Journal Card (disabled) */}
       <View style={styles.createCardDisabled}>
         <View style={styles.createCardContent}>
           <View style={styles.iconContainer}>
@@ -228,7 +223,6 @@ export default function JournalCreateScreen() {
         </View>
       </View>
 
-      {/* Success Message */}
       <View style={styles.successMessage}>
         <Text style={styles.successTitle}>Entry Saved!</Text>
         <Text style={styles.successSubtitle}>
@@ -240,7 +234,6 @@ export default function JournalCreateScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Recent Journal Entries Preview */}
       <View style={styles.recentSection}>
         <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
 
@@ -294,14 +287,20 @@ export default function JournalCreateScreen() {
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {renderHeader()}
-
+        <AppHeader title="Journal" showBack={true} showMenu={true} />
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          style={{ marginBottom: 60 }}
+        >
           {currentStep === "create" && renderCreateStep()}
           {currentStep === "success" && renderSuccessStep()}
-
           {renderActionButtons()}
         </ScrollView>
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -315,41 +314,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: Spacing.xl,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    backgroundColor: Colors.primary + "30",
-    marginHorizontal: -Spacing.xl,
-    paddingHorizontal: Spacing.xl,
-  },
-  backButton: {
-    padding: Spacing.sm,
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: "center",
-    ...Typography.title,
-    fontWeight: "600",
-  },
-  notificationButton: {
-    padding: Spacing.sm,
-    position: "relative",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 8,
-    height: 8,
-    backgroundColor: Colors.secondary,
-    borderRadius: 4,
-  },
-  menuButton: {
-    padding: Spacing.sm,
+    paddingTop: Spacing.md,
   },
   createContainer: {
     flex: 1,
@@ -425,7 +390,6 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: Spacing.xl,
     gap: Spacing.lg,
   },
   cancelButton: {

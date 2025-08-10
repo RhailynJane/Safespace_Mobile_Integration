@@ -10,6 +10,7 @@ import {
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
 import { supabase } from "../lib/supabase";
+import { useRouter } from "expo-router";
 
 interface AuthUser {
   uid: string;
@@ -55,11 +56,11 @@ interface AuthResult {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const transformFirebaseUser = (firebaseUser: FirebaseUser): AuthUser => ({
     uid: firebaseUser.uid,
@@ -201,9 +202,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    await signOut(auth);
-    setUser(null);
-    setProfile(null);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      // Clear all user-related state
+      setUser(null);
+      setProfile(null);
+
+      // Redirect to login screen
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+      throw error; // Re-throw to allow handling in components
+    }
   };
 
   const sendVerificationEmail = async (): Promise<boolean> => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,18 +13,23 @@ import {
   Pressable,
   ActivityIndicator,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
+import { useFocusEffect } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
 type MoodEntry = {
   id: string;
-  mood: string;
+  mood_type: string;
   created_at: string;
+  mood_emoji?: string;
+  mood_label?: string;
 };
 
 type Resource = {
@@ -33,20 +38,11 @@ type Resource = {
   duration: string;
 };
 
-type CommunityPost = {
-  id: string;
-  user_name: string;
-  avatar_url: string;
-  content: string;
-  created_at: string;
-};
-
 export default function HomeScreen() {
   const { user, profile, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
-  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [activeTab, setActiveTab] = useState("home");
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
 
@@ -57,6 +53,15 @@ export default function HomeScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   const quickActions = [
     {
@@ -182,51 +187,160 @@ export default function HomeScreen() {
       icon: "log-out",
       title: "Sign Out",
       onPress: async () => {
-        setSideMenuVisible(false);
-        await logout();
+        try {
+          setSideMenuVisible(false);
+          await logout();
+        } catch (error) {
+          console.error("Sign out error:", error);
+        }
       },
     },
   ];
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const getEmojiForMood = (moodType: string) => {
+    switch (moodType) {
+      case "very-happy":
+        return "😄";
+      case "happy":
+        return "🙂";
+      case "neutral":
+        return "😐";
+      case "sad":
+        return "🙁";
+      case "very-sad":
+        return "😢";
+      default:
+        return "😐";
+    }
+  };
 
-  const fetchData = async () => {
+  const getLabelForMood = (moodType: string) => {
+    switch (moodType) {
+      case "very-happy":
+        return "Very Happy";
+      case "happy":
+        return "Happy";
+      case "neutral":
+        return "Neutral";
+      case "sad":
+        return "Sad";
+      case "very-sad":
+        return "Very Sad";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const fetchRecentMoods = async () => {
     try {
-      setLoading(true);
+      if (!user?.uid) return;
 
-      // Fetch user's recent moods
-      const { data: moodData } = await supabase
+      // First get client ID
+      const { data: clientData, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("firebase_uid", user.uid)
+        .single();
+
+      if (clientError || !clientData) return;
+
+      // Then fetch mood entries
+      const { data, error } = await supabase
         .from("mood_entries")
-        .select("id, mood, created_at")
-        .eq("user_id", user?.uid)
+        .select("*")
+        .eq("client_id", clientData.id)
         .order("created_at", { ascending: false })
         .limit(3);
 
-      // Fetch resources
-      const { data: resourceData } = await supabase
+      if (error) return;
+
+      const transformedEntries = (data || []).map((entry) => ({
+        ...entry,
+        mood_emoji: getEmojiForMood(entry.mood_type),
+        mood_label: getLabelForMood(entry.mood_type),
+      }));
+
+      setRecentMoods(transformedEntries);
+    } catch (error) {
+      console.log("Mood entries not available");
+      setRecentMoods([]);
+    }
+  };
+
+  const fetchResources = async () => {
+    try {
+      // Check if resources table exists
+      const { data: tableExists } = await supabase.rpc("table_exists", {
+        table_name: "resources",
+      });
+
+      if (!tableExists) {
+        setResources([]);
+        return;
+      }
+
+      const { data, error } = await supabase
         .from("resources")
         .select("id, title, duration")
         .order("created_at", { ascending: false })
         .limit(3);
 
-      // Fetch community posts
-      const { data: postData } = await supabase
-        .from("community_posts")
-        .select("id, user_name, avatar_url, content, created_at")
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      setRecentMoods(moodData || []);
-      setResources(resourceData || []);
-      setCommunityPosts(postData || []);
+      if (error) throw error;
+      setResources(data || []);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      setResources([]);
+    }
+  };
+
+  // Set up realtime subscription for mood updates
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // First get client ID for the filter
+    supabase
+      .from("clients")
+      .select("id")
+      .eq("firebase_uid", user.uid)
+      .single()
+      .then(({ data: clientData, error: clientError }) => {
+        if (clientError || !clientData) return;
+
+        const subscription = supabase
+          .channel("mood_entries")
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "mood_entries",
+              filter: `client_id=eq.${clientData.id}`,
+            },
+            () => {
+              fetchRecentMoods(); // Refresh when mood entries change
+            }
+          )
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(subscription);
+        };
+      });
+  }, [user?.uid]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchRecentMoods(), fetchResources()]);
     } finally {
       setLoading(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [user?.uid])
+  );
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -246,24 +360,9 @@ export default function HomeScreen() {
     }
   };
 
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return `${diffInSeconds} sec ago`;
-    if (diffInSeconds < 3600)
-      return `${Math.floor(diffInSeconds / 60)} min ago`;
-    if (diffInSeconds < 86400)
-      return `${Math.floor(diffInSeconds / 3600)} hr ago`;
-    return `${Math.floor(diffInSeconds / 86400)} days ago`;
-  };
-
   const getGreetingName = () => {
     if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) {
-      return user.displayName.split(" ")[0];
-    }
+    if (user?.displayName) return user.displayName.split(" ")[0];
     return "User";
   };
 
@@ -276,184 +375,178 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Hello, {getGreetingName()}</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Emergency Help Section */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.helpButton}
-            onPress={() => router.push("/crisis-support")}
-          >
-            <View style={styles.helpButtonContent}>
-              <Ionicons name="help-buoy" size={24} color="white" />
-              <Text style={styles.helpButtonText}>Get Help Now</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="white" />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+            <Ionicons name="menu" size={28} color="#4CAF50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Hello, {getGreetingName()}</Text>
+          <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
           </TouchableOpacity>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            {quickActions.map((action) => (
-              <TouchableOpacity
-                key={action.id}
-                style={[styles.actionCard, { backgroundColor: action.color }]}
-                onPress={action.onPress}
-              >
-                <Ionicons name={action.icon as any} size={24} color="#4CAF50" />
-                <Text style={styles.actionTitle}>{action.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Mood Tracking Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Moods</Text>
-          {recentMoods.length > 0 ? (
-            <View style={styles.recentMoods}>
-              {recentMoods.map((mood) => (
-                <View key={mood.id} style={styles.moodItem}>
-                  <Text style={styles.moodDate}>
-                    {formatDate(mood.created_at)}
-                  </Text>
-                  <Text style={styles.moodText}>{mood.mood}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={styles.noDataText}>No mood entries yet</Text>
-          )}
-        </View>
-
-        {/* Resources Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recommended Resources</Text>
-          {resources.length > 0 ? (
-            resources.map((resource) => (
-              <TouchableOpacity
-                key={resource.id}
-                style={styles.resourceCard}
-                onPress={() => router.push(`/resources/${resource.id}`)}
-              >
-                <View style={styles.resourceInfo}>
-                  <Text style={styles.resourceTitle}>{resource.title}</Text>
-                  <Text style={styles.resourceDuration}>
-                    {resource.duration}
-                  </Text>
-                </View>
-                <Ionicons name="play-circle" size={32} color="#4CAF50" />
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.noDataText}>No resources available</Text>
-          )}
-        </View>
-
-        {/* Community Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Community Updates</Text>
-          {communityPosts.length > 0 ? (
-            communityPosts.map((post) => (
-              <View key={post.id} style={styles.communityPost}>
-                <Image
-                  source={{
-                    uri: post.avatar_url || "https://via.placeholder.com/40",
-                  }}
-                  style={styles.avatar}
-                />
-                <View style={styles.postContent}>
-                  <Text style={styles.postName}>{post.user_name}</Text>
-                  <Text style={styles.postText}>{post.content}</Text>
-                  <Text style={styles.postTime}>
-                    {formatTimeAgo(post.created_at)}
-                  </Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noDataText}>No community posts yet</Text>
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={[
-              styles.navItem,
-              activeTab === tab.id && styles.navItemActive,
-            ]}
-            onPress={() => {
-              setActiveTab(tab.id);
-              if (tab.id !== "home") router.push(`/${tab.id}`);
-            }}
-          >
-            <Ionicons
-              name={tab.icon as any}
-              size={24}
-              color={activeTab === tab.id ? "#4CAF50" : "#757575"}
-            />
-            <Text
-              style={[
-                styles.navText,
-                activeTab === tab.id && styles.navTextActive,
-              ]}
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Emergency Help Section */}
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.helpButton}
+              onPress={() => router.push("/crisis-support")}
             >
-              {tab.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <View style={styles.helpButtonContent}>
+                <Ionicons name="help-buoy" size={24} color="white" />
+                <Text style={styles.helpButtonText}>Get Help Now</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
 
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getGreetingName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
+          {/* Quick Actions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.actionsGrid}>
+              {quickActions.map((action) => (
                 <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
+                  key={action.id}
+                  style={[styles.actionCard, { backgroundColor: action.color }]}
+                  onPress={action.onPress}
                 >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  <Ionicons
+                    name={action.icon as any}
+                    size={24}
+                    color="#4CAF50"
+                  />
+                  <Text style={styles.actionTitle}>{action.title}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
           </View>
+
+          {/* Mood Tracking Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Moods</Text>
+            {recentMoods.length > 0 ? (
+              <View style={styles.recentMoods}>
+                {recentMoods.map((mood) => (
+                  <View key={mood.id} style={styles.moodItem}>
+                    <Text style={styles.moodEmoji}>{mood.mood_emoji}</Text>
+                    <View style={styles.moodDetails}>
+                      <Text style={styles.moodDate}>
+                        {formatDate(mood.created_at)}
+                      </Text>
+                      <Text style={styles.moodText}>{mood.mood_label}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noDataText}>No mood entries yet</Text>
+            )}
+          </View>
+
+          {/* Resources Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recommended Resources</Text>
+            {resources.length > 0 ? (
+              resources.map((resource) => (
+                <TouchableOpacity
+                  key={resource.id}
+                  style={styles.resourceCard}
+                  onPress={() => router.push(`/resources/${resource.id}`)}
+                >
+                  <View style={styles.resourceInfo}>
+                    <Text style={styles.resourceTitle}>{resource.title}</Text>
+                    <Text style={styles.resourceDuration}>
+                      {resource.duration}
+                    </Text>
+                  </View>
+                  <Ionicons name="play-circle" size={32} color="#4CAF50" />
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No resources available</Text>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Bottom Navigation */}
+        <View style={styles.bottomNav}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[
+                styles.navItem,
+                activeTab === tab.id && styles.navItemActive,
+              ]}
+              onPress={() => {
+                setActiveTab(tab.id);
+                if (tab.id !== "home") router.push(`/${tab.id}`);
+              }}
+            >
+              <Ionicons
+                name={tab.icon as any}
+                size={24}
+                color={activeTab === tab.id ? "#4CAF50" : "#757575"}
+              />
+              <Text
+                style={[
+                  styles.navText,
+                  activeTab === tab.id && styles.navTextActive,
+                ]}
+              >
+                {tab.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      </Modal>
-    </SafeAreaView>
+
+        {/* Side Menu */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getGreetingName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -520,10 +613,17 @@ const styles = StyleSheet.create({
   },
   moodItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
+  },
+  moodEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  moodDetails: {
+    flex: 1,
   },
   moodDate: {
     fontSize: 14,
@@ -581,36 +681,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#757575",
   },
-  communityPost: {
-    flexDirection: "row",
-    backgroundColor: "#F5F5F5",
-    padding: 16,
-    borderRadius: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  postContent: {
-    flex: 1,
-  },
-  postName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  postText: {
-    fontSize: 14,
-    color: "#212121",
-    marginBottom: 4,
-  },
-  postTime: {
-    fontSize: 12,
-    color: "#757575",
-  },
   bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -659,12 +729,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
   },
   profileName: {
     fontSize: 18,

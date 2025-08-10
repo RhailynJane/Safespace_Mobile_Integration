@@ -1,81 +1,99 @@
-// Enable client-side rendering for Next.js compatibility
 "use client";
 
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Image,
+  ScrollView,
+  Alert,
 } from "react-native";
 import { useAuth } from "../../../context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import BottomNavigation from "../../../components/BottomNavigation";
 
-/**
- * ProfileScreen Component
- *
- * Displays user profile information and navigation menu.
- * Includes user avatar, name, email, and menu items for
- * profile management, settings, help, and sign out functionality.
- */
 export default function ProfileScreen() {
-  // Get user data and logout function from authentication context
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState("profile");
 
-  /**
-   * Handles user logout process
-   * Attempts to log out the user and handles any potential errors
-   */
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
     } catch (error) {
       console.error("Logout error:", error);
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
     }
   };
 
+  const getGreetingName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    return "User";
+  };
+
   return (
-    // SafeAreaView prevents content from overlapping with system UI
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Profile Information Section */}
         <View style={styles.profileSection}>
-          {/* User profile image with fallback placeholder */}
-          <Image
-            source={{ uri: user?.photoURL || "https://via.placeholder.com/80" }}
-            style={styles.profileImage}
-          />
-          {/* Display user's name with fallback */}
-          <Text style={styles.name}>{user?.displayName || "User"}</Text>
-          {/* Display user's email address */}
+          <View style={styles.profileInitials}>
+            <Text style={styles.initialsText}>
+              {(getGreetingName() ?? "U").charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.name}>{getGreetingName()}</Text>
           <Text style={styles.email}>{user?.email}</Text>
         </View>
 
         {/* Menu Items Section */}
         <View style={styles.menuSection}>
-          {/* Edit Profile Menu Item */}
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/profile/edit")}
+          >
             <Ionicons name="person-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Edit Profile</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
 
-          {/* Settings Menu Item */}
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/settings")}
+          >
             <Ionicons name="settings-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Settings</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
 
-          {/* Help & Support Menu Item */}
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/help")}
+          >
             <Ionicons name="help-circle-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Help & Support</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
 
-          {/* Sign Out Menu Item - styled differently with red color */}
           <TouchableOpacity
             style={[styles.menuItem, styles.logoutItem]}
             onPress={handleLogout}
@@ -84,89 +102,90 @@ export default function ProfileScreen() {
             <Text style={[styles.menuText, styles.logoutText]}>Sign Out</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
+
+      <BottomNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  // Main container - fills screen with light gray background
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
   },
-  // Content wrapper - adds horizontal padding and top spacing
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 80, // Space for bottom navigation
   },
-  // Profile card container - white background with shadow and centered content
   profileSection: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 15,
     padding: 30,
-    marginBottom: 20,
-    // iOS shadow properties
+    margin: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    // Android shadow property
     elevation: 3,
   },
-  // Circular profile image styling
-  profileImage: {
+  profileInitials: {
     width: 80,
     height: 80,
-    borderRadius: 40, // Makes image circular (half of width/height)
+    borderRadius: 40,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 15,
   },
-  // User name styling - large, bold text
+  initialsText: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
   name: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#333",
     marginBottom: 5,
   },
-  // Email text styling - smaller, lighter color
   email: {
     fontSize: 14,
     color: "#666",
   },
-  // Menu container - white background with shadow
   menuSection: {
     backgroundColor: "#FFFFFF",
     borderRadius: 15,
+    marginHorizontal: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  // Individual menu item styling - horizontal layout with border
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0", // Light gray separator line
+    borderBottomColor: "#F0F0F0",
   },
-  // Menu item text - takes up available space between icons
   menuText: {
-    flex: 1, // Expands to fill space between icons
+    flex: 1,
     fontSize: 16,
     color: "#333",
-    marginLeft: 15, // Space between left icon and text
+    marginLeft: 15,
   },
-  // Logout item specific styling - removes bottom border
   logoutItem: {
-    borderBottomWidth: 0, // No border on last item
+    borderBottomWidth: 0,
   },
-  // Logout text color - red to indicate destructive action
   logoutText: {
-    color: "#FF6B6B", // Red color for sign out text
+    color: "#FF6B6B",
   },
 });

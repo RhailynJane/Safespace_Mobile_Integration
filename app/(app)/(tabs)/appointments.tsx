@@ -25,7 +25,7 @@ export default function AppointmentsScreen() {
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
-    { id: "community", name: "Community", icon: "people" },
+    { id: "community-forum", name: "Community", icon: "people" },
     { id: "appointments", name: "Appointments", icon: "calendar" },
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
