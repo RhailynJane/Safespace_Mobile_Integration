@@ -47,7 +47,7 @@ export default function HomeScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
 
   const tabs = [
-    { id: "index", name: "Home", icon: "home" },
+    { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
     { id: "appointments", name: "Appointments", icon: "calendar" },
     { id: "messages", name: "Messages", icon: "chatbubbles" },

@@ -1,61 +1,54 @@
 // File: components/SafeSpaceLogo.tsx
-
 import React from "react";
-import { View, StyleSheet } from "react-native";
-import { Colors } from "../constants/theme";
+import { View, StyleSheet, Image, ImageSourcePropType } from "react-native";
 
-// Props interface for the SafeSpaceLogo component
 type SafeSpaceLogoProps = {
-  size?: number; // Optional size prop to control logo dimensions (default: 60)
+  size?: number; // Logo dimensions in pixels (default: 60)
+  width?: number; // Optional specific width (overrides size)
+  height?: number; // Optional specific height (overrides size)
+  tintColor?: string; // Optional color to tint the logo
+  style?: object; // Additional style overrides
 };
 
 /**
- * SafeSpaceLogo - Custom logo component for the SafeSpace app
- * Creates a heart-shaped logo using two rotated rounded squares
- * The logo is scalable and uses brand colors from the theme
+ * SafeSpaceLogo - Enhanced logo component with precise size control
+ * Displays the SafeSpace logo with flexible sizing options
  */
-const SafeSpaceLogo: React.FC<SafeSpaceLogoProps> = ({ size = 60 }) => {
-  // Dynamic styles based on the size prop
-  // Using StyleSheet.create inside component to access the size variable
+const SafeSpaceLogo: React.FC<SafeSpaceLogoProps> = ({
+  size = 300,
+  width,
+  height,
+  tintColor,
+  style,
+}) => {
+  const logoImage: ImageSourcePropType = require("../assets/images/safespace-logo.png");
+
+  // Calculate final dimensions
+  const finalWidth = width ?? size;
+  const finalHeight = height ?? size;
+
   const logoStyles = StyleSheet.create({
-    // Main container that defines the overall logo dimensions
     container: {
-      width: size,
-      height: size,
-      position: "relative", // Allows absolute positioning of child elements
+      width: finalWidth,
+      height: finalHeight,
+      alignItems: "center",
+      justifyContent: "center",
     },
-
-    // Left half of the heart shape
-    heartLeft: {
-      position: "absolute",
-      width: size / 2, // Half the container width
-      height: size / 2, // Half the container height
-      backgroundColor: Colors.primary, // Primary brand color
-      borderRadius: size / 4, // Rounded corners (quarter of width for nice curves)
-      top: 0,
-      left: 0,
-      transform: [{ rotate: "-45deg" }], // Rotate counter-clockwise to form left heart curve
-    },
-
-    // Right half of the heart shape
-    heartRight: {
-      position: "absolute",
-      width: size / 2,
-      height: size / 2,
-      backgroundColor: Colors.secondary, // Secondary brand color for contrast
-      borderRadius: size / 4,
-      top: 0,
-      right: 0,
-      transform: [{ rotate: "45deg" }], // Rotate clockwise to form right heart curve
+    image: {
+      width: "100%",
+      height: "100%",
+      resizeMode: "contain",
+      tintColor: tintColor,
     },
   });
 
   return (
-    <View style={logoStyles.container}>
-      {/* Left heart element */}
-      <View style={logoStyles.heartLeft} />
-      {/* Right heart element */}
-      <View style={logoStyles.heartRight} />
+    <View style={[logoStyles.container, style]}>
+      <Image
+        source={logoImage}
+        style={logoStyles.image}
+        accessibilityLabel="SafeSpace logo"
+      />
     </View>
   );
 };

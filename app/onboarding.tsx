@@ -28,7 +28,7 @@ const onboardingSteps = [
     description:
       "Our AI helps you understand and track your mental health journey.",
     image: require("../assets/images/onboarding-step1.png"), // Meditation illustration
-    bgColor: "#dcfce7", // Light green background
+    bgColor: "#b9e0d1",
     stepLabel: "Step One", // Shows step indicator at top
   },
   {
@@ -37,7 +37,7 @@ const onboardingSteps = [
     description:
       "Track your emotions and moods with smart insights and patterns.",
     image: require("../assets/images/onboarding-step2.png"), // Mood tracking illustration
-    bgColor: "#fed7aa", // Light orange background
+    bgColor: "#f7c193",
     stepLabel: "Step Two",
   },
   {
@@ -53,7 +53,7 @@ const onboardingSteps = [
     subtitle: "Makes You Happy",
     description: "Access curated resources designed to improve your wellbeing.",
     image: require("../assets/images/onboarding-step4.png"), // Resources illustration
-    bgColor: "#065f46", // Dark green background
+    bgColor: "#1f655a", // Dark green background
     stepLabel: "Step Four",
   },
   {
@@ -61,7 +61,7 @@ const onboardingSteps = [
     subtitle: "Community",
     description: "Connect with others who understand your journey.",
     image: require("../assets/images/onboarding-step5.png"), // Community illustration
-    bgColor: "#f9fafb", // Light background
+    bgColor: "#ffffff", // Light background
     stepLabel: "Step Five",
   },
 ];

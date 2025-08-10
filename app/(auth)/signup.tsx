@@ -101,8 +101,7 @@ export default function SignupScreen() {
           signupData.firstName,
           signupData.lastName,
           signupData.therapyType,
-          signupData.phoneNumber,
-          signupData.age
+          signupData.phoneNumber
         );
 
         if (firebaseResult?.error) {
@@ -181,7 +180,7 @@ export default function SignupScreen() {
               <TherapyTypeCard
                 type="adult"
                 title="For Adult"
-                subtitle="18 years or older"
+                subtitle="17 years or older"
                 emoji="👨‍💼"
                 isSelected={signupData.therapyType === "adult"}
                 onPress={() => handleTherapyTypeSelection("adult")}
@@ -189,7 +188,7 @@ export default function SignupScreen() {
               <TherapyTypeCard
                 type="minor"
                 title="For Minor"
-                subtitle="Under 18 years old"
+                subtitle="Under 16 years old"
                 emoji="👶"
                 isSelected={signupData.therapyType === "minor"}
                 onPress={() => handleTherapyTypeSelection("minor")}
@@ -241,8 +240,7 @@ export default function SignupScreen() {
       case "verification":
         return (
           <EmailVerificationStep
-            data={signupData}
-            onUpdate={updateSignupData}
+            email={signupData.email}
             onNext={nextStep}
             onBack={prevStep}
             stepNumber={getStepNumber()}
