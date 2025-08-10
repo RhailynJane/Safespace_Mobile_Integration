@@ -255,22 +255,23 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* 
-              SOCIAL LOGIN SECTION
-              Alternative authentication methods via social platforms
-              Currently displays UI buttons (functionality would be implemented separately)
-            */}
-            <View style={styles.socialContainer}>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={24} color="#DB4437" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-instagram" size={24} color="#E4405F" />
-              </TouchableOpacity>
-            </View>
+            {/*
+  SOCIAL LOGIN SECTION
+  Alternative authentication methods via social platforms
+  Currently displays UI buttons (functionality would be implemented separately)
+  
+<View style={styles.socialContainer}>
+  <TouchableOpacity style={styles.socialButton}>
+    <Ionicons name="logo-facebook" size={24} color="#1877F2" />
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.socialButton}>
+    <Ionicons name="logo-google" size={24} color="#DB4437" />
+  </TouchableOpacity>
+  <TouchableOpacity style={styles.socialButton}>
+    <Ionicons name="logo-instagram" size={24} color="#E4405F" />
+  </TouchableOpacity>
+</View>
+*/}
 
             {/* 
               FOOTER NAVIGATION LINKS

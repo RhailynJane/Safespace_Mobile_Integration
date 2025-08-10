@@ -18,33 +18,53 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Mood tracking table functions
 export const MoodService = {
-  async logMood(userId: string, moodData: any) {
-    const { data, error } = await supabase
-      .from("mood_entries")
-      .insert([{ user_id: userId, ...moodData }])
-      .select();
+  async logMood(
+    clientId: string,
+    moodData: {
+      type: "very-happy" | "happy" | "neutral" | "sad" | "very-sad";
+      intensity: number;
+      factors: string[];
+      notes?: string;
+    }
+  ) {
+    const { data, error } = await supabase.rpc("log_mood_with_factors", {
+      p_client_id: clientId,
+      p_mood_type: moodData.type,
+      p_intensity: moodData.intensity,
+      p_notes: moodData.notes || null,
+      p_factors: moodData.factors,
+    });
 
     if (error) throw error;
-    return data?.[0];
+    return data;
   },
 
   async getMoodHistory(
-    userId: string,
+    clientId: string,
     range: "week" | "month" | "all" = "all"
   ) {
     let query = supabase
       .from("mood_entries")
-      .select("*")
-      .eq("user_id", userId)
+      .select(
+        `
+        id,
+        mood_type,
+        intensity,
+        notes,
+        created_at,
+        factors: mood_factors(factor)
+      `
+      )
+      .eq("client_id", clientId)
       .order("created_at", { ascending: false });
 
     if (range === "week") {
-      query = query.gte(
+      query = query.gt(
         "created_at",
         new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
       );
     } else if (range === "month") {
-      query = query.gte(
+      query = query.gt(
         "created_at",
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
       );
@@ -52,6 +72,30 @@ export const MoodService = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+
+    return data.map((entry) => ({
+      id: entry.id,
+      mood: entry.mood_type,
+      emoji: this.getMoodEmoji(entry.mood_type),
+      intensity: entry.intensity,
+      notes: entry.notes,
+      date: entry.created_at,
+      formattedDate: new Date(entry.created_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      factors: entry.factors.map((f) => f.factor),
+    }));
+  },
+
+  getMoodEmoji(type: string): string {
+    const emojiMap: Record<string, string> = {
+      "very-happy": "😄",
+      happy: "🙂",
+      neutral: "😐",
+      sad: "🙁",
+      "very-sad": "😢",
+    };
+    return emojiMap[type] || "🙂";
   },
 };

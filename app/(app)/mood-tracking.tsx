@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, Typography } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
+import BottomNavigation from "../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -38,6 +39,24 @@ const MoodTrackingScreen = () => {
   const [recentEntries, setRecentEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeEmoji, setActiveEmoji] = useState<MoodType | null>(null);
+  const [activeTab, setActiveTab] = useState("mood");
+
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
 
   // Initialize animated values
   const moodOptions = useRef<MoodOption[]>([
@@ -202,19 +221,80 @@ const MoodTrackingScreen = () => {
   const loadRecentEntries = async () => {
     setLoading(true);
     try {
+      // First get the client_id for the current user
+      const { data: clientData, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("firebase_uid", user!.uid)
+        .single();
+
+      if (clientError || !clientData) {
+        throw clientError || new Error("Client record not found");
+      }
+
+      // Then get mood entries for this client_id
       const { data, error } = await supabase
         .from("mood_entries")
-        .select("*")
-        .eq("user_id", user!.uid)
+        .select(
+          `
+        *,
+        mood_factors: mood_factors(factor)
+      `
+        )
+        .eq("client_id", clientData.id)
         .order("created_at", { ascending: false })
         .limit(3);
 
       if (error) throw error;
-      setRecentEntries(data || []);
+
+      // Transform data to include emoji and label
+      const transformedEntries = (data || []).map((entry) => ({
+        ...entry,
+        mood_emoji: getEmojiForMood(entry.mood_type),
+        mood_label: getLabelForMood(entry.mood_type),
+      }));
+
+      setRecentEntries(transformedEntries);
     } catch (error) {
       console.error("Failed to load mood history:", error);
+      setRecentEntries([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper functions
+  const getEmojiForMood = (moodType: string) => {
+    switch (moodType) {
+      case "very-happy":
+        return "😄";
+      case "happy":
+        return "🙂";
+      case "neutral":
+        return "😐";
+      case "sad":
+        return "🙁";
+      case "very-sad":
+        return "😢";
+      default:
+        return "😐";
+    }
+  };
+
+  const getLabelForMood = (moodType: string) => {
+    switch (moodType) {
+      case "very-happy":
+        return "Very Happy";
+      case "happy":
+        return "Happy";
+      case "neutral":
+        return "Neutral";
+      case "sad":
+        return "Sad";
+      case "very-sad":
+        return "Very Sad";
+      default:
+        return "Unknown";
     }
   };
 
@@ -362,6 +442,15 @@ const MoodTrackingScreen = () => {
             </View>
           )}
         </View>
+
+        {/* View Mood History Link */}
+        <TouchableOpacity
+          style={styles.historyLink}
+          onPress={() => router.push("/(app)/mood-history")}
+        >
+          <Text style={styles.historyLinkText}>View Mood History</Text>
+          <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Side Menu */}
@@ -405,6 +494,12 @@ const MoodTrackingScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <BottomNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+      />
     </SafeAreaView>
   );
 };
@@ -576,6 +671,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  historyLink: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+  },
+  historyLinkText: {
+    ...Typography.body,
+    fontWeight: "500",
+    color: Colors.primary,
   },
 });
 

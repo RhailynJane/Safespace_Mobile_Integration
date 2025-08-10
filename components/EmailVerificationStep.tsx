@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,220 +8,218 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { sendEmailVerification, reload } from "firebase/auth";
-import type { SignupData } from "../app/(auth)/signup";
 
-// Props interface for the EmailVerificationStep component
 interface EmailVerificationStepProps {
-  data: SignupData; // Current form data containing user's email address
-  onUpdate: (data: Partial<SignupData>) => void; // Callback to update form data (not used in this step)
-  onNext: () => void; // Callback to proceed to next step after verification
-  onBack: () => void; // Callback to go back to previous step
-  stepNumber: number; // Current step number for progress indication
+  email: string;
+  onNext: () => void;
+  onBack?: () => void;
+  stepNumber: number;
 }
 
-/**
- * EmailVerificationStep - Third step of the signup process
- * Handles email verification by allowing users to check verification status
- * and resend verification emails if needed
- */
 export default function EmailVerificationStep({
-  data,
-  onUpdate,
+  email,
   onNext,
   onBack,
   stepNumber,
 }: EmailVerificationStepProps) {
-  // Get current authenticated user from auth context
-  const { user } = useAuth();
-
-  // State for general loading operations
+  const { sendVerificationEmail, checkEmailVerification } = useAuth();
   const [loading, setLoading] = useState(false);
-  // State specifically for checking email verification status
   const [checking, setChecking] = useState(false);
-  // State for displaying error messages to user
   const [error, setError] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
 
-  /**
-   * Handles resending verification email to the user
-   * Shows success/error alerts based on the result
-   */
+  // Handle cooldown timer for resend button
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
   const handleResend = async () => {
-    if (user) {
-      try {
-        // Send new verification email via Firebase
-        await sendEmailVerification(user);
+    if (cooldown > 0) return;
+
+    try {
+      setLoading(true);
+      const success = await sendVerificationEmail();
+      if (success) {
+        setCooldown(30); // 30-second cooldown
         Alert.alert(
           "Verification Email Sent",
-          `Check your inbox at ${data.email}`
+          `A new verification link has been sent to ${email}`
         );
-      } catch (err) {
-        // Show error alert if resend fails
-        Alert.alert("Error", "Failed to resend verification email.");
+      } else {
+        setError("Failed to resend verification email");
       }
+    } catch (err) {
+      setError("Failed to resend verification email");
+      console.error("Resend error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  /**
-   * Checks if the user's email has been verified
-   * Reloads user data from Firebase and checks verification status
-   */
-  const checkEmailVerified = async () => {
-    if (!user) return;
-
-    setChecking(true); // Show loading indicator
-    setError(""); // Clear any previous errors
-
+  const checkVerificationStatus = async () => {
     try {
-      // Reload user data from Firebase to get latest verification status
-      await reload(user);
+      setChecking(true);
+      setError("");
+      const verified = await checkEmailVerification();
 
-      if (user.emailVerified) {
-        onNext(); // Email verified - proceed to next step
+      if (verified) {
+        setIsVerified(true);
+        onNext(); // Proceed to next step
       } else {
-        // Email not verified yet - show helpful message
-        setError(
-          "Email not verified yet. Please click the link in your inbox."
-        );
+        setError("Email not verified yet. Please check your inbox.");
       }
     } catch (err) {
-      // Handle errors during verification check
-      setError("Failed to check verification status. Try again.");
+      setError("Failed to check verification status");
+      console.error("Verification check error:", err);
     } finally {
-      setChecking(false); // Hide loading indicator
+      setChecking(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Step header */}
       <Text style={styles.title}>Verify Your Email</Text>
       <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
 
-      {/* Instructions with user's email address highlighted */}
       <Text style={styles.description}>
         We've sent a verification link to{" "}
-        <Text style={styles.email}>{data.email}</Text>. Please check your inbox
-        and click the link to verify your account.
+        <Text style={styles.email}>{email}</Text>. Please:
       </Text>
 
-      {/* Primary verification check button */}
+      <View style={styles.instructions}>
+        <Text style={styles.instruction}>1. Check your inbox</Text>
+        <Text style={styles.instruction}>2. Click the verification link</Text>
+        <Text style={styles.instruction}>3. Return to this app</Text>
+      </View>
+
       <TouchableOpacity
-        style={[styles.verifyButton, checking && styles.disabledButton]}
-        onPress={checkEmailVerified}
-        disabled={checking} // Disable during verification check
+        style={[
+          styles.button,
+          (checking || isVerified) && styles.disabledButton,
+        ]}
+        onPress={checkVerificationStatus}
+        disabled={checking || isVerified}
       >
         {checking ? (
-          // Show loading spinner while checking verification status
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.verifyButtonText}>I've Verified My Email</Text>
+          <Text style={styles.buttonText}>
+            {isVerified ? "Verified! Continue" : "I've Verified My Email"}
+          </Text>
         )}
       </TouchableOpacity>
 
-      {/* Display error message if verification check fails */}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {/* Resend email option */}
       <View style={styles.resendContainer}>
-        <Text style={styles.resendText}>Didn't receive the email? </Text>
-        <TouchableOpacity onPress={handleResend}>
-          <Text style={styles.resendLink}>Resend</Text>
+        <TouchableOpacity
+          onPress={handleResend}
+          disabled={loading || cooldown > 0}
+        >
+          <Text
+            style={[
+              styles.resendLink,
+              (loading || cooldown > 0) && styles.disabledLink,
+            ]}
+          >
+            {loading
+              ? "Sending..."
+              : cooldown > 0
+              ? `Resend in ${cooldown}s`
+              : "Resend Email"}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {onBack && (
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Main container - centers content and provides padding
   container: {
     flex: 1,
-    paddingHorizontal: 24, // Side padding for mobile screens
-    alignItems: "center",
-    justifyContent: "center", // Center content vertically
+    padding: 24,
+    justifyContent: "center",
   },
-
-  // Main step title styling
   title: {
     fontSize: 24,
     fontWeight: "600",
-    color: "#333",
-    textAlign: "center",
     marginBottom: 8,
+    textAlign: "center",
   },
-
-  // Step progress indicator
   subtitle: {
     fontSize: 16,
-    color: "#666", // Medium gray for secondary text
+    color: "#666",
+    marginBottom: 32,
     textAlign: "center",
-    marginBottom: 32, // Large margin before description
   },
-
-  // Instructional text explaining the verification process
   description: {
     fontSize: 16,
     color: "#666",
+    marginBottom: 16,
     textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 22, // Better readability for multi-line text
   },
-
-  // Highlighted email address within description
   email: {
-    fontWeight: "600", // Bold to emphasize the email address
-    color: "#333", // Darker color for emphasis
+    fontWeight: "600",
+    color: "#333",
   },
-
-  // Primary verification button styling
-  verifyButton: {
-    backgroundColor: "#7FDBDA", // Teal brand color
-    borderRadius: 25, // Highly rounded corners
-    paddingVertical: 16,
-    paddingHorizontal: 32, // Horizontal padding for button width
+  instructions: {
+    marginBottom: 32,
+    paddingHorizontal: 20,
+  },
+  instruction: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 8,
+  },
+  button: {
+    backgroundColor: "#7FDBDA",
+    padding: 16,
+    borderRadius: 8,
     alignItems: "center",
     marginBottom: 16,
   },
-
-  // Verification button text styling
-  verifyButtonText: {
-    color: "#FFFFFF", // White text on teal background
-    fontSize: 16,
-    fontWeight: "600", // Semi-bold for emphasis
-  },
-
-  // Styling for disabled button state during checking
   disabledButton: {
-    opacity: 0.6, // Reduced opacity to indicate disabled state
+    opacity: 0.6,
   },
-
-  // Container for resend email option
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
   resendContainer: {
-    flexDirection: "row", // Horizontal layout for text and link
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 12,
+    marginTop: 16,
   },
-
-  // Regular text before resend link
-  resendText: {
-    fontSize: 14,
-    color: "#666", // Medium gray
-  },
-
-  // Resend link styling
   resendLink: {
-    fontSize: 14,
-    color: "#FF6B6B", // Red/coral color to indicate clickable link
-    fontWeight: "600", // Bold to distinguish from regular text
+    color: "#FF6B6B",
+    fontWeight: "600",
+    textAlign: "center",
   },
-
-  // Error message text styling
+  disabledLink: {
+    opacity: 0.6,
+    color: "#999",
+  },
   errorText: {
-    color: "#FF6B6B", // Red color for error messages
-    fontSize: 14,
-    marginTop: 12,
-    textAlign: "center", // Center error messages
+    color: "#FF6B6B",
+    marginTop: 8,
+    textAlign: "center",
+  },
+  backButton: {
+    marginTop: 24,
+    padding: 12,
+  },
+  backButtonText: {
+    color: "#666",
+    textAlign: "center",
+    fontWeight: "500",
   },
 });
