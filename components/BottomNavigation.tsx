@@ -1,103 +1,76 @@
-import type React from "react";
 import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
-type NavItem = "home" | "appointments" | "messages" | "profile";
-
-interface BottomNavigationProps {
-  activeTab?: NavItem;
+interface Tab {
+  id: string;
+  name: string;
+  icon: string;
 }
 
-const BottomNavigation: React.FC<BottomNavigationProps> = ({
-  activeTab = "home",
-}) => {
-  const handleNavPress = (tab: NavItem) => {
-    switch (tab) {
-      case "home":
-        router.push("/(app)");
-        break;
-      case "appointments":
-        console.log("Appointments pressed");
-        break;
-      case "messages":
-        console.log("Messages pressed");
-        break;
-      case "profile":
-        console.log("Profile pressed");
-        break;
-    }
-  };
+interface BottomNavigationProps {
+  tabs: Tab[];
+  activeTab: string;
+  onTabPress: (tabId: string) => void;
+}
 
-  const renderNavItem = (tab: NavItem, iconName: string, label: string) => {
-    const isActive = activeTab === tab;
-
-    return (
-      <TouchableOpacity
-        key={tab}
-        style={styles.navItem}
-        onPress={() => handleNavPress(tab)}
-      >
-        <View
-          style={[styles.iconContainer, isActive && styles.activeIconContainer]}
-        >
-          <Ionicons
-            name={iconName as any}
-            size={24}
-            color={isActive ? "#7FDBDA" : "#666"}
-          />
-        </View>
-        <Text style={[styles.navLabel, isActive && styles.activeNavLabel]}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
+export default function BottomNavigation({
+  tabs,
+  activeTab,
+  onTabPress,
+}: BottomNavigationProps) {
   return (
     <View style={styles.container}>
-      <View style={styles.navBar}>
-        {renderNavItem("home", "home", "Home")}
-        {renderNavItem("appointments", "calendar", "Book Appointments")}
-        {renderNavItem("messages", "chatbubble", "Messages")}
-        {renderNavItem("profile", "person", "Profile")}
-      </View>
+      {tabs.map((tab) => (
+        <TouchableOpacity
+          key={tab.id}
+          style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+          onPress={() => onTabPress(tab.id)}
+        >
+          <Ionicons
+            name={tab.icon as any}
+            size={24}
+            color={activeTab === tab.id ? "#4CAF50" : "#757575"}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === tab.id && styles.activeTabText,
+            ]}
+          >
+            {tab.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: "#E0E0E0",
+    backgroundColor: "#FFFFFF",
   },
-  navBar: {
-    flexDirection: "row",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  navItem: {
-    flex: 1,
+  tab: {
     alignItems: "center",
-    justifyContent: "center",
+    padding: 8,
   },
-  iconContainer: {
-    marginBottom: 4,
+  activeTab: {
+    borderTopWidth: 2,
+    borderTopColor: "#4CAF50",
   },
-  activeIconContainer: {
-    // Could add background or other active styling here
+  tabText: {
+    fontSize: 12,
+    color: "#757575",
+    marginTop: 4,
   },
-  navLabel: {
-    fontSize: 11,
-    color: "#666",
-    textAlign: "center",
-  },
-  activeNavLabel: {
-    color: "#7FDBDA",
-    fontWeight: "600",
+  activeTabText: {
+    color: "#4CAF50",
+    fontWeight: "500",
   },
 });
-
-export default BottomNavigation;

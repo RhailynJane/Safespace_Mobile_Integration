@@ -1,53 +1,94 @@
 "use client";
 
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Image,
+  ScrollView,
+  Alert,
 } from "react-native";
 import { useAuth } from "../../../context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import BottomNavigation from "../../../components/BottomNavigation";
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState("profile");
+
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
 
   const handleLogout = async () => {
     try {
       await logout();
     } catch (error) {
       console.error("Logout error:", error);
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
     }
+  };
+
+  const getGreetingName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    return "User";
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Profile Information Section */}
         <View style={styles.profileSection}>
-          <Image
-            source={{ uri: user?.photoURL || "https://via.placeholder.com/80" }}
-            style={styles.profileImage}
-          />
-          <Text style={styles.name}>{user?.displayName || "User"}</Text>
+          <View style={styles.profileInitials}>
+            <Text style={styles.initialsText}>
+              {(getGreetingName() ?? "U").charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.name}>{getGreetingName()}</Text>
           <Text style={styles.email}>{user?.email}</Text>
         </View>
 
+        {/* Menu Items Section */}
         <View style={styles.menuSection}>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/profile/edit")}
+          >
             <Ionicons name="person-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Edit Profile</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/settings")}
+          >
             <Ionicons name="settings-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Settings</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push("/help")}
+          >
             <Ionicons name="help-circle-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Help & Support</Text>
             <Ionicons name="chevron-forward" size={20} color="#666" />
@@ -61,7 +102,13 @@ export default function ProfileScreen() {
             <Text style={[styles.menuText, styles.logoutText]}>Sign Out</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
+
+      <BottomNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+      />
     </SafeAreaView>
   );
 }
@@ -71,28 +118,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 80, // Space for bottom navigation
   },
   profileSection: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 15,
     padding: 30,
-    marginBottom: 20,
+    margin: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  profileImage: {
+  profileInitials: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 15,
+  },
+  initialsText: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFFFFF",
   },
   name: {
     fontSize: 20,
@@ -107,6 +161,7 @@ const styles = StyleSheet.create({
   menuSection: {
     backgroundColor: "#FFFFFF",
     borderRadius: 15,
+    marginHorizontal: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

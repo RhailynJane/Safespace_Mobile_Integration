@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,60 +8,73 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { sendEmailVerification, reload } from "firebase/auth";
-import type { SignupData } from "../app/(auth)/signup";
 
 interface EmailVerificationStepProps {
-  data: SignupData;
-  onUpdate: (data: Partial<SignupData>) => void;
+  email: string;
   onNext: () => void;
-  onBack: () => void;
+  onBack?: () => void;
   stepNumber: number;
 }
 
 export default function EmailVerificationStep({
-  data,
-  onUpdate,
+  email,
   onNext,
   onBack,
   stepNumber,
 }: EmailVerificationStepProps) {
-  const { user } = useAuth();
+  const { sendVerificationEmail, checkEmailVerification } = useAuth();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
+
+  // Handle cooldown timer for resend button
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
 
   const handleResend = async () => {
-    if (user) {
-      try {
-        await sendEmailVerification(user);
+    if (cooldown > 0) return;
+
+    try {
+      setLoading(true);
+      const success = await sendVerificationEmail();
+      if (success) {
+        setCooldown(30); // 30-second cooldown
         Alert.alert(
           "Verification Email Sent",
-          `Check your inbox at ${data.email}`
+          `A new verification link has been sent to ${email}`
         );
-      } catch (err) {
-        Alert.alert("Error", "Failed to resend verification email.");
+      } else {
+        setError("Failed to resend verification email");
       }
+    } catch (err) {
+      setError("Failed to resend verification email");
+      console.error("Resend error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const checkEmailVerified = async () => {
-    if (!user) return;
-
-    setChecking(true);
-    setError("");
-
+  const checkVerificationStatus = async () => {
     try {
-      await reload(user);
-      if (user.emailVerified) {
-        onNext(); // Move to next step
+      setChecking(true);
+      setError("");
+      const verified = await checkEmailVerification();
+
+      if (verified) {
+        setIsVerified(true);
+        onNext(); // Proceed to next step
       } else {
-        setError(
-          "Email not verified yet. Please click the link in your inbox."
-        );
+        setError("Email not verified yet. Please check your inbox.");
       }
     } catch (err) {
-      setError("Failed to check verification status. Try again.");
+      setError("Failed to check verification status");
+      console.error("Verification check error:", err);
     } finally {
       setChecking(false);
     }
@@ -76,30 +87,59 @@ export default function EmailVerificationStep({
 
       <Text style={styles.description}>
         We've sent a verification link to{" "}
-        <Text style={styles.email}>{data.email}</Text>. Please check your inbox
-        and click the link to verify your account.
+        <Text style={styles.email}>{email}</Text>. Please:
       </Text>
 
+      <View style={styles.instructions}>
+        <Text style={styles.instruction}>1. Check your inbox</Text>
+        <Text style={styles.instruction}>2. Click the verification link</Text>
+        <Text style={styles.instruction}>3. Return to this app</Text>
+      </View>
+
       <TouchableOpacity
-        style={[styles.verifyButton, checking && styles.disabledButton]}
-        onPress={checkEmailVerified}
-        disabled={checking}
+        style={[
+          styles.button,
+          (checking || isVerified) && styles.disabledButton,
+        ]}
+        onPress={checkVerificationStatus}
+        disabled={checking || isVerified}
       >
         {checking ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.verifyButtonText}>I've Verified My Email</Text>
+          <Text style={styles.buttonText}>
+            {isVerified ? "Verified! Continue" : "I've Verified My Email"}
+          </Text>
         )}
       </TouchableOpacity>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <View style={styles.resendContainer}>
-        <Text style={styles.resendText}>Didn't receive the email? </Text>
-        <TouchableOpacity onPress={handleResend}>
-          <Text style={styles.resendLink}>Resend</Text>
+        <TouchableOpacity
+          onPress={handleResend}
+          disabled={loading || cooldown > 0}
+        >
+          <Text
+            style={[
+              styles.resendLink,
+              (loading || cooldown > 0) && styles.disabledLink,
+            ]}
+          >
+            {loading
+              ? "Sending..."
+              : cooldown > 0
+              ? `Resend in ${cooldown}s`
+              : "Resend Email"}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {onBack && (
+        <TouchableOpacity style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -107,69 +147,79 @@ export default function EmailVerificationStep({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 24,
-    alignItems: "center",
+    padding: 24,
     justifyContent: "center",
   },
   title: {
     fontSize: 24,
     fontWeight: "600",
-    color: "#333",
-    textAlign: "center",
     marginBottom: 8,
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
     color: "#666",
-    textAlign: "center",
     marginBottom: 32,
+    textAlign: "center",
   },
   description: {
     fontSize: 16,
     color: "#666",
+    marginBottom: 16,
     textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 22,
   },
   email: {
     fontWeight: "600",
     color: "#333",
   },
-  verifyButton: {
+  instructions: {
+    marginBottom: 32,
+    paddingHorizontal: 20,
+  },
+  instruction: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 8,
+  },
+  button: {
     backgroundColor: "#7FDBDA",
-    borderRadius: 25,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    padding: 16,
+    borderRadius: 8,
     alignItems: "center",
     marginBottom: 16,
-  },
-  verifyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
   },
   disabledButton: {
     opacity: 0.6,
   },
-  resendContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 12,
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
   },
-  resendText: {
-    fontSize: 14,
-    color: "#666",
+  resendContainer: {
+    marginTop: 16,
   },
   resendLink: {
-    fontSize: 14,
     color: "#FF6B6B",
     fontWeight: "600",
+    textAlign: "center",
+  },
+  disabledLink: {
+    opacity: 0.6,
+    color: "#999",
   },
   errorText: {
     color: "#FF6B6B",
-    fontSize: 14,
-    marginTop: 12,
+    marginTop: 8,
     textAlign: "center",
+  },
+  backButton: {
+    marginTop: 24,
+    padding: 12,
+  },
+  backButtonText: {
+    color: "#666",
+    textAlign: "center",
+    fontWeight: "500",
   },
 });

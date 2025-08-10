@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import {
   View,
@@ -21,6 +19,8 @@ import PasswordStep from "../../components/PasswordStep";
 import EmailVerificationStep from "../../components/EmailVerificationStep";
 import SuccessStep from "../../components/SuccessStep";
 import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../../lib/supabase";
+import { getAuth } from "firebase/auth";
 
 export type SignupStep =
   | "therapyType"
@@ -28,7 +28,6 @@ export type SignupStep =
   | "password"
   | "verification"
   | "success";
-export type TherapyType = "adult" | "minor" | "guardian";
 
 export interface SignupData {
   firstName: string;
@@ -38,7 +37,7 @@ export interface SignupData {
   phoneNumber: string;
   password: string;
   verificationCode: string;
-  therapyType: TherapyType | null;
+  therapyType: "adult" | "minor" | "guardian" | null;
 }
 
 export default function SignupScreen() {
@@ -55,15 +54,13 @@ export default function SignupScreen() {
     verificationCode: "",
     therapyType: null,
   });
-
-  // New state to hold error messages to show in UI
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const updateSignupData = (data: Partial<SignupData>) => {
     setSignupData((prev) => ({ ...prev, ...data }));
   };
 
-  const handleTherapyTypeSelection = (type: TherapyType) => {
+  const handleTherapyTypeSelection = (type: "adult" | "minor" | "guardian") => {
     updateSignupData({ therapyType: type });
     setCurrentStep("personal");
   };
@@ -78,42 +75,60 @@ export default function SignupScreen() {
     ];
     const currentIndex = steps.indexOf(currentStep);
 
-    // Clear previous errors when moving forward
     setErrorMessage(null);
 
     if (currentStep === "password") {
+      // Validate required fields
+      if (!signupData.therapyType) {
+        setErrorMessage("Please select a therapy type");
+        return;
+      }
+      if (!signupData.firstName || !signupData.lastName) {
+        setErrorMessage("Please provide your full name");
+        return;
+      }
+      if (!signupData.email || !signupData.password) {
+        setErrorMessage("Email and password are required");
+        return;
+      }
+
       setLoading(true);
+
       try {
-        const result = await signUp(
+        const firebaseResult = await signUp(
           signupData.email,
           signupData.password,
           signupData.firstName,
-          signupData.lastName
+          signupData.lastName,
+          signupData.therapyType,
+          signupData.phoneNumber
         );
 
-        if (result?.error) {
-          // Show error message in UI instead of alert
-          setErrorMessage(result.error);
+        if (firebaseResult?.error) {
+          setErrorMessage(firebaseResult.error);
           setLoading(false);
           return;
         }
 
-        // User created successfully, move to verification step
         setCurrentStep("verification");
       } catch (error) {
-        setErrorMessage("Failed to create account. Please try again.");
+        setErrorMessage(
+          typeof error === "string"
+            ? error
+            : "Failed to complete registration. Please try again."
+        );
         console.error("Signup error:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
       return;
     }
 
-    // For other steps, just move to next step
-    if (
-      currentIndex < steps.length - 1 &&
-      steps[currentIndex + 1] !== undefined
-    ) {
-      setCurrentStep(steps[currentIndex + 1] as SignupStep);
+    if (currentIndex < steps.length - 1) {
+      const nextStep = steps[currentIndex + 1];
+      if (nextStep) {
+        setCurrentStep(nextStep);
+      }
     }
   };
 
@@ -126,26 +141,19 @@ export default function SignupScreen() {
       "success",
     ];
     const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex > 0) {
-      setCurrentStep(steps[currentIndex - 1] as SignupStep);
+    if (currentIndex > 0 && steps[currentIndex - 1]) {
+      setCurrentStep(steps[currentIndex - 1]!);
     }
   };
 
   const getStepNumber = (): number => {
-    switch (currentStep) {
-      case "therapyType":
-        return 0;
-      case "personal":
-        return 1;
-      case "password":
-        return 2;
-      case "verification":
-        return 3;
-      case "success":
-        return 4;
-      default:
-        return 1;
-    }
+    return [
+      "therapyType",
+      "personal",
+      "password",
+      "verification",
+      "success",
+    ].indexOf(currentStep);
   };
 
   const renderCurrentStep = () => {
@@ -153,10 +161,7 @@ export default function SignupScreen() {
       case "therapyType":
         return (
           <View style={styles.therapyTypeContainer}>
-            {/* Title */}
             <Text style={styles.title}>Sign Up To SafeSpace</Text>
-
-            {/* Toggle Buttons */}
             <View style={styles.toggleContainer}>
               <TouchableOpacity
                 style={styles.toggleButton}
@@ -168,32 +173,26 @@ export default function SignupScreen() {
                 <Text style={styles.activeToggleText}>Sign Up</Text>
               </View>
             </View>
-
-            {/* Question */}
             <Text style={styles.question}>
               What type of therapy are you looking for?
             </Text>
-
-            {/* Therapy Type Cards */}
             <View style={styles.cardsContainer}>
               <TherapyTypeCard
                 type="adult"
                 title="For Adult"
-                subtitle="18 years or older"
+                subtitle="17 years or older"
                 emoji="👨‍💼"
                 isSelected={signupData.therapyType === "adult"}
                 onPress={() => handleTherapyTypeSelection("adult")}
               />
-
               <TherapyTypeCard
                 type="minor"
                 title="For Minor"
-                subtitle="Under 18 years old"
+                subtitle="Under 16 years old"
                 emoji="👶"
                 isSelected={signupData.therapyType === "minor"}
                 onPress={() => handleTherapyTypeSelection("minor")}
               />
-
               <TherapyTypeCard
                 type="guardian"
                 title="For Guardian"
@@ -203,8 +202,6 @@ export default function SignupScreen() {
                 onPress={() => handleTherapyTypeSelection("guardian")}
               />
             </View>
-
-            {/* Footer */}
             <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
               <Text style={styles.footerText}>
                 Already signed up? <Text style={styles.linkText}>Sign In</Text>
@@ -234,8 +231,6 @@ export default function SignupScreen() {
               stepNumber={getStepNumber()}
               loading={loading}
             />
-
-            {/* Show error message below password step */}
             {errorMessage && (
               <Text style={styles.errorText}>{errorMessage}</Text>
             )}
@@ -245,8 +240,7 @@ export default function SignupScreen() {
       case "verification":
         return (
           <EmailVerificationStep
-            data={signupData}
-            onUpdate={updateSignupData}
+            email={signupData.email}
             onNext={nextStep}
             onBack={prevStep}
             stepNumber={getStepNumber()}
@@ -264,20 +258,16 @@ export default function SignupScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
-
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Logo - Show for all steps except success */}
           {currentStep !== "success" && (
             <View style={styles.logoContainer}>
               <SafeSpaceLogo size={currentStep === "therapyType" ? 80 : 60} />
             </View>
           )}
-
-          {/* Step Content */}
           {renderCurrentStep()}
         </ScrollView>
       </KeyboardAvoidingView>

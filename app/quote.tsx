@@ -1,15 +1,21 @@
-"use client";
-
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+/**
+ * QuoteScreen - Splash screen displaying an inspirational quote
+ * Shows the SafeSpace logo with animation and an inspiring mental health quote
+ * Automatically transitions to onboarding after 4 seconds
+ */
 export default function QuoteScreen() {
+  // Animation values
   const fadeAnim = new Animated.Value(0);
   const slideAnim = new Animated.Value(20);
+  const logoScaleAnim = new Animated.Value(0.8); // Added scale animation for logo
 
   useEffect(() => {
+    // Start parallel animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -21,8 +27,14 @@ export default function QuoteScreen() {
         duration: 1000,
         useNativeDriver: true,
       }),
+      Animated.timing(logoScaleAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
     ]).start();
 
+    // Auto-navigate after 4 seconds
     const timer = setTimeout(() => {
       router.replace("/onboarding");
     }, 4000);
@@ -33,14 +45,24 @@ export default function QuoteScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
-          <View style={styles.logo}>
-            <View style={styles.logoInner}>
-              <View style={styles.logoCenter} />
-            </View>
-          </View>
+        {/* SafeSpace Logo with animations */}
+        <Animated.View
+          style={[
+            styles.logoContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: logoScaleAnim }],
+            },
+          ]}
+        >
+          <Image
+            source={require("../assets/images/safespace-logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </Animated.View>
 
+        {/* Quote container with animations */}
         <Animated.View
           style={[
             styles.quoteContainer,
@@ -63,7 +85,7 @@ export default function QuoteScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fed7aa",
+    backgroundColor: "#fed7aa", // Warm peach background
   },
   content: {
     flex: 1,
@@ -73,33 +95,17 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 32,
+    width: 150, // Container size for logo
+    height: 150,
   },
   logo: {
-    width: 64,
-    height: 64,
-    backgroundColor: "#ffffff",
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
+    width: "100%",
+    height: "100%",
+    // Optional shadow if needed
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 8,
-  },
-  logoInner: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#14b8a6",
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logoCenter: {
-    width: 24,
-    height: 24,
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
   },
   quoteContainer: {
     alignItems: "center",
