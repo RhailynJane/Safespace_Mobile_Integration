@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -218,6 +219,15 @@ export default function AppointmentsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Add the image above the main content */}
+      <View style={styles.imageContainer}>
+        <Image 
+          source={require('../../../../assets/images/appointment.png')} 
+          style={styles.appointmentImage}
+          resizeMode="contain"
+        />
+      </View>
+
       {/* Main Content */}
       {renderContent()}
 
@@ -262,11 +272,14 @@ export default function AppointmentsScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  appointmentImage: {
+    width: width * 0.9,
+    height: 350,
   },
   loadingContainer: {
     flex: 1,
@@ -286,11 +299,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2E7D32",
   },
+  imageContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    marginTop: 10,
+  },
   content: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 20,
+    marginTop: 40,
   },
   title: {
     fontSize: 22,
