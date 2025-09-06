@@ -177,15 +177,26 @@ return (
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="menu" size={28} color="#4CAF50" />
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Messages</Text>
-          <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>New Message</Text>
+          <View style={{ width: 24 }} />
         </View>
-        </SafeAreaView>
+
+        {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#9E9E9E" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search contacts..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9E9E9E"
+          autoFocus={true}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -200,22 +211,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  headerGradient: {
-    paddingTop: 10,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-    overflow: 'hidden',
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
+    backgroundColor: "#FFFFFF",
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "#2E7D32",
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    margin: 15,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
   },
 });
