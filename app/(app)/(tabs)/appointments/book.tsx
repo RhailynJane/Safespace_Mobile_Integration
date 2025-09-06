@@ -44,7 +44,7 @@ export default function BookAppointment() {
     },
   ];
 
-  const filteredSupportWorkers = supportWorkers.filter(sw => 
+  const filteredSupportWorkers = supportWorkers.filter((sw) =>
     sw.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -204,10 +204,39 @@ export default function BookAppointment() {
       </View>
 
       <ScrollView style={styles.container}>
-      <Text style={styles.title}>Schedule a session with a support worker</Text>
-      <View style={styles.stepsContainer}>
-        <Text style={styles.stepsText}>1 → 2 → 3 → 4</Text>
-      </View>
+        <Text style={styles.title}>
+          Schedule a session with a support worker
+        </Text>
+
+        {/* Step Indicator */}
+        <View style={styles.stepsContainer}>
+          <View style={styles.stepRow}>
+            {/* Step 1 - Active */}
+            <View style={[styles.stepCircle, styles.stepCircleActive]}>
+              <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                1
+              </Text>
+            </View>
+            <View style={styles.stepConnector} />
+
+            {/* Step 2 - Inactive */}
+            <View style={styles.stepCircle}>
+              <Text style={styles.stepNumber}>2</Text>
+            </View>
+            <View style={styles.stepConnector} />
+
+            {/* Step 3 - Inactive */}
+            <View style={styles.stepCircle}>
+              <Text style={styles.stepNumber}>3</Text>
+            </View>
+            <View style={styles.stepConnector} />
+
+            {/* Step 4 - Inactive */}
+            <View style={styles.stepCircle}>
+              <Text style={styles.stepNumber}>4</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Side Menu */}
@@ -359,20 +388,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  title: { 
-    fontSize: 12, 
-    fontWeight: "600", 
-    color: "#333", 
-    marginBottom: 16, 
-    textAlign: "center" 
-},
-  stepsContainer: { 
-    alignItems: "center", 
-    marginBottom: 24 
+  title: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+    textAlign: "center",
   },
-  stepsText: { 
-    fontSize: 15, 
-    color: "#4CAF50", 
-    fontWeight: "600" 
+  stepsContainer: {
+    alignItems: "center",
+    marginBottom: 24,
+    marginTop: 16,
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: "#4CAF50",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "white",
+  },
+  stepCircleActive: {
+    backgroundColor: "#4CAF50",
+  },
+  stepNumber: {
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  stepNumberActive: {
+    color: "white",
+  },
+  stepConnector: {
+    width: 40,
+    height: 2,
+    backgroundColor: "#E0E0E0",
+    marginHorizontal: 8,
   },
 });
