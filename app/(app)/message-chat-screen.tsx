@@ -198,6 +198,41 @@ export default function ChatScreen() {
         ))}
       </ScrollView>
 
+      {/* Message Input */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.inputContainer}
+      >
+        <View style={styles.inputWrapper}>
+          <TouchableOpacity style={styles.attachmentButton}>
+            <Ionicons name="attach" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+          
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type a message..."
+            value={newMessage}
+            onChangeText={setNewMessage}
+            multiline
+            maxLength={500}
+          />
+          
+          <TouchableOpacity 
+            style={[
+              styles.sendButton,
+              newMessage.trim() === "" && styles.sendButtonDisabled
+            ]}
+            onPress={handleSendMessage}
+            disabled={newMessage.trim() === ""}
+          >
+            <Ionicons 
+              name="send" 
+              size={24} 
+              color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"} 
+            />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -293,5 +328,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9E9E9E",
     alignSelf: "flex-end",
+  },
+  inputContainer: {
+    padding: 15,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 24,
+    paddingHorizontal: 10,
+  },
+  attachmentButton: {
+    padding: 8,
+  },
+  textInput: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    maxHeight: 100,
+    fontSize: 16,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 5,
+  },
+  sendButtonDisabled: {
+    backgroundColor: "#E0E0E0",
   },
 })
