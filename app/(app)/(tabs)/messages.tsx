@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Dimensions,
   TextInput,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -203,13 +204,47 @@ export default function MessagesScreen() {
         />
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Messages Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Messages space for you.
-        </Text>
-      </View>
+      {/* Conversation List */}
+      <ScrollView style={styles.conversationList}>
+        {conversations.map((conversation) => (
+          <TouchableOpacity 
+            key={conversation.id} 
+            style={styles.conversationItem}
+            onPress={() => router.push(`/chat/${conversation.id}`)}
+          >
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ uri: conversation.avatar }}
+                style={styles.avatar}
+              />
+              {conversation.online && <View style={styles.onlineIndicator} />}
+            </View>
+            
+            <View style={styles.conversationContent}>
+              <View style={styles.conversationHeader}>
+                <Text style={styles.conversationName}>{conversation.name}</Text>
+                <Text style={styles.conversationTime}>{conversation.time}</Text>
+              </View>
+              <Text 
+                style={[
+                  styles.conversationMessage,
+                  conversation.unread > 0 && styles.unreadMessage
+                ]}
+                numberOfLines={1}
+              >
+                {conversation.lastMessage}
+              </Text>
+            </View>
+            
+            {conversation.unread > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>{conversation.unread}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
 
       {/* Side Menu */}
       <Modal
@@ -293,6 +328,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+
   content: {
     flex: 1,
     justifyContent: "center",
@@ -363,4 +399,76 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 15,
   },
+  conversationList: {
+    flex: 1,
+    paddingHorizontal: 15,
+  },
+  conversationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 15,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  conversationContent: {
+    flex: 1,
+  },
+  conversationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  conversationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  conversationTime: {
+    fontSize: 12,
+    color: '#9E9E9E',
+  },
+  conversationMessage: {
+    fontSize: 14,
+    color: '#757575',
+  },
+  unreadMessage: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  unreadBadge: {
+    backgroundColor: '#4CAF50',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  unreadCount: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+
 });
