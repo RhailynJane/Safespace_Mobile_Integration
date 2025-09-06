@@ -13,15 +13,45 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import { useAuth } from "../../../../context/AuthContext";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
+
+// Mock data for support workers
+const supportWorkers = [
+  {
+    id: 1,
+    name: "Eric Young",
+    title: "Support worker",
+    specialties: ["Anxiety", "Depression", "Trauma"],
+  },
+  {
+    id: 2,
+    name: "Michael Chen",
+    title: "Support worker",
+    specialties: ["Anxiety", "Depression", "Trauma"],
+  },
+];
+
+// Mock data for appointments
+const appointments = [
+  {
+    id: 1,
+    supportWorker: "Eric Young",
+    date: "October 6, 2025",
+    time: "10:30 AM",
+    type: "Video",
+    status: "upcoming",
+  },
+];
+
 export default function AppointmentsScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
+  const [activeView, setActiveView] = useState("main"); // 'main', 'book', 'details', 'confirmation', 'scheduled'
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -153,6 +183,28 @@ export default function AppointmentsScreen() {
     );
   }
 
+  const handleBookAppointment = () => {
+    // Navigate to the first step of the booking flow
+    router.push("/appointments/book");
+  };
+
+  
+
+  const renderContent = () => (
+    <View style={styles.content}>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleBookAppointment}>
+          <Text style={styles.buttonText}>Book Appointment</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveView("scheduled")}>
+          <Text style={styles.secondaryButtonText}>Check Scheduled Appointments</Text>
+        </TouchableOpacity>
+      </View>
+      {/* Show the list of appointments below the buttons */}
+      {activeView === "scheduled"}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -167,12 +219,7 @@ export default function AppointmentsScreen() {
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Appointments Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Appointments space for you.
-        </Text>
-      </View>
+      {renderContent()}
 
       {/* Side Menu */}
       <Modal
@@ -309,4 +356,38 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 15,
   },
+  buttonContainer: {
+    width: "100%",
+    alignItems: "center",
+    gap: 16,
+  },
+  primaryButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    backgroundColor: "transparent",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    width: "100%",
+    alignItems: "center",
+  },
+  secondaryButtonText: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
 });
