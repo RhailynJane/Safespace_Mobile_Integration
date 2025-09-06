@@ -1,0 +1,221 @@
+import { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Dimensions,
+  TextInput,
+  Image,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useAuth } from "../../context/AuthContext";
+import BottomNavigation from "../../components/BottomNavigation";
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get("window");
+export default function MessagesScreen() {
+  const { user, profile, logout } = useAuth();
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("messages");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newMessageModalVisible, setNewMessageModalVisible] = useState(false);
+
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
+  const sideMenuItems = [
+    {
+      icon: "home",
+      title: "Dashboard",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.replace("/(app)/(tabs)/home");
+      },
+    },
+    {
+      icon: "person",
+      title: "Profile",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/profile");
+      },
+    },
+    {
+      icon: "bar-chart",
+      title: "Self-Assessment",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/self-assessment");
+      },
+    },
+    {
+      icon: "happy",
+      title: "Mood Tracking",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/mood-tracking");
+      },
+    },
+    {
+      icon: "journal",
+      title: "Journaling",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/journaling");
+      },
+    },
+    {
+      icon: "library",
+      title: "Resources",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/resources");
+      },
+    },
+    {
+      icon: "help-circle",
+      title: "Crisis Support",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/crisis-support");
+      },
+    },
+    {
+      icon: "chatbubble",
+      title: "Messages",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/messages");
+      },
+    },
+    {
+      icon: "calendar",
+      title: "Appointments",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/appointments");
+      },
+    },
+    {
+      icon: "people",
+      title: "Community Forum",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/community-forum");
+      },
+    },
+    {
+      icon: "videocam",
+      title: "Video Consultations",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/video-consultations");
+      },
+    },
+    {
+      icon: "log-out",
+      title: "Sign Out",
+      onPress: async () => {
+        setSideMenuVisible(false);
+        await logout();
+      },
+    },
+  ];
+
+  const getDisplayName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
+  }
+
+const contacts = [
+  {
+    id: 1,
+    name: "Eric Young",
+    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+    online: true,
+  },
+  {
+    id: 2,
+    name: "Support Group",
+    avatar: "https://randomuser.me/api/portraits/women/4.jpg",
+    online: false,
+  },
+];
+
+return (
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+            <Ionicons name="menu" size={28} color="#4CAF50" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Messages</Text>
+          <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
+          </TouchableOpacity>
+        </View>
+        </SafeAreaView>
+  );
+}
+
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerGradient: {
+    paddingTop: 10,
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    paddingTop: 10,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+});

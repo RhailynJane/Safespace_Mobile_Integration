@@ -205,18 +205,6 @@ export default function MessagesScreen() {
         />
       </View>
 
-      {/* New Message Button */}
-      <TouchableOpacity 
-        style={styles.newMessageButton}
-        onPress={() => setNewMessageModalVisible(true)}
-      >
-        <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
-          style={styles.newMessageButtonGradient}
-        >
-          <Ionicons name="add" size={28} color="#FFFFFF" />
-        </LinearGradient>
-      </TouchableOpacity>
 
       {/* Conversation List */}
       <ScrollView style={styles.conversationList}>
@@ -259,8 +247,18 @@ export default function MessagesScreen() {
         ))}
       </ScrollView>
 
-      
-
+      {/* New Message Button */}
+      <TouchableOpacity 
+        style={styles.newMessageButton}
+        onPress={() => router.push("/new-message")}
+      >
+        <LinearGradient
+          colors={['#4CAF50', '#2E7D32']}
+          style={styles.newMessageButtonGradient}
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Side Menu */}
       <Modal
