@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -190,6 +191,18 @@ export default function MessagesScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#9E9E9E" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search conversations..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9E9E9E"
+        />
+      </View>
+
       {/* Main Content */}
       <View style={styles.content}>
         <Text style={styles.title}>Messages Coming Soon</Text>
@@ -262,6 +275,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     color: "#2E7D32",
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    margin: 15,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
   },
   content: {
     flex: 1,
