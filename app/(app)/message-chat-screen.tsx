@@ -167,11 +167,38 @@ export default function ChatScreen() {
           </View>
           
           <TouchableOpacity>
-            <Ionicons name="call-outline" size={24} color="#FFFFFF" />
+            <Ionicons name="call-outline" size={24} color="#2E7D32" />
           </TouchableOpacity>
         </View>
 
-       </SafeAreaView>
+        {/* Chat Messages */}
+      <ScrollView 
+        style={styles.messagesContainer}
+        ref={scrollViewRef}
+        contentContainerStyle={styles.messagesContent}
+      >
+        {messages.map((message) => (
+          <View
+            key={message.id}
+            style={[
+              styles.messageBubble,
+              message.sender === "me" ? styles.myMessage : styles.theirMessage,
+            ]}
+          >
+            <Text
+              style={[
+                styles.messageText,
+                message.sender === "me" ? styles.myMessageText : styles.theirMessageText,
+              ]}
+            >
+              {message.text}
+            </Text>
+            <Text style={styles.messageTime}>{message.time}</Text>
+          </View>
+        ))}
+      </ScrollView>
+
+    </SafeAreaView>
   );
 }
 
@@ -208,11 +235,11 @@ const styles = StyleSheet.create({
   contactName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "#2E7D32",
   },
   contactStatus: {
     fontSize: 12,
-    color: "rgba(255, 255, 255, 0.8)",
+    color: "##000000",
     flexDirection: "row",
     alignItems: "center",
   },
@@ -222,5 +249,49 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#FFFFFF",
     marginLeft: 5,
+  },
+  messagesContainer: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
+  },
+  messagesContent: {
+    padding: 15,
+    paddingBottom: 10,
+  },
+  messageBubble: {
+    maxWidth: "80%",
+    padding: 12,
+    borderRadius: 18,
+    marginBottom: 10,
+  },
+  myMessage: {
+    alignSelf: "flex-end",
+    backgroundColor: "#DCF8C6",
+    borderTopRightRadius: 4,
+  },
+  theirMessage: {
+    alignSelf: "flex-start",
+    backgroundColor: "#cfe2f3",
+    borderTopLeftRadius: 4,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  messageText: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  myMessageText: {
+    color: "#000000",
+  },
+  theirMessageText: {
+    color: "#000000",
+  },
+  messageTime: {
+    fontSize: 12,
+    color: "#9E9E9E",
+    alignSelf: "flex-end",
   },
 })
