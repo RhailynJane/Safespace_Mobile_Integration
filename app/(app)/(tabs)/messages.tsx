@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "../../../context/AuthContext";
 import BottomNavigation from "../../../components/BottomNavigation";
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
@@ -204,6 +205,19 @@ export default function MessagesScreen() {
         />
       </View>
 
+      {/* New Message Button */}
+      <TouchableOpacity 
+        style={styles.newMessageButton}
+        onPress={() => setNewMessageModalVisible(true)}
+      >
+        <LinearGradient
+          colors={['#4CAF50', '#2E7D32']}
+          style={styles.newMessageButtonGradient}
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </LinearGradient>
+      </TouchableOpacity>
+
       {/* Conversation List */}
       <ScrollView style={styles.conversationList}>
         {conversations.map((conversation) => (
@@ -244,6 +258,8 @@ export default function MessagesScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      
 
 
       {/* Side Menu */}
@@ -470,5 +486,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-
+newMessageButton: {
+    position: 'absolute',
+    bottom: 80,
+    right: 20,
+    zIndex: 10,
+  },
+  newMessageButtonGradient: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
 });
