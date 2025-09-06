@@ -204,9 +204,7 @@ return (
           <TouchableOpacity 
             key={contact.id} 
             style={styles.contactItem}
-            onPress={() => {
-              router.push(`/chat/${contact.id}`);
-            }}
+            onPress={() => router.push(`/message-chat-screen?id=${contact.id}`)}
           >
             <View style={styles.avatarContainer}>
               <Image source={{ uri: contact.avatar }} style={styles.contactAvatar} />

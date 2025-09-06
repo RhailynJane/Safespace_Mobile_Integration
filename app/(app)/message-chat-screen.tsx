@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 
 // Sample messages data for each conversation
 const conversationMessages: { [key: string]: { id: number; text: string; time: string; sender: string; }[] } = {
@@ -87,6 +86,10 @@ const contacts: { [key: string]: Contact } = {
     online: false,
   },
 };
+
+// User avatar for sent messages
+const userAvatar = "https://randomuser.me/api/portraits/women/17.jpg";
+
 
 export default function ChatScreen() {
   const params = useLocalSearchParams();
@@ -181,19 +184,34 @@ export default function ChatScreen() {
           <View
             key={message.id}
             style={[
-              styles.messageBubble,
-              message.sender === "me" ? styles.myMessage : styles.theirMessage,
+              styles.messageContainer,
+              message.sender === "me" ? styles.myMessageContainer : styles.theirMessageContainer,
             ]}
           >
-            <Text
+            {message.sender === "other" && (
+              <Image source={{ uri: contact.avatar }} style={styles.messageAvatar} />
+            )}
+            
+            <View
               style={[
-                styles.messageText,
-                message.sender === "me" ? styles.myMessageText : styles.theirMessageText,
+                styles.messageBubble,
+                message.sender === "me" ? styles.myMessage : styles.theirMessage,
               ]}
             >
-              {message.text}
-            </Text>
-            <Text style={styles.messageTime}>{message.time}</Text>
+              <Text
+                style={[
+                  styles.messageText,
+                  message.sender === "me" ? styles.myMessageText : styles.theirMessageText,
+                ]}
+              >
+                {message.text}
+              </Text>
+              <Text style={styles.messageTime}>{message.time}</Text>
+            </View>
+
+            {message.sender === "me" && (
+              <Image source={{ uri: userAvatar }} style={styles.messageAvatar} />
+            )}
           </View>
         ))}
       </ScrollView>
@@ -298,6 +316,24 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 18,
     marginBottom: 10,
+  },
+  messageContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    marginBottom: 10,
+    maxWidth: "100%",
+  },
+  myMessageContainer: {
+    justifyContent: "flex-end",
+  },
+  theirMessageContainer: {
+    justifyContent: "flex-start",
+  },
+  messageAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginHorizontal: 5,
   },
   myMessage: {
     alignSelf: "flex-end",
