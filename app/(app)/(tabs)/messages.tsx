@@ -22,6 +22,8 @@ export default function MessagesScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newMessageModalVisible, setNewMessageModalVisible] = useState(false);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -152,6 +154,28 @@ export default function MessagesScreen() {
       </View>
     );
   }
+
+  // Sample conversations data
+  const conversations = [
+    {
+      id: 1,
+      name: "Eric Young",
+      lastMessage: "I'm glad you're feeling okay now.",
+      time: "30m ago",
+      unread: 0,
+      online: true,
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+    },
+    {
+      id: 2,
+      name: "Support Group",
+      lastMessage: "Jenny: I found this article really helpful...",
+      time: "2d ago",
+      unread: 5,
+      online: false,
+      avatar: "https://randomuser.me/api/portraits/women/4.jpg",
+    },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
