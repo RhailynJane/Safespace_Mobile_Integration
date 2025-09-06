@@ -19,34 +19,6 @@ import BottomNavigation from "../../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 
-// Mock data for support workers
-const supportWorkers = [
-  {
-    id: 1,
-    name: "Eric Young",
-    title: "Support worker",
-    specialties: ["Anxiety", "Depression", "Trauma"],
-  },
-  {
-    id: 2,
-    name: "Michael Chen",
-    title: "Support worker",
-    specialties: ["Anxiety", "Depression", "Trauma"],
-  },
-];
-
-// Mock data for appointments
-const appointments = [
-  {
-    id: 1,
-    supportWorker: "Eric Young",
-    date: "October 6, 2025",
-    time: "10:30 AM",
-    type: "Video",
-    status: "upcoming",
-  },
-];
-
 export default function AppointmentsScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -185,8 +157,7 @@ export default function AppointmentsScreen() {
   }
 
   const handleBookAppointment = () => {
-    // Navigate to the first step of the booking flow
-    router.push("/appointments/book");
+    router.push("../appointments/book.tsx");
   };
 
   
