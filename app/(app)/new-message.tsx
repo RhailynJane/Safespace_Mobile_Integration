@@ -171,6 +171,12 @@ const contacts = [
     avatar: "https://randomuser.me/api/portraits/women/4.jpg",
     online: false,
   },
+  {
+    id: 3,
+    name: "Sophia Lee",
+    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
+    online: true,
+  },
 ];
 
 return (

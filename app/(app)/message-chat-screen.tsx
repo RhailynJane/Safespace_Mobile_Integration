@@ -85,6 +85,12 @@ const contacts: { [key: string]: Contact } = {
     avatar: "https://randomuser.me/api/portraits/women/4.jpg",
     online: false,
   },
+  "3": {
+    id: 3,
+    name: "Sophia Lee",
+    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
+    online: true,
+  },
 };
 
 // User avatar for sent messages
