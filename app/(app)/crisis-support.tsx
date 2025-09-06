@@ -172,14 +172,17 @@ export default function CrisisScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
       >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Need Immediate Help?</Text>
-          <Text style={styles.sectionText}>
-            If you or someone you know is in crisis, please call 911 or contact a 24/7 crisis line in your area.
-          </Text>
-          <Text style={styles.sectionText}>
-            For urgent mental health support, reach out to the Distress Centre at 403-266-4357 or visit distresscentre.com.
-          </Text>
+        {/* Card for Need Immediate Help Section */}
+        <View style={styles.card}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Need Immediate Help?</Text>
+            <Text style={styles.sectionText}>
+              If you or someone you know is in crisis, please call 911 or contact a 24/7 crisis line in your area.
+            </Text>
+            <Text style={styles.sectionText}>
+              For urgent mental health support, reach out to the Distress Centre at 403-266-4357 or visit distresscentre.com.
+            </Text>
+          </View>
         </View>
 
         <View style={styles.emergencyButtons}>
@@ -331,18 +334,34 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
   },
+  card: {
+    backgroundColor: "#c22f2fff",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#2E7D32",
+    color: "#FFFFFF",
     marginBottom: 12,
   },
   sectionText: {
     fontSize: 16,
-    color: "#333",
+    color: "#FFFFFF",
     lineHeight: 22,
     marginBottom: 8,
   },
