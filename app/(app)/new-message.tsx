@@ -196,6 +196,26 @@ return (
           autoFocus={true}
         />
       </View>
+
+      {/* Contact List */}
+      <ScrollView style={styles.contactList}>
+        <Text style={styles.sectionTitle}>Recent Contacts</Text>
+        {contacts.map((contact) => (
+          <TouchableOpacity 
+            key={contact.id} 
+            style={styles.contactItem}
+            onPress={() => {
+              router.push(`/chat/${contact.id}`);
+            }}
+          >
+            <View style={styles.avatarContainer}>
+              <Image source={{ uri: contact.avatar }} style={styles.contactAvatar} />
+              {contact.online && <View style={styles.onlineIndicator} />}
+            </View>
+            <Text style={styles.contactName}>{contact.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -241,4 +261,46 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  contactList: {
+    flex: 1,
+    paddingHorizontal: 15,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#9E9E9E',
+    marginBottom: 15,
+    marginTop: 10,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 15,
+  },
+  contactAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  contactName: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+
 });
