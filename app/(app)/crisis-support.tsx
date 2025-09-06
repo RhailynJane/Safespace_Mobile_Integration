@@ -167,12 +167,17 @@ export default function CrisisScreen() {
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Crisis Support Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Crisis Support space for you.
-        </Text>
-      </View>
+      <ScrollView style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Need Immediate Help?</Text>
+          <Text style={styles.sectionText}>
+            If you or someone you know is in crisis, please call 911 or contact a 24/7 crisis line in your area.
+          </Text>
+          <Text style={styles.sectionText}>
+            For urgent mental health support, reach out to the Distress Centre at 403-266-4357 or visit distresscentre.com.
+          </Text>
+        </View>
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -308,5 +313,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D32",
+    marginBottom: 12,
+  },
+  sectionText: {
+    fontSize: 16,
+    color: "#333",
+    lineHeight: 22,
+    marginBottom: 8,
   },
 });
