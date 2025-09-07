@@ -77,6 +77,51 @@ export default function VideoCallScreen() {
         <View style={styles.callStatus}>
           <Text style={styles.callStatusText}>00:08</Text>
         </View>
+
+        {/* Bottom Controls */}
+      <View style={styles.controlsContainer}>
+        <View style={styles.controlsRow}>
+          {/* Chat Button */}
+          <TouchableOpacity 
+            style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
+            onPress={handleToggleChat}
+          >
+            <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
+            <Text style={styles.controlText}>Chat</Text>
+          </TouchableOpacity>
+
+          {/* Raise Hand Button */}
+          <TouchableOpacity 
+            style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
+            onPress={handleToggleRaiseHand}
+          >
+            <Ionicons 
+              name={isRaiseHand ? "hand-left" : "hand-left-outline"} 
+              size={24} 
+              color="#FFFFFF" 
+            />
+            <Text style={styles.controlText}>Raise</Text>
+          </TouchableOpacity>
+
+          {/* React Button */}
+          <TouchableOpacity style={styles.controlButton}>
+            <Ionicons name="happy" size={24} color="#FFFFFF" />
+            <Text style={styles.controlText}>React</Text>
+          </TouchableOpacity>
+
+          {/* View Button */}
+          <TouchableOpacity style={styles.controlButton}>
+            <Ionicons name="people" size={24} color="#FFFFFF" />
+            <Text style={styles.controlText}>View</Text>
+          </TouchableOpacity>
+
+          {/* More Options Button */}
+          <TouchableOpacity style={styles.controlButton}>
+            <Ionicons name="ellipsis-horizontal" size={24} color="#FFFFFF" />
+            <Text style={styles.controlText}>More</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -160,5 +205,32 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  controlsContainer: {
+    padding: 20,
+    backgroundColor: "#2D2D2D",
+  },
+  controlsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  controlButton: {
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#404040",
+    minWidth: 60,
+  },
+  controlButtonActive: {
+    backgroundColor: "#4CAF50",
+  },
+  controlButtonMuted: {
+    backgroundColor: "#F44336",
+  },
+  controlText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    marginTop: 4,
   },
 });
