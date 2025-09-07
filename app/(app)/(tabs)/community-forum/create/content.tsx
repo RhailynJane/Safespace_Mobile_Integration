@@ -16,7 +16,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { useAuth } from "../../../../../context/AuthContext";
 
-export default function SelectCategoryScreen() {
+export default function CreatePostScreen() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
   const [postContent, setPostContent] = useState("");
