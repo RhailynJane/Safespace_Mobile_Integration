@@ -16,8 +16,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../context/AuthContext";
-import BottomNavigation from "../../components/BottomNavigation";
+import { useAuth } from "../../../context/AuthContext";
+import BottomNavigation from "../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 export default function VideoScreen() {
@@ -427,19 +427,14 @@ const styles = StyleSheet.create({
     elevation: 3,
     width: width - 40,
   },
-  statusContainer: {
-    marginBottom: 20,
-  },
   name: {
     fontSize: 15,
     fontWeight: "600",
     color: "#212121",
-    marginBottom: 4,
   },
   date: {
     fontSize: 13,
     color: "#757575",
-    marginBottom: 12,
   },
   time: {
     fontSize: 13,
