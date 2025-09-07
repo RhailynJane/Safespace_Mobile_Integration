@@ -30,8 +30,8 @@ export default function AppointmentList() {
   const { id } = useLocalSearchParams();
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [rescheduleModalVisible, setRescheduleModalVisible] = useState(false);
-  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
-  
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
+
   // Mock data for appointments
   const appointments = [
     {
@@ -92,11 +92,21 @@ export default function AppointmentList() {
   };
 
   const confirmReschedule = () => {
+    if (!selectedTimeSlot) {
+      Alert.alert(
+        "Selection Required",
+        "Please select a time slot to reschedule your appointment."
+      );
+      return;
+    }
+
     setLoading(true);
+    // Simulate API call
     setTimeout(() => {
       setLoading(false);
       setRescheduleModalVisible(false);
       Alert.alert("Success", "Your appointment has been rescheduled");
+      setSelectedTimeSlot(null);
       router.back();
     }, 1500);
   };
@@ -244,11 +254,13 @@ export default function AppointmentList() {
         </TouchableOpacity>
       </View>
 
-    <ScrollView style={styles.content}>
+      <ScrollView style={styles.content}>
         {/* Appointment Card */}
         <View style={styles.appointmentCard}>
-          <Text style={styles.supportWorkerName}>{appointment.supportWorker}</Text>
-          
+          <Text style={styles.supportWorkerName}>
+            {appointment.supportWorker}
+          </Text>
+
           <View style={styles.detailRow}>
             <Ionicons name="calendar-outline" size={20} color="#666" />
             <Text style={styles.detailText}>{appointment.date}</Text>
@@ -263,66 +275,186 @@ export default function AppointmentList() {
           </View>
 
           <View style={styles.detailRow}>
-            <Ionicons name="information-circle-outline" size={20} color="#666" />
+            <Ionicons
+              name="information-circle-outline"
+              size={20}
+              color="#666"
+            />
             <Text style={styles.detailText}>Status: {appointment.status}</Text>
           </View>
         </View>
 
         {/* Action Buttons */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleJoinSession}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleJoinSession}
+          >
             <Ionicons name="videocam" size={20} color="#FFF" />
             <Text style={styles.primaryButtonText}>Join Session</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleReschedule}>
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleReschedule}
+          >
             <Ionicons name="calendar" size={20} color="#4CAF50" />
             <Text style={styles.secondaryButtonText}>Reschedule</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.tertiaryButton} onPress={handleCancel}>
+
+          <TouchableOpacity
+            style={styles.tertiaryButton}
+            onPress={handleCancel}
+          >
             <Ionicons name="close-circle" size={20} color="#F44336" />
             <Text style={styles.tertiaryButtonText}>Cancel Appointment</Text>
           </TouchableOpacity>
         </View>
 
         {/* Cancel Confirmation Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={cancelModalVisible}
-        onRequestClose={() => setCancelModalVisible(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setCancelModalVisible(false)}>
-          <BlurView intensity={20} style={styles.blurContainer}>
-            <View style={styles.confirmationModalContent}>
-              <View style={styles.modalIconContainer}>
-                <Ionicons name="close-circle" size={48} color="#F44336" />
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={cancelModalVisible}
+          onRequestClose={() => setCancelModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setCancelModalVisible(false)}
+          >
+            <BlurView intensity={20} style={styles.blurContainer}>
+              <View style={styles.confirmationModalContent}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="close-circle" size={48} color="#F44336" />
+                </View>
+                <Text style={styles.modalTitle}>Cancel Appointment?</Text>
+                <Text style={styles.modalText}>
+                  Are you sure you want to cancel your session with{" "}
+                  {appointment.supportWorker} on {appointment.date}?
+                </Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancelButton]}
+                    onPress={() => setCancelModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelButtonText}>
+                      Keep Appointment
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalConfirmButton]}
+                    onPress={confirmCancel}
+                  >
+                    <Text style={styles.modalConfirmButtonText}>
+                      Yes, Cancel
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Text style={styles.modalTitle}>Cancel Appointment?</Text>
-              <Text style={styles.modalText}>
-                Are you sure you want to cancel your session with {appointment.supportWorker} on {appointment.date}?
-              </Text>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalCancelButton]} 
-                  onPress={() => setCancelModalVisible(false)}
-                >
-                  <Text style={styles.modalCancelButtonText}>Keep Appointment</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.modalButton, styles.modalConfirmButton]} 
-                  onPress={confirmCancel}
-                >
-                  <Text style={styles.modalConfirmButtonText}>Yes, Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </BlurView>
-        </Pressable>
-      </Modal>
-    </ScrollView>
+            </BlurView>
+          </Pressable>
+        </Modal>
 
+        {/* Reschedule Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={rescheduleModalVisible}
+          onRequestClose={() => setRescheduleModalVisible(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setRescheduleModalVisible(false)}
+          >
+            <BlurView intensity={20} style={styles.blurContainer}>
+              <View style={styles.confirmationModalContent}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="calendar" size={48} color="#4CAF50" />
+                </View>
+                <Text style={styles.modalTitle}>Reschedule Appointment</Text>
+                <Text style={styles.modalText}>
+                  Select a new date and time for your session with{" "}
+                  {appointment.supportWorker}.
+                </Text>
+
+                <View style={styles.rescheduleOptions}>
+                  <Text style={styles.rescheduleHint}>
+                    Available time slots:
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.timeSlot,
+                      selectedTimeSlot === "slot1" && styles.selectedTimeSlot,
+                    ]}
+                    onPress={() => setSelectedTimeSlot("slot1")}
+                  >
+                    <Text
+                      style={[
+                        styles.timeSlotText,
+                        selectedTimeSlot === "slot1" &&
+                          styles.selectedTimeSlotText,
+                      ]}
+                    >
+                      October 08, 2025 at 2:00 PM
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.timeSlot,
+                      selectedTimeSlot === "slot2" && styles.selectedTimeSlot,
+                    ]}
+                    onPress={() => setSelectedTimeSlot("slot2")}
+                  >
+                    <Text
+                      style={[
+                        styles.timeSlotText,
+                        selectedTimeSlot === "slot2" &&
+                          styles.selectedTimeSlotText,
+                      ]}
+                    >
+                      October 09, 2025 at 11:00 AM
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.timeSlot,
+                      selectedTimeSlot === "slot3" && styles.selectedTimeSlot,
+                    ]}
+                    onPress={() => setSelectedTimeSlot("slot3")}
+                  >
+                    <Text
+                      style={[
+                        styles.timeSlotText,
+                        selectedTimeSlot === "slot3" &&
+                          styles.selectedTimeSlotText,
+                      ]}
+                    >
+                      October 10, 2025 at 4:30 PM
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalCancelButton]}
+                    onPress={() => setRescheduleModalVisible(false)}
+                  >
+                    <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalConfirmButton]}
+                    onPress={confirmReschedule}
+                  >
+                    <Text style={styles.modalConfirmButtonText}>
+                      Confirm Reschedule
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </BlurView>
+          </Pressable>
+        </Modal>
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -583,6 +715,8 @@ const styles = StyleSheet.create({
     color: "#666",
     fontWeight: "600",
     textAlign: "center",
+    justifyContent: "center",
+    marginTop: 8,
   },
   modalConfirmButton: {
     backgroundColor: "#F44336",
@@ -592,7 +726,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 6,
   },
   blurContainer: {
     width: "100%",
@@ -616,5 +750,36 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
+  },
+  rescheduleOptions: {
+    width: "100%",
+    marginBottom: 20,
+  },
+  rescheduleHint: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  timeSlot: {
+    backgroundColor: "#F8F9FA",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  timeSlotText: {
+    fontSize: 14,
+    color: "#2c3e50",
+    fontWeight: "500",
+  },
+  selectedTimeSlot: {
+    backgroundColor: "#E8F5E9",
+    borderColor: "#4CAF50",
+    borderWidth: 2,
+  },
+  selectedTimeSlotText: {
+    color: "#2E7D32",
+    fontWeight: "600",
   },
 });
