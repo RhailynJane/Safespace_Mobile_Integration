@@ -199,6 +199,11 @@ export default function AppointmentList() {
 
   const appointment = appointments.length > 0 ? appointments[0] : null;
 
+  const handleAppointmentPress = (appointmentId: number) => {
+    // Navigate to appointment details or show details modal
+    router.push(`/(app)/(tabs)/appointments/${appointmentId}`);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -231,6 +236,71 @@ export default function AppointmentList() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Appointments List */}
+      <ScrollView style={styles.appointmentsContainer}>
+        {activeAppointmentsTab === 'upcoming' ? (
+          appointments.filter(a => a.status === 'upcoming').length > 0 ? (
+            appointments.filter(a => a.status === 'upcoming').map((appointment) => (
+              <TouchableOpacity 
+                key={appointment.id} 
+                style={styles.appointmentCard}
+                onPress={() => handleAppointmentPress(appointment.id)}
+              >
+                <Text style={styles.supportWorker}>{appointment.supportWorker}</Text>
+                <View style={styles.appointmentDetails}>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="calendar-outline" size={16} color="#666" />
+                    <Text style={styles.detailText}>{appointment.date}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="time-outline" size={16} color="#666" />
+                    <Text style={styles.detailText}>{appointment.time}</Text>
+                  </View>
+                </View>
+                <View style={styles.sessionType}>
+                  <Ionicons name="videocam" size={14} color="#4CAF50" />
+                  <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color="#CCC" />
+              <Text style={styles.emptyStateText}>No upcoming appointments</Text>
+            </View>
+          )
+        ) : appointments.filter(a => a.status === 'past').length > 0 ? (
+          appointments.filter(a => a.status === 'past').map((appointment) => (
+            <TouchableOpacity 
+              key={appointment.id} 
+              style={styles.appointmentCard}
+              onPress={() => handleAppointmentPress(appointment.id)}
+            >
+              <Text style={styles.supportWorker}>{appointment.supportWorker}</Text>
+              <View style={styles.appointmentDetails}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="calendar-outline" size={16} color="#666" />
+                  <Text style={styles.detailText}>{appointment.date}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="time-outline" size={16} color="#666" />
+                  <Text style={styles.detailText}>{appointment.time}</Text>
+                </View>
+              </View>
+              <View style={styles.sessionType}>
+                <Ionicons name="videocam" size={14} color="#4CAF50" />
+                <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="calendar-outline" size={48} color="#CCC" />
+            <Text style={styles.emptyStateText}>No past appointments</Text>
+          </View>
+        )}
+      </ScrollView>
 
       
       {/* Side Menu */}
@@ -392,5 +462,70 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: "#4CAF50",
     fontWeight: "600",
+  },
+  appointmentsContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  appointmentCard: {
+    backgroundColor: "#F2F7F2",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50",
+  },
+  supportWorker: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2c3e50",
+    marginBottom: 12,
+  },
+  appointmentDetails: {
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 8,
+  },
+  sessionType: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#cfe2f3",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+  },
+  sessionTypeText: {
+    fontSize: 14,
+    color: "#2c3e50",
+    marginLeft: 6,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: "#999",
+    marginTop: 16,
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
   },
 });
