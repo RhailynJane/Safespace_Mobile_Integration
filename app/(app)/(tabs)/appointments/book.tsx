@@ -237,18 +237,35 @@ export default function BookAppointment() {
             </View>
           </View>
         </View>
-      </ScrollView>
 
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search support worker..."
-          placeholderTextColor="#999"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search support worker..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        {filteredSupportWorkers.map((supportWorker) => (
+          <TouchableOpacity
+            key={supportWorker.id}
+            style={styles.supportWorkerCard}
+            onPress={() => handleSelectSupportWorker(supportWorker.id)}
+          >
+            <Text style={styles.supportWorkerName}>{supportWorker.name}</Text>
+            <Text style={styles.supportWorkerTitle}>{supportWorker.title}</Text>
+            <View style={styles.specialtiesContainer}>
+              {supportWorker.specialties.map((specialty, index) => (
+                <Text key={index} style={styles.specialtyText}>{specialty}</Text>
+              ))}
+            </View>
+            <Text style={styles.selectText}>Select Support Worker</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -301,6 +318,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  supportWorkerCard: {
+    backgroundColor: "#c0d8c1",
+    borderRadius: 10,
+    padding: 16,
+    marginHorizontal: 15,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   header: {
     flexDirection: "row",
@@ -453,12 +482,49 @@ const styles = StyleSheet.create({
     height: 50,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
+  },
+  supportWorkerName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  supportWorkerNameHeading: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  supportWorkerTitle: {
+    fontSize: 14,
+    color: "#fffff",
+    marginBottom: 8,
+  },
+  specialtiesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 16,
+    gap: 8,
+  },
+  specialtyText: {
+    backgroundColor: "#d0cad8ff",
+    color: "#00000",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    fontSize: 12,
+  },
+selectText: {
+    color: "#00000",
+    fontWeight: "600",
+    textAlign: "center",
   },
 
 });
