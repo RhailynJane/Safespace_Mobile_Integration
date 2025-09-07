@@ -149,22 +149,13 @@ export default function VideoScreen() {
       time: "10:30 AM",
       type: "Video",
       status: "Upcoming",
-      meetingLink: "https://meet.google.com/knr-pkav-xpt",
       avatar: "https://randomuser.me/api/portraits/men/1.jpg",
     },
   ];
 
   const handleJoinMeeting = () => {
-    if (appointments[0]?.meetingLink) {
-      Linking.openURL(appointments[0].meetingLink).catch((err) => {
-        Alert.alert("Error", "Could not open the meeting link");
-        console.error("Error opening URL:", err);
-      });
-    } else {
-      Alert.alert("Error", "Meeting link is not available");
-    }
+    router.push("/video-consultations/video-call");
   };
-
   const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -203,13 +194,11 @@ export default function VideoScreen() {
                 style={styles.avatar}
               />
               <View style={styles.nameContainer}>
-                <Text style={styles.name}>{appointments[0]?.supportWorker ?? ""}</Text>
-                <Text style={styles.date}>
-                  {appointments[0]?.date ?? ""} 
+                <Text style={styles.name}>
+                  {appointments[0]?.supportWorker ?? ""}
                 </Text>
-                <Text style={styles.time}>
-                  {appointments[0]?.time ?? ""}
-                </Text>
+                <Text style={styles.date}>{appointments[0]?.date ?? ""}</Text>
+                <Text style={styles.time}>{appointments[0]?.time ?? ""}</Text>
               </View>
               <View
                 style={[
@@ -221,18 +210,22 @@ export default function VideoScreen() {
                     : styles.canceledBadge,
                 ]}
               >
-                <Text style={styles.statusText}>{appointments[0]?.status ?? ""}</Text>
+                <Text style={styles.statusText}>
+                  {appointments[0]?.status ?? ""}
+                </Text>
               </View>
             </View>
 
             <View style={styles.divider} />
 
             <Text style={styles.sectionTitle}>Technical Requirements</Text>
-            
+
             <Text style={styles.subsectionTitle}>System Requirements</Text>
             <View style={styles.requirementItem}>
               <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>Stable internet connection (min 1 Mbps)</Text>
+              <Text style={styles.requirementText}>
+                Stable internet connection (min 1 Mbps)
+              </Text>
             </View>
             <View style={styles.requirementItem}>
               <View style={styles.bulletPoint} />
@@ -242,19 +235,27 @@ export default function VideoScreen() {
             <Text style={styles.subsectionTitle}>Privacy & Security</Text>
             <View style={styles.requirementItem}>
               <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>End to end encrypted video calls</Text>
+              <Text style={styles.requirementText}>
+                End to end encrypted video calls
+              </Text>
             </View>
             <View style={styles.requirementItem}>
               <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>HIPAA/PIPEDA compliant platform</Text>
+              <Text style={styles.requirementText}>
+                HIPAA/PIPEDA compliant platform
+              </Text>
             </View>
             <View style={styles.requirementItem}>
               <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>No recordings without consent</Text>
+              <Text style={styles.requirementText}>
+                No recordings without consent
+              </Text>
             </View>
             <View style={styles.requirementItem}>
               <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>Secure data transmission</Text>
+              <Text style={styles.requirementText}>
+                Secure data transmission
+              </Text>
             </View>
 
             {appointments[0] && appointments[0].status === "Upcoming" && (
