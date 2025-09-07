@@ -28,20 +28,20 @@ export default function BookAppointment() {
   const { supportWorkerId } = useLocalSearchParams();
 
   // Mock data for support workers
-  const supportWorkers = [
+   const supportWorkers = [
     {
       id: 1,
       name: "Eric Young",
-      title: "Licensed Therapist",
+      title: "Support worker",
       avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Stress"],
+      specialties: ["Anxiety", "Depression", "Trauma"],
     },
     {
       id: 2,
-      name: "Sarah Lee",
-      title: "Mental Health Counselor",
-      avatar: "https://randomuser.me/api/portraits/women/2.jpg",
-      specialties: ["Relationships", "Self-Esteem", "Trauma"],
+      name: "Michael Chen",
+      title: "Support worker",
+      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
+      specialties: ["Anxiety", "Depression", "Trauma"],
     },
   ];
 
@@ -198,6 +198,19 @@ export default function BookAppointment() {
     },
   ];
 
+  const handleContinue = () => {
+    // Navigate to confirmation, passing all selected data as parameters
+    router.push({
+      pathname: "/appointments/confirm",
+      params: {
+        supportWorkerId: supportWorker.id,
+        selectedType,
+        selectedDate: selectedDate || "",
+        selectedTime: selectedTime || "",
+      }
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -248,7 +261,19 @@ export default function BookAppointment() {
           </View>
         </View>
 
-    
+{/* Support Worker Card with Avatar and Name */}
+<View style={styles.supportWorkerCard}>
+  <View style={styles.supportWorkerHeader}>
+    <Image 
+      source={{ uri: supportWorker.avatar }} 
+      style={styles.avatar}
+    />
+    <View style={styles.supportWorkerInfo}>
+      <Text style={styles.supportWorkerName}>{supportWorker.name}</Text>
+      <Text style={styles.supportWorkerTitle}>{supportWorker.title}</Text>
+    </View>
+  </View>
+</View>
       </ScrollView>
 
       {/* Side Menu */}
@@ -472,5 +497,35 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#333",
+  },
+  supportWorkerNameHeading: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  supportWorkerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  supportWorkerInfo: {
+    flex: 1,
+  },
+  supportWorkerName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  supportWorkerTitle: {
+    fontSize: 14,
+    color: "#666",
   },
 });
