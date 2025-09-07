@@ -62,7 +62,6 @@ const CATEGORIES = [
   "Support",
   "Stories",
   "Bookmarked",
-  "Favorites",
 ];
 
 export default function CommunityMainScreen() {
@@ -235,29 +234,55 @@ export default function CommunityMainScreen() {
               <Text style={styles.postTitle}>{post.title}</Text>
               <Text style={styles.postContent}>{post.content}</Text>
 
-              <View style={styles.postFooter}>
-                <View style={styles.interactionButtons}>
-                  <TouchableOpacity style={styles.interactionButton}>
-                    <Ionicons name="heart-outline" size={20} color="#666" />
-                    <Text style={styles.interactionText}>{post.likes}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.interactionButton}>
-                    <Ionicons
-                      name="chatbubble-outline"
-                      size={20}
-                      color="#666"
-                    />
-                    <Text style={styles.interactionText}>{post.comments}</Text>
-                  </TouchableOpacity>
-                </View>
-                <TouchableOpacity>
-                  <Ionicons name="bookmark-outline" size={20} color="#666" />
-                </TouchableOpacity>
-              </View>
+        <View style={styles.postFooter}>
+          <View style={styles.interactionButtons}>
+            <TouchableOpacity 
+              style={styles.interactionButton}
+              onPress={() => handleLikePress(post.id)}
+            >
+              <Ionicons 
+                name={likedPosts.has(post.id) ? "heart" : "heart-outline"} 
+                size={20} 
+                color={likedPosts.has(post.id) ? "#E53935" : "#666"} 
+              />
+              <Text style={[
+                styles.interactionText,
+                likedPosts.has(post.id) && styles.interactionTextActive
+              ]}>
+                {post.likes}
+              </Text>
             </TouchableOpacity>
-          ))}
+            
+            <TouchableOpacity 
+              style={styles.interactionButton}
+              onPress={() => handleCommentPress(post.id)}
+            >
+              <Ionicons 
+                name={commentedPosts.has(post.id) ? "chatbubble" : "chatbubble-outline"} 
+                size={20} 
+                color={commentedPosts.has(post.id) ? "#4CAF50" : "#666"} 
+              />
+              <Text style={[
+                styles.interactionText,
+                commentedPosts.has(post.id) && styles.interactionTextActive
+              ]}>
+                {post.comments}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity onPress={() => handleBookmarkPress(post.id)}>
+            <Ionicons 
+              name={bookmarkedPosts.has(post.id) ? "bookmark" : "bookmark-outline"} 
+              size={20} 
+              color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"} 
+            />
+          </TouchableOpacity>
         </View>
-      </ScrollView>
+      </TouchableOpacity>
+    ))}
+  </View>
+</ScrollView>
 
       {/* Bottom Navigation */}
       <BottomNavigation
@@ -457,4 +482,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
   },
+  interactionTextActive: {
+  color: "#4CAF50",
+  fontWeight: "600",
+},
 });
