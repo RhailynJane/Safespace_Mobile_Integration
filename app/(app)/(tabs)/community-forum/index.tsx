@@ -42,8 +42,7 @@ export default function CommunityScreen() {
   };
 
   const handleStartPress = () => {
-    // Navigate to the actual community forum
-    router.push("/community-forum/main");
+    router.push("../community-forum/main");
   };
 
   const sideMenuItems = [
