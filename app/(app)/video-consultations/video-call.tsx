@@ -10,10 +10,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "../../../context/AuthContext";
+import BottomNavigation from "../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 
-// Mock appointment data - in a real app, this would come from props or context
 const appointments = [
   {
     id: 1,
@@ -38,15 +38,29 @@ export default function VideoCallScreen() {
   };
 
   const handleStartMeeting = () => {
-    // Here you would typically connect to your video API
-    // For now, we'll just show a success message
     alert("Meeting started successfully!");
-    // You could navigate to an actual video call screen here
   };
 
-  // Get the current appointment (in a real app, this would come from navigation params)
   const currentAppointment = appointments[0];
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community-forum", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
 
+  const [activeTab, setActiveTab] = useState<string>("home");
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
+  
   return (
     <SafeAreaView style={styles.meetingContainer}>
       <View style={styles.meetingHeader}>
@@ -132,6 +146,12 @@ export default function VideoCallScreen() {
           <Text style={styles.joinNowButtonText}>Join Now</Text>
         </TouchableOpacity>
       </View>
+
+      <BottomNavigation
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabPress={handleTabPress}
+            />
     </SafeAreaView>
   );
 }
@@ -237,7 +257,7 @@ const styles = StyleSheet.create({
   meetingActions: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 20,
+    padding: 10,
     borderTopWidth: 1,
     borderTopColor: "#E0E0E0",
   },
@@ -246,26 +266,26 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: "center",
     marginRight: 10,
   },
   cancelButtonText: {
     color: "#757575",
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "600",
   },
   joinNowButton: {
     flex: 1,
-    padding: 16,
+    padding: 15,
     backgroundColor: "#4CAF50",
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: "center",
     marginLeft: 10,
   },
   joinNowButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "600",
   },
 });
