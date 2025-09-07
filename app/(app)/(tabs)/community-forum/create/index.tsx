@@ -122,6 +122,20 @@ export default function SelectCategoryScreen() {
         </View>
       </ScrollView>
 
+      {/* Continue Button */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[
+            styles.continueButton,
+            !selectedCategory && styles.continueButtonDisabled
+          ]}
+          onPress={handleContinue}
+          disabled={!selectedCategory}
+        >
+          <Text style={styles.continueButtonText}>Continue</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
@@ -205,6 +219,28 @@ const styles = StyleSheet.create({
   },
   categoryTextActive: {
     color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  footer: {
+    padding: 20,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#FFFFFF",
+  },
+  continueButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    borderRadius: 20,
+    alignItems: "center",
+    marginRight: 30,
+    marginLeft: 30,
+  },
+  continueButtonDisabled: {
+    backgroundColor: "#CCCCCC",
+  },
+  continueButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
     fontWeight: "600",
   },
 });
