@@ -72,7 +72,6 @@ export default function VideoCallScreen() {
           </View>
           <View style={styles.profileTextContainer}>
             <Text style={styles.avatarName}>{getDisplayName()}</Text>
-            <Text style={styles.avatarStatus}>Connecting...</Text>
           </View>
         </View>
       </View>
@@ -117,6 +116,22 @@ export default function VideoCallScreen() {
             </View>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.meetingActions}>
+        <TouchableOpacity 
+          style={styles.cancelButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.joinNowButton}
+          onPress={handleStartMeeting}
+        >
+          <Text style={styles.joinNowButtonText}>Join Now</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -218,5 +233,39 @@ const styles = StyleSheet.create({
   audioOptionDesc: {
     fontSize: 10,
     color: "#757575",
+  },
+  meetingActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    alignItems: "center",
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    color: "#757575",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  joinNowButton: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: "#4CAF50",
+    borderRadius: 8,
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  joinNowButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
