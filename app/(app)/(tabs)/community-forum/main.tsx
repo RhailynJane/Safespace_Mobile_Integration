@@ -56,7 +56,7 @@ const POSTS = [
   },
 ];
 
-const CATEGORIES = ["Trending", "Stress", "Support", "Stories"];
+const CATEGORIES = ["Trending", "Stress", "Support", "Stories", "Bookmarked", "Favorites"];
 
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   categoriesContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 3,
   },
   categoryButton: {
     paddingHorizontal: 12,
