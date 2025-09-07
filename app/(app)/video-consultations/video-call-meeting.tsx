@@ -57,9 +57,8 @@ export default function VideoCallScreen() {
             </View>
           </View>
         </View>
-      </View>
 
-      {/* Self Video Preview */}
+        {/* Self Video Preview */}
         <View style={styles.selfVideoPreview}>
           <Image
             source={{ uri: "https://randomuser.me/api/portraits/women/17.jpg" }}
@@ -77,13 +76,18 @@ export default function VideoCallScreen() {
         <View style={styles.callStatus}>
           <Text style={styles.callStatusText}>00:08</Text>
         </View>
+      </View>
 
-        {/* Bottom Controls */}
+      {/* Bottom Controls */}
       <View style={styles.controlsContainer}>
+        {/* First Row - All controls in one line */}
         <View style={styles.controlsRow}>
           {/* Chat Button */}
-          <TouchableOpacity 
-            style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
+          <TouchableOpacity
+            style={[
+              styles.controlButton,
+              isChatOpen && styles.controlButtonActive,
+            ]}
             onPress={handleToggleChat}
           >
             <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
@@ -91,14 +95,17 @@ export default function VideoCallScreen() {
           </TouchableOpacity>
 
           {/* Raise Hand Button */}
-          <TouchableOpacity 
-            style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
+          <TouchableOpacity
+            style={[
+              styles.controlButton,
+              isRaiseHand && styles.controlButtonActive,
+            ]}
             onPress={handleToggleRaiseHand}
           >
-            <Ionicons 
-              name={isRaiseHand ? "hand-left" : "hand-left-outline"} 
-              size={24} 
-              color="#FFFFFF" 
+            <Ionicons
+              name={isRaiseHand ? "hand-left" : "hand-left-outline"}
+              size={24}
+              color="#FFFFFF"
             />
             <Text style={styles.controlText}>Raise</Text>
           </TouchableOpacity>
@@ -109,19 +116,64 @@ export default function VideoCallScreen() {
             <Text style={styles.controlText}>React</Text>
           </TouchableOpacity>
 
-          {/* View Button */}
-          <TouchableOpacity style={styles.controlButton}>
-            <Ionicons name="people" size={24} color="#FFFFFF" />
-            <Text style={styles.controlText}>View</Text>
+          {/* Camera Toggle */}
+          <TouchableOpacity
+            style={[
+              styles.controlButton,
+              !isCameraOn && styles.controlButtonMuted,
+            ]}
+            onPress={handleToggleCamera}
+          >
+            <Ionicons
+              name={isCameraOn ? "videocam" : "videocam-off"}
+              size={24}
+              color="#FFFFFF"
+            />
+            <Text style={styles.controlText}>Camera</Text>
           </TouchableOpacity>
 
-          {/* More Options Button */}
+          {/* Mic Toggle */}
+          <TouchableOpacity
+            style={[
+              styles.controlButton,
+              !isMicOn && styles.controlButtonMuted,
+            ]}
+            onPress={handleToggleMic}
+          >
+            <Ionicons
+              name={isMicOn ? "mic" : "mic-off"}
+              size={24}
+              color="#FFFFFF"
+            />
+            <Text style={styles.controlText}>Mic</Text>
+          </TouchableOpacity>
+
+          {/* Share Button */}
           <TouchableOpacity style={styles.controlButton}>
-            <Ionicons name="ellipsis-horizontal" size={24} color="#FFFFFF" />
-            <Text style={styles.controlText}>More</Text>
+            <Ionicons name="share" size={24} color="#FFFFFF" />
+            <Text style={styles.controlText}>Share</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Second Row - Only Leave button */}
+        <View style={styles.leaveButtonContainer}>
+          <TouchableOpacity
+            style={styles.leaveButton}
+            onPress={handleLeaveCall}
+          >
+            <Ionicons name="call" size={16} color="#FFFFFF" />
+            <Text style={styles.leaveButtonText}>Leave</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Chat Panel */}
+      {isChatOpen && (
+        <View style={styles.chatPanel}>
+          <Text style={styles.chatTitle}>Chat</Text>
+          {/* Chat messages would go here */}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -207,20 +259,22 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   controlsContainer: {
-    padding: 20,
+    padding: 10,
     backgroundColor: "#2D2D2D",
   },
   controlsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 15,
+    marginBottom: 10,
+    flexWrap: "wrap",
   },
   controlButton: {
     alignItems: "center",
-    padding: 10,
+    padding: 13,
     borderRadius: 8,
     backgroundColor: "#404040",
-    minWidth: 60,
+    minWidth: 20,
+    marginBottom: 5,
   },
   controlButtonActive: {
     backgroundColor: "#4CAF50",
@@ -232,5 +286,51 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     marginTop: 4,
+  },
+  leaveButtonContainer: {
+    alignItems: "center",
+    marginTop: 10,
+  },
+  leaveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: "#F44336",
+    width: "80%",
+    height: 30,
+    gap: 8,
+  },
+  leaveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    marginTop: 4,
+    fontWeight: "600",
+  },
+  chatPanel: {
+    position: "absolute",
+    right: 20,
+    bottom: 180,
+    width: 300,
+    height: 400,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  chatTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 16,
+    color: "#333333",
   },
 });
