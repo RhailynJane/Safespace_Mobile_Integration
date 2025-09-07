@@ -332,63 +332,86 @@ export default function BookAppointment() {
         </View>
 
         {/* Date and Time Selection */}
+        {/* Date and Time Selection */}
         <Text style={styles.sectionTitle}>Select Date and Time</Text>
 
-        <Text style={styles.subSectionTitle}>Available Dates</Text>
-        <View style={styles.datesContainer}>
-          {AVAILABLE_DATES.map((date) => (
-            <TouchableOpacity
-              key={date}
-              style={[
-                styles.dateButton,
-                selectedDate === date && styles.dateButtonSelected,
-              ]}
-              onPress={() => {
-                setSelectedDate(date);
-                setSelectedTime(null); // Reset time when date changes
-              }}
-            >
-              <Text
+        {/* Available Dates Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Available Dates</Text>
+          <View style={styles.datesContainer}>
+            {AVAILABLE_DATES.map((date) => (
+              <TouchableOpacity
+                key={date}
                 style={[
-                  styles.dateText,
-                  selectedDate === date && styles.dateTextSelected,
+                  styles.dateItem,
+                  selectedDate === date && styles.dateItemSelected,
                 ]}
+                onPress={() => {
+                  setSelectedDate(date);
+                  setSelectedTime(null); // Reset time when date changes
+                }}
               >
-                {date}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Ionicons
+                  name="calendar"
+                  size={20}
+                  color={selectedDate === date ? "#4CAF50" : "#666"}
+                  style={styles.dateIcon}
+                />
+                <Text
+                  style={[
+                    styles.dateText,
+                    selectedDate === date && styles.dateTextSelected,
+                  ]}
+                >
+                  {date}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {selectedDate ? (
           <>
-            <Text style={styles.subSectionTitle}>Available Times</Text>
-            <View style={styles.timesContainer}>
-              {AVAILABLE_TIMES.map((time) => (
-                <TouchableOpacity
-                  key={time}
-                  style={[
-                    styles.timeButton,
-                    selectedTime === time && styles.timeButtonSelected,
-                  ]}
-                  onPress={() => setSelectedTime(time)}
-                >
-                  <Text
+            {/* Available Times Card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Available Times</Text>
+              <View style={styles.timesContainer}>
+                {AVAILABLE_TIMES.map((time) => (
+                  <TouchableOpacity
+                    key={time}
                     style={[
-                      styles.timeText,
-                      selectedTime === time && styles.timeTextSelected,
+                      styles.timeItem,
+                      selectedTime === time && styles.timeItemSelected,
                     ]}
+                    onPress={() => setSelectedTime(time)}
                   >
-                    {time}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Ionicons
+                      name="time"
+                      size={16}
+                      color={selectedTime === time ? "#4CAF50" : "#666"}
+                      style={styles.timeIcon}
+                    />
+                    <Text
+                      style={[
+                        styles.timeText,
+                        selectedTime === time && styles.timeTextSelected,
+                      ]}
+                    >
+                      {time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </>
         ) : (
-          <Text style={styles.placeholderText}>
-            Please select available date first
-          </Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Available Times</Text>
+            <View style={styles.timesContainer}></View>
+            <Text style={styles.placeholderText}>
+              Please select available date first
+            </Text>
+          </View>
         )}
       </ScrollView>
 
@@ -693,26 +716,47 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "600",
   },
-  
-  datesContainer: {
-    marginBottom: 24,
+  card: {
+    backgroundColor: "#d0e0e3",
+    borderRadius: 12,
+    padding: 20,
     marginHorizontal: 15,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  dateButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 16,
+  },
+  datesContainer: {
+    gap: 10,
+  },
+  dateItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
     borderRadius: 8,
+    padding: 12,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
-    marginBottom: 8,
+    borderColor: "#E9ECEF",
   },
-  dateButtonSelected: {
+  dateItemSelected: {
     backgroundColor: "#E8F5E9",
     borderColor: "#4CAF50",
   },
+  dateIcon: {
+    marginRight: 12,
+  },
   dateText: {
     fontSize: 14,
-    color: "#666",
+    color: "#495057",
+    flex: 1,
   },
   dateTextSelected: {
     color: "#2E7D32",
@@ -721,24 +765,30 @@ const styles = StyleSheet.create({
   timesContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 24,
-    marginHorizontal: 15,
+    gap: 10,
+    justifyContent: "space-between",
   },
-  timeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  timeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
     borderRadius: 8,
+    padding: 10,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E9ECEF",
+    width: "48%", // Two items per row
+    minWidth: 140,
   },
-  timeButtonSelected: {
+  timeItemSelected: {
     backgroundColor: "#E8F5E9",
     borderColor: "#4CAF50",
   },
+  timeIcon: {
+    marginRight: 8,
+  },
   timeText: {
     fontSize: 14,
-    color: "#666",
+    color: "#495057",
   },
   timeTextSelected: {
     color: "#2E7D32",
@@ -746,11 +796,10 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontSize: 14,
-    color: "#999",
+    color: "#6C757D",
     fontStyle: "italic",
-    marginBottom: 24,
     textAlign: "center",
+    paddingVertical: 20,
     marginHorizontal: 15,
   },
-  
 });
