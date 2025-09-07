@@ -37,8 +37,8 @@ export default function AppointmentList() {
       date: "October 07, 2025",
       time: "10:30 AM",
       type: "Video",
-      status: "upcoming",
-      meetingLink: "https://meet.example.com/abc123",
+      status: "Upcoming",
+      meetingLink: "https://meet.google.com/knr-pkav-xpt",
     },
   ];
 
@@ -266,6 +266,24 @@ export default function AppointmentList() {
             <Text style={styles.detailText}>Status: {appointment.status}</Text>
           </View>
         </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleJoinSession}>
+            <Ionicons name="videocam" size={20} color="#FFF" />
+            <Text style={styles.primaryButtonText}>Join Session</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleReschedule}>
+            <Ionicons name="calendar" size={20} color="#4CAF50" />
+            <Text style={styles.secondaryButtonText}>Reschedule</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.tertiaryButton} onPress={handleCancel}>
+            <Ionicons name="close-circle" size={20} color="#F44336" />
+            <Text style={styles.tertiaryButtonText}>Cancel Appointment</Text>
+          </TouchableOpacity>
+        </View>
     </ScrollView>
 
 
@@ -436,5 +454,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#666",
     marginLeft: 12,
+  },
+  actions: {
+    marginBottom: 24,
+  },
+  primaryButton: {
+    backgroundColor: "#4CAF50",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  secondaryButton: {
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    marginBottom: 12,
+  },
+  secondaryButtonText: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  tertiaryButton: {
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#F44336",
+  },
+  tertiaryButtonText: {
+    color: "#F44336",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
   },
 });
