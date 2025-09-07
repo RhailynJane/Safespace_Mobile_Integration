@@ -160,8 +160,6 @@ export default function CommunityMainScreen() {
           </View>
         </View>
 
-        <View style={styles.divider} />
-
         {/* Posts List */}
         <View style={styles.postsSection}>
           {POSTS.map((post) => (
@@ -335,10 +333,6 @@ const styles = StyleSheet.create({
   categoryTextActive: {
     color: "#FFFFFF",
     fontWeight: "500",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#E0E0E0",
   },
   postsSection: {
     padding: 16,
