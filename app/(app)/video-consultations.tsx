@@ -138,6 +138,30 @@ export default function VideoScreen() {
     },
   ];
 
+  const appointments = [
+    {
+      id: 1,
+      supportWorker: "Eric Young",
+      date: "October 07, 2025",
+      time: "10:30 AM",
+      type: "Video",
+      status: "Upcoming",
+      meetingLink: "https://meet.google.com/knr-pkav-xpt",
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+    },
+  ];
+
+  const handleJoinMeeting = () => {
+    const meetingUrl = appointments[0]?.meetingLink;
+    if (meetingUrl) {
+      // Open the meeting link in the browser
+      // For Expo, use Linking API
+      import("expo-linking").then(Linking => {
+        Linking.openURL(meetingUrl);
+      });
+    }
+  };
+
   const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -167,13 +191,40 @@ export default function VideoScreen() {
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Video Consultation Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Video Consultation space for
-          you.
-        </Text>
-      </View>
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.content}>
+          <View style={styles.appointmentCard}>
+            <View style={styles.statusContainer}>
+              <Text style={styles.name}>{appointments[0]?.supportWorker ?? ""}</Text>
+              <Text style={styles.date}>
+                {appointments[0]?.date ?? ""} {appointments[0]?.time ?? ""}
+              </Text>
+              <View
+                style={[
+                  styles.statusBadge,
+                  appointments[0]?.status === "Upcoming"
+                    ? styles.upcomingBadge
+                    : appointments[0]?.status === "Completed"
+                    ? styles.completedBadge
+                    : styles.canceledBadge,
+                ]}
+              >
+                <Text style={styles.statusText}>{appointments[0]?.status ?? ""}</Text>
+              </View>
+            </View>
+
+            {appointments[0] && appointments[0].status === "Upcoming" && (
+              <TouchableOpacity
+                style={styles.joinButton}
+                onPress={handleJoinMeeting}
+              >
+                <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                <Text style={styles.joinButtonText}>Join Meeting</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -309,5 +360,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  appointmentCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  statusContainer: {
+    marginBottom: 20,
+  },
+  name: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  date: {
+    fontSize: 16,
+    color: "#757575",
+    marginBottom: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: "flex-start",
+  },
+  upcomingBadge: {
+    backgroundColor: "#FFECB3",
+  },
+  completedBadge: {
+    backgroundColor: "#C8E6C9",
+  },
+  canceledBadge: {
+    backgroundColor: "#FFCDD2",
+  },
+  statusText: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  joinButton: {
+    flexDirection: "row",
+    backgroundColor: "#4CAF50",
+    padding: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 24,
+    gap: 8,
+  },
+  joinButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
