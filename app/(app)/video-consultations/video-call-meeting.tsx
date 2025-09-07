@@ -20,7 +20,7 @@ export default function VideoCallScreen() {
   const [isRaiseHand, setIsRaiseHand] = useState(false);
 
   const handleLeaveCall = () => {
-    router.back();
+    router.replace("../(tabs)/appointments/appointment-list");
   };
 
   const handleToggleCamera = () => {
@@ -74,7 +74,7 @@ export default function VideoCallScreen() {
 
         {/* Call Status */}
         <View style={styles.callStatus}>
-          <Text style={styles.callStatusText}>00:08</Text>
+          <Text style={styles.callStatusText}>00:01</Text>
         </View>
       </View>
 
@@ -146,12 +146,6 @@ export default function VideoCallScreen() {
               color="#FFFFFF"
             />
             <Text style={styles.controlText}>Mic</Text>
-          </TouchableOpacity>
-
-          {/* Share Button */}
-          <TouchableOpacity style={styles.controlButton}>
-            <Ionicons name="share" size={24} color="#FFFFFF" />
-            <Text style={styles.controlText}>Share</Text>
           </TouchableOpacity>
         </View>
 
