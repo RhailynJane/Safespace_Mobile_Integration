@@ -38,7 +38,7 @@ export default function VideoCallScreen() {
   };
 
   const handleStartMeeting = () => {
-    alert("Meeting started successfully!");
+    router.replace("/video-consultations/video-call-meeting");
   };
 
   const currentAppointment = appointments[0];
@@ -60,18 +60,18 @@ export default function VideoCallScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
-  
+
   return (
     <SafeAreaView style={styles.meetingContainer}>
       <View style={styles.meetingHeader}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
           <Ionicons name="arrow-back" size={24} color="#4CAF50" />
         </TouchableOpacity>
         <Text style={styles.meetingTitle}>Safespace Meeting</Text>
-        <View style={{ width: 24 }} /> 
+        <View style={{ width: 24 }} />
       </View>
 
       {/* Meeting Content */}
@@ -79,7 +79,7 @@ export default function VideoCallScreen() {
         <Text style={styles.meetingWith}>
           Meeting with {currentAppointment?.supportWorker ?? ""}
         </Text>
-        
+
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Ionicons name="person" size={50} color="#FFFFFF" />
@@ -91,55 +91,59 @@ export default function VideoCallScreen() {
       </View>
 
       {/*Audio Options Content */}
-       <View style={styles.audioOptions}>
-          <Text style={styles.audioTitle}>Audio Options</Text>
-          
-          <TouchableOpacity 
-            style={[
-              styles.audioOption,
-              audioOption === 'phone' && styles.audioOptionSelected
-            ]}
-            onPress={() => setAudioOption('phone')}
-          >
-            <Ionicons 
-              name={audioOption === 'phone' ? "radio-button-on" : "radio-button-off"} 
-              size={24} 
-              color={audioOption === 'phone' ? "#4CAF50" : "#757575"} 
-            />
-            <View style={styles.audioOptionText}>
-              <Text style={styles.audioOptionTitle}>Phone Audio</Text>
-              <Text style={styles.audioOptionDesc}>Call in with your phone</Text>
-            </View>
-          </TouchableOpacity>
+      <View style={styles.audioOptions}>
+        <Text style={styles.audioTitle}>Audio Options</Text>
 
-          <TouchableOpacity 
-            style={[
-              styles.audioOption, 
-              audioOption === 'none' && styles.audioOptionSelected
-            ]}
-            onPress={() => setAudioOption('none')}
-          >
-            <Ionicons 
-              name={audioOption === 'none' ? "radio-button-on" : "radio-button-off"} 
-              size={24} 
-              color={audioOption === 'none' ? "#4CAF50" : "#757575"} 
-            />
-            <View style={styles.audioOptionText}>
-              <Text style={styles.audioOptionTitle}>Don't Use Audio</Text>
-              <Text style={styles.audioOptionDesc}>Join without audio</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.audioOption,
+            audioOption === "phone" && styles.audioOptionSelected,
+          ]}
+          onPress={() => setAudioOption("phone")}
+        >
+          <Ionicons
+            name={
+              audioOption === "phone" ? "radio-button-on" : "radio-button-off"
+            }
+            size={24}
+            color={audioOption === "phone" ? "#4CAF50" : "#757575"}
+          />
+          <View style={styles.audioOptionText}>
+            <Text style={styles.audioOptionTitle}>Phone Audio</Text>
+            <Text style={styles.audioOptionDesc}>Call in with your phone</Text>
+          </View>
+        </TouchableOpacity>
 
-        <View style={styles.meetingActions}>
-        <TouchableOpacity 
+        <TouchableOpacity
+          style={[
+            styles.audioOption,
+            audioOption === "none" && styles.audioOptionSelected,
+          ]}
+          onPress={() => setAudioOption("none")}
+        >
+          <Ionicons
+            name={
+              audioOption === "none" ? "radio-button-on" : "radio-button-off"
+            }
+            size={24}
+            color={audioOption === "none" ? "#4CAF50" : "#757575"}
+          />
+          <View style={styles.audioOptionText}>
+            <Text style={styles.audioOptionTitle}>Don't Use Audio</Text>
+            <Text style={styles.audioOptionDesc}>Join without audio</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.meetingActions}>
+        <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => router.back()}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.joinNowButton}
           onPress={handleStartMeeting}
         >
@@ -148,10 +152,10 @@ export default function VideoCallScreen() {
       </View>
 
       <BottomNavigation
-              tabs={tabs}
-              activeTab={activeTab}
-              onTabPress={handleTabPress}
-            />
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+      />
     </SafeAreaView>
   );
 }
@@ -214,7 +218,7 @@ const styles = StyleSheet.create({
   profileTextContainer: {
     alignItems: "center",
   },
-   audioOptions: {
+  audioOptions: {
     width: "100%",
     maxWidth: 300,
     marginRight: 15,
