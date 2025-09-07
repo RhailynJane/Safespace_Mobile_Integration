@@ -7,43 +7,39 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
+  TextInput,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
-  TextInput,
+  Animated,
+  Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 const { width, height } = Dimensions.get("window");
 
+// Mock chat messages
+const initialMessages = [
+  { id: 1, text: "Hello! How are you feeling today?", sender: "Eric", time: "10:25 AM" },
+  { id: 2, text: "I'm doing well, thank you for asking.", sender: "You", time: "10:26 AM" },
+  { id: 3, text: "That's great to hear. Let's begin our session.", sender: "Eric", time: "10:28 AM" },
+];
+
+// Emoji options
+const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
+
 export default function VideoCallScreen() {
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRaiseHand, setIsRaiseHand] = useState(false);
-
-  // Chat state
-  const [messages, setMessages] = useState([
-    { id: "1", sender: "You", text: "Hello!", time: "00:00" },
-    { id: "2", sender: "Eric Young", text: "Hi there!", time: "00:01" },
-  ]);
+  const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
+  const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState("");
-
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: (prev.length + 1).toString(),
-          sender: "You",
-          text: newMessage,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-      setNewMessage("");
-    }
-  };
+  const [reactions, setReactions] = useState<
+    { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
+  >([]);
 
   const handleLeaveCall = () => {
     router.replace("../(tabs)/appointments/appointment-list");
@@ -59,10 +55,83 @@ export default function VideoCallScreen() {
 
   const handleToggleChat = () => {
     setIsChatOpen(!isChatOpen);
+    // Close emoji panel if chat is opened
+    if (!isChatOpen) {
+      setIsEmojiPanelOpen(false);
+    }
   };
 
   const handleToggleRaiseHand = () => {
     setIsRaiseHand(!isRaiseHand);
+  };
+
+  const handleToggleEmojiPanel = () => {
+    setIsEmojiPanelOpen(!isEmojiPanelOpen);
+    // Close chat if emoji panel is opened
+    if (!isEmojiPanelOpen && isChatOpen) {
+      setIsChatOpen(false);
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (newMessage.trim()) {
+      const newMsg = {
+        id: messages.length + 1,
+        text: newMessage,
+        sender: "You",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages([...messages, newMsg]);
+      setNewMessage("");
+      
+      // Simulate a response after a short delay
+      setTimeout(() => {
+        const responseMsg = {
+          id: messages.length + 2,
+          text: "Thank you for sharing that. Let's explore this further in our session.",
+          sender: "Eric",
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, responseMsg]);
+      }, 1500);
+    }
+  };
+
+  const handleAddReaction = (emoji: string) => {
+    // Add the reaction to the screen with a random position
+    const newReaction = {
+      id: Date.now(),
+      emoji,
+      position: {
+        x: Math.random() * (width - 100) + 50, // Random x position
+        y: Math.random() * (height - 200) + 100, // Random y position
+      },
+      opacity: new Animated.Value(1),
+    };
+    
+    setReactions([...reactions, newReaction]);
+    
+    // Animate the reaction (fade out and move up)
+    Animated.sequence([
+      Animated.timing(newReaction.opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(newReaction.opacity, {
+        toValue: 0,
+        duration: 2000,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Remove the reaction after animation completes
+    setTimeout(() => {
+      setReactions(prev => prev.filter(r => r.id !== newReaction.id));
+    }, 2300);
+    
+    // Close the emoji panel after selection
+    setIsEmojiPanelOpen(false);
   };
 
   return (
@@ -102,6 +171,31 @@ export default function VideoCallScreen() {
         <View style={styles.callStatus}>
           <Text style={styles.callStatusText}>00:01</Text>
         </View>
+
+        {/* Reactions displayed on screen */}
+        {reactions.map((reaction) => (
+          <Animated.Text
+            key={reaction.id}
+            style={[
+              styles.reaction,
+              {
+                left: reaction.position.x,
+                top: reaction.position.y,
+                opacity: reaction.opacity,
+                transform: [
+                  {
+                    translateY: reaction.opacity.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -50],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            {reaction.emoji}
+          </Animated.Text>
+        ))}
       </View>
 
       {/* Bottom Controls */}
@@ -109,11 +203,8 @@ export default function VideoCallScreen() {
         {/* First Row - All controls in one line */}
         <View style={styles.controlsRow}>
           {/* Chat Button */}
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              isChatOpen && styles.controlButtonActive,
-            ]}
+          <TouchableOpacity 
+            style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
             onPress={handleToggleChat}
           >
             <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
@@ -121,55 +212,49 @@ export default function VideoCallScreen() {
           </TouchableOpacity>
 
           {/* Raise Hand Button */}
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              isRaiseHand && styles.controlButtonActive,
-            ]}
+          <TouchableOpacity 
+            style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
             onPress={handleToggleRaiseHand}
           >
-            <Ionicons
-              name={isRaiseHand ? "hand-left" : "hand-left-outline"}
-              size={24}
-              color="#FFFFFF"
+            <Ionicons 
+              name={isRaiseHand ? "hand-left" : "hand-left-outline"} 
+              size={24} 
+              color="#FFFFFF" 
             />
             <Text style={styles.controlText}>Raise</Text>
           </TouchableOpacity>
 
           {/* React Button */}
-          <TouchableOpacity style={styles.controlButton}>
+          <TouchableOpacity 
+            style={[styles.controlButton, isEmojiPanelOpen && styles.controlButtonActive]}
+            onPress={handleToggleEmojiPanel}
+          >
             <Ionicons name="happy" size={24} color="#FFFFFF" />
             <Text style={styles.controlText}>React</Text>
           </TouchableOpacity>
 
           {/* Camera Toggle */}
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              !isCameraOn && styles.controlButtonMuted,
-            ]}
+          <TouchableOpacity 
+            style={[styles.controlButton, !isCameraOn && styles.controlButtonMuted]}
             onPress={handleToggleCamera}
           >
-            <Ionicons
-              name={isCameraOn ? "videocam" : "videocam-off"}
-              size={24}
-              color="#FFFFFF"
+            <Ionicons 
+              name={isCameraOn ? "videocam" : "videocam-off"} 
+              size={24} 
+              color="#FFFFFF" 
             />
             <Text style={styles.controlText}>Camera</Text>
           </TouchableOpacity>
 
           {/* Mic Toggle */}
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              !isMicOn && styles.controlButtonMuted,
-            ]}
+          <TouchableOpacity 
+            style={[styles.controlButton, !isMicOn && styles.controlButtonMuted]}
             onPress={handleToggleMic}
           >
-            <Ionicons
-              name={isMicOn ? "mic" : "mic-off"}
-              size={24}
-              color="#FFFFFF"
+            <Ionicons 
+              name={isMicOn ? "mic" : "mic-off"} 
+              size={24} 
+              color="#FFFFFF" 
             />
             <Text style={styles.controlText}>Mic</Text>
           </TouchableOpacity>
@@ -177,7 +262,7 @@ export default function VideoCallScreen() {
 
         {/* Second Row - Only Leave button */}
         <View style={styles.leaveButtonContainer}>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={styles.leaveButton}
             onPress={handleLeaveCall}
           >
@@ -186,6 +271,24 @@ export default function VideoCallScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Emoji Panel */}
+      {isEmojiPanelOpen && (
+        <View style={styles.emojiPanel}>
+          <Text style={styles.emojiPanelTitle}>React</Text>
+          <View style={styles.emojiGrid}>
+            {emojiOptions.map((emoji, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.emojiButton}
+                onPress={() => handleAddReaction(emoji)}
+              >
+                <Text style={styles.emoji}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Chat Panel */}
       {isChatOpen && (
@@ -328,8 +431,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  // Reaction styles
+  reaction: {
+    position: "absolute",
+    fontSize: 30,
+    zIndex: 100,
+  },
+  // Controls styles
   controlsContainer: {
-    padding: 10,
+    padding: 15,
     backgroundColor: "#2D2D2D",
   },
   controlsRow: {
@@ -340,10 +450,10 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     alignItems: "center",
-    padding: 13,
+    padding: 10,
     borderRadius: 8,
     backgroundColor: "#404040",
-    minWidth: 20,
+    minWidth: 60,
     marginBottom: 5,
   },
   controlButtonActive: {
@@ -359,7 +469,6 @@ const styles = StyleSheet.create({
   },
   leaveButtonContainer: {
     alignItems: "center",
-    marginTop: 10,
   },
   leaveButton: {
     flexDirection: "row",
@@ -370,14 +479,50 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#F44336",
     width: "80%",
-    height: 30,
     gap: 8,
   },
   leaveButtonText: {
     color: "#FFFFFF",
-    fontSize: 10,
-    marginTop: 4,
+    fontSize: 14,
     fontWeight: "600",
+  },
+  // Emoji Panel styles
+  emojiPanel: {
+    position: "absolute",
+    bottom: 150,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  emojiPanelTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 12,
+    color: "#333333",
+    textAlign: "center",
+  },
+  emojiGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    width: 240,
+  },
+  emojiButton: {
+    padding: 8,
+    borderRadius: 8,
+    margin: 4,
+    backgroundColor: "#F0F0F0",
+  },
+  emoji: {
+    fontSize: 24,
   },
   // Chat Panel Styles
   chatPanelContainer: {
@@ -386,6 +531,7 @@ const styles = StyleSheet.create({
     bottom: 180,
     width: 300,
     height: 400,
+    zIndex: 1000,
   },
   chatPanel: {
     flex: 1,
@@ -465,4 +611,3 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 });
-
