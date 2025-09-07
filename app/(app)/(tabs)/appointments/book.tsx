@@ -145,7 +145,7 @@ export default function BookAppointment() {
       title: "Community Forum",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/community-forum");
+        router.push("/(app)/(tabs)/community-forum");
       },
     },
     {
