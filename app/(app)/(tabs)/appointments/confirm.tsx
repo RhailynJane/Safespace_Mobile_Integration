@@ -32,6 +32,7 @@ export default function BookAppointment() {
   const [selectedType, setSelectedType] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
+  const [appointmentNotes, setAppointmentNotes] = useState<string>("");
 
   // Mock data for support workers
   const supportWorkers = [
@@ -230,10 +231,11 @@ export default function BookAppointment() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.scrollContainer}>
         <Text style={styles.title}>
           Schedule a session with a support worker
         </Text>
+
         {/* Step Indicator */}
         <View style={styles.stepsContainer}>
           <View style={styles.stepRow}>
@@ -263,23 +265,17 @@ export default function BookAppointment() {
             </View>
           </View>
         </View>
+
         {/* Booking Details Card */}
-        <LinearGradient
-          colors={["#C0D8C1", "#A8CFAA", "#90C693"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.card}
-        >
-          {" "}
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>Booking Details</Text>
           <Text style={styles.subSectionTitle}>Appointment Summary</Text>
+          
           {appointment ? (
             <View style={styles.summaryContainer}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Support Worker:</Text>
-                <Text style={styles.summaryValue}>
-                  {appointment.supportWorker}
-                </Text>
+                <Text style={styles.summaryValue}>{appointment.supportWorker}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Date:</Text>
@@ -297,7 +293,35 @@ export default function BookAppointment() {
           ) : (
             <Text>No appointment data available</Text>
           )}
-        </LinearGradient>{" "}
+
+          <View style={styles.divider} />
+
+          <Text style={styles.subSectionTitle}>Notes for Support Worker (Optional)</Text>
+          <TextInput
+            style={styles.notesInput}
+            multiline
+            numberOfLines={4}
+            placeholder="Share any specific concerns or topics you'd like to discuss..."
+            placeholderTextColor="#999"
+            value={appointmentNotes}
+            onChangeText={setAppointmentNotes}
+          />
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.bookButton}
+              onPress={handleConfirmBooking}
+            >
+              <Text style={styles.bookButtonText}>Book Appointment</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Side Menu */}
@@ -347,22 +371,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
+  scrollContainer: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  supportWorkerCard: {
-    backgroundColor: "#c0d8c1",
-    borderRadius: 10,
-    padding: 16,
-    marginHorizontal: 15,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   header: {
     flexDirection: "row",
@@ -377,96 +392,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2E7D32",
   },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
-  },
-  buttonContainer: {
-    width: "100%",
-    alignItems: "center",
-    gap: 16,
-  },
-  primaryButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    width: "100%",
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#4CAF50",
-    fontSize: 16,
-    fontWeight: "600",
-  },
   title: {
     fontSize: 15,
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
     textAlign: "center",
+    marginTop: 16,
   },
   stepsContainer: {
     alignItems: "center",
@@ -505,25 +437,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0E0E0",
     marginHorizontal: 8,
   },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    margin: 15,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: "#333",
-  },
   card: {
-    backgroundColor: "#C0D8C1",
     borderRadius: 12,
     padding: 20,
     marginHorizontal: 15,
@@ -533,6 +447,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    backgroundColor: "#d0e0e3",
   },
   cardTitle: {
     fontSize: 20,
@@ -557,11 +472,118 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: "#666",
+    color: "#000000",
     fontWeight: "600",
   },
   summaryValue: {
     fontSize: 14,
+    color: "#333",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#000000",
+    marginVertical: 20,
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderColor: "#000000",
+    borderRadius: 8,
+    padding: 16,
+    textAlignVertical: "top",
+    marginBottom: 20,
+    minHeight: 100,
+    fontSize: 14,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  backButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    alignItems: "center",
+  },
+  backButtonText: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  bookButton: {
+    flex: 2,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  bookButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalContainer: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  sideMenu: {
+    width: "75%",
+    backgroundColor: "#FFFFFF",
+    height: "100%",
+  },
+  sideMenuHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    alignItems: "center",
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: "#757575",
+  },
+  sideMenuContent: {
+    padding: 10,
+  },
+  sideMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  sideMenuItemText: {
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 15,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    margin: 15,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
     color: "#333",
   },
 });
