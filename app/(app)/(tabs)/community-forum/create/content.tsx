@@ -8,20 +8,20 @@ import {
   ScrollView,
   Alert,
   Image,
+  TextInput,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams  } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { useAuth } from "../../../../../context/AuthContext";
 
-
-
 export default function SelectCategoryScreen() {
-const [selectedCategory, setSelectedCategory] = useState("");
-const [activeTab, setActiveTab] = useState("community-forum");
-const [postContent, setPostContent] = useState(""); 
-const [isPrivate, setIsPrivate] = useState(false);
-const [isDraft, setIsDraft] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [activeTab, setActiveTab] = useState("community-forum");
+  const [postContent, setPostContent] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [isDraft, setIsDraft] = useState(false);
   const { user, profile, logout } = useAuth();
 
   const handleSaveDraft = () => {
@@ -34,12 +34,11 @@ const [isDraft, setIsDraft] = useState(false);
       category: selectedCategory,
       content: postContent,
       isPrivate,
-      isDraft
+      isDraft,
     });
-    
+
     router.push("/community-forum/create/success");
   };
-  
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -58,7 +57,7 @@ const [isDraft, setIsDraft] = useState(false);
     }
   };
 
-    const getDisplayName = () => {
+  const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
     if (user?.email) return user.email.split("@")[0];
@@ -77,22 +76,56 @@ const [isDraft, setIsDraft] = useState(false);
       </View>
 
       <ScrollView style={styles.content}>
-              {/* User Profile Summary */}
-              <View style={styles.profileSection}>
-                <View style={styles.profileContainer}>
-                  <View style={styles.profileImageContainer}>
-                    <Image
-                      source={{
-                        uri: "https://randomuser.me/api/portraits/women/17.jpg",
-                      }}
-                      style={styles.profileImage}
-                    />
-                  </View>
-                  <View style={styles.profileTextContainer}>
-                    <Text style={styles.userName}>{getDisplayName()}</Text>
-                  </View>
-                </View>
+        {/* User Profile Summary with Post Card Inside */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileSection}>
+            <View style={styles.profileContainer}>
+              <View style={styles.profileImageContainer}>
+                <Image
+                  source={{
+                    uri: "https://randomuser.me/api/portraits/women/17.jpg",
+                  }}
+                  style={styles.profileImage}
+                />
               </View>
+              <View style={styles.profileTextContainer}>
+                <Text style={styles.userName}>{getDisplayName()}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Post Content Card (inside user card) */}
+          <View style={styles.postCard}>
+            <TextInput
+              style={styles.postInput}
+              multiline
+              placeholder="Share your thoughts, experiences, or questions..."
+              value={postContent}
+              onChangeText={setPostContent}
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.charCount}>{postContent.length}/300</Text>
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Privacy Settings */}
+        <View style={styles.privacyContainer}>
+          <View style={styles.privacyRow}>
+            <Text style={styles.privacyText}>Hide from Community?</Text>
+            <Switch
+              value={isPrivate}
+              onValueChange={setIsPrivate}
+              thumbColor={isPrivate ? "#4CAF50" : "#f4f3f4"}
+              trackColor={{ false: "#767577", true: "#81b0ff" }}
+            />
+          </View>
+          {isPrivate && (
+            <Text style={styles.privacyNote}>This post will be private.</Text>
+          )}
+        </View>
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -124,46 +157,93 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
   },
   content: {
-    flexGrow: 1,
-    padding: 20,
+    flex: 1,
+    padding: 16,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 24,
-    textAlign: "center",
+  profileCard: {
+    backgroundColor: "#d7e0e9",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   profileSection: {
-    padding: 20,
-    backgroundColor: "#d9ead3",
+    marginBottom: 16,
   },
   profileContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
   profileImageContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#E0E0E0",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
   profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   profileTextContainer: {
     justifyContent: "center",
   },
   userName: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "600",
     color: "#212121",
-    marginBottom: 4,
+  },
+  postCard: {
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+    padding: 12,
+  },
+  postInput: {
+    minHeight: 120,
+    fontSize: 12,
+    textAlignVertical: "top",
+    color: "#424242",
+  },
+  charCount: {
+    fontSize: 12,
+    color: "#999",
+    textAlign: "right",
+    marginTop: 8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F8F8F8",
+    marginVertical: 16,
+  },
+  privacyContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  privacyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  privacyText: {
+    fontSize: 16,
+    color: "#212121",
+  },
+  privacyNote: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
   },
 });
-
