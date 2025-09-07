@@ -12,6 +12,7 @@ import {
   Dimensions,
   Linking,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -196,11 +197,17 @@ export default function VideoScreen() {
       <ScrollView style={styles.scrollContent}>
         <View style={styles.content}>
           <View style={styles.appointmentCard}>
-            <View style={styles.statusContainer}>
-              <Text style={styles.name}>{appointments[0]?.supportWorker ?? ""}</Text>
-              <Text style={styles.date}>
-                {appointments[0]?.date ?? ""} {appointments[0]?.time ?? ""}
-              </Text>
+            <View style={styles.profileContainer}>
+              <Image
+                source={{ uri: appointments[0]?.avatar }}
+                style={styles.avatar}
+              />
+              <View style={styles.nameContainer}>
+                <Text style={styles.name}>{appointments[0]?.supportWorker ?? ""}</Text>
+                <Text style={styles.date}>
+                  {appointments[0]?.date ?? ""} {appointments[0]?.time ?? ""}
+                </Text>
+              </View>
               <View
                 style={[
                   styles.statusBadge,
@@ -214,16 +221,6 @@ export default function VideoScreen() {
                 <Text style={styles.statusText}>{appointments[0]?.status ?? ""}</Text>
               </View>
             </View>
-
-            {appointments[0] && appointments[0].status === "Upcoming" && (
-              <TouchableOpacity
-                style={styles.joinButton}
-                onPress={handleJoinMeeting}
-              >
-                <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                <Text style={styles.joinButtonText}>Join Meeting</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </ScrollView>
@@ -269,11 +266,16 @@ export default function VideoScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -378,18 +380,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
+    width: width - 40,
   },
   statusContainer: {
     marginBottom: 20,
   },
   name: {
-    fontSize: 22,
+    fontSize: 15,
     fontWeight: "600",
     color: "#212121",
     marginBottom: 4,
   },
   date: {
-    fontSize: 16,
+    fontSize: 13,
     color: "#757575",
     marginBottom: 12,
   },
@@ -397,7 +400,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    alignSelf: "flex-start",
+    alignSelf: "flex-end",
   },
   upcomingBadge: {
     backgroundColor: "#FFECB3",
@@ -426,5 +429,13 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  profileContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  nameContainer: {
+    flex: 1,
   },
 });
