@@ -265,6 +265,38 @@ export default function BookAppointment() {
             </View>
           </View>
         </View>
+
+        {/* Confirmation Card */}
+        <View style={styles.confirmationCard}>
+          <Text style={styles.confirmationTitle}>Appointment Booked</Text>
+          <Text style={styles.confirmationMessage}>
+            Your appointment has been successfully scheduled.
+          </Text>
+
+          <View style={styles.appointmentDetails}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Support Worker:</Text>
+              <Text style={styles.detailValue}>{appointment ? appointment.supportWorker : ""}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Date:</Text>
+              <Text style={styles.detailValue}>
+                {appointment ? `${appointment.date}` : ""}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Time:</Text>
+              <Text style={styles.detailValue}>
+                {appointment ? `${appointment.time}` : ""}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Session Type:</Text>
+              <Text style={styles.detailValue}>{appointment ? appointment.type : ""}</Text>
+            </View>
+          </View>
+        </View>
+          
       </ScrollView>
 
       {/* Side Menu */}
@@ -528,5 +560,54 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#333",
+  },
+   confirmationCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 24,
+    marginHorizontal: 15,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    alignItems: "center",
+  },
+  confirmationTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#2E7D32",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  confirmationMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  appointmentDetails: {
+    width: "100%",
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  detailLabel: {
+    fontSize: 16,
+    color: "#666",
+    fontWeight: "600",
+  },
+  detailValue: {
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "500",
   },
 });
