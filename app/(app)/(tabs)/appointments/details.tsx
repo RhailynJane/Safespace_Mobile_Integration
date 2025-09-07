@@ -330,6 +330,66 @@ export default function BookAppointment() {
             );
           })}
         </View>
+
+        {/* Date and Time Selection */}
+        <Text style={styles.sectionTitle}>Select Date and Time</Text>
+
+        <Text style={styles.subSectionTitle}>Available Dates</Text>
+        <View style={styles.datesContainer}>
+          {AVAILABLE_DATES.map((date) => (
+            <TouchableOpacity
+              key={date}
+              style={[
+                styles.dateButton,
+                selectedDate === date && styles.dateButtonSelected,
+              ]}
+              onPress={() => {
+                setSelectedDate(date);
+                setSelectedTime(null); // Reset time when date changes
+              }}
+            >
+              <Text
+                style={[
+                  styles.dateText,
+                  selectedDate === date && styles.dateTextSelected,
+                ]}
+              >
+                {date}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {selectedDate ? (
+          <>
+            <Text style={styles.subSectionTitle}>Available Times</Text>
+            <View style={styles.timesContainer}>
+              {AVAILABLE_TIMES.map((time) => (
+                <TouchableOpacity
+                  key={time}
+                  style={[
+                    styles.timeButton,
+                    selectedTime === time && styles.timeButtonSelected,
+                  ]}
+                  onPress={() => setSelectedTime(time)}
+                >
+                  <Text
+                    style={[
+                      styles.timeText,
+                      selectedTime === time && styles.timeTextSelected,
+                    ]}
+                  >
+                    {time}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        ) : (
+          <Text style={styles.placeholderText}>
+            Please select available date first
+          </Text>
+        )}
       </ScrollView>
 
       {/* Side Menu */}
@@ -633,4 +693,64 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "600",
   },
+  
+  datesContainer: {
+    marginBottom: 24,
+    marginHorizontal: 15,
+  },
+  dateButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    marginBottom: 8,
+  },
+  dateButtonSelected: {
+    backgroundColor: "#E8F5E9",
+    borderColor: "#4CAF50",
+  },
+  dateText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  dateTextSelected: {
+    color: "#2E7D32",
+    fontWeight: "600",
+  },
+  timesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 24,
+    marginHorizontal: 15,
+  },
+  timeButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  timeButtonSelected: {
+    backgroundColor: "#E8F5E9",
+    borderColor: "#4CAF50",
+  },
+  timeText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  timeTextSelected: {
+    color: "#2E7D32",
+    fontWeight: "600",
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: "#999",
+    fontStyle: "italic",
+    marginBottom: 24,
+    textAlign: "center",
+    marginHorizontal: 15,
+  },
+  
 });
