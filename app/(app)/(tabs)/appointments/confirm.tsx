@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useAuth } from "../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function BookAppointment() {
   const { user, profile, logout } = useAuth();
@@ -27,30 +28,33 @@ export default function BookAppointment() {
 
   const { supportWorkerId } = useLocalSearchParams();
 
+  // Add state for selectedType, selectedDate, selectedTime
+  const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
+
   // Mock data for support workers
   const supportWorkers = [
     {
       id: 1,
       name: "Eric Young",
-      title: "Licensed Therapist",
+      title: "Support worker",
       avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Stress"],
+      specialties: ["Anxiety", "Depression", "Trauma"],
     },
     {
       id: 2,
-      name: "Sarah Lee",
-      title: "Mental Health Counselor",
-      avatar: "https://randomuser.me/api/portraits/women/2.jpg",
-      specialties: ["Relationships", "Self-Esteem", "Trauma"],
+      name: "Michael Chen",
+      title: "Support worker",
+      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
+      specialties: ["Anxiety", "Depression", "Trauma"],
     },
   ];
 
   // Find the support worker based on the ID from the URL
-  const supportWorker = supportWorkers.find(sw => sw.id === Number(supportWorkerId));
-  
-  const [selectedType, setSelectedType] = useState("Video Call");
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const supportWorker = supportWorkers.find(
+    (sw) => sw.id === Number(supportWorkerId)
+  );
 
   if (!supportWorker) {
     return <Text>Support worker not found</Text>;
@@ -178,6 +182,31 @@ export default function BookAppointment() {
     return "User";
   };
 
+  const handleConfirmBooking = () => {
+    router.push({
+      pathname: "/appointments/confirmation",
+      params: {
+        supportWorkerId: supportWorker.id,
+        supportWorkerName: supportWorker.name,
+        selectedType,
+        selectedDate,
+        selectedTime,
+      },
+    });
+  };
+
+  // Mock data for appointments
+  const appointments = [
+    {
+      id: 1,
+      supportWorker: "Eric Young",
+      date: "October 07, 2025",
+      time: "10:30 AM",
+      type: "Video",
+      status: "upcoming",
+    },
+  ];
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -186,17 +215,7 @@ export default function BookAppointment() {
     );
   }
 
-  // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 06, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "upcoming",
-    },
-  ];
+  const appointment = appointments.length > 0 ? appointments[0] : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -215,29 +234,26 @@ export default function BookAppointment() {
         <Text style={styles.title}>
           Schedule a session with a support worker
         </Text>
-
         {/* Step Indicator */}
         <View style={styles.stepsContainer}>
           <View style={styles.stepRow}>
             {/* Step 1 - Inactive */}
             <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>
-                1
-              </Text>
+              <Text style={styles.stepNumber}>1</Text>
             </View>
             <View style={styles.stepConnector} />
 
-            {/* Step 2 - Active */}
+            {/* Step 2 - Inactive */}
+            <View style={styles.stepCircle}>
+              <Text style={styles.stepNumber}>2</Text>
+            </View>
+            <View style={styles.stepConnector} />
+
+            {/* Step 3 - Active */}
             <View style={[styles.stepCircle, styles.stepCircleActive]}>
               <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                2
+                3
               </Text>
-            </View>
-            <View style={styles.stepConnector} />
-
-            {/* Step 3 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>3</Text>
             </View>
             <View style={styles.stepConnector} />
 
@@ -247,8 +263,41 @@ export default function BookAppointment() {
             </View>
           </View>
         </View>
-
-    
+        {/* Booking Details Card */}
+        <LinearGradient
+          colors={["#C0D8C1", "#A8CFAA", "#90C693"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.card}
+        >
+          {" "}
+          <Text style={styles.cardTitle}>Booking Details</Text>
+          <Text style={styles.subSectionTitle}>Appointment Summary</Text>
+          {appointment ? (
+            <View style={styles.summaryContainer}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Support Worker:</Text>
+                <Text style={styles.summaryValue}>
+                  {appointment.supportWorker}
+                </Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Date:</Text>
+                <Text style={styles.summaryValue}>{appointment.date}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Time:</Text>
+                <Text style={styles.summaryValue}>{appointment.time}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Session Type:</Text>
+                <Text style={styles.summaryValue}>{appointment.type}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text>No appointment data available</Text>
+          )}
+        </LinearGradient>{" "}
       </ScrollView>
 
       {/* Side Menu */}
@@ -471,6 +520,48 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
+    color: "#333",
+  },
+  card: {
+    backgroundColor: "#C0D8C1",
+    borderRadius: 12,
+    padding: 20,
+    marginHorizontal: 15,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  subSectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+  summaryContainer: {
+    marginBottom: 20,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "600",
+  },
+  summaryValue: {
+    fontSize: 14,
     color: "#333",
   },
 });
