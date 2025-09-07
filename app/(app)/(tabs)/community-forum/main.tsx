@@ -134,6 +134,33 @@ export default function CommunityMainScreen() {
             <Ionicons name="add" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
+
+        {/* Browse By Categories */}
+        <View style={styles.categoriesHeader}>
+          <View style={styles.categoriesContainer}>
+            {CATEGORIES.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  selectedCategory === category &&
+                    styles.categoryButtonActive,
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text
+                  style={[
+                    styles.categoryText,
+                    selectedCategory === category &&
+                      styles.categoryTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
       </ScrollView>
 
       <BottomNavigation
@@ -218,4 +245,38 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+
+categoriesHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  flexWrap: "wrap",
+  marginTop: 16,
+  paddingHorizontal: 16,
+  paddingBottom: 8,
+  justifyContent: "center",
+},
+
+categoriesContainer: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+},
+categoryButton: {
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 16,
+  backgroundColor: "#F5F5F5",
+  marginBottom: 4,
+},
+categoryButtonActive: {
+  backgroundColor: "#4CAF50",
+},
+categoryText: {
+  fontSize: 10,
+  color: "#666",
+},
+categoryTextActive: {
+  color: "#FFFFFF",
+  fontWeight: "500",
+},
 });
