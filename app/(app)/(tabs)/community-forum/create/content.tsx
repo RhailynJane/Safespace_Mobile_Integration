@@ -128,6 +128,27 @@ export default function SelectCategoryScreen() {
         </View>
       </ScrollView>
 
+      {/* Action Buttons */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.draftButton}
+          onPress={handleSaveDraft}
+        >
+          <Text style={styles.draftButtonText}>Save as Draft</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.publishButton,
+            !postContent.trim() && styles.publishButtonDisabled
+          ]}
+          onPress={handlePublish}
+          disabled={!postContent.trim()}
+        >
+          <Text style={styles.publishButtonText}>Continue</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
@@ -245,5 +266,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     fontStyle: "italic",
+  },
+  footer: {
+    flexDirection: "row",
+    padding: 20,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#FFFFFF",
+    gap: 12,
+  },
+  draftButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  draftButtonText: {
+    color: "#666",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  publishButton: {
+    flex: 2,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  publishButtonDisabled: {
+    backgroundColor: "#CCCCCC",
+  },
+  publishButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
