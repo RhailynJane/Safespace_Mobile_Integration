@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useAuth } from "../../../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -27,6 +28,14 @@ const appointments = [
 
 export default function VideoCallScreen() {
   const [audioOption, setAudioOption] = useState("phone"); // 'phone', 'none'
+  const { user, profile, logout } = useAuth();
+
+  const getDisplayName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
+  };
 
   const handleStartMeeting = () => {
     // Here you would typically connect to your video API
@@ -51,6 +60,7 @@ export default function VideoCallScreen() {
         <View style={{ width: 24 }} /> 
       </View>
 
+      {/* Meeting Content */}
       <View style={styles.meetingContent}>
         <Text style={styles.meetingWith}>
           Meeting with {currentAppointment?.supportWorker ?? ""}
@@ -60,11 +70,53 @@ export default function VideoCallScreen() {
           <View style={styles.avatar}>
             <Ionicons name="person" size={50} color="#FFFFFF" />
           </View>
-          <Text style={styles.avatarName}>{currentAppointment?.supportWorker ?? ""}</Text>
-          <Text style={styles.avatarStatus}>Connecting...</Text>
+          <View style={styles.profileTextContainer}>
+            <Text style={styles.avatarName}>{getDisplayName()}</Text>
+            <Text style={styles.avatarStatus}>Connecting...</Text>
+          </View>
         </View>
       </View>
 
+      {/*Audio Options Content */}
+       <View style={styles.audioOptions}>
+          <Text style={styles.audioTitle}>Audio Options</Text>
+          
+          <TouchableOpacity 
+            style={[
+              styles.audioOption,
+              audioOption === 'phone' && styles.audioOptionSelected
+            ]}
+            onPress={() => setAudioOption('phone')}
+          >
+            <Ionicons 
+              name={audioOption === 'phone' ? "radio-button-on" : "radio-button-off"} 
+              size={24} 
+              color={audioOption === 'phone' ? "#4CAF50" : "#757575"} 
+            />
+            <View style={styles.audioOptionText}>
+              <Text style={styles.audioOptionTitle}>Phone Audio</Text>
+              <Text style={styles.audioOptionDesc}>Call in with your phone</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              styles.audioOption, 
+              audioOption === 'none' && styles.audioOptionSelected
+            ]}
+            onPress={() => setAudioOption('none')}
+          >
+            <Ionicons 
+              name={audioOption === 'none' ? "radio-button-on" : "radio-button-off"} 
+              size={24} 
+              color={audioOption === 'none' ? "#4CAF50" : "#757575"} 
+            />
+            <View style={styles.audioOptionText}>
+              <Text style={styles.audioOptionTitle}>Don't Use Audio</Text>
+              <Text style={styles.audioOptionDesc}>Join without audio</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
     </SafeAreaView>
   );
 }
@@ -122,6 +174,49 @@ const styles = StyleSheet.create({
   },
   avatarStatus: {
     fontSize: 14,
+    color: "#757575",
+  },
+  profileTextContainer: {
+    alignItems: "center",
+  },
+   audioOptions: {
+    width: "100%",
+    maxWidth: 300,
+    marginRight: 15,
+    marginLeft: 50,
+    justifyContent: "center",
+  },
+  audioTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 15,
+  },
+  audioOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  audioOptionSelected: {
+    borderColor: "#4CAF50",
+    backgroundColor: "#F1F8E9",
+  },
+  audioOptionText: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  audioOptionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  audioOptionDesc: {
+    fontSize: 10,
     color: "#757575",
   },
 });
