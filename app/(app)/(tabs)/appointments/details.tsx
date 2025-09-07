@@ -281,6 +281,55 @@ export default function BookAppointment() {
             </View>
           </View>
         </View>
+
+        {/* Session Type Selection */}
+        {/* Session Type Selection */}
+        <Text style={styles.sectionTitle}>Select Session Type</Text>
+        <View style={styles.sessionTypeContainer}>
+          {SESSION_TYPES.map((type) => {
+            // Determine icon based on session type
+            let iconName;
+            switch (type) {
+              case "Video Call":
+                iconName = "videocam";
+                break;
+              case "Phone Call":
+                iconName = "call";
+                break;
+              case "In Person":
+                iconName = "person";
+                break;
+              default:
+                iconName = "help";
+            }
+
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.sessionTypeButton,
+                  selectedType === type && styles.sessionTypeButtonSelected,
+                ]}
+                onPress={() => setSelectedType(type)}
+              >
+                <Ionicons
+                  name={iconName as keyof typeof Ionicons.glyphMap}
+                  size={24}
+                  color={selectedType === type ? "#FFFFFF" : "#4CAF50"}
+                  style={styles.sessionTypeIcon}
+                />
+                <Text
+                  style={[
+                    styles.sessionTypeText,
+                    selectedType === type && styles.sessionTypeTextSelected,
+                  ]}
+                >
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </ScrollView>
 
       {/* Side Menu */}
@@ -534,5 +583,54 @@ const styles = StyleSheet.create({
   supportWorkerTitle: {
     fontSize: 14,
     color: "#666",
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 10,
+    marginTop: 10,
+    marginLeft: 16,
+  },
+  subSectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+  sessionTypeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginLeft: 16,
+    marginRight: 16,
+    marginBottom: 24,
+    gap: 8,
+  },
+  sessionTypeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    alignItems: "center",
+    marginHorizontal: 4,
+    justifyContent: "center",
+  },
+  sessionTypeButtonSelected: {
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
+  },
+  sessionTypeIcon: {
+    marginBottom: 8,
+  },
+  sessionTypeText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
+  sessionTypeTextSelected: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 });
