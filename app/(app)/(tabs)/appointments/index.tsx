@@ -157,8 +157,12 @@ export default function AppointmentsScreen() {
   }
 
   const handleBookAppointment = () => {
-    router.push("../appointments/book.tsx");
+    router.push("../appointments/book");
   };
+
+  const handleViewScheduled = () => {
+    router.push("../appointments/appointment-list");
+  }
 
   
 
@@ -168,7 +172,7 @@ export default function AppointmentsScreen() {
         <TouchableOpacity style={styles.primaryButton} onPress={handleBookAppointment}>
           <Text style={styles.buttonText}>Book Appointment</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveView("scheduled")}>
+        <TouchableOpacity style={styles.secondaryButton} onPress={handleViewScheduled}>
           <Text style={styles.secondaryButtonText}>Check Scheduled Appointments</Text>
         </TouchableOpacity>
       </View>

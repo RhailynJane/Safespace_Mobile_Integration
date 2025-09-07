@@ -67,10 +67,7 @@ export default function AppointmentList() {
   }
 
   const handleJoinSession = () => {
-    Linking.openURL(appointment.meetingLink).catch((err) => {
-      Alert.alert("Error", "Could not open the meeting link");
-      console.error("Error opening URL:", err);
-    });
+    router.push("/video-consultations");
   };
 
   const handleReschedule = () => {
