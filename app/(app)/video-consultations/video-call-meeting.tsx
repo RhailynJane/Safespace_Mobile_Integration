@@ -58,6 +58,25 @@ export default function VideoCallScreen() {
           </View>
         </View>
       </View>
+
+      {/* Self Video Preview */}
+        <View style={styles.selfVideoPreview}>
+          <Image
+            source={{ uri: "https://randomuser.me/api/portraits/women/17.jpg" }}
+            style={styles.selfVideoImage}
+            resizeMode="cover"
+          />
+          {!isCameraOn && (
+            <View style={styles.cameraOffOverlay}>
+              <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
+            </View>
+          )}
+        </View>
+
+        {/* Call Status */}
+        <View style={styles.callStatus}>
+          <Text style={styles.callStatusText}>00:08</Text>
+        </View>
     </SafeAreaView>
   );
 }
@@ -102,5 +121,44 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
     borderRadius: 10,
     padding: 4,
+  },
+  selfVideoPreview: {
+    position: "absolute",
+    bottom: 100,
+    right: 20,
+    width: 120,
+    height: 160,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  selfVideoImage: {
+    width: "100%",
+    height: "100%",
+  },
+  cameraOffOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  callStatus: {
+    position: "absolute",
+    top: 20,
+    alignSelf: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  callStatusText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

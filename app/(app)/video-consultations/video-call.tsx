@@ -38,7 +38,7 @@ export default function VideoCallScreen() {
   };
 
   const handleStartMeeting = () => {
-    router.replace("/video-consultations/video-call-meeting");
+    router.replace("../video-consultations/video-call-meeting");
   };
 
   const currentAppointment = appointments[0];
