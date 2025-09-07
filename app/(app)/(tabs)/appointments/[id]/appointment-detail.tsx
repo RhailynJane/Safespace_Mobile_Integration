@@ -13,22 +13,25 @@ import {
   Image,
   Linking,
   Alert,
+  ImageBackground,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { useAuth } from "../../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
+import { BlurView } from "expo-blur";
 
 export default function AppointmentList() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [searchQuery, setSearchQuery] = useState("");
   const { id } = useLocalSearchParams();
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [rescheduleModalVisible, setRescheduleModalVisible] = useState(false);
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  
   // Mock data for appointments
   const appointments = [
     {
@@ -80,7 +83,6 @@ export default function AppointmentList() {
 
   const confirmCancel = () => {
     setLoading(true);
-    // Simulate API call
     setTimeout(() => {
       setLoading(false);
       setCancelModalVisible(false);
@@ -91,7 +93,6 @@ export default function AppointmentList() {
 
   const confirmReschedule = () => {
     setLoading(true);
-    // Simulate API call
     setTimeout(() => {
       setLoading(false);
       setRescheduleModalVisible(false);
@@ -284,6 +285,42 @@ export default function AppointmentList() {
             <Text style={styles.tertiaryButtonText}>Cancel Appointment</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Cancel Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={cancelModalVisible}
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setCancelModalVisible(false)}>
+          <BlurView intensity={20} style={styles.blurContainer}>
+            <View style={styles.confirmationModalContent}>
+              <View style={styles.modalIconContainer}>
+                <Ionicons name="close-circle" size={48} color="#F44336" />
+              </View>
+              <Text style={styles.modalTitle}>Cancel Appointment?</Text>
+              <Text style={styles.modalText}>
+                Are you sure you want to cancel your session with {appointment.supportWorker} on {appointment.date}?
+              </Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalCancelButton]} 
+                  onPress={() => setCancelModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelButtonText}>Keep Appointment</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.modalConfirmButton]} 
+                  onPress={confirmCancel}
+                >
+                  <Text style={styles.modalConfirmButtonText}>Yes, Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </BlurView>
+        </Pressable>
+      </Modal>
     </ScrollView>
 
 
@@ -505,5 +542,79 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2c3e50",
+    marginBottom: 12,
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 24,
+    lineHeight: 24,
+    textAlign: "center",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 6,
+  },
+  modalCancelButton: {
+    backgroundColor: "#F5F5F5",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  modalCancelButtonText: {
+    color: "#666",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  modalConfirmButton: {
+    backgroundColor: "#F44336",
+  },
+  modalConfirmButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    textAlign: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  blurContainer: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmationModalContent: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 24,
+    width: "85%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#F8F9FA",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
   },
 });
