@@ -50,7 +50,22 @@ export default function VideoCallScreen() {
         <Text style={styles.meetingTitle}>Safespace Meeting</Text>
         <View style={{ width: 24 }} /> 
       </View>
-      </SafeAreaView>
+
+      <View style={styles.meetingContent}>
+        <Text style={styles.meetingWith}>
+          Meeting with {currentAppointment?.supportWorker ?? ""}
+        </Text>
+        
+        <View style={styles.avatarContainer}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={50} color="#FFFFFF" />
+          </View>
+          <Text style={styles.avatarName}>{currentAppointment?.supportWorker ?? ""}</Text>
+          <Text style={styles.avatarStatus}>Connecting...</Text>
+        </View>
+      </View>
+
+    </SafeAreaView>
   );
 }
 
@@ -75,5 +90,38 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#2E7D32",
+  },
+  meetingContent: {
+    flex: 1,
+    padding: 20,
+    alignItems: "center",
+  },
+  meetingWith: {
+    fontSize: 16,
+    color: "#757575",
+    marginBottom: 30,
+  },
+  avatarContainer: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  avatarName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 5,
+  },
+  avatarStatus: {
+    fontSize: 14,
+    color: "#757575",
   },
 });
