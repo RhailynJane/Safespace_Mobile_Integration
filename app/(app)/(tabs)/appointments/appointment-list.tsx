@@ -199,10 +199,12 @@ export default function AppointmentList() {
 
   const appointment = appointments.length > 0 ? appointments[0] : null;
 
-  const handleAppointmentPress = (appointmentId: number) => {
+const handleAppointmentPress = (appointmentId: number) => {
     // Navigate to appointment details or show details modal
-    router.push(`/(app)/(tabs)/appointments/${appointmentId}`);
-  };
+    if (appointment) {
+      router.push(`/(app)/(tabs)/appointments/${appointment.id}/appointment-detail`);
+    }
+};
 
   return (
     <SafeAreaView style={styles.container}>
