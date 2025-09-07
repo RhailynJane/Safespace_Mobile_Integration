@@ -15,9 +15,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
-import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from "../../../../context/AuthContext";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
@@ -195,7 +195,12 @@ export default function MessagesScreen() {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#9E9E9E" style={styles.searchIcon} />
+        <Ionicons
+          name="search"
+          size={20}
+          color="#9E9E9E"
+          style={styles.searchIcon}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
@@ -205,14 +210,13 @@ export default function MessagesScreen() {
         />
       </View>
 
-
       {/* Conversation List */}
       <ScrollView style={styles.conversationList}>
         {conversations.map((conversation) => (
-          <TouchableOpacity 
-            key={conversation.id} 
+          <TouchableOpacity
+            key={conversation.id}
             style={styles.conversationItem}
-            onPress={() => router.push(`/message-chat-screen?id=${conversation.id}`)}
+            onPress={() => router.replace(`../messages/message-chat-screen?id=${conversation.id}`)}
           >
             <View style={styles.avatarContainer}>
               <Image
@@ -221,23 +225,23 @@ export default function MessagesScreen() {
               />
               {conversation.online && <View style={styles.onlineIndicator} />}
             </View>
-            
+
             <View style={styles.conversationContent}>
               <View style={styles.conversationHeader}>
                 <Text style={styles.conversationName}>{conversation.name}</Text>
                 <Text style={styles.conversationTime}>{conversation.time}</Text>
               </View>
-              <Text 
+              <Text
                 style={[
                   styles.conversationMessage,
-                  conversation.unread > 0 && styles.unreadMessage
+                  conversation.unread > 0 && styles.unreadMessage,
                 ]}
                 numberOfLines={1}
               >
                 {conversation.lastMessage}
               </Text>
             </View>
-            
+
             {conversation.unread > 0 && (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadCount}>{conversation.unread}</Text>
@@ -248,12 +252,12 @@ export default function MessagesScreen() {
       </ScrollView>
 
       {/* New Message Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.newMessageButton}
-        onPress={() => router.push("/new-message")}
+        onPress={() => router.push("../messages/new-message")}
       >
         <LinearGradient
-          colors={['#4CAF50', '#2E7D32']}
+          colors={["#4CAF50", "#2E7D32"]}
           style={styles.newMessageButtonGradient}
         >
           <Ionicons name="add" size={28} color="#FFFFFF" />
@@ -326,9 +330,9 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
     margin: 15,
     borderRadius: 10,
     paddingHorizontal: 15,
@@ -340,7 +344,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
 
   content: {
@@ -418,14 +422,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   conversationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: "#F0F0F0",
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
     marginRight: 15,
   },
   avatar: {
@@ -434,58 +438,58 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   onlineIndicator: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: "#FFF",
   },
   conversationContent: {
     flex: 1,
   },
   conversationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 5,
   },
   conversationName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   conversationTime: {
     fontSize: 12,
-    color: '#9E9E9E',
+    color: "#9E9E9E",
   },
   conversationMessage: {
     fontSize: 14,
-    color: '#757575',
+    color: "#757575",
   },
   unreadMessage: {
-    color: '#333',
-    fontWeight: '500',
+    color: "#333",
+    fontWeight: "500",
   },
   unreadBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
     width: 20,
     height: 20,
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginLeft: 10,
   },
   unreadCount: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
-newMessageButton: {
-    position: 'absolute',
+  newMessageButton: {
+    position: "absolute",
     bottom: 80,
     right: 20,
     zIndex: 10,
@@ -494,10 +498,10 @@ newMessageButton: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
