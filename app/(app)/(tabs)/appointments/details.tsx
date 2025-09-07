@@ -28,7 +28,7 @@ export default function BookAppointment() {
   const { supportWorkerId } = useLocalSearchParams();
 
   // Mock data for support workers
-   const supportWorkers = [
+  const supportWorkers = [
     {
       id: 1,
       name: "Eric Young",
@@ -46,8 +46,10 @@ export default function BookAppointment() {
   ];
 
   // Find the support worker based on the ID from the URL
-  const supportWorker = supportWorkers.find(sw => sw.id === Number(supportWorkerId));
-  
+  const supportWorker = supportWorkers.find(
+    (sw) => sw.id === Number(supportWorkerId)
+  );
+
   const [selectedType, setSelectedType] = useState("Video Call");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -186,16 +188,21 @@ export default function BookAppointment() {
     );
   }
 
-  // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 06, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "upcoming",
-    },
+  const SESSION_TYPES = ["Video Call", "Phone Call", "In Person"];
+
+  const AVAILABLE_DATES = [
+    "Monday, October 7, 2025",
+    "Wednesday, October 9, 2025",
+    "Friday, October 11, 2025",
+    "Monday, October 14, 2025",
+  ];
+
+  const AVAILABLE_TIMES = [
+    "9:00 AM",
+    "10:30 AM",
+    "2:00 PM",
+    "3:30 PM",
+    "5:00 PM",
   ];
 
   const handleContinue = () => {
@@ -207,7 +214,7 @@ export default function BookAppointment() {
         selectedType,
         selectedDate: selectedDate || "",
         selectedTime: selectedTime || "",
-      }
+      },
     });
   };
 
@@ -234,9 +241,7 @@ export default function BookAppointment() {
           <View style={styles.stepRow}>
             {/* Step 1 - Inactive */}
             <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>
-                1
-              </Text>
+              <Text style={styles.stepNumber}>1</Text>
             </View>
             <View style={styles.stepConnector} />
 
@@ -261,19 +266,21 @@ export default function BookAppointment() {
           </View>
         </View>
 
-{/* Support Worker Card with Avatar and Name */}
-<View style={styles.supportWorkerCard}>
-  <View style={styles.supportWorkerHeader}>
-    <Image 
-      source={{ uri: supportWorker.avatar }} 
-      style={styles.avatar}
-    />
-    <View style={styles.supportWorkerInfo}>
-      <Text style={styles.supportWorkerName}>{supportWorker.name}</Text>
-      <Text style={styles.supportWorkerTitle}>{supportWorker.title}</Text>
-    </View>
-  </View>
-</View>
+        {/* Support Worker Card with Avatar and Name */}
+        <View style={styles.supportWorkerCard}>
+          <View style={styles.supportWorkerHeader}>
+            <Image
+              source={{ uri: supportWorker.avatar }}
+              style={styles.avatar}
+            />
+            <View style={styles.supportWorkerInfo}>
+              <Text style={styles.supportWorkerName}>{supportWorker.name}</Text>
+              <Text style={styles.supportWorkerTitle}>
+                {supportWorker.title}
+              </Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Side Menu */}
