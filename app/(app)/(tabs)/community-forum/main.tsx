@@ -56,12 +56,54 @@ const POSTS = [
   },
 ];
 
-const CATEGORIES = ["Trending", "Stress", "Support", "Stories", "Bookmarked", "Favorites"];
+const CATEGORIES = [
+  "Trending",
+  "Stress",
+  "Support",
+  "Stories",
+  "Bookmarked",
+  "Favorites",
+];
 
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeTab, setActiveTab] = useState("community-forum");
   const { user, profile, logout } = useAuth();
+  const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
+  const [commentedPosts, setCommentedPosts] = useState<Set<number>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
+    new Set()
+  );
+
+  const handleLikePress = (postId: number) => {
+    const newLikedPosts = new Set(likedPosts);
+    if (newLikedPosts.has(postId)) {
+      newLikedPosts.delete(postId);
+    } else {
+      newLikedPosts.add(postId);
+    }
+    setLikedPosts(newLikedPosts);
+  };
+
+  const handleCommentPress = (postId: number) => {
+    const newCommentedPosts = new Set(commentedPosts);
+    if (newCommentedPosts.has(postId)) {
+      newCommentedPosts.delete(postId);
+    } else {
+      newCommentedPosts.add(postId);
+    }
+    setCommentedPosts(newCommentedPosts);
+  };
+
+  const handleBookmarkPress = (postId: number) => {
+    const newBookmarkedPosts = new Set(bookmarkedPosts);
+    if (newBookmarkedPosts.has(postId)) {
+      newBookmarkedPosts.delete(postId);
+    } else {
+      newBookmarkedPosts.add(postId);
+    }
+    setBookmarkedPosts(newBookmarkedPosts);
+  };
 
   const handleBackPress = () => {
     router.back();
