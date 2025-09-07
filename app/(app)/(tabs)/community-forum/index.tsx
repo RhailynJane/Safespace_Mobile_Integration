@@ -10,11 +10,12 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import { useAuth } from "../../../../context/AuthContext";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 export default function CommunityScreen() {
@@ -39,6 +40,12 @@ export default function CommunityScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  const handleStartPress = () => {
+    // Navigate to the actual community forum
+    router.push("/community-forum/main");
+  };
+
   const sideMenuItems = [
     {
       icon: "home",
@@ -166,13 +173,34 @@ export default function CommunityScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Add the image above the main content */}
+            <View style={styles.imageContainer}>
+              <Image 
+                source={require('../../../../assets/images/community-forum.png')} 
+                style={styles.appointmentImage}
+                resizeMode="contain"
+              />
+            </View>
+
       {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Community Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Community space for you.
-        </Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.welcomeContainer}>
+          <Text style={styles.welcomeTitle}>Welcome to Our</Text>
+          <Text style={styles.welcomeTitle}>Community!</Text>
+
+          <Text style={styles.welcomeSubtitle}>
+            Our community is a place of warmth and acceptance, where everyone's
+            voice is valued and respected.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={handleStartPress}
+          >
+            <Text style={styles.startButtonText}>Start</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -215,11 +243,19 @@ export default function CommunityScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#ead1dc",
+  },
+  imageContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+  },
+  appointmentImage: {
+    width: width * 0.9,
+    height: 350,
   },
   loadingContainer: {
     flex: 1,
@@ -308,5 +344,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  welcomeContainer: {
+    alignItems: "center",
+    padding: 20,
+  },
+  welcomeTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#2E7D32",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 24,
+    marginTop: 20,
+    marginBottom: 25,
+  },
+  startButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    marginTop: 20,
+  },
+  startButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
   },
 });
