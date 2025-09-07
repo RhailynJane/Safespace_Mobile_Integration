@@ -10,6 +10,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Linking,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -152,13 +154,13 @@ export default function VideoScreen() {
   ];
 
   const handleJoinMeeting = () => {
-    const meetingUrl = appointments[0]?.meetingLink;
-    if (meetingUrl) {
-      // Open the meeting link in the browser
-      // For Expo, use Linking API
-      import("expo-linking").then(Linking => {
-        Linking.openURL(meetingUrl);
+    if (appointments[0]?.meetingLink) {
+      Linking.openURL(appointments[0].meetingLink).catch((err) => {
+        Alert.alert("Error", "Could not open the meeting link");
+        console.error("Error opening URL:", err);
       });
+    } else {
+      Alert.alert("Error", "Meeting link is not available");
     }
   };
 
