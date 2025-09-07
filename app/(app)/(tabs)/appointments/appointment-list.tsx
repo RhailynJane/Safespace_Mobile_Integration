@@ -19,7 +19,7 @@ import { useAuth } from "../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 
-export default function BookAppointment() {
+export default function AppointmentList() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,6 +35,7 @@ export default function BookAppointment() {
   const [appointmentNotes, setAppointmentNotes] = useState<string>("");
   const [activeView, setActiveView] = useState<string>("confirmation");
   const [bookingStep, setBookingStep] = useState<number>(1);
+  const [activeAppointmentsTab, setActiveAppointmentsTab] = useState<'upcoming' | 'past'>('upcoming');
 
   // Mock data for support workers
   const supportWorkers = [
@@ -53,15 +54,6 @@ export default function BookAppointment() {
       specialties: ["Anxiety", "Depression", "Trauma"],
     },
   ];
-
-  // Find the support worker based on the ID from the URL
-  const supportWorker = supportWorkers.find(
-    (sw) => sw.id === Number(supportWorkerId)
-  );
-
-  if (!supportWorker) {
-    return <Text>Support worker not found</Text>;
-  }
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -185,28 +177,6 @@ export default function BookAppointment() {
     return "User";
   };
 
-  const handleCheckAppointments = () => {
-    setActiveView("scheduled");
-  };
-
-  const handleBackToMain = () => {
-    setActiveView("main");
-    setSelectedDate("");
-    setSelectedTime("");
-    setSelectedType("Video Call");
-    setBookingStep(1);
-    setAppointmentNotes("");
-  };
-
-  const handleBookAnother = () => {
-    setActiveView("book");
-    setBookingStep(1);
-    setSelectedDate("");
-    setSelectedTime("");
-    setSelectedType("Video Call");
-    setAppointmentNotes("");
-  };
-
   // Mock data for appointments
   const appointments = [
     {
@@ -239,6 +209,26 @@ export default function BookAppointment() {
         <Text style={styles.headerTitle}>Appointments</Text>
         <TouchableOpacity onPress={() => router.push("/notifications")}>
           <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
+        </TouchableOpacity>
+      </View>
+
+       {/* Appointments Tabs */}
+      <View style={styles.appointmentsTabs}>
+        <TouchableOpacity 
+          style={[styles.tab, activeAppointmentsTab === 'upcoming' && styles.activeTab]} 
+          onPress={() => setActiveAppointmentsTab('upcoming')}
+        >
+          <Text style={[styles.tabText, activeAppointmentsTab === 'upcoming' && styles.activeTabText]}>
+            Upcoming ({appointments.filter(a => a.status === 'upcoming').length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeAppointmentsTab === 'past' && styles.activeTab]} 
+          onPress={() => setActiveAppointmentsTab('past')}
+        >
+          <Text style={[styles.tabText, activeAppointmentsTab === 'past' && styles.activeTabText]}>
+            Past ({appointments.filter(a => a.status === 'past').length})
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -381,82 +371,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
-  confirmationCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 24,
-    marginHorizontal: 15,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    alignItems: "center",
-  },
-  confirmationTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#2E7D32",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  confirmationMessage: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  appointmentDetails: {
-    width: "100%",
-    backgroundColor: "#F8F9FA",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
-  },
-  detailRow: {
+  appointmentsTabs: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
   },
-  detailLabel: {
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: "#4CAF50",
+  },
+  tabText: {
     fontSize: 16,
     color: "#666",
-    fontWeight: "600",
   },
-  detailValue: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "500",
-  },
-  primaryButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    width: "100%",
-    alignItems: "center",
-  },
-  secondaryButtonText: {
+  activeTabText: {
     color: "#4CAF50",
-    fontSize: 16,
     fontWeight: "600",
   },
 });
