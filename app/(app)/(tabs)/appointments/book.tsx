@@ -10,6 +10,7 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -34,12 +35,14 @@ export default function BookAppointment() {
       id: 1,
       name: "Eric Young",
       title: "Support worker",
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
       specialties: ["Anxiety", "Depression", "Trauma"],
     },
     {
       id: 2,
       name: "Michael Chen",
       title: "Support worker",
+      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
       specialties: ["Anxiety", "Depression", "Trauma"],
     },
   ];
@@ -239,7 +242,12 @@ export default function BookAppointment() {
         </View>
 
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <Ionicons
+            name="search"
+            size={20}
+            color="#666"
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search support worker..."
@@ -255,11 +263,27 @@ export default function BookAppointment() {
             style={styles.supportWorkerCard}
             onPress={() => handleSelectSupportWorker(supportWorker.id)}
           >
-            <Text style={styles.supportWorkerName}>{supportWorker.name}</Text>
-            <Text style={styles.supportWorkerTitle}>{supportWorker.title}</Text>
+            {/* Add avatar image here */}
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ uri: supportWorker.avatar }}
+                style={styles.avatar}
+              />
+              <View style={styles.supportWorkerInfo}>
+                <Text style={styles.supportWorkerName}>
+                  {supportWorker.name}
+                </Text>
+                <Text style={styles.supportWorkerTitle}>
+                  {supportWorker.title}
+                </Text>
+              </View>
+            </View>
+
             <View style={styles.specialtiesContainer}>
               {supportWorker.specialties.map((specialty, index) => (
-                <Text key={index} style={styles.specialtyText}>{specialty}</Text>
+                <Text key={index} style={styles.specialtyText}>
+                  {specialty}
+                </Text>
               ))}
             </View>
             <Text style={styles.selectText}>Select Support Worker</Text>
@@ -473,9 +497,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
     margin: 15,
     borderRadius: 10,
     paddingHorizontal: 15,
@@ -504,8 +528,8 @@ const styles = StyleSheet.create({
   },
   supportWorkerTitle: {
     fontSize: 14,
-    color: "#fffff",
-    marginBottom: 8,
+    color: "#666",
+    marginBottom: 0,
   },
   specialtiesContainer: {
     flexDirection: "row",
@@ -521,10 +545,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     fontSize: 12,
   },
-selectText: {
+  selectText: {
     color: "#00000",
     fontWeight: "600",
     textAlign: "center",
   },
-
+  avatarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  supportWorkerInfo: {
+    flex: 1,
+  },
 });
