@@ -302,7 +302,17 @@ export default function AppointmentList() {
         )}
       </ScrollView>
 
-      
+      {/* Schedule New Appointment Button */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={styles.scheduleButton}
+          onPress={() => router.push('/appointments/book')}
+        >
+          <Ionicons name="add" size={24} color="#FFF" />
+          <Text style={styles.scheduleButtonText}>Schedule New Appointment</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Side Menu */}
       <Modal
         animationType="fade"
@@ -527,5 +537,21 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: "#E0E0E0",
+  },
+  scheduleButton: {
+    backgroundColor: "#4CAF50",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 15,
+    borderRadius: 30,
+    marginRight: 25,
+    marginLeft: 25,
+  },
+  scheduleButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600",
+    marginLeft: 8,
   },
 });
