@@ -413,6 +413,18 @@ export default function BookAppointment() {
             </Text>
           </View>
         )}
+
+        <TouchableOpacity
+            style={[
+              styles.continueButton,
+              (!selectedDate || !selectedTime) && styles.continueButtonDisabled
+            ]}
+            onPress={handleContinue}
+            disabled={!selectedDate || !selectedTime}
+          >
+            <Text style={styles.continueButtonText}>Continue</Text>
+          </TouchableOpacity>
+
       </ScrollView>
 
       {/* Side Menu */}
@@ -802,4 +814,23 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     marginHorizontal: 15,
   },
+  continueButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 14,
+    borderRadius: 20,
+    alignItems: "center",
+    marginTop: 16,
+    marginRight: 50,
+    marginLeft: 50,
+    marginBottom: 20,
+  },
+  continueButtonDisabled: {
+    backgroundColor: "#C8E6C9",
+  },
+  continueButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
 });
