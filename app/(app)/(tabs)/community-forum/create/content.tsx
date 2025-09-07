@@ -6,60 +6,40 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams  } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
+import { useAuth } from "../../../../../context/AuthContext";
 
-const CATEGORIES = [
-  "Self Care",
-  "Mindfulness",
-  "Stories",
-  "Support",
-  "Creative",
-  "Therapy",
-  "Stress",
-  "Affirmation",
-  "Awareness",
-];
 
-const getCategoryIcon = (category: string) => {
-  switch (category) {
-    case "Self Care":
-      return "heart-outline";
-    case "Mindfulness":
-      return "leaf-outline";
-    case "Stories":
-      return "book-outline";
-    case "Support":
-      return "people-outline";
-    case "Creative":
-      return "color-palette-outline";
-    case "Therapy":
-      return "medical-outline";
-    case "Stress":
-      return "flash-outline";
-    case "Affirmation":
-      return "chatbubble-ellipses-outline";
-    case "Awareness":
-      return "eye-outline";
-    default:
-      return "help-outline";
-  }
-};
 
 export default function SelectCategoryScreen() {
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [activeTab, setActiveTab] = useState("community-forum");
+const [selectedCategory, setSelectedCategory] = useState("");
+const [activeTab, setActiveTab] = useState("community-forum");
+const [postContent, setPostContent] = useState(""); 
+const [isPrivate, setIsPrivate] = useState(false);
+const [isDraft, setIsDraft] = useState(false);
+  const { user, profile, logout } = useAuth();
 
-  const handleContinue = () => {
-    if (selectedCategory) {
-      router.push({
-        pathname: "/community-forum/create/content",
-        params: { category: selectedCategory },
-      });
-    }
+  const handleSaveDraft = () => {
+    setIsDraft(true);
+    Alert.alert("Draft Saved", "Your post has been saved as a draft.");
   };
+
+  const handlePublish = () => {
+    console.log("Publishing post:", {
+      category: selectedCategory,
+      content: postContent,
+      isPrivate,
+      isDraft
+    });
+    
+    router.push("/community-forum/create/success");
+  };
+  
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -78,6 +58,13 @@ export default function SelectCategoryScreen() {
     }
   };
 
+    const getDisplayName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -89,8 +76,24 @@ export default function SelectCategoryScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-
-      
+      <ScrollView style={styles.content}>
+              {/* User Profile Summary */}
+              <View style={styles.profileSection}>
+                <View style={styles.profileContainer}>
+                  <View style={styles.profileImageContainer}>
+                    <Image
+                      source={{
+                        uri: "https://randomuser.me/api/portraits/women/17.jpg",
+                      }}
+                      style={styles.profileImage}
+                    />
+                  </View>
+                  <View style={styles.profileTextContainer}>
+                    <Text style={styles.userName}>{getDisplayName()}</Text>
+                  </View>
+                </View>
+              </View>
+      </ScrollView>
 
       {/* Bottom Navigation */}
       <BottomNavigation
@@ -101,7 +104,6 @@ export default function SelectCategoryScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -132,5 +134,36 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: "center",
   },
-  
+  profileSection: {
+    padding: 20,
+    backgroundColor: "#d9ead3",
+  },
+  profileContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  profileImageContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#E0E0E0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  profileTextContainer: {
+    justifyContent: "center",
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
 });
+

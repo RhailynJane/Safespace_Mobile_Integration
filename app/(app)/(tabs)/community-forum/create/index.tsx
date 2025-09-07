@@ -55,7 +55,7 @@ export default function SelectCategoryScreen() {
   const handleContinue = () => {
     if (selectedCategory) {
       router.replace({
-        pathname: "../create/content",
+        pathname: "/app/(app)/(tabs)/community-forum/create/content.tsx",
         params: { category: selectedCategory },
       });
     }
