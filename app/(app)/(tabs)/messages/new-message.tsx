@@ -15,9 +15,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../context/AuthContext";
-import BottomNavigation from "../../components/BottomNavigation";
-import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from "../../../../context/AuthContext";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
@@ -158,41 +158,46 @@ export default function MessagesScreen() {
     );
   }
 
-const contacts = [
-  {
-    id: 1,
-    name: "Eric Young",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    online: true,
-  },
-  {
-    id: 2,
-    name: "Support Group",
-    avatar: "https://randomuser.me/api/portraits/women/4.jpg",
-    online: false,
-  },
-  {
-    id: 3,
-    name: "Sophia Lee",
-    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
-    online: true,
-  },
-];
+  const contacts = [
+    {
+      id: 1,
+      name: "Eric Young",
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+      online: true,
+    },
+    {
+      id: 2,
+      name: "Support Group",
+      avatar: "https://randomuser.me/api/portraits/women/4.jpg",
+      online: false,
+    },
+    {
+      id: 3,
+      name: "Sophia Lee",
+      avatar: "https://randomuser.me/api/portraits/women/3.jpg",
+      online: true,
+    },
+  ];
 
-return (
-      <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>New Message</Text>
-          <View style={{ width: 24 }} />
-        </View>
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>New Message</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
-        {/* Search Bar */}
+      {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#9E9E9E" style={styles.searchIcon} />
+        <Ionicons
+          name="search"
+          size={20}
+          color="#9E9E9E"
+          style={styles.searchIcon}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search contacts..."
@@ -207,13 +212,18 @@ return (
       <ScrollView style={styles.contactList}>
         <Text style={styles.sectionTitle}>Recent Contacts</Text>
         {contacts.map((contact) => (
-          <TouchableOpacity 
-            key={contact.id} 
+          <TouchableOpacity
+            key={contact.id}
             style={styles.contactItem}
-            onPress={() => router.push(`/message-chat-screen?id=${contact.id}`)}
+            onPress={() =>
+              router.push(`../messages/message-chat-screen?id=${contact.id}`)
+            }
           >
             <View style={styles.avatarContainer}>
-              <Image source={{ uri: contact.avatar }} style={styles.contactAvatar} />
+              <Image
+                source={{ uri: contact.avatar }}
+                style={styles.contactAvatar}
+              />
               {contact.online && <View style={styles.onlineIndicator} />}
             </View>
             <Text style={styles.contactName}>{contact.name}</Text>
@@ -223,7 +233,6 @@ return (
     </SafeAreaView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -249,9 +258,9 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
     margin: 15,
     borderRadius: 10,
     paddingHorizontal: 15,
@@ -263,7 +272,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: "#333",
   },
   contactList: {
     flex: 1,
@@ -271,18 +280,18 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#9E9E9E',
+    fontWeight: "600",
+    color: "#9E9E9E",
     marginBottom: 15,
     marginTop: 10,
   },
   contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
   },
   avatarContainer: {
-    position: 'relative',
+    position: "relative",
     marginRight: 15,
   },
   contactAvatar: {
@@ -291,20 +300,19 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   onlineIndicator: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     right: 0,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: "#FFF",
   },
   contactName: {
     fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    color: "#333",
+    fontWeight: "500",
   },
-
 });
