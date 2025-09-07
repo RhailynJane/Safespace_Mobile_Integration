@@ -54,8 +54,8 @@ export default function SelectCategoryScreen() {
 
   const handleContinue = () => {
     if (selectedCategory) {
-      router.replace({
-        pathname: "../create/content",
+      router.push({
+        pathname: "/community-forum/create/content",
         params: { category: selectedCategory },
       });
     }
@@ -89,52 +89,8 @@ export default function SelectCategoryScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Select post category</Text>
 
-        <View style={styles.categoriesContainer}>
-          {CATEGORIES.map((category) => (
-            <TouchableOpacity
-              key={category}
-              style={[
-                styles.categoryCard,
-                selectedCategory === category && styles.categoryCardActive,
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <View style={styles.categoryIcon}>
-                <Ionicons
-                  name={getCategoryIcon(category)}
-                  size={24}
-                  color={selectedCategory === category ? "#FFFFFF" : "#4CAF50"}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === category && styles.categoryTextActive,
-                ]}
-              >
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Continue Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.continueButton,
-            !selectedCategory && styles.continueButtonDisabled
-          ]}
-          onPress={handleContinue}
-          disabled={!selectedCategory}
-        >
-          <Text style={styles.continueButtonText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
+      
 
       {/* Bottom Navigation */}
       <BottomNavigation
@@ -176,71 +132,5 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     textAlign: "center",
   },
-  categoriesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 20,
-    justifyContent: "center",
-    marginTop: 15,
-  },
-  categoryCard: {
-    width: 100,
-    height: 150,
-    backgroundColor: "#d7e0e9",
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
-    borderWidth: 2,
-    borderColor: "#E0E0E0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  categoryCardActive: {
-    backgroundColor: "#4CAF50",
-    borderColor: "#4CAF50",
-    shadowColor: "#4CAF50",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  categoryIcon: {
-    marginBottom: 8,
-  },
-  categoryText: {
-    fontSize: 12,
-    color: "#666",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  categoryTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  footer: {
-    padding: 20,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#FFFFFF",
-  },
-  continueButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    borderRadius: 20,
-    alignItems: "center",
-    marginRight: 30,
-    marginLeft: 30,
-  },
-  continueButtonDisabled: {
-    backgroundColor: "#CCCCCC",
-  },
-  continueButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  
 });
