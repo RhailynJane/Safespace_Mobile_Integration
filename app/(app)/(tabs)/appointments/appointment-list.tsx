@@ -185,6 +185,10 @@ export default function BookAppointment() {
     return "User";
   };
 
+  const handleCheckAppointments = () => {
+    setActiveView("scheduled");
+  };
+
   const handleBackToMain = () => {
     setActiveView("main");
     setSelectedDate("");
@@ -238,93 +242,7 @@ export default function BookAppointment() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollContainer}>
-        <Text style={styles.title}>
-          Schedule a session with a support worker
-        </Text>
-
-        {/* Step Indicator */}
-        <View style={styles.stepsContainer}>
-          <View style={styles.stepRow}>
-            {/* Step 1 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>1</Text>
-            </View>
-            <View style={styles.stepConnector} />
-
-            {/* Step 2 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>2</Text>
-            </View>
-            <View style={styles.stepConnector} />
-
-            {/* Step 3 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>3</Text>
-            </View>
-            <View style={styles.stepConnector} />
-
-            {/* Step 4 - Active */}
-            <View style={[styles.stepCircle, styles.stepCircleActive]}>
-              <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                4
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Confirmation Card */}
-        <View style={styles.confirmationCard}>
-          <Text style={styles.confirmationTitle}>Appointment Booked</Text>
-          <Text style={styles.confirmationMessage}>
-            Your appointment has been successfully scheduled.
-          </Text>
-
-          <View style={styles.appointmentDetails}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Support Worker:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? appointment.supportWorker : ""}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Date:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? `${appointment.date}` : ""}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Time:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? `${appointment.time}` : ""}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Session Type:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? appointment.type : ""}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => router.replace("/appointments/appointment-list")}
-            >
-              <Text style={styles.buttonText}>Check Appointments</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => router.replace("/appointments/book")}
-            >
-              <Text style={styles.secondaryButtonText}>
-                Book Another Appointment
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
-
+      
       {/* Side Menu */}
       <Modal
         animationType="fade"
@@ -400,130 +318,6 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     textAlign: "center",
     marginTop: 16,
-  },
-  stepsContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-    marginTop: 16,
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: "#4CAF50",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "white",
-  },
-  stepCircleActive: {
-    backgroundColor: "#4CAF50",
-  },
-  stepNumber: {
-    fontSize: 16,
-    color: "#4CAF50",
-    fontWeight: "600",
-  },
-  stepNumberActive: {
-    color: "white",
-  },
-  stepConnector: {
-    width: 40,
-    height: 2,
-    backgroundColor: "#E0E0E0",
-    marginHorizontal: 8,
-  },
-  card: {
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 15,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    backgroundColor: "#d0e0e3",
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  subSectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-  },
-  summaryContainer: {
-    marginBottom: 20,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: "#000000",
-    fontWeight: "600",
-  },
-  summaryValue: {
-    fontSize: 14,
-    color: "#333",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#000000",
-    marginVertical: 20,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: "#000000",
-    borderRadius: 8,
-    padding: 16,
-    textAlignVertical: "top",
-    marginBottom: 20,
-    minHeight: 100,
-    fontSize: 14,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-  },
-  backButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    alignItems: "center",
-  },
-  backButtonText: {
-    color: "#4CAF50",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  bookButton: {
-    flex: 2,
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  bookButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
   },
   modalContainer: {
     flex: 1,
