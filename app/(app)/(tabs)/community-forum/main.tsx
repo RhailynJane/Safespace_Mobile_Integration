@@ -50,7 +50,7 @@ const POSTS = [
     comments: 42,
     category: "Stories",
     user: {
-      name: "Jessica L.",
+      name: "John L.",
       posts: 7,
     },
   },
@@ -143,16 +143,14 @@ export default function CommunityMainScreen() {
                 key={category}
                 style={[
                   styles.categoryButton,
-                  selectedCategory === category &&
-                    styles.categoryButtonActive,
+                  selectedCategory === category && styles.categoryButtonActive,
                 ]}
                 onPress={() => setSelectedCategory(category)}
               >
                 <Text
                   style={[
                     styles.categoryText,
-                    selectedCategory === category &&
-                      styles.categoryTextActive,
+                    selectedCategory === category && styles.categoryTextActive,
                   ]}
                 >
                   {category}
@@ -161,8 +159,67 @@ export default function CommunityMainScreen() {
             ))}
           </View>
         </View>
+
+        <View style={styles.divider} />
+
+        {/* Posts List */}
+        <View style={styles.postsSection}>
+          {POSTS.map((post) => (
+            <TouchableOpacity
+              key={post.id}
+              style={styles.postCard}
+              onPress={() => handlePostPress(post.id)}
+            >
+              <View style={styles.postHeader}>
+                <View style={styles.userInfo}>
+                  <Image
+                    source={{
+                      uri: `https://randomuser.me/api/portraits/${
+                        post.user.name.includes("Sarah") ? "women" : "men"
+                      }/${post.id}.jpg`,
+                    }}
+                    style={styles.postUserImage}
+                  />
+                  <View>
+                    <Text style={styles.postUserName}>{post.user.name}</Text>
+                    <Text style={styles.postUserStats}>
+                      {post.user.posts} posts
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.categoryTag}>
+                  <Text style={styles.categoryTagText}>{post.category}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.postTitle}>{post.title}</Text>
+              <Text style={styles.postContent}>{post.content}</Text>
+
+              <View style={styles.postFooter}>
+                <View style={styles.interactionButtons}>
+                  <TouchableOpacity style={styles.interactionButton}>
+                    <Ionicons name="heart-outline" size={20} color="#666" />
+                    <Text style={styles.interactionText}>{post.likes}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.interactionButton}>
+                    <Ionicons
+                      name="chatbubble-outline"
+                      size={20}
+                      color="#666"
+                    />
+                    <Text style={styles.interactionText}>{post.comments}</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity>
+                  <Ionicons name="bookmark-outline" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
 
+      {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -246,37 +303,122 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-categoriesHeader: {
-  flexDirection: "row",
-  alignItems: "center",
-  flexWrap: "wrap",
-  marginTop: 16,
-  paddingHorizontal: 16,
-  paddingBottom: 8,
-  justifyContent: "center",
-},
+  categoriesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    justifyContent: "center",
+  },
 
-categoriesContainer: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8,
-},
-categoryButton: {
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 16,
-  backgroundColor: "#F5F5F5",
-  marginBottom: 4,
-},
-categoryButtonActive: {
-  backgroundColor: "#4CAF50",
-},
-categoryText: {
-  fontSize: 10,
-  color: "#666",
-},
-categoryTextActive: {
-  color: "#FFFFFF",
-  fontWeight: "500",
-},
+  categoriesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  categoryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#F5F5F5",
+    marginBottom: 4,
+  },
+  categoryButtonActive: {
+    backgroundColor: "#4CAF50",
+  },
+  categoryText: {
+    fontSize: 10,
+    color: "#666",
+  },
+  categoryTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "500",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+  },
+  postsSection: {
+    padding: 16,
+    gap: 16,
+  },
+  postCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  postHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  postUserImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E0E0E0",
+  },
+  postUserName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#212121",
+  },
+  postUserStats: {
+    fontSize: 12,
+    color: "#757575",
+  },
+  categoryTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "#E8F5E9",
+  },
+  categoryTagText: {
+    fontSize: 12,
+    color: "#2E7D32",
+    fontWeight: "500",
+  },
+  postTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 8,
+  },
+  postContent: {
+    fontSize: 14,
+    color: "#424242",
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  postFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  interactionButtons: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  interactionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  interactionText: {
+    fontSize: 14,
+    color: "#666",
+  },
 });
