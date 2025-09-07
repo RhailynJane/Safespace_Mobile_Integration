@@ -7,6 +7,10 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -18,6 +22,28 @@ export default function VideoCallScreen() {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRaiseHand, setIsRaiseHand] = useState(false);
+
+  // Chat state
+  const [messages, setMessages] = useState([
+    { id: "1", sender: "You", text: "Hello!", time: "00:00" },
+    { id: "2", sender: "Eric Young", text: "Hi there!", time: "00:01" },
+  ]);
+  const [newMessage, setNewMessage] = useState("");
+
+  const handleSendMessage = () => {
+    if (newMessage.trim()) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (prev.length + 1).toString(),
+          sender: "You",
+          text: newMessage,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+      setNewMessage("");
+    }
+  };
 
   const handleLeaveCall = () => {
     router.replace("../(tabs)/appointments/appointment-list");
@@ -163,10 +189,60 @@ export default function VideoCallScreen() {
 
       {/* Chat Panel */}
       {isChatOpen && (
-        <View style={styles.chatPanel}>
-          <Text style={styles.chatTitle}>Chat</Text>
-          {/* Chat messages would go here */}
-        </View>
+        <KeyboardAvoidingView 
+          style={styles.chatPanelContainer}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={100}
+        >
+          <View style={styles.chatPanel}>
+            <View style={styles.chatHeader}>
+              <Text style={styles.chatTitle}>Chat</Text>
+              <TouchableOpacity onPress={() => setIsChatOpen(false)}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView 
+              style={styles.messagesContainer}
+              ref={ref => ref?.scrollToEnd({ animated: true })}
+            >
+              {messages.map((message) => (
+                <View 
+                  key={message.id} 
+                  style={[
+                    styles.messageBubble,
+                    message.sender === "You" ? styles.myMessage : styles.theirMessage
+                  ]}
+                >
+                  <Text style={styles.messageText}>{message.text}</Text>
+                  <Text style={styles.messageTime}>{message.time}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.messageInputContainer}>
+              <TextInput
+                style={styles.messageInput}
+                placeholder="Type a message..."
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity 
+                style={styles.sendButton}
+                onPress={handleSendMessage}
+                disabled={!newMessage.trim()}
+              >
+                <Ionicons 
+                  name="send" 
+                  size={20} 
+                  color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );
@@ -303,15 +379,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "600",
   },
-  chatPanel: {
+  // Chat Panel Styles
+  chatPanelContainer: {
     position: "absolute",
     right: 20,
     bottom: 180,
     width: 300,
     height: 400,
+  },
+  chatPanel: {
+    flex: 1,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 16,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -321,10 +401,68 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  chatHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    backgroundColor: "#F8F9FA",
+  },
   chatTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 16,
     color: "#333333",
   },
+  messagesContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  messageBubble: {
+    maxWidth: "80%",
+    padding: 12,
+    borderRadius: 18,
+    marginBottom: 12,
+  },
+  myMessage: {
+    alignSelf: "flex-end",
+    backgroundColor: "#DCF8C6",
+  },
+  theirMessage: {
+    alignSelf: "flex-start",
+    backgroundColor: "#F1F0F0",
+  },
+  messageText: {
+    fontSize: 14,
+    color: "#333333",
+    marginBottom: 4,
+  },
+  messageTime: {
+    fontSize: 10,
+    color: "#666666",
+    alignSelf: "flex-end",
+  },
+  messageInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+    backgroundColor: "#FFFFFF",
+  },
+  messageInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    maxHeight: 100,
+    marginRight: 8,
+  },
+  sendButton: {
+    padding: 8,
+  },
 });
+
