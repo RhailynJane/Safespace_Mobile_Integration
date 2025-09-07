@@ -184,7 +184,7 @@ export default function BookAppointment() {
   };
 
   const handleConfirmBooking = () => {
-    router.push({
+    router.replace({
       pathname: "/appointments/confirmation",
       params: {
         supportWorkerId: supportWorker.id,
