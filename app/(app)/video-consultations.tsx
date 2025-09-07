@@ -205,7 +205,10 @@ export default function VideoScreen() {
               <View style={styles.nameContainer}>
                 <Text style={styles.name}>{appointments[0]?.supportWorker ?? ""}</Text>
                 <Text style={styles.date}>
-                  {appointments[0]?.date ?? ""} {appointments[0]?.time ?? ""}
+                  {appointments[0]?.date ?? ""} 
+                </Text>
+                <Text style={styles.time}>
+                  {appointments[0]?.time ?? ""}
                 </Text>
               </View>
               <View
@@ -221,6 +224,48 @@ export default function VideoScreen() {
                 <Text style={styles.statusText}>{appointments[0]?.status ?? ""}</Text>
               </View>
             </View>
+
+            <View style={styles.divider} />
+
+            <Text style={styles.sectionTitle}>Technical Requirements</Text>
+            
+            <Text style={styles.subsectionTitle}>System Requirements</Text>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>Stable internet connection (min 1 Mbps)</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>Speakers or headphones</Text>
+            </View>
+
+            <Text style={styles.subsectionTitle}>Privacy & Security</Text>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>End to end encrypted video calls</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>HIPAA/PIPEDA compliant platform</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>No recordings without consent</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>Secure data transmission</Text>
+            </View>
+
+            {appointments[0] && appointments[0].status === "Upcoming" && (
+              <TouchableOpacity
+                style={styles.joinButton}
+                onPress={handleJoinMeeting}
+              >
+                <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                <Text style={styles.joinButtonText}>Join Meeting</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -396,11 +441,16 @@ const styles = StyleSheet.create({
     color: "#757575",
     marginBottom: 12,
   },
+  time: {
+    fontSize: 13,
+    color: "#757575",
+  },
   statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     alignSelf: "flex-end",
+    marginTop: 10,
   },
   upcomingBadge: {
     backgroundColor: "#FFECB3",
@@ -437,5 +487,42 @@ const styles = StyleSheet.create({
   },
   nameContainer: {
     flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+    marginVertical: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D32",
+    marginBottom: 16,
+  },
+  subsectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  requirementItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  bulletPoint: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4CAF50",
+    marginTop: 8,
+    marginRight: 12,
+  },
+  requirementText: {
+    fontSize: 16,
+    color: "#424242",
+    flex: 1,
+    lineHeight: 24,
   },
 });
