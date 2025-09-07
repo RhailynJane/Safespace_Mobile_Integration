@@ -33,6 +33,8 @@ export default function BookAppointment() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [appointmentNotes, setAppointmentNotes] = useState<string>("");
+  const [activeView, setActiveView] = useState<string>("confirmation");
+  const [bookingStep, setBookingStep] = useState<number>(1);
 
   // Mock data for support workers
   const supportWorkers = [
@@ -183,17 +185,26 @@ export default function BookAppointment() {
     return "User";
   };
 
-  const handleConfirmBooking = () => {
-    router.push({
-      pathname: "/appointments/confirmation",
-      params: {
-        supportWorkerId: supportWorker.id,
-        supportWorkerName: supportWorker.name,
-        selectedType,
-        selectedDate,
-        selectedTime,
-      },
-    });
+  const handleCheckAppointments = () => {
+    setActiveView("scheduled");
+  };
+
+  const handleBackToMain = () => {
+    setActiveView("main");
+    setSelectedDate("");
+    setSelectedTime("");
+    setSelectedType("Video Call");
+    setBookingStep(1);
+    setAppointmentNotes("");
+  };
+
+  const handleBookAnother = () => {
+    setActiveView("book");
+    setBookingStep(1);
+    setSelectedDate("");
+    setSelectedTime("");
+    setSelectedType("Video Call");
+    setAppointmentNotes("");
   };
 
   // Mock data for appointments
@@ -276,7 +287,9 @@ export default function BookAppointment() {
           <View style={styles.appointmentDetails}>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Support Worker:</Text>
-              <Text style={styles.detailValue}>{appointment ? appointment.supportWorker : ""}</Text>
+              <Text style={styles.detailValue}>
+                {appointment ? appointment.supportWorker : ""}
+              </Text>
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Date:</Text>
@@ -292,11 +305,28 @@ export default function BookAppointment() {
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Session Type:</Text>
-              <Text style={styles.detailValue}>{appointment ? appointment.type : ""}</Text>
+              <Text style={styles.detailValue}>
+                {appointment ? appointment.type : ""}
+              </Text>
             </View>
+
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleCheckAppointments}
+            >
+              <Text style={styles.buttonText}>Check Appointments</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.replace("/appointments/book")}
+            >
+              <Text style={styles.secondaryButtonText}>
+                Book Another Appointment
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-          
       </ScrollView>
 
       {/* Side Menu */}
@@ -561,7 +591,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
-   confirmationCard: {
+  confirmationCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 24,
@@ -609,5 +639,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     fontWeight: "500",
+  },
+  primaryButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    backgroundColor: "transparent",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    width: "100%",
+    alignItems: "center",
+  },
+  secondaryButtonText: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
