@@ -78,16 +78,6 @@ export default function CommunityMainScreen() {
     setLikedPosts(newLikedPosts);
   };
 
-  const handleCommentPress = (postId: number) => {
-    const newCommentedPosts = new Set(commentedPosts);
-    if (newCommentedPosts.has(postId)) {
-      newCommentedPosts.delete(postId);
-    } else {
-      newCommentedPosts.add(postId);
-    }
-    setCommentedPosts(newCommentedPosts);
-  };
-
   const handleBookmarkPress = (postId: number) => {
     const newBookmarkedPosts = new Set(bookmarkedPosts);
     if (newBookmarkedPosts.has(postId)) {
@@ -103,8 +93,11 @@ export default function CommunityMainScreen() {
   };
 
   const handlePostPress = (postId: number) => {
-    router.push(`/community-forum/${postId}`);
-  };
+  router.push({
+    pathname: "/community-forum/comments",
+    params: { id: postId }
+  });
+};
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -252,7 +245,10 @@ export default function CommunityMainScreen() {
                   <TouchableOpacity
                     style={styles.interactionButton}
                     onPress={() =>
-                      router.push(`/community-forum/comments?id=${post.id}`)
+                      router.push({
+                        pathname: "/community-forum/comments",
+                        params: { id: post.id },
+                      })
                     }
                   >
                     <Ionicons
