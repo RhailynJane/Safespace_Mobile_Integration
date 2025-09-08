@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,15 +9,27 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Image,
 } from "react-native";
 import { useAuth } from "../../../context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const { user, profile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState<{
+    firstName: string;
+    lastName: string;
+    location: string;
+  }>({
+    firstName: "",
+    lastName: "",
+    location: "",
+  });
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -26,6 +38,22 @@ export default function ProfileScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  // Load profile image when screen loads
+  useEffect(() => {
+    loadProfileImage();
+  }, []);
+
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log('Error loading profile image:', error);
+    }
+  };
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -51,25 +79,63 @@ export default function ProfileScreen() {
     return "User";
   };
 
+  const getInitials = () => {
+    // Use saved profile data first, then fallback to auth context
+    const firstName = profileData.firstName || profile?.firstName || "";
+    const lastName = profileData.lastName || profile?.lastName || "";
+    
+    if (firstName && lastName) {
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    } else if (firstName) {
+      return firstName.charAt(0).toUpperCase();
+    }
+    
+    const name = getGreetingName();
+    if (!name || name.length === 0) {
+      return "U";
+    }
+    return name.charAt(0).toUpperCase();
+  };
+
+  // Refresh image when screen becomes visible (manual refresh)
+  const handleRefresh = () => {
+    loadProfileImage();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        onScrollBeginDrag={handleRefresh} // Refresh on scroll
+      >
         {/* Profile Information Section */}
         <View style={styles.profileSection}>
-          <View style={styles.profileInitials}>
-            <Text style={styles.initialsText}>
-              {(getGreetingName() ?? "U").charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <Text style={styles.name}>{getGreetingName()}</Text>
+          {profileImage ? (
+            <Image source={{ uri: profileImage }} style={styles.profileInitials} />
+          ) : (
+            <View style={styles.profileInitials}>
+              <Text style={styles.initialsText}>{getInitials()}</Text>
+            </View>
+          )}
+          <Text style={styles.name}>{getFullName()}</Text>
           <Text style={styles.email}>{user?.email}</Text>
+          {getLocation() && (
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={14} color="#666" />
+              <Text style={styles.location}>{getLocation()}</Text>
+            </View>
+          )}
         </View>
 
         {/* Menu Items Section */}
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/profile/edit")}
+            onPress={() => {
+              router.push("/profile/edit");
+              // Refresh image when returning (small delay)
+              setTimeout(handleRefresh, 100);
+            }}
           >
             <Ionicons name="person-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Edit Profile</Text>
@@ -157,6 +223,16 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 14,
     color: "#666",
+  },
+  locationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  location: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 4,
   },
   menuSection: {
     backgroundColor: "#FFFFFF",
