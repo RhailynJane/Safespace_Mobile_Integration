@@ -167,7 +167,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/settings")}
+            onPress={() => router.push("/profile/settings")}
           >
             <Ionicons name="settings-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Settings</Text>
