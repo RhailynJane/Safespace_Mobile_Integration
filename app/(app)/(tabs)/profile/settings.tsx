@@ -72,19 +72,37 @@ export default function SettingsScreen() {
   const breathingDurationOptions = ["2 minutes", "5 minutes", "10 minutes", "15 minutes"];
   const breathingStyleOptions = ["4-7-8 Technique", "Box Breathing", "Equal Breathing", "Deep Belly"];
 
+  // Define theme colors
+  const theme = {
+    colors: {
+      background: darkMode ? "#121212" : "#F5F5F5",
+      surface: darkMode ? "#1E1E1E" : "#FFFFFF",
+      text: darkMode ? "#FFFFFF" : "#333",
+      textSecondary: darkMode ? "#B3B3B3" : "#666",
+      textDisabled: darkMode ? "#666" : "#999",
+      border: darkMode ? "#333" : "#E0E0E0",
+      borderLight: darkMode ? "#2A2A2A" : "#F0F0F0",
+      icon: darkMode ? "#B3B3B3" : "#666",
+      iconDisabled: darkMode ? "#666" : "#999",
+      primary: "#4CAF50",
+      accent: "#7FDBDA",
+      error: "#FF6B6B",
+    }
+  };
+
   const renderToggleRow = (title: string, subtitle: string, value: boolean, onToggle: (value: boolean) => void, icon: keyof typeof Ionicons.glyphMap, disabled = false) => (
-    <View style={[styles.settingRow, disabled && styles.disabledRow]}>
+    <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }, disabled && styles.disabledRow]}>
       <View style={styles.settingLeft}>
-        <Ionicons name={icon} size={20} color={disabled ? "#999" : "#666"} />
+        <Ionicons name={icon} size={20} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, disabled && styles.disabledText]}>{title}</Text>
-          <Text style={[styles.settingSubtitle, disabled && styles.disabledText]}>{subtitle}</Text>
+          <Text style={[styles.settingTitle, { color: disabled ? theme.colors.textDisabled : theme.colors.text }]}>{title}</Text>
+          <Text style={[styles.settingSubtitle, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>{subtitle}</Text>
         </View>
       </View>
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
+        trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
         thumbColor="#FFFFFF"
         disabled={disabled}
       />
@@ -93,7 +111,7 @@ export default function SettingsScreen() {
 
   const renderPickerRow = (title: string, subtitle: string, value: string, options: string[], onSelect: (value: string) => void, icon: keyof typeof Ionicons.glyphMap, disabled = false) => (
     <TouchableOpacity 
-      style={[styles.settingRow, disabled && styles.disabledRow]}
+      style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }, disabled && styles.disabledRow]}
       onPress={() => {
         if (disabled) return;
         Alert.alert(
@@ -110,34 +128,34 @@ export default function SettingsScreen() {
       }}
     >
       <View style={styles.settingLeft}>
-        <Ionicons name={icon} size={20} color={disabled ? "#999" : "#666"} />
+        <Ionicons name={icon} size={20} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, disabled && styles.disabledText]}>{title}</Text>
-          <Text style={[styles.settingSubtitle, disabled && styles.disabledText]}>{subtitle}</Text>
+          <Text style={[styles.settingTitle, { color: disabled ? theme.colors.textDisabled : theme.colors.text }]}>{title}</Text>
+          <Text style={[styles.settingSubtitle, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>{subtitle}</Text>
         </View>
       </View>
       <View style={styles.settingRight}>
-        <Text style={[styles.settingValue, disabled && styles.disabledText]}>{value}</Text>
-        <Ionicons name="chevron-forward" size={16} color={disabled ? "#999" : "#666"} />
+        <Text style={[styles.settingValue, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>{value}</Text>
+        <Ionicons name="chevron-forward" size={16} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
       </View>
     </TouchableOpacity>
   );
 
   const renderInputRow = (title: string, subtitle: string, value: string, onChangeText: (text: string) => void, icon: keyof typeof Ionicons.glyphMap, placeholder: string) => (
-    <View style={styles.settingRow}>
+    <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}>
       <View style={styles.settingLeft}>
-        <Ionicons name={icon} size={20} color="#666" />
+        <Ionicons name={icon} size={20} color={theme.colors.icon} />
         <View style={styles.settingTextContainer}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          <Text style={styles.settingSubtitle}>{subtitle}</Text>
+          <Text style={[styles.settingTitle, { color: theme.colors.text }]}>{title}</Text>
+          <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
         </View>
       </View>
       <TextInput
-        style={styles.settingInput}
+        style={[styles.settingInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#999"
+        placeholderTextColor={theme.colors.textSecondary}
       />
     </View>
   );
@@ -406,10 +424,6 @@ const styles = StyleSheet.create({
   disabledRow: {
     opacity: 0.5,
   },
-
-  disabledText: {
-  color: "#999",
-},
   settingLeft: {
     flexDirection: "row",
     alignItems: "center",
