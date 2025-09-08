@@ -10,15 +10,15 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../context/AuthContext";
-import BottomNavigation from "../../components/BottomNavigation";
+import { useAuth } from "../../../context/AuthContext";
+import BottomNavigation from "../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
-export default function AssessmentScreen() {
+
+export default function AssessmentSelectionScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,6 +32,45 @@ export default function AssessmentScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  const assessmentTypes = [
+    {
+      id: "depression-phq9",
+      title: "Depression Screening (PHQ-9)",
+      description: "Helps identify symptoms of depression",
+      duration: "Duration: 5-7 minutes",
+      icon: "sad-outline",
+      backgroundColor: "#F3E5F5",
+      iconColor: "#9C27B0",
+    },
+    {
+      id: "anxiety-gad7",
+      title: "Anxiety Screening (GAD-7)",
+      description: "Helps identify symptoms of anxiety",
+      duration: "Duration: 3-5 minutes",
+      icon: "alert-circle-outline",
+      backgroundColor: "#FFF3E0",
+      iconColor: "#FF9800",
+    },
+    {
+      id: "general-mental-health",
+      title: "General Mental Health",
+      description: "Comprehensive Mental health assessment",
+      duration: "Duration: 10-15 minutes",
+      icon: "checkmark-circle-outline",
+      backgroundColor: "#E8F5E8",
+      iconColor: "#4CAF50",
+    },
+    {
+      id: "stress-assessment",
+      title: "Stress Assessment",
+      description: "Evaluate current stress levels and sources",
+      duration: "Duration: 5-8 minutes",
+      icon: "warning-outline",
+      backgroundColor: "#FFEBEE",
+      iconColor: "#F44336",
+    },
+  ];
+
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -41,36 +80,9 @@ export default function AssessmentScreen() {
     }
   };
 
-  const assessmentOptions = [
-    {
-      id: "before-appointment",
-      title: "Before Appointment",
-      description: "Complete assessment before meeting with your provider",
-      icon: "calendar-outline",
-      backgroundColor: "#E8F5E8",
-      iconColor: "#4CAF50",
-    },
-    {
-      id: "provider-requested",
-      title: "Provider Requested",
-      description: "Your healthcare provider asked you to complete this",
-      icon: "person-outline",
-      backgroundColor: "#E3F2FD",
-      iconColor: "#2196F3",
-    },
-    {
-      id: "personal-check-in",
-      title: "Personal Check-in",
-      description: "Monitor your mental health progress",
-      icon: "heart-outline",
-      backgroundColor: "#FCE4EC",
-      iconColor: "#E91E63",
-    },
-  ];
-
-  const handleAssessmentOption = (optionId: string) => {
-    // All assessment options navigate to the same assessment selection screen
-    router.push("/assessment/selection");
+  const handleAssessmentType = (assessmentId: string) => {
+    // Navigate to the specific assessment questionnaire
+    router.push(`/assessment/questionnaire/${assessmentId}`);
   };
 
   const sideMenuItems = [
@@ -209,43 +221,36 @@ export default function AssessmentScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Illustration Section */}
-        <View style={styles.illustrationContainer}>
-          {/* You can replace this with your uploaded illustration */}
-          <View style={styles.illustrationPlaceholder}>
-            <View style={styles.cloudShape}>
-              <Ionicons name="heart" size={30} color="#4CAF50" />
-              <Ionicons name="add-circle" size={20} color="#2196F3" />
-              <Ionicons name="heart" size={15} color="#4CAF50" />
-            </View>
-            <View style={styles.personIllustration}>
-              <View style={styles.personHead} />
-              <View style={styles.personBody}>
-                <View style={styles.heartInHands}>
-                  <Ionicons name="heart" size={25} color="#FFFFFF" />
-                  <Ionicons name="add" size={15} color="#FFFFFF" />
-                </View>
-              </View>
-            </View>
-          </View>
-          
-          <Text style={styles.questionText}>Why are you taking this assessment?</Text>
+        {/* Purpose Section */}
+        <View style={styles.purposeSection}>
+          <Text style={styles.purposeTitle}>Purpose: Pre-Appointment Assessment</Text>
+          <Text style={styles.purposeDescription}>
+            This assessment will help your provider better understand your current state before your appointment
+          </Text>
         </View>
 
-        {/* Assessment Options */}
-        <View style={styles.optionsContainer}>
-          {assessmentOptions.map((option) => (
+        {/* Instructions */}
+        <View style={styles.instructionsSection}>
+          <Text style={styles.instructionsText}>
+            Please select an assessment to help evaluate your current mental health status
+          </Text>
+        </View>
+
+        {/* Assessment Types */}
+        <View style={styles.assessmentTypesContainer}>
+          {assessmentTypes.map((assessment) => (
             <TouchableOpacity
-              key={option.id}
-              style={[styles.optionCard, { backgroundColor: option.backgroundColor }]}
-              onPress={() => handleAssessmentOption(option.id)}
+              key={assessment.id}
+              style={[styles.assessmentCard, { backgroundColor: assessment.backgroundColor }]}
+              onPress={() => handleAssessmentType(assessment.id)}
             >
-              <View style={styles.optionIconContainer}>
-                <Ionicons name={option.icon as any} size={24} color={option.iconColor} />
+              <View style={styles.assessmentIconContainer}>
+                <Ionicons name={assessment.icon as any} size={24} color={assessment.iconColor} />
               </View>
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>{option.title}</Text>
-                <Text style={styles.optionDescription}>{option.description}</Text>
+              <View style={styles.assessmentContent}>
+                <Text style={styles.assessmentTitle}>{assessment.title}</Text>
+                <Text style={styles.assessmentDescription}>{assessment.description}</Text>
+                <Text style={styles.assessmentDuration}>{assessment.duration}</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -347,72 +352,42 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
-  illustrationContainer: {
-    alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+  purposeSection: {
+    backgroundColor: "#FFFFFF",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  illustrationPlaceholder: {
-    width: 200,
-    height: 200,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 30,
-    position: "relative",
-  },
-  cloudShape: {
-    position: "absolute",
-    top: 20,
-    right: 30,
-    width: 80,
-    height: 50,
-    backgroundColor: "#E3F2FD",
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 5,
-  },
-  personIllustration: {
-    alignItems: "center",
-  },
-  personHead: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#FFCDD2",
-    marginBottom: 10,
-  },
-  personBody: {
-    width: 60,
-    height: 80,
-    backgroundColor: "#4CAF50",
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  heartInHands: {
-    width: 40,
-    height: 35,
-    backgroundColor: "#2196F3",
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "row",
-  },
-  questionText: {
-    fontSize: 22,
+  purposeTitle: {
+    fontSize: 16,
     fontWeight: "600",
     color: "#333",
-    textAlign: "center",
-    lineHeight: 28,
+    marginBottom: 8,
   },
-  optionsContainer: {
+  purposeDescription: {
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
+  },
+  instructionsSection: {
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 20,
-    paddingBottom: 100,
-    gap: 15,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
-  optionCard: {
+  instructionsText: {
+    fontSize: 14,
+    color: "#666",
+    lineHeight: 20,
+  },
+  assessmentTypesContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    gap: 15,
+    paddingBottom: 100,
+  },
+  assessmentCard: {
     flexDirection: "row",
     alignItems: "center",
     padding: 20,
@@ -426,7 +401,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  optionIconContainer: {
+  assessmentIconContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -443,19 +418,25 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  optionContent: {
+  assessmentContent: {
     flex: 1,
   },
-  optionTitle: {
+  assessmentTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
   },
-  optionDescription: {
+  assessmentDescription: {
     fontSize: 14,
     color: "#666",
     lineHeight: 20,
+    marginBottom: 5,
+  },
+  assessmentDuration: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
   },
   modalContainer: {
     flex: 1,
