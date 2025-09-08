@@ -56,20 +56,48 @@ const POSTS = [
   },
 ];
 
-const CATEGORIES = ["Trending", "Stress", "Support", "Stories"];
+const CATEGORIES = ["Trending", "Stress", "Support", "Stories", "Bookmarked"];
 
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeTab, setActiveTab] = useState("community-forum");
   const { user, profile, logout } = useAuth();
+  const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
+  const [commentedPosts, setCommentedPosts] = useState<Set<number>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
+    new Set()
+  );
+
+  const handleLikePress = (postId: number) => {
+    const newLikedPosts = new Set(likedPosts);
+    if (newLikedPosts.has(postId)) {
+      newLikedPosts.delete(postId);
+    } else {
+      newLikedPosts.add(postId);
+    }
+    setLikedPosts(newLikedPosts);
+  };
+
+  const handleBookmarkPress = (postId: number) => {
+    const newBookmarkedPosts = new Set(bookmarkedPosts);
+    if (newBookmarkedPosts.has(postId)) {
+      newBookmarkedPosts.delete(postId);
+    } else {
+      newBookmarkedPosts.add(postId);
+    }
+    setBookmarkedPosts(newBookmarkedPosts);
+  };
 
   const handleBackPress = () => {
     router.back();
   };
 
   const handlePostPress = (postId: number) => {
-    router.push(`/community-forum/${postId}`);
-  };
+  router.push({
+    pathname: "/community-forum/comments",
+    params: { id: postId }
+  });
+};
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -195,11 +223,34 @@ export default function CommunityMainScreen() {
 
               <View style={styles.postFooter}>
                 <View style={styles.interactionButtons}>
-                  <TouchableOpacity style={styles.interactionButton}>
-                    <Ionicons name="heart-outline" size={20} color="#666" />
-                    <Text style={styles.interactionText}>{post.likes}</Text>
+                  <TouchableOpacity
+                    style={styles.interactionButton}
+                    onPress={() => handleLikePress(post.id)}
+                  >
+                    <Ionicons
+                      name={likedPosts.has(post.id) ? "heart" : "heart-outline"}
+                      size={20}
+                      color={likedPosts.has(post.id) ? "#E53935" : "#666"}
+                    />
+                    <Text
+                      style={[
+                        styles.interactionText,
+                        likedPosts.has(post.id) && styles.interactionTextActive,
+                      ]}
+                    >
+                      {post.likes}
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.interactionButton}>
+
+                  <TouchableOpacity
+                    style={styles.interactionButton}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/community-forum/comments",
+                        params: { id: post.id },
+                      })
+                    }
+                  >
                     <Ionicons
                       name="chatbubble-outline"
                       size={20}
@@ -208,8 +259,17 @@ export default function CommunityMainScreen() {
                     <Text style={styles.interactionText}>{post.comments}</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity>
-                  <Ionicons name="bookmark-outline" size={20} color="#666" />
+
+                <TouchableOpacity onPress={() => handleBookmarkPress(post.id)}>
+                  <Ionicons
+                    name={
+                      bookmarkedPosts.has(post.id)
+                        ? "bookmark"
+                        : "bookmark-outline"
+                    }
+                    size={20}
+                    color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"}
+                  />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -314,7 +374,7 @@ const styles = StyleSheet.create({
   categoriesContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 3,
   },
   categoryButton: {
     paddingHorizontal: 12,
@@ -414,5 +474,9 @@ const styles = StyleSheet.create({
   interactionText: {
     fontSize: 14,
     color: "#666",
+  },
+  interactionTextActive: {
+    color: "#4CAF50",
+    fontWeight: "600",
   },
 });

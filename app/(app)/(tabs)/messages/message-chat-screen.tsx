@@ -15,7 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
 // Sample messages data for each conversation
-const conversationMessages: { [key: string]: { id: number; text: string; time: string; sender: string; }[] } = {
+const conversationMessages: {
+  [key: string]: { id: number; text: string; time: string; sender: string }[];
+} = {
   "1": [
     {
       id: 1,
@@ -96,13 +98,14 @@ const contacts: { [key: string]: Contact } = {
 // User avatar for sent messages
 const userAvatar = "https://randomuser.me/api/portraits/women/17.jpg";
 
-
 export default function ChatScreen() {
   const params = useLocalSearchParams();
   const contactId = params.id as string;
   const contact = contacts[contactId];
-  
-  const [messages, setMessages] = useState(conversationMessages[contactId] || []);
+
+  const [messages, setMessages] = useState(
+    conversationMessages[contactId] || []
+  );
   const [newMessage, setNewMessage] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -117,17 +120,17 @@ export default function ChatScreen() {
 
   const handleSendMessage = () => {
     if (newMessage.trim() === "") return;
-    
+
     const newMsg = {
       id: messages.length + 1,
       text: newMessage,
       time: "Just now",
       sender: "me",
     };
-    
+
     setMessages([...messages, newMsg]);
     setNewMessage("");
-    
+
     if (contactId === "1") {
       setTimeout(() => {
         const reply = {
@@ -159,29 +162,29 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-          
-          <View style={styles.contactInfo}>
-            <Image source={{ uri: contact.avatar }} style={styles.headerAvatar} />
-            <View>
-              <Text style={styles.contactName}>{contact.name}</Text>
-              <Text style={styles.contactStatus}>
-                {contact.online ? "Online" : "Offline"}
-                {contact.online && <View style={styles.onlineIndicator} />}
-              </Text>
-            </View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+        </TouchableOpacity>
+
+        <View style={styles.contactInfo}>
+          <Image source={{ uri: contact.avatar }} style={styles.headerAvatar} />
+          <View>
+            <Text style={styles.contactName}>{contact.name}</Text>
+            <Text style={styles.contactStatus}>
+              {contact.online ? "Online" : "Offline"}
+              {contact.online && <View style={styles.onlineIndicator} />}
+            </Text>
           </View>
-          
-          <TouchableOpacity>
-            <Ionicons name="call-outline" size={24} color="#2E7D32" />
-          </TouchableOpacity>
         </View>
 
-        {/* Chat Messages */}
-      <ScrollView 
+        <TouchableOpacity onPress={() => router.push("../appointments/book")}>
+          <Ionicons name="call-outline" size={24} color="#2E7D32" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Chat Messages */}
+      <ScrollView
         style={styles.messagesContainer}
         ref={scrollViewRef}
         contentContainerStyle={styles.messagesContent}
@@ -191,23 +194,32 @@ export default function ChatScreen() {
             key={message.id}
             style={[
               styles.messageContainer,
-              message.sender === "me" ? styles.myMessageContainer : styles.theirMessageContainer,
+              message.sender === "me"
+                ? styles.myMessageContainer
+                : styles.theirMessageContainer,
             ]}
           >
             {message.sender === "other" && (
-              <Image source={{ uri: contact.avatar }} style={styles.messageAvatar} />
+              <Image
+                source={{ uri: contact.avatar }}
+                style={styles.messageAvatar}
+              />
             )}
-            
+
             <View
               style={[
                 styles.messageBubble,
-                message.sender === "me" ? styles.myMessage : styles.theirMessage,
+                message.sender === "me"
+                  ? styles.myMessage
+                  : styles.theirMessage,
               ]}
             >
               <Text
                 style={[
                   styles.messageText,
-                  message.sender === "me" ? styles.myMessageText : styles.theirMessageText,
+                  message.sender === "me"
+                    ? styles.myMessageText
+                    : styles.theirMessageText,
                 ]}
               >
                 {message.text}
@@ -216,7 +228,10 @@ export default function ChatScreen() {
             </View>
 
             {message.sender === "me" && (
-              <Image source={{ uri: userAvatar }} style={styles.messageAvatar} />
+              <Image
+                source={{ uri: userAvatar }}
+                style={styles.messageAvatar}
+              />
             )}
           </View>
         ))}
@@ -231,7 +246,7 @@ export default function ChatScreen() {
           <TouchableOpacity style={styles.attachmentButton}>
             <Ionicons name="attach" size={24} color="#4CAF50" />
           </TouchableOpacity>
-          
+
           <TextInput
             style={styles.textInput}
             placeholder="Type a message..."
@@ -240,19 +255,19 @@ export default function ChatScreen() {
             multiline
             maxLength={500}
           />
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[
               styles.sendButton,
-              newMessage.trim() === "" && styles.sendButtonDisabled
+              newMessage.trim() === "" && styles.sendButtonDisabled,
             ]}
             onPress={handleSendMessage}
             disabled={newMessage.trim() === ""}
           >
-            <Ionicons 
-              name="send" 
-              size={24} 
-              color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"} 
+            <Ionicons
+              name="send"
+              size={24}
+              color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
             />
           </TouchableOpacity>
         </View>
@@ -270,7 +285,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderBottomLeftRadius: 15,
     borderBottomRightRadius: 15,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   header: {
     flexDirection: "row",
@@ -406,4 +421,4 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: "#E0E0E0",
   },
-})
+});
