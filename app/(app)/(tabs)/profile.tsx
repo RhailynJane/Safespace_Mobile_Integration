@@ -176,7 +176,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/help")}
+            onPress={() => router.push("/profile/help-support")}
           >
             <Ionicons name="help-circle-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Help & Support</Text>
