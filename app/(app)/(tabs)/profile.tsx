@@ -39,19 +39,34 @@ export default function ProfileScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Load profile image when screen loads
+  // Load profile data when screen loads and refresh periodically
   useEffect(() => {
-    loadProfileImage();
+    loadProfileData();
+    
+    // Set up interval to check for updates every 2 seconds
+    const interval = setInterval(() => {
+      loadProfileData();
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const loadProfileImage = async () => {
+  const loadProfileData = async () => {
     try {
+      // Load profile image
       const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
       if (savedImage) {
         setProfileImage(savedImage);
       }
+
+      // Load profile data (name, location)
+      const savedProfileData = await AsyncStorage.getItem(`profileData_${user?.uid}`);
+      if (savedProfileData) {
+        const parsedData = JSON.parse(savedProfileData);
+        setProfileData(parsedData);
+      }
     } catch (error) {
-      console.log('Error loading profile image:', error);
+      console.log('Error loading profile data:', error);
     }
   };
 
@@ -74,13 +89,28 @@ export default function ProfileScreen() {
   };
 
   const getGreetingName = () => {
+    // Use saved profile data first, then fallback to auth context
+    if (profileData.firstName) return profileData.firstName;
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
     return "User";
   };
 
+  const getFullName = () => {
+    if (profileData.firstName && profileData.lastName) {
+      return `${profileData.firstName} ${profileData.lastName}`.trim();
+    }
+    if (profile?.firstName && profile?.lastName) {
+      return `${profile.firstName} ${profile.lastName}`.trim();
+    }
+    return getGreetingName();
+  };
+
+  const getLocation = () => {
+    return profileData.location || profile?.location || "";
+  };
+
   const getInitials = () => {
-    // Use saved profile data first, then fallback to auth context
     const firstName = profileData.firstName || profile?.firstName || "";
     const lastName = profileData.lastName || profile?.lastName || "";
     
@@ -97,16 +127,11 @@ export default function ProfileScreen() {
     return name.charAt(0).toUpperCase();
   };
 
-  // Refresh image when screen becomes visible (manual refresh)
-  const handleRefresh = () => {
-    loadProfileImage();
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView 
         contentContainerStyle={styles.scrollContainer}
-        onScrollBeginDrag={handleRefresh} // Refresh on scroll
+        onScrollBeginDrag={() => loadProfileData()} // Refresh on scroll
       >
         {/* Profile Information Section */}
         <View style={styles.profileSection}>
@@ -133,8 +158,6 @@ export default function ProfileScreen() {
             style={styles.menuItem}
             onPress={() => {
               router.push("/profile/edit");
-              // Refresh image when returning (small delay)
-              setTimeout(handleRefresh, 100);
             }}
           >
             <Ionicons name="person-outline" size={24} color="#666" />
