@@ -175,7 +175,7 @@ export default function CrisisScreen() {
         {/* Card for Need Immediate Help Section */}
         <View style={styles.card}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Need Immediate Help?</Text>
+            <Text style={styles.sectionMainTitle}>Need Immediate Help?</Text>
             <Text style={styles.sectionText}>
               If you or someone you know is in crisis, please call 911 or contact a 24/7 crisis line in your area.
             </Text>
@@ -357,6 +357,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     color: "#4CAF50",
+    marginBottom: 12,
+  },
+  sectionMainTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#FFFFFF",
     marginBottom: 12,
   },
   sectionText: {
