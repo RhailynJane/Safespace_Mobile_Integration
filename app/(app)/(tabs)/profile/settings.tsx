@@ -56,15 +56,19 @@ export default function SettingsScreen() {
   ];
 
   const handleTabPress = (tabId: string) => {
-    setActiveTab(tabId);
-    if (tabId === "home") {
-      router.replace("/(app)/(tabs)/home");
-    } else if (tabId === "profile") {
-      router.back();
-    } else {
-      router.push(`/(app)/(tabs)/${tabId}`);
-    }
-  };
+  setActiveTab(tabId);
+  if (tabId === "home") {
+    router.replace("/(app)/(tabs)/home");
+  } else if (tabId === "profile") {
+    router.back();
+  } else if (tabId === "messages") {
+    router.push("/(app)/(tabs)/messages");
+  } else if (tabId === "appointments") {
+    router.push("/(app)/(tabs)/appointments");
+  } else {
+    router.push(`/(app)/(tabs)/${tabId}`);
+  }
+};
 
   const textSizeOptions = ["Small", "Medium", "Large", "Extra Large"];
   const autoLockOptions = ["Immediate", "1 minute", "5 minutes", "15 minutes", "Never"];
@@ -376,7 +380,10 @@ export default function SettingsScreen() {
         tabs={tabs}
         activeTab={activeTab}
         onTabPress={handleTabPress}
+        theme={theme}
       />
+
+
     </SafeAreaView>
   );
 }
