@@ -161,20 +161,20 @@ export default function SettingsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color="#333" />
+          <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Settings</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Display & Accessibility */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Display & Accessibility</Text>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Display & Accessibility</Text>
           
           {renderToggleRow(
             "Dark Mode",
@@ -211,15 +211,15 @@ export default function SettingsScreen() {
         </View>
 
         {/* Privacy & Security */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy & Security</Text>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Privacy & Security</Text>
 
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}>
             <View style={styles.settingLeft}>
-              <Ionicons name="eye-off" size={20} color="#666" />
+              <Ionicons name="eye-off" size={20} color={theme.colors.icon} />
               <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>Hide App Content</Text>
-                <Text style={styles.settingSubtitle}>Automatically blur app in recent apps</Text>
+                <Text style={[styles.settingTitle, { color: theme.colors.text }]}>Hide App Content</Text>
+                <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>Automatically blur app in recent apps</Text>
               </View>
             </View>
             <View style={styles.enabledIndicator}>
@@ -248,8 +248,8 @@ export default function SettingsScreen() {
         </View>
 
         {/* Notifications */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notifications</Text>
 
           {renderToggleRow(
             "Enable Notifications",
@@ -270,19 +270,21 @@ export default function SettingsScreen() {
           {quietHoursEnabled && (
             <View style={styles.nestedSettings}>
               <View style={styles.timeRow}>
-                <Text style={styles.timeLabel}>From:</Text>
+                <Text style={[styles.timeLabel, { color: theme.colors.text }]}>From:</Text>
                 <TextInput
-                  style={styles.timeInput}
+                  style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                   value={quietStartTime}
                   onChangeText={setQuietStartTime}
                   placeholder="22:00"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
-                <Text style={styles.timeLabel}>To:</Text>
+                <Text style={[styles.timeLabel, { color: theme.colors.text }]}>To:</Text>
                 <TextInput
-                  style={styles.timeInput}
+                  style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                   value={quietEndTime}
                   onChangeText={setQuietEndTime}
                   placeholder="08:00"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
             </View>
@@ -299,8 +301,8 @@ export default function SettingsScreen() {
         </View>
 
         {/* Emergency Contacts */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Emergency Contacts</Text>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Emergency Contacts</Text>
 
           {renderInputRow(
             "Crisis Contact",
@@ -322,8 +324,8 @@ export default function SettingsScreen() {
         </View>
 
         {/* Wellbeing Features */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Wellbeing Features</Text>
+        <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Wellbeing Features</Text>
 
           {renderToggleRow(
             "Safe Mode",
