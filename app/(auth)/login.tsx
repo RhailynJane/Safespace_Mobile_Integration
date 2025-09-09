@@ -117,13 +117,20 @@ export default function LoginScreen() {
           Centers content vertically when space allows
         */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
+          
+        {/* ELLIPSE  
+            At the top of the screen 
+        */}
+                          <View style={styles.topEllipse}></View> 
+          
+
           {/* 
             LOGO SECTION
             SafeSpace branding at top of login form
             Provides visual identity and professional appearance
           */}
           <View style={styles.logoContainer}>
-            <SafeSpaceLogo size={80} />
+            <SafeSpaceLogo size={218} />
           </View>
 
           {/* SCREEN TITLE */}
@@ -319,12 +326,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  //ELLIPSE 
+  topEllipse: {
+  position: 'absolute',
+  top: 0,
+  left: -50,
+  right: -50,
+  height: 200,
+  backgroundColor: '#B87B7B',
+  opacity: 0.10, // 50% opacity
+  borderBottomLeftRadius: 200,
+  borderBottomRightRadius: 200,
+  zIndex: -1, // Place behind other content
+},
+
   // SCROLLABLE CONTENT CONTAINER
   // Centers content vertically when space allows, enables scrolling when needed
   scrollContainer: {
     flexGrow: 1, // Allow growth beyond screen height
     paddingHorizontal: 24, // Side padding for content
-    paddingVertical: 20, // Top/bottom padding
+    paddingVertical: 15, // Top/bottom padding
     justifyContent: "center", // Center content vertically when possible
   },
 
@@ -332,7 +353,6 @@ const styles = StyleSheet.create({
   // Logo container with appropriate spacing
   logoContainer: {
     alignItems: "center", // Center logo horizontally
-    marginBottom: 30, // Space below logo
   },
 
   // Screen title styling
@@ -370,7 +390,7 @@ const styles = StyleSheet.create({
 
   // Active toggle button (Sign In)
   activeToggle: {
-    backgroundColor: "#7FDBDA", // Teal background for active state
+    backgroundColor: "#7BB8A8", // Teal background for active state
   },
 
   // Active toggle text styling
@@ -440,7 +460,7 @@ const styles = StyleSheet.create({
   // BUTTON STYLES
   // Primary sign in button
   signInButton: {
-    backgroundColor: "#7FDBDA", // Teal color matching app theme
+    backgroundColor: "#7BB8A8", // Teal color matching app theme
     borderRadius: 25, // Fully rounded corners
     paddingVertical: 16, // Vertical padding for touch target
     alignItems: "center", // Center text horizontally
