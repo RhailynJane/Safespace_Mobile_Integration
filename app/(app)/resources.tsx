@@ -288,8 +288,13 @@ export default function ResourcesScreen() {
                 key={resource.id}
                 style={styles.resourceCard}
                 onPress={() => {
-                  // Handle resource selection
-                  console.log("Selected resource:", resource.title);
+                  // Handle resource selection based on the resource
+                  if (resource.title === "Understanding Anxiety") {
+                    router.push("/understanding-anxiety");
+                  } else {
+                    console.log("Selected resource:", resource.title);
+                    // Add navigation for other resources as needed
+                  }
                 }}
               >
                 <View style={[styles.resourceImageContainer, { backgroundColor: resource.backgroundColor }]}>
