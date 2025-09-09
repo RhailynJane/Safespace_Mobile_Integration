@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
 
   // Step progress indicator
   subtitle: {
-    fontSize: 16,
+    fontSize: 12,
     color: "#666", // Medium gray for secondary text
     textAlign: "center",
     marginBottom: 32, // Large margin before form content

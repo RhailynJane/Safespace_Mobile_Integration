@@ -134,8 +134,21 @@ export default function OnboardingFlow() {
       */}
       <View style={styles.textSection}>
         <SafeAreaView style={styles.textSafeArea}>
-          {/* Decorative progress line at top of text section */}
-          <View style={styles.progressLine} />
+          {/*
+            PROGRESS LINE
+            Single line showing completion progress with brown colors
+          */}
+          <View style={styles.progressLineContainer}>
+            <View style={styles.progressLineBackground} />
+            <View 
+              style={[
+                styles.progressLineFill,
+                { 
+                  width: `${((currentStep + 1) / onboardingSteps.length) * 100}%` 
+                }
+              ]} 
+            />
+          </View>
 
           {/* 
             TEXT CONTENT
@@ -172,26 +185,7 @@ export default function OnboardingFlow() {
             <Text style={styles.continueButtonText}>→</Text>
           </TouchableOpacity>
 
-          {/* 
-            PROGRESS DOTS
-            Row of dots showing current progress through onboarding
-            Current step highlighted in teal, others in gray
-          */}
-          <View style={styles.progressIndicator}>
-            {onboardingSteps.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressDot,
-                  {
-                    // Highlight current step with teal color
-                    backgroundColor:
-                      index === currentStep ? "#14b8a6" : "#d1d5db",
-                  },
-                ]}
-              />
-            ))}
-          </View>
+
         </SafeAreaView>
       </View>
     </View>
@@ -264,27 +258,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between", // Distribute children evenly
   },
 
-  // Decorative line at top of text section
-  progressLine: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#d1d5db", // Light gray
-    borderRadius: 2,
-    alignSelf: "center", // Center horizontally
-    marginTop: 12,
-  },
-
   // Container for title, subtitle, and description
   textContainer: {
     alignItems: "center", // Center text horizontally
     flex: 1, // Take up most of the text section
     justifyContent: "center", // Center content vertically
     paddingVertical: 20,
+    marginBottom: 35, // Space above button
   },
 
   // Main title styling
   title: {
-    fontSize: 24,
+    paddingTop: 30,
+    fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
     color: "#111827", // Dark gray/black
@@ -294,7 +280,7 @@ const styles = StyleSheet.create({
 
   // Subtitle with accent color
   subtitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
     color: "#14b8a6", // Teal accent color
@@ -338,20 +324,30 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // PROGRESS INDICATORS
-  // Container for progress dots
-  progressIndicator: {
-    flexDirection: "row", // Horizontal layout
-    justifyContent: "center", // Center the dots
-    paddingBottom: 10,
+  // Progress line container
+  progressLineContainer: {
+    height: 4,
+    width: '60%',
+    alignSelf: 'center',
+    position: 'relative',
+    marginTop: 12,
+    marginBottom: 20,
   },
 
-  // Individual progress dot
-  progressDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4, // Makes it circular
-    marginHorizontal: 4, // Space between dots
-    // backgroundColor is set dynamically in the component
+  // Background line (incomplete progress)
+  progressLineBackground: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(139, 69, 19, 0.2)', // Medium brown 20% opacity
+    borderRadius: 2,
+  },
+
+  // Fill line (completed progress)
+  progressLineFill: {
+    position: 'absolute',
+    height: '100%',
+    backgroundColor: 'rgba(139, 69, 19, 0.6)', // Medium brown 60% opacity
+    borderRadius: 2,
   },
 });
