@@ -88,6 +88,8 @@ export default function AssessmentSelectionScreen() {
       router.push("/assessment/gad7");
     } else if (assessmentId === "general-mental-health") {
     router.push("/assessment/general-mental-health");
+    } else if (assessmentId === "stress-assessment") {
+    router.push("/assessment/stress-test");
     } else {
       // For other assessments, navigate to a generic placeholder for now
       router.push(`/assessment/questionnaire/${assessmentId}`);
