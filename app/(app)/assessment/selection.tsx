@@ -84,6 +84,8 @@ export default function AssessmentSelectionScreen() {
     // Navigate to the specific assessment questionnaire
     if (assessmentId === "depression-phq9") {
       router.push("/assessment/phq9");
+    } else if (assessmentId === "anxiety-gad7") {
+      router.push("/assessment/gad7");
     } else {
       // For other assessments, navigate to a generic placeholder for now
       router.push(`/assessment/questionnaire/${assessmentId}`);
