@@ -10,6 +10,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  TextInput,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -17,11 +19,14 @@ import { useAuth } from "../../context/AuthContext";
 import BottomNavigation from "../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
+
 export default function ResourcesScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("resources");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -29,6 +34,52 @@ export default function ResourcesScreen() {
     { id: "appointments", name: "Appointments", icon: "calendar" },
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const categories = [
+    { id: "stress", name: "Stress", icon: "💧", color: "#FF8A65" },
+    { id: "anxiety", name: "Anxiety", icon: "🧠", color: "#81C784" },
+    { id: "depression", name: "Depression", icon: "👥", color: "#64B5F6" },
+    { id: "sleep", name: "Sleep", icon: "🛏️", color: "#4DD0E1" },
+  ];
+
+  const resources = [
+    {
+      id: 1,
+      title: "Breathing Exercises",
+      type: "Exercise",
+      duration: "5 mins",
+      category: "stress",
+      image: "🧘‍♀️",
+      backgroundColor: "#E8F5E8",
+    },
+    {
+      id: 2,
+      title: "Understanding Anxiety",
+      type: "Article",
+      duration: "10 mins",
+      category: "anxiety",
+      image: "🧠",
+      backgroundColor: "#E3F2FD",
+    },
+    {
+      id: 3,
+      title: "Mood Tracking Tips",
+      type: "Article",
+      duration: "10 mins",
+      category: "depression",
+      image: "📊",
+      backgroundColor: "#FFF3E0",
+    },
+    {
+      id: 4,
+      title: "Daily Routine Building",
+      type: "Guide",
+      duration: "15 mins",
+      category: "sleep",
+      image: "📅",
+      backgroundColor: "#F3E5F5",
+    },
   ];
 
   const handleTabPress = (tabId: string) => {
@@ -39,6 +90,7 @@ export default function ResourcesScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
   const sideMenuItems = [
     {
       icon: "home",
@@ -145,6 +197,12 @@ export default function ResourcesScreen() {
     return "User";
   };
 
+  const filteredResources = resources.filter((resource) => {
+    const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "" || resource.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -157,22 +215,100 @@ export default function ResourcesScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Resources</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Support and Resources</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={24} color="#333" />
+            <View style={styles.notificationBadge} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+            <Ionicons name="grid-outline" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Resources Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Resources space for you.
-        </Text>
-      </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search resources"
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+        </View>
+
+        {/* Suggested Categories */}
+        <View style={styles.categoriesSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Suggested Category</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllButton}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView 
+            horizontal={true}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScrollContainer}
+          >
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  styles.categoryButton,
+                  { backgroundColor: category.color },
+                  selectedCategory === category.id && styles.selectedCategory
+                ]}
+                onPress={() => setSelectedCategory(selectedCategory === category.id ? "" : category.id)}
+              >
+                <Text style={styles.categoryIcon}>{category.icon}</Text>
+                <Text style={styles.categoryName}>{category.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* All Resources */}
+        <View style={styles.resourcesSection}>
+          <Text style={styles.resourcesSectionTitle}>All Resources</Text>
+          
+          <View style={styles.resourcesList}>
+            {filteredResources.map((resource) => (
+              <TouchableOpacity
+                key={resource.id}
+                style={styles.resourceCard}
+                onPress={() => {
+                  // Handle resource selection
+                  console.log("Selected resource:", resource.title);
+                }}
+              >
+                <View style={[styles.resourceImageContainer, { backgroundColor: resource.backgroundColor }]}>
+                  <Text style={styles.resourceEmoji}>{resource.image}</Text>
+                </View>
+                
+                <View style={styles.resourceContent}>
+                  <Text style={styles.resourceTitle}>{resource.title}</Text>
+                  <View style={styles.resourceMeta}>
+                    <Text style={styles.resourceType}>{resource.type}</Text>
+                    <View style={styles.resourceDot} />
+                    <Text style={styles.resourceDuration}>{resource.duration}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -219,7 +355,7 @@ export default function ResourcesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F8F9FA",
   },
   loadingContainer: {
     flex: 1,
@@ -230,33 +366,187 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: "#F8F9FA",
+  },
+  headerTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#2E7D32",
+    color: "#333",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 15,
+  },
+  notificationButton: {
+    position: "relative",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FF5722",
   },
   content: {
     flex: 1,
-    justifyContent: "center",
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  searchBar: {
+    flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  categoriesSection: {
+    paddingVertical: 15,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
     paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 22,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 12,
+  },
+  seeAllButton: {
+    fontSize: 14,
+    color: "#FF5722",
+    fontWeight: "500",
+  },
+  categoriesScrollContainer: {
+    paddingHorizontal: 20,
+    gap: 15,
+  },
+  categoryButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  selectedCategory: {
+    borderWidth: 2,
+    borderColor: "#4CAF50",
+  },
+  categoryIcon: {
+    fontSize: 24,
+    marginBottom: 5,
+  },
+  categoryName: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#333",
     textAlign: "center",
   },
-  subtitle: {
+  resourcesSection: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 100,
+  },
+  resourcesSectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 15,
+  },
+  resourcesList: {
+    gap: 15,
+  },
+  resourceCard: {
+    flexDirection: "row",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 15,
+    padding: 15,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  resourceImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  resourceEmoji: {
+    fontSize: 28,
+  },
+  resourceContent: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  resourceTitle: {
     fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  resourceMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  resourceType: {
+    fontSize: 14,
     color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
+  },
+  resourceDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#666",
+    marginHorizontal: 8,
+  },
+  resourceDuration: {
+    fontSize: 14,
+    color: "#666",
   },
   modalContainer: {
     flex: 1,
@@ -276,12 +566,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
   },
   profileName: {
     fontSize: 18,
