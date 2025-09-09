@@ -82,7 +82,12 @@ export default function AssessmentSelectionScreen() {
 
   const handleAssessmentType = (assessmentId: string) => {
     // Navigate to the specific assessment questionnaire
-    router.push(`/assessment/questionnaire/${assessmentId}`);
+    if (assessmentId === "depression-phq9") {
+      router.push("/assessment/phq9");
+    } else {
+      // For other assessments, navigate to a generic placeholder for now
+      router.push(`/assessment/questionnaire/${assessmentId}`);
+    }
   };
 
   const sideMenuItems = [
@@ -281,7 +286,7 @@ export default function AssessmentSelectionScreen() {
                   style={styles.sideMenuItem}
                   onPress={item.onPress}
                 >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                  <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
                   <Text style={styles.sideMenuItemText}>{item.title}</Text>
                 </TouchableOpacity>
               ))}
