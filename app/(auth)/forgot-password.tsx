@@ -135,7 +135,7 @@ export default function ForgotPasswordScreen() {
             Provides visual continuity with other auth screens
           */}
           <View style={styles.logoContainer}>
-            <SafeSpaceLogo size={80} />
+            <SafeSpaceLogo size={218} />
           </View>
 
           {/* 
@@ -272,8 +272,6 @@ const styles = StyleSheet.create({
   // Logo container with appropriate spacing
   logoContainer: {
     alignItems: "center", // Center logo horizontally
-    marginBottom: 30, // Space below logo
-    marginTop: 60, // Space above logo (accounts for back button)
   },
 
   // HEADER TEXT STYLES

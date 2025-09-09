@@ -197,14 +197,19 @@ export default function SignupScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
+
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
+
+                <View style={styles.topEllipse}></View> 
+
+
           {currentStep !== "success" && (
             <View style={styles.logoContainer}>
-              <SafeSpaceLogo size={60} />
+              <SafeSpaceLogo size={218} />
             </View>
           )}
           {renderCurrentStep()}
@@ -225,15 +230,14 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingVertical: 15,
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 30,
-    marginTop: 20,
+    marginBottom: 2,
   },
   headerContainer: {
-    marginBottom: 30,
+    marginBottom: 2,
   },
   title: {
     fontSize: 20,
@@ -260,8 +264,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 20,
   },
+
+  topEllipse: {
+  position: 'absolute',
+  top: 0,
+  left: -50,
+  right: -50,
+  height: 200,
+  backgroundColor: '#B87B7B',
+  opacity: 0.10, // 50% opacity
+  borderBottomLeftRadius: 200,
+  borderBottomRightRadius: 200,
+  zIndex: -1, // Place behind other content
+},
+
   activeToggle: {
-    backgroundColor: "#7FDBDA",
+    backgroundColor: "#7BB8A8",
   },
   activeToggleText: {
     color: "#FFF",

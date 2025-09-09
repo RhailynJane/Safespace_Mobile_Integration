@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
 
   // Primary create account button styling
   continueButton: {
-    backgroundColor: "#7FDBDA", // Teal brand color
+    backgroundColor: "#7BB8A8", // Teal brand color
     borderRadius: 25, // Highly rounded corners
     paddingVertical: 16, // Comfortable touch target
     alignItems: "center",
