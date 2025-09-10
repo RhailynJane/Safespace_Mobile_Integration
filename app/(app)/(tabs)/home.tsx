@@ -21,6 +21,7 @@ import { router } from "expo-router";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
+import { BorderRadius } from "../../../constants/theme";
 
 const { width } = Dimensions.get("window");
 
@@ -67,29 +68,33 @@ export default function HomeScreen() {
     {
       id: "mood",
       title: "Track Mood",
-      icon: "happy",
-      color: "#E8F5E9",
+      icon: "happy-outline",
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/mood-tracking"),
     },
     {
       id: "journal",
       title: "Journal",
-      icon: "create",
-      color: "#E0F7FA",
+      icon: "journal-outline",
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/journaling"),
     },
     {
       id: "resources",
       title: "Resources",
-      icon: "book",
-      color: "#E8EAF6",
+      icon: "library-outline",
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/resources"),
     },
     {
       id: "crisis",
       title: "Crisis Support",
-      icon: "help-buoy",
-      color: "#F3E5F5",
+      icon: "help-buoy-outline",
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),
     },
   ];
@@ -229,6 +234,13 @@ export default function HomeScreen() {
       default:
         return "Unknown";
     }
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
   };
 
   const fetchRecentMoods = async () => {
@@ -383,12 +395,18 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="menu" size={28} color="#4CAF50" />
+            <View style={styles.profileImageContainer}>
+              <Ionicons name="person" size={20} color="#4CAF50" />
+            </View>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Hello, {getGreetingName()}</Text>
-          <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity onPress={() => router.push("/notifications")}>
+              <Ionicons name="notifications-outline" size={24} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton}>
+              <Ionicons name="grid-outline" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView
@@ -396,6 +414,15 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          
+          {/* Greeting Section */}
+          <View style={styles.greetingSection}>
+            <Text style={styles.greetingText}>
+              {getGreeting()}, <Text style={styles.nameText}>{getGreetingName()}!</Text>
+            </Text>
+            <Text style={styles.subGreetingText}>How are you feeling today?</Text>
+          </View>
+
           {/* Emergency Help Section */}
           <View style={styles.section}>
             <TouchableOpacity
@@ -403,10 +430,8 @@ export default function HomeScreen() {
               onPress={() => router.push("/crisis-support")}
             >
               <View style={styles.helpButtonContent}>
-                <Ionicons name="help-buoy" size={24} color="white" />
                 <Text style={styles.helpButtonText}>Get Help Now</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="white" />
             </TouchableOpacity>
           </View>
 
@@ -417,14 +442,22 @@ export default function HomeScreen() {
               {quickActions.map((action) => (
                 <TouchableOpacity
                   key={action.id}
-                  style={[styles.actionCard, { backgroundColor: action.color }]}
+                  style={[
+                    styles.actionCard,
+                    { 
+                      backgroundColor: action.color,
+                      borderColor: action.borderColor 
+                    }
+                  ]}
                   onPress={action.onPress}
                 >
-                  <Ionicons
-                    name={action.icon as any}
-                    size={24}
-                    color="#4CAF50"
-                  />
+                  <View style={[styles.iconContainer, { backgroundColor: action.borderColor }]}>
+                    <Ionicons
+                      name={action.icon as any}
+                      size={28}
+                      color="white"
+                    />
+                  </View>
                   <Text style={styles.actionTitle}>{action.title}</Text>
                 </TouchableOpacity>
               ))}
@@ -449,7 +482,12 @@ export default function HomeScreen() {
                 ))}
               </View>
             ) : (
-              <Text style={styles.noDataText}>No mood entries yet</Text>
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>No mood entries yet</Text>
+                <Text style={styles.noDataSubtext}>
+                  Start tracking your mood to see insights here
+                </Text>
+              </View>
             )}
           </View>
 
@@ -473,7 +511,12 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={styles.noDataText}>No resources available</Text>
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>No resources available</Text>
+                <Text style={styles.noDataSubtext}>
+                  Check back later for new content
+                </Text>
+              </View>
             )}
           </View>
         </ScrollView>
@@ -483,10 +526,7 @@ export default function HomeScreen() {
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab.id}
-              style={[
-                styles.navItem,
-                activeTab === tab.id && styles.navItemActive,
-              ]}
+              style={styles.navItem}
               onPress={() => {
                 setActiveTab(tab.id);
                 if (tab.id !== "home") router.push(`/${tab.id}`);
@@ -495,16 +535,8 @@ export default function HomeScreen() {
               <Ionicons
                 name={tab.icon as any}
                 size={24}
-                color={activeTab === tab.id ? "#4CAF50" : "#757575"}
+                color={activeTab === tab.id ? "#4CAF50" : "#9E9E9E"}
               />
-              <Text
-                style={[
-                  styles.navText,
-                  activeTab === tab.id && styles.navTextActive,
-                ]}
-              >
-                {tab.name}
-              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -553,7 +585,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F2F2F7",
   },
   loadingContainer: {
     flex: 1,
@@ -564,37 +596,76 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    paddingBottom: 5,
+    backgroundColor: "#7BB8A8",
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
+  profileImageContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  menuButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
-    paddingBottom: 70,
+    paddingBottom: 80,
+  },
+  greetingSection: {
+    backgroundColor: "#7BB8A8",
+    marginHorizontal: 0,
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    borderTopLeftRadius: 0,      // Sharp top left corner
+    borderTopRightRadius: 0,     // Sharp top right corner
+    borderBottomLeftRadius: 50,  // Rounded bottom left
+    borderBottomRightRadius: 50, // Rounded bottom right
+    marginBottom: 20,
+  },
+
+  greetingText: {
+    fontSize: 24,
+    fontWeight: "300",
+    fontFamily: 'Epilogue-Regular',
+    color: "#000000",
+    marginBottom: 4,
+  },
+  subGreetingText: {
+    fontSize: 15,
+    fontFamily: 'Epilogue-Regular',
+
+    color: "#000000",
+    opacity: 0.8,
   },
   section: {
     paddingHorizontal: 20,
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2E7D32",
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: 'Epilogue-Regular',
+    color: "#212121",
     marginBottom: 16,
   },
   helpButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F44336",
+    backgroundColor: "#DF1D1D",
+    fontFamily: 'Epilogue-Regular',
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 50,
   },
   helpButtonContent: {
     flexDirection: "row",
@@ -603,70 +674,129 @@ const styles = StyleSheet.create({
   helpButtonText: {
     fontSize: 16,
     color: "#FFFFFF",
+    fontFamily: 'Epilogue-Regular',
+
     fontWeight: "600",
     marginLeft: 8,
-  },
-  recentMoods: {
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    padding: 12,
-  },
-  moodItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  moodEmoji: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  moodDetails: {
-    flex: 1,
-  },
-  moodDate: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  moodText: {
-    fontSize: 14,
-    color: "#212121",
-    fontWeight: "500",
-  },
-  noDataText: {
-    textAlign: "center",
-    color: "#757575",
-    paddingVertical: 16,
   },
   actionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 12,
+    padding: 20,
+
   },
   actionCard: {
-    width: "48%",
-    borderRadius: 12,
-    padding: 16,
+    width: 141 ,
+    height: 159,
+    borderRadius: 16,
+    padding: 20,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    minHeight: 120,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 12,
   },
   actionTitle: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#212121",
-    marginTop: 8,
+    textAlign: "center",
+  },
+  recentMoods: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  moodItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
+  },
+  moodEmoji: {
+    fontSize: 28,
+    marginRight: 16,
+  },
+  moodDetails: {
+    flex: 1,
+  },
+  moodDate: {
+    fontSize: 12,
+    color: "#9E9E9E",
+    marginBottom: 2,
+  },
+  moodText: {
+    fontSize: 16,
+    color: "#212121",
+    fontWeight: "500",
+  },
+  noDataContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#424242",
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  noDataSubtext: {
+    fontSize: 14,
+    color: "#9E9E9E",
+    textAlign: "center",
   },
   resourceCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   resourceInfo: {
     flex: 1,
@@ -685,31 +815,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    paddingVertical: 16,
     backgroundColor: "#FFFFFF",
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
   },
   navItem: {
     alignItems: "center",
     padding: 8,
-  },
-  navItemActive: {
-    borderTopWidth: 2,
-    borderTopColor: "#4CAF50",
-  },
-  navText: {
-    fontSize: 12,
-    color: "#757575",
-    marginTop: 4,
-  },
-  navTextActive: {
-    color: "#4CAF50",
-    fontWeight: "500",
   },
   modalContainer: {
     flex: 1,
@@ -736,6 +859,13 @@ const styles = StyleSheet.create({
     color: "#212121",
     marginBottom: 4,
   },
+  nameText: {
+  fontWeight: "700", // Bold for the name
+  color: "#4C4A53",
+  fontFamily: 'Epilogue-Regular',
+
+
+},
   profileEmail: {
     fontSize: 14,
     color: "#757575",
