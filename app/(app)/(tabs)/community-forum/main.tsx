@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
@@ -8,11 +8,17 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Modal,
+  Pressable,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useAuth } from "../../../../context/AuthContext";
+
+const { width } = Dimensions.get("window");
 
 // Mock data for posts
 const POSTS = [
@@ -57,8 +63,7 @@ const POSTS = [
   },
 ];
 
-const CATEGORIES = ["Trending", "Stress", "Support", "Stories"];
-
+const CATEGORIES = ["Trending", "Stress", "Support", "Stories", "Bookmark", "Favorites"];
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeTab, setActiveTab] = useState("community-forum");
@@ -69,6 +74,8 @@ export default function CommunityMainScreen() {
     new Set()
   );
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const loadProfileImage = async () => {
     try {
@@ -96,6 +103,124 @@ export default function CommunityMainScreen() {
   useEffect(() => {
     loadProfileImage();
   }, [user?.uid]);
+
+  const showSideMenu = () => {
+    setSideMenuVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideSideMenu = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      setSideMenuVisible(false);
+    });
+  };
+
+  const sideMenuItems = [
+    {
+      icon: "home",
+      title: "Dashboard",
+      onPress: () => {
+        hideSideMenu();
+        router.replace("/(app)/(tabs)/home");
+      },
+    },
+    {
+      icon: "person",
+      title: "Profile",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/(app)/(tabs)/profile");
+      },
+    },
+    {
+      icon: "bar-chart",
+      title: "Self-Assessment",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/self-assessment");
+      },
+    },
+    {
+      icon: "happy",
+      title: "Mood Tracking",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/mood-tracking");
+      },
+    },
+    {
+      icon: "journal",
+      title: "Journaling",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/journaling");
+      },
+    },
+    {
+      icon: "library",
+      title: "Resources",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/resources");
+      },
+    },
+    {
+      icon: "help-circle",
+      title: "Crisis Support",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/crisis-support");
+      },
+    },
+    {
+      icon: "chatbubble",
+      title: "Messages",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/(app)/(tabs)/messages");
+      },
+    },
+    {
+      icon: "calendar",
+      title: "Appointments",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/(app)/(tabs)/appointments");
+      },
+    },
+    {
+      icon: "people",
+      title: "Community Forum",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/community-forum");
+      },
+    },
+    {
+      icon: "videocam",
+      title: "Video Consultations",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/video-consultations");
+      },
+    },
+    {
+      icon: "log-out",
+      title: "Sign Out",
+      onPress: async () => {
+        hideSideMenu();
+        await logout();
+      },
+    },
+  ];
 
   const handleLikePress = (postId: number) => {
     const newLikedPosts = new Set(likedPosts);
@@ -152,56 +277,61 @@ export default function CommunityMainScreen() {
     return "John Doe";
   };
 
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
-          <View style={styles.profileImageContainer}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} />
-            ) : (
-              <Text style={styles.initialsText}>{getInitials()}</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#666" />
+      <View style={styles.headerContainer}>
+        {/* Top Header Row */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+            <View style={styles.profileImageContainer}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              ) : (
+                <Text style={styles.initialsText}>{getInitials()}</Text>
+              )}
+            </View>
           </TouchableOpacity>
-          <TouchableOpacity>
-            <Ionicons name="grid" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={() => router.push("/notifications")}>
+              <Ionicons name="notifications-outline" size={24} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={showSideMenu}
+            >
+              <Ionicons name="grid" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* User Profile Summary */}
         <View style={styles.profileSection}>
           <View style={styles.profileContainer}>
-            <View style={styles.profileImageContainer}>
-              <Image
-                source={{
-                  uri: "https://randomuser.me/api/portraits/men/17.jpg",
-                }}
-                style={styles.profileImage}
-              />
-            </View>
             <View style={styles.profileTextContainer}>
               <Text style={styles.userName}>{getDisplayName()}</Text>
-              <Text style={styles.userStats}>📝 0 Total Posts</Text>
+              <Text style={styles.userStats}>
+                <Ionicons name="document-text" size={16} color="#666" /> 0 Total Posts
+              </Text>          
             </View>
           </View>
-
-          {/* Add Post Button */}
-          <TouchableOpacity
-            style={styles.addPostButton}
-            onPress={() => router.push("/community-forum/create")}
-          >
-            <Text style={styles.addPostButtonText}>Add Post</Text>
-          </TouchableOpacity>
         </View>
+      </View>
 
+      {/* Dedicated Add Post Button Container */}
+      <View style={styles.addPostContainer}>
+        <TouchableOpacity
+          style={styles.addPostButton}
+          onPress={() => router.push("/community-forum/create")}
+        >
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Text style={styles.addPostButtonText}>Create New Post</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Browse By Categories */}
         <View style={styles.categoriesSection}>
           <Text style={styles.browseBySectionTitle}>Browse By</Text>
@@ -288,11 +418,55 @@ export default function CommunityMainScreen() {
                     <Text style={styles.interactionText}>{post.comments}</Text>
                   </TouchableOpacity>
                 </View>
+                <TouchableOpacity onPress={() => handleBookmarkPress(post.id)}>
+                  <Ionicons
+                    name={bookmarkedPosts.has(post.id) ? "bookmark" : "bookmark-outline"}
+                    size={18}
+                    color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#FF6B35"}
+                  />
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
+
+      {/* Side Menu Modal */}
+      <Modal
+        animationType="none" 
+        transparent={true}
+        visible={sideMenuVisible}
+        onRequestClose={hideSideMenu}
+      >
+        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={hideSideMenu}
+          />
+          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+            <View style={styles.sideMenuHeader}>
+              <Text style={styles.profileName}>{getGreetingName()}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
+            </View>
+            <ScrollView style={styles.sideMenuContent}>
+              {sideMenuItems.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.sideMenuItem}
+                  onPress={item.onPress}
+                >
+                  <Ionicons
+                    name={item.icon as any}
+                    size={20}
+                    color="#757575"
+                  />
+                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
       {/* Bottom Navigation */}
       <BottomNavigation
@@ -309,6 +483,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F2F2F7",
   },
+  headerContainer: {
+    backgroundColor: "#7BB8A8",
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    
+    
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -316,7 +497,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 15,
-    backgroundColor: "#7BB8A8",
   },
   profileImageContainer: {
     width: 40,
@@ -341,25 +521,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  menuButton: {
+    padding: 4,
+  },
   content: {
     flex: 1,
   },
   profileSection: {
-    backgroundColor: "#D4EDDA",
+    backgroundColor: "#7BB8A8",
     padding: 16,
-    margin: 16,
+    marginHorizontal: 16,
     borderRadius: 12,
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
+    borderBottomLeftRadius: 40,    
+    borderBottomRightRadius: 40,
   },
   profileContainer: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     flex: 1,
+    borderTopLeftRadius: 40,    // Add this
+    borderTopRightRadius: 40,
   },
   profileTextContainer: {
     flex: 1,
+    alignItems: "flex-start",
+    
   },
   userName: {
     fontSize: 16,
@@ -371,16 +560,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
   },
+  addPostContainer: {
+    backgroundColor: "#F2F2F7",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+
   addPostButton: {
     backgroundColor: "#28A745",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#28A745",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addPostButtonText: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
   },
   categoriesSection: {
     paddingHorizontal: 16,
@@ -433,7 +642,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
+
   },
   postUserInfo: {
     flexDirection: "row",
@@ -479,5 +688,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#FF6B35",
     fontWeight: "500",
+  },
+  // Side Menu Styles
+  fullScreenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+  },
+  sideMenu: {
+    paddingTop: 40,
+    width: width * 0.75,
+    backgroundColor: "#FFFFFF",
+    height: "100%",
+  },
+  sideMenuHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    alignItems: "center",
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: "#757575",
+  },
+  sideMenuContent: {
+    padding: 10,
+  },
+  sideMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  sideMenuItemText: {
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 15,
   },
 });
