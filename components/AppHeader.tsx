@@ -1,5 +1,5 @@
 // File: components/AppHeader.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,14 +8,16 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, Typography } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
 export interface AppHeaderProps {
-  title: string;
+  title?: string;
   showBack?: boolean;
   showMenu?: boolean;
   rightActions?: React.ReactNode;
@@ -24,11 +26,33 @@ export interface AppHeaderProps {
 
 export const AppHeader = ({
   title,
-  showBack = true,
+  showBack = false,
   showMenu = true,
 }: AppHeaderProps) => {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const { logout } = useAuth();
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const { logout, user, profile } = useAuth();
+
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log('Error loading profile image:', error);
+    }
+  };
+
+  const getInitials = () => {
+    const firstName = profile?.firstName || "";
+    const lastName = profile?.lastName || "";
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+  };
+
+  useEffect(() => {
+    loadProfileImage();
+  }, [user?.uid]);
 
   const sideMenuItems = [
     {
@@ -136,37 +160,33 @@ export const AppHeader = ({
   return (
     <>
       <View style={styles.header}>
-        {showBack ? (
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={24}
-              color={Colors.textPrimary}
-            />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backButton} />
-        )}
+        {/* Profile Image/Back Button */}
+        <TouchableOpacity 
+          onPress={showBack ? () => router.back() : () => router.push("/(app)/(tabs)/profile/edit")}
+          style={styles.profileImageContainer}
+        >
+          {profileImage ? (
+            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+          ) : (
+            <Text style={styles.initialsText}>{getInitials()}</Text>
+          )}
+        </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>{title}</Text>
-
-        {showMenu ? (
-          <TouchableOpacity
-            onPress={() => setSideMenuVisible(true)}
-            style={styles.menuButton}
-          >
-            <Ionicons
-              name="menu-outline"
-              size={24}
-              color={Colors.textPrimary}
-            />
+        {/* Right Actions */}
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <Ionicons name="notifications-outline" size={24} color="#666" />
           </TouchableOpacity>
-        ) : (
-          <View style={styles.menuButton} />
-        )}
+          {showMenu ? (
+            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+              <Ionicons name="grid" size={24} color="#666" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity>
+              <Ionicons name="grid" size={24} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Side Menu Modal */}
@@ -217,28 +237,35 @@ export const AppHeader = ({
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceSecondary,
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
+    backgroundColor: "#7BB8A8",
   },
-  backButton: {
-    padding: Spacing.sm,
+  profileImageContainer: {
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerTitle: {
-    ...Typography.title,
-    fontSize: 20,
-    fontWeight: "600",
-    flex: 1,
-    textAlign: "center",
-  },
-  menuButton: {
-    padding: Spacing.sm,
+  profileImage: {
     width: 40,
-    alignItems: "flex-end",
+    height: 40,
+    borderRadius: 20,
+  },
+  initialsText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#4CAF50",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   modalContainer: {
     flex: 1,

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -33,8 +34,8 @@ const POSTS = [
     title: "Dealing with Anxiety Lately?",
     content:
       "I've been feeling more anxious than usual – overthinking, tight chest, hard to focus. It sneaks in even when things seem okay. 😊\n\nJust checking in... how do you manage your anxiety day-to-day?\nBreathing exercises, journaling, talking to someone?\n\nOpen to any ideas or even just sharing how you feel.\nYou're not alone. 😊",
-    likes: 35,
-    comments: 178,
+    likes: 20,
+    comments: 241,
     category: "Support",
     user: {
       name: "Michael T.",
@@ -56,7 +57,7 @@ const POSTS = [
   },
 ];
 
-const CATEGORIES = ["Trending", "Stress", "Support", "Stories", "Bookmarked"];
+const CATEGORIES = ["Trending", "Stress", "Support", "Stories"];
 
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
@@ -67,6 +68,34 @@ export default function CommunityMainScreen() {
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
     new Set()
   );
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log('Error loading profile image:', error);
+    }
+  };
+
+  const getInitials = () => {
+    const firstName = profile?.firstName || "";
+    const lastName = profile?.lastName || "";
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+  };
+
+  const getGreetingName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    return "User";
+  };
+
+  useEffect(() => {
+    loadProfileImage();
+  }, [user?.uid]);
 
   const handleLikePress = (postId: number) => {
     const newLikedPosts = new Set(likedPosts);
@@ -93,11 +122,11 @@ export default function CommunityMainScreen() {
   };
 
   const handlePostPress = (postId: number) => {
-  router.push({
-    pathname: "/community-forum/comments",
-    params: { id: postId }
-  });
-};
+    router.push({
+      pathname: "/community-forum/comments",
+      params: { id: postId }
+    });
+  };
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -117,54 +146,65 @@ export default function CommunityMainScreen() {
   };
 
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (profile?.firstName) return profile.firstName + " " + (profile.lastName || "");
+    if (user?.displayName) return user.displayName;
     if (user?.email) return user.email.split("@")[0];
-    return "User";
+    return "John Doe";
   };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress}>
-          <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+        <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+          <View style={styles.profileImageContainer}>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            ) : (
+              <Text style={styles.initialsText}>{getInitials()}</Text>
+            )}
+          </View>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Community Forum</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <Ionicons name="notifications-outline" size={24} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <Ionicons name="grid" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* User Profile Summary */}
         <View style={styles.profileSection}>
           <View style={styles.profileContainer}>
             <View style={styles.profileImageContainer}>
               <Image
                 source={{
-                  uri: "https://randomuser.me/api/portraits/women/17.jpg",
+                  uri: "https://randomuser.me/api/portraits/men/17.jpg",
                 }}
                 style={styles.profileImage}
               />
             </View>
             <View style={styles.profileTextContainer}>
               <Text style={styles.userName}>{getDisplayName()}</Text>
-              <Text style={styles.userStats}>0 Total Posts</Text>
+              <Text style={styles.userStats}>📝 0 Total Posts</Text>
             </View>
           </View>
 
-          {/* Create New Post Button */}
+          {/* Add Post Button */}
           <TouchableOpacity
-            style={styles.newPostButton}
+            style={styles.addPostButton}
             onPress={() => router.push("/community-forum/create")}
           >
-            <Ionicons name="add" size={24} color="#FFFFFF" />
+            <Text style={styles.addPostButtonText}>Add Post</Text>
           </TouchableOpacity>
         </View>
 
         {/* Browse By Categories */}
-        <View style={styles.categoriesHeader}>
+        <View style={styles.categoriesSection}>
+          <Text style={styles.browseBySectionTitle}>Browse By</Text>
           <View style={styles.categoriesContainer}>
             {CATEGORIES.map((category) => (
               <TouchableOpacity
@@ -197,29 +237,25 @@ export default function CommunityMainScreen() {
               onPress={() => handlePostPress(post.id)}
             >
               <View style={styles.postHeader}>
-                <View style={styles.userInfo}>
+                <View style={styles.postUserInfo}>
                   <Image
                     source={{
                       uri: `https://randomuser.me/api/portraits/${
                         post.user.name.includes("Sarah") ? "women" : "men"
-                      }/${post.id}.jpg`,
+                      }/${post.id + 10}.jpg`,
                     }}
                     style={styles.postUserImage}
                   />
-                  <View>
-                    <Text style={styles.postUserName}>{post.user.name}</Text>
-                    <Text style={styles.postUserStats}>
-                      {post.user.posts} posts
-                    </Text>
-                  </View>
+                  <Text style={styles.postTitle}>{post.title}</Text>
                 </View>
-                <View style={styles.categoryTag}>
-                  <Text style={styles.categoryTagText}>{post.category}</Text>
-                </View>
+                <TouchableOpacity style={styles.moreButton}>
+                  <Ionicons name="ellipsis-horizontal" size={20} color="#999" />
+                </TouchableOpacity>
               </View>
 
-              <Text style={styles.postTitle}>{post.title}</Text>
-              <Text style={styles.postContent}>{post.content}</Text>
+              <Text style={styles.postContent} numberOfLines={4}>
+                {post.content}
+              </Text>
 
               <View style={styles.postFooter}>
                 <View style={styles.interactionButtons}>
@@ -229,17 +265,10 @@ export default function CommunityMainScreen() {
                   >
                     <Ionicons
                       name={likedPosts.has(post.id) ? "heart" : "heart-outline"}
-                      size={20}
-                      color={likedPosts.has(post.id) ? "#E53935" : "#666"}
+                      size={18}
+                      color={likedPosts.has(post.id) ? "#E53935" : "#FF6B35"}
                     />
-                    <Text
-                      style={[
-                        styles.interactionText,
-                        likedPosts.has(post.id) && styles.interactionTextActive,
-                      ]}
-                    >
-                      {post.likes}
-                    </Text>
+                    <Text style={styles.interactionText}>{post.likes}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -253,24 +282,12 @@ export default function CommunityMainScreen() {
                   >
                     <Ionicons
                       name="chatbubble-outline"
-                      size={20}
-                      color="#666"
+                      size={18}
+                      color="#FF6B35"
                     />
                     <Text style={styles.interactionText}>{post.comments}</Text>
                   </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity onPress={() => handleBookmarkPress(post.id)}>
-                  <Ionicons
-                    name={
-                      bookmarkedPosts.has(post.id)
-                        ? "bookmark"
-                        : "bookmark-outline"
-                    }
-                    size={20}
-                    color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"}
-                  />
-                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           ))}
@@ -290,118 +307,122 @@ export default function CommunityMainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#F2F2F7",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
+    backgroundColor: "#7BB8A8",
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2E7D32",
+  profileImageContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  initialsText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#4CAF50",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   content: {
     flex: 1,
   },
   profileSection: {
-    padding: 20,
-    backgroundColor: "#d9ead3",
+    backgroundColor: "#D4EDDA",
+    padding: 16,
+    margin: 16,
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   profileContainer: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  profileImageContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#E0E0E0",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    flex: 1,
   },
   profileTextContainer: {
-    justifyContent: "center",
+    flex: 1,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#212121",
+    color: "#333",
     marginBottom: 4,
   },
   userStats: {
     fontSize: 14,
-    color: "#757575",
+    color: "#666",
   },
-  newPostButton: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    width: 35,
-    height: 35,
-    borderRadius: 28,
-    backgroundColor: "#4CAF50",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-
-  categoriesHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    marginTop: 16,
+  addPostButton: {
+    backgroundColor: "#28A745",
     paddingHorizontal: 16,
-    paddingBottom: 8,
-    justifyContent: "center",
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-
+  addPostButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  categoriesSection: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  browseBySectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
   categoriesContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 3,
+    gap: 8,
   },
   categoryButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#F5F5F5",
-    marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#E0E0E0",
   },
   categoryButtonActive: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#333",
   },
   categoryText: {
-    fontSize: 10,
+    fontSize: 14,
     color: "#666",
+    fontWeight: "500",
   },
   categoryTextActive: {
     color: "#FFFFFF",
-    fontWeight: "500",
   },
   postsSection: {
-    padding: 16,
-    gap: 16,
+    paddingHorizontal: 16,
+    gap: 12,
   },
   postCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
+    marginBottom: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -414,48 +435,31 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 12,
   },
-  userInfo: {
+  postUserInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    flex: 1,
   },
   postUserImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E0E0E0",
-  },
-  postUserName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#212121",
-  },
-  postUserStats: {
-    fontSize: 12,
-    color: "#757575",
-  },
-  categoryTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "#E8F5E9",
-  },
-  categoryTagText: {
-    fontSize: 12,
-    color: "#2E7D32",
-    fontWeight: "500",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 12,
   },
   postTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#212121",
-    marginBottom: 8,
+    color: "#333",
+    flex: 1,
+  },
+  moreButton: {
+    padding: 4,
   },
   postContent: {
     fontSize: 14,
-    color: "#424242",
+    color: "#666",
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   postFooter: {
     flexDirection: "row",
@@ -472,11 +476,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   interactionText: {
-    fontSize: 14,
-    color: "#666",
-  },
-  interactionTextActive: {
-    color: "#4CAF50",
-    fontWeight: "600",
+    fontSize: 12,
+    color: "#FF6B35",
+    fontWeight: "500",
   },
 });
