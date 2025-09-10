@@ -10,7 +10,8 @@ import {
 import { AppHeader } from "../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 
-// Define the notification type
+
+ // Type definition for a Notification object.
 interface Notification {
   id: string;
   title: string;
@@ -20,17 +21,20 @@ interface Notification {
   type: "message" | "appointment" | "system" | "reminder";
 }
 
+/**
+ * NotificationsScreen
+ * This screen displays a list of user notifications such as messages,
+ * appointment reminders, system updates, or journal/mood reminders.
+ */
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Mock data for notifications
   useEffect(() => {
     loadNotifications();
   }, []);
 
   const loadNotifications = () => {
-    // In a real app, you would fetch this from your backend
     const mockNotifications: Notification[] = [
       {
         id: "1",
@@ -77,18 +81,32 @@ export default function NotificationsScreen() {
     setNotifications(mockNotifications);
   };
 
+  /**
+   * onRefresh
+   * Triggered when user pulls down to refresh the list.
+   */
   const onRefresh = () => {
     setRefreshing(true);
     loadNotifications();
-    setTimeout(() => setRefreshing(false), 1000);
+    setTimeout(() => setRefreshing(false), 1000); 
   };
 
+  /**
+   * markAsRead
+   * Marks a single notification as read by matching its ID.
+   * Useful for when user taps on an unread notification.
+   */
   const markAsRead = (id: string) => {
     setNotifications(notifications.map(notification => 
       notification.id === id ? {...notification, isRead: true} : notification
     ));
   };
 
+  /**
+   * markAllAsRead
+   * Marks all notifications in the list as read.
+   * Triggered when user presses the "Mark all as read" button.
+   */
   const markAllAsRead = () => {
     setNotifications(notifications.map(notification => ({
       ...notification,
@@ -96,6 +114,11 @@ export default function NotificationsScreen() {
     })));
   };
 
+  /**
+   * getNotificationIcon
+   * Returns the icon name (Ionicons) based on notification type.
+   * Ensures consistent visual language for each category.
+   */
   const getNotificationIcon = (type: string) => {
     switch(type) {
       case "message":
@@ -111,6 +134,10 @@ export default function NotificationsScreen() {
     }
   };
 
+  /**
+   * getNotificationColor
+   * Returns a color code for each notification type.
+   */
   const getNotificationColor = (type: string) => {
     switch(type) {
       case "message":
@@ -126,12 +153,14 @@ export default function NotificationsScreen() {
     }
   };
 
+  // Calculate the number of unread notifications
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
     <View style={styles.container}>
       <AppHeader title="Notifications" showBack={true} />
       
+      {/* Top bar showing unread count & "Mark all as read" action */}
       <View style={styles.headerActions}>
         <Text style={styles.unreadText}>
           {unreadCount} unread {unreadCount === 1 ? 'notification' : 'notifications'}
@@ -143,12 +172,14 @@ export default function NotificationsScreen() {
         )}
       </View>
 
+      {/* Main notifications list (scrollable with pull-to-refresh) */}
       <ScrollView
         style={styles.notificationsList}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* Empty state when no notifications are available */}
         {notifications.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="notifications-off-outline" size={64} color="#E0E0E0" />
@@ -158,15 +189,17 @@ export default function NotificationsScreen() {
             </Text>
           </View>
         ) : (
+          // Render a list of notifications
           notifications.map((notification) => (
             <TouchableOpacity
               key={notification.id}
               style={[
                 styles.notificationItem,
-                !notification.isRead && styles.unreadNotification
+                !notification.isRead && styles.unreadNotification 
               ]}
-              onPress={() => markAsRead(notification.id)}
+              onPress={() => markAsRead(notification.id)} 
             >
+              {/* Left: Notification Icon */}
               <View style={styles.notificationIconContainer}>
                 <Ionicons
                   name={getNotificationIcon(notification.type)}
@@ -175,6 +208,7 @@ export default function NotificationsScreen() {
                 />
               </View>
               
+              {/* Middle: Notification details (title, message, time) */}
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationTitle}>
                   {notification.title}
@@ -187,6 +221,7 @@ export default function NotificationsScreen() {
                 </Text>
               </View>
               
+              {/* Right: Green dot indicator for unread notifications */}
               {!notification.isRead && (
                 <View style={styles.unreadIndicator} />
               )}
@@ -198,13 +233,17 @@ export default function NotificationsScreen() {
   );
 }
 
+/**
+ * Stylesheet for NotificationsScreen.
+ * Handles layout, spacing, typography, and visual states (unread/read).
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
   headerActions: {
-    flexDirection: "row",
+    flexDirection: "row", 
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
@@ -251,7 +290,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   unreadNotification: {
-    backgroundColor: "#F8F9FF",
+    backgroundColor: "#F8F9FF", 
   },
   notificationIconContainer: {
     width: 40,
