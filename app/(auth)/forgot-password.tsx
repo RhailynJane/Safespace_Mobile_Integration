@@ -277,11 +277,11 @@ const styles = StyleSheet.create({
   // HEADER TEXT STYLES
   // Main title for the screen
   title: {
-    fontSize: 24,
-    fontWeight: "600", // Semi-bold weight
+    fontSize: 20,
+    fontWeight: "700", 
     color: "#333", // Dark gray for good contrast
     textAlign: "center",
-    marginBottom: 16,
+    marginBottom: 30, // Space before toggle
   },
 
   // Instructional subtitle text
@@ -302,10 +302,11 @@ const styles = StyleSheet.create({
 
   // Input field label
   inputLabel: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "400",
     color: "#333",
-    marginBottom: 8, // Small space before input
+    marginBottom: 20, // Small space before input
+    marginTop: 2, // Space above label (except first)
   },
 
   // INPUT FIELD STYLING
@@ -333,15 +334,15 @@ const styles = StyleSheet.create({
 
   // Text input field
   input: {
-    flex: 1, // Take remaining space after icon
-    fontSize: 16,
-    color: "#333",
+    flex: 1, // Take remaining space after icons
+    fontSize: 12,
+    color: "#",
   },
 
   // BUTTON STYLES
   // Primary reset button
   resetButton: {
-    backgroundColor: "#7FDBDA", // Teal color matching app theme
+    backgroundColor: "#7BB8A8", // Teal color matching app theme
     borderRadius: 25, // Fully rounded corners
     paddingVertical: 16, // Vertical padding for touch target
     alignItems: "center", // Center text horizontally
@@ -377,8 +378,10 @@ const styles = StyleSheet.create({
 
   // Highlighted link text within footer
   linkText: {
-    fontWeight: "600",
-    color: "#FF6B6B", // Red accent color for links
+    fontWeight: "400",
+    color: "#E43232",
+    textDecorationLine: 'underline',
+
   },
 
   // MESSAGE STYLES
