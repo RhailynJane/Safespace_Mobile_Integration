@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "../../../../context/AuthContext";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -184,16 +185,7 @@ export default function AppointmentsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointments</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
-
+      <AppHeader title="Appointments" showBack={true} />
       {/* Add the image above the main content */}
       <View style={styles.imageContainer}>
         <Image 

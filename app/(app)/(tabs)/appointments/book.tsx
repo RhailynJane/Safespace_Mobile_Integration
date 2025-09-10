@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useAuth } from "../../../../context/AuthContext";
+import { AppHeader } from "../../../../components/AppHeader";
 
 export default function BookAppointment() {
   const { user, profile, logout } = useAuth();
@@ -196,15 +197,7 @@ export default function BookAppointment() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointments</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
+      <AppHeader title="Appointments" showBack={true} />
 
       <ScrollView style={styles.container}>
         <Text style={styles.title}>

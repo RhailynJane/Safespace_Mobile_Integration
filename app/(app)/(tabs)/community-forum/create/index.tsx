@@ -12,7 +12,6 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { AppHeader } from "../../../../../components/AppHeader";
 
-
 const CATEGORIES = [
   "Self Care",
   "Mindfulness",
@@ -83,7 +82,7 @@ export default function SelectCategoryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-    <AppHeader title="Add New Post" showBack={true} />
+      <AppHeader title="Add New Post" showBack={true} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Select post category</Text>
@@ -102,7 +101,7 @@ export default function SelectCategoryScreen() {
                 <Ionicons
                   name={getCategoryIcon(category)}
                   size={24}
-                  color={selectedCategory === category ? "#FFFFFF" : "#000"}
+                  color={selectedCategory === category ? "#FFFFFF" : "#4CAF50"}
                 />
               </View>
               <Text
@@ -116,21 +115,21 @@ export default function SelectCategoryScreen() {
             </TouchableOpacity>
           ))}
         </View>
-      </ScrollView>
 
-      {/* Continue Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.continueButton,
-            !selectedCategory && styles.continueButtonDisabled
-          ]}
-          onPress={handleContinue}
-          disabled={!selectedCategory}
-        >
-          <Text style={styles.continueButtonText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Continue Button */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[
+              styles.continueButton,
+              !selectedCategory && styles.continueButtonDisabled,
+            ]}
+            onPress={handleContinue}
+            disabled={!selectedCategory}
+          >
+            <Text style={styles.continueButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Bottom Navigation */}
       <BottomNavigation
@@ -151,14 +150,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    backgroundColor: "#D2D2F0D6",
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "800",
     color: "#000",
   },
   content: {
@@ -240,3 +239,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+ 

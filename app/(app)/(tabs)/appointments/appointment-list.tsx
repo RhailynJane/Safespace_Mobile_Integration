@@ -18,6 +18,8 @@ import BottomNavigation from "../../../../components/BottomNavigation";
 import { useAuth } from "../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { AppHeader } from "../../../../components/AppHeader";
+
 
 export default function AppointmentList() {
   const { user, profile, logout } = useAuth();
@@ -209,6 +211,9 @@ const handleAppointmentPress = (appointmentId: number) => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
+            <AppHeader title="Appointments" showBack={true} />
+
+      
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
           <Ionicons name="menu" size={28} color="#4CAF50" />
