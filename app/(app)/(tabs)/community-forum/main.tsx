@@ -293,6 +293,13 @@ export default function CommunityMainScreen() {
               )}
             </View>
           </TouchableOpacity>
+          
+      <View style={styles.profileTextContainer}>
+        <Text style={styles.userName}>{getDisplayName()}</Text>
+        <Text style={styles.userStats}>
+          <Ionicons name="document-text" size={16} color="#666" /> 0 Total Posts
+        </Text>          
+      </View>
 
           <View style={styles.headerRight}>
             <TouchableOpacity onPress={() => router.push("/notifications")}>
@@ -307,33 +314,23 @@ export default function CommunityMainScreen() {
           </View>
         </View>
 
-        {/* User Profile Summary */}
-        <View style={styles.profileSection}>
-          <View style={styles.profileContainer}>
-            <View style={styles.profileTextContainer}>
-              <Text style={styles.userName}>{getDisplayName()}</Text>
-              <Text style={styles.userStats}>
-                <Ionicons name="document-text" size={16} color="#666" /> 0 Total Posts
-              </Text>          
+          {/* User Profile Summary */}
+          <View style={styles.profileSection}>
+            <View style={styles.profileContainer}>
             </View>
           </View>
-        </View>
-      </View>
-
-      {/* Dedicated Add Post Button Container */}
-      <View style={styles.addPostContainer}>
-        <TouchableOpacity
-          style={styles.addPostButton}
-          onPress={() => router.push("/community-forum/create")}
-        >
-          <Ionicons name="add" size={20} color="#FFFFFF" />
-          <Text style={styles.addPostButtonText}>Create New Post</Text>
-        </TouchableOpacity>
-      </View>
+          </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Browse By Categories */}
         <View style={styles.categoriesSection}>
+                  <TouchableOpacity
+          style={styles.addPostButton}
+          onPress={() => router.push("/community-forum/create")}
+        >
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Text style={styles.addPostButtonText}>Add Post</Text>
+        </TouchableOpacity>
           <Text style={styles.browseBySectionTitle}>Browse By</Text>
           <View style={styles.categoriesContainer}>
             {CATEGORIES.map((category) => (
@@ -379,7 +376,7 @@ export default function CommunityMainScreen() {
                   <Text style={styles.postTitle}>{post.title}</Text>
                 </View>
                 <TouchableOpacity style={styles.moreButton}>
-                  <Ionicons name="ellipsis-horizontal" size={20} color="#999" />
+                  <Ionicons name="ellipsis-vertical" size={18} color="#999" />
                 </TouchableOpacity>
               </View>
 
@@ -487,8 +484,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#7BB8A8",
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    
-    
+    shadowColor: "grey",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   header: {
     flexDirection: "row",
@@ -526,10 +529,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    marginTop: 10,
   },
   profileSection: {
     backgroundColor: "#7BB8A8",
-    padding: 16,
     marginHorizontal: 16,
     borderRadius: 12,
     flexDirection: "row",
@@ -548,6 +551,7 @@ const styles = StyleSheet.create({
   profileTextContainer: {
     flex: 1,
     alignItems: "flex-start",
+    marginLeft: 15,
     
   },
   userName: {
@@ -561,33 +565,34 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   addPostContainer: {
-    backgroundColor: "#F2F2F7",
     paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-
+    justifyContent: "flex-end",
+    },
   addPostButton: {
-    backgroundColor: "#28A745",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    backgroundColor: "#2EA78F",
+    height:40,
+    paddingHorizontal: 30,
+    paddingVertical: 10,
     borderRadius: 25,
+    borderColor: "#D36500",
+    borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#28A745",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    alignSelf: "flex-end",  
+    shadowColor: "grey",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
     elevation: 3,
-  },
+    },
   addPostButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "600",
     marginLeft: 8,
   },
@@ -597,7 +602,7 @@ const styles = StyleSheet.create({
   },
   browseBySectionTitle: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "800",
     color: "#333",
     marginBottom: 12,
   },
@@ -605,20 +610,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: "auto", 
   },
-  categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  categoryButton: { // for bookmark and favorites
+    width: "30%",
+    paddingHorizontal: 20,
+    paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: "#E0E0E0",
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+
   },
   categoryButtonActive: {
-    backgroundColor: "#333",
+    backgroundColor: "#757575",
   },
   categoryText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
+    fontSize: 9,
+    color: "#000",
+    borderColor: '#FFF',
+    fontWeight: "400",
+    fontFamily: "Epilogue",
+    justifyContent: "center",
+    lineHeight: 12,
+    alignItems: "center",
+    textAlign: "center",
   },
   categoryTextActive: {
     color: "#FFFFFF",
@@ -632,11 +651,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    minHeight: 191,
+    shadowColor: "grey",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 3,
   },
   postHeader: {
     flexDirection: "row",
@@ -656,8 +679,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   postTitle: {
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 12,
+    fontFamily: "Epilogue",
+    fontWeight: "900",
     color: "#333",
     flex: 1,
   },
@@ -665,15 +689,20 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   postContent: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#666",
-    lineHeight: 20,
+    lineHeight: 18,
     marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+
+
   },
   postFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 8,
   },
   interactionButtons: {
     flexDirection: "row",
