@@ -30,6 +30,7 @@ const onboardingSteps = [
     image: require("../assets/images/onboarding-step1.png"), // Meditation illustration
     bgColor: "#b9e0d1",
     stepLabel: "Step One", // Shows step indicator at top
+    subtitleColor: "#0d9488", // Darker teal for subtitle
   },
   {
     title: "Intelligent",
@@ -39,6 +40,8 @@ const onboardingSteps = [
     image: require("../assets/images/onboarding-step2.png"), // Mood tracking illustration
     bgColor: "#f7c193",
     stepLabel: "Step Two",
+    subtitleColor: "#db9558ff", 
+
   },
   {
     title: "AI Mental",
@@ -47,6 +50,7 @@ const onboardingSteps = [
     image: require("../assets/images/onboarding-step3.png"), // Journaling illustration
     bgColor: "#e0e7ff", // Light purple background
     stepLabel: "Step Three",
+    subtitleColor: "#9aa5ccff",
   },
   {
     title: "Mindful Resources That",
@@ -55,6 +59,8 @@ const onboardingSteps = [
     image: require("../assets/images/onboarding-step4.png"), // Resources illustration
     bgColor: "#1f655a", // Dark green background
     stepLabel: "Step Four",
+    subtitleColor: "#1f655a",
+
   },
   {
     title: "Loving & Supportive",
@@ -63,6 +69,8 @@ const onboardingSteps = [
     image: require("../assets/images/onboarding-step5.png"), // Community illustration
     bgColor: "#ffffff", // Light background
     stepLabel: "Step Five",
+    subtitleColor: "#A44121",
+
   },
 ];
 
@@ -161,12 +169,12 @@ export default function OnboardingFlow() {
                 {/* Main title in dark color */}
                 <Text style={styles.title}>{currentStepData.title}</Text>
 
-                {/* Subtitle in accent color (teal) - optional */}
-                {currentStepData.subtitle && (
-                  <Text style={styles.subtitle}>
-                    {currentStepData.subtitle}
-                  </Text>
-                )}
+            {/* Subtitle in accent color (teal) - optional */}
+            {currentStepData.subtitle && (
+              <Text style={[styles.subtitle, { color: currentStepData.subtitleColor || "#14b8a6" }]}>
+                {currentStepData.subtitle}
+              </Text>
+            )}
 
                 {/* Description text in gray */}
                 <Text style={styles.description}>
@@ -270,18 +278,20 @@ const styles = StyleSheet.create({
   // Main title styling
   title: {
     paddingTop: 30,
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: "900",
     textAlign: "center",
-    color: "#111827", // Dark gray/black
+    color: "#4F3422", // Brownish dark color
     marginBottom: 4,
-    lineHeight: 30, // Better text spacing
+    lineHeight: 22, 
+    flexWrap: 'wrap', // Enables wrapping
+
   },
 
   // Subtitle with accent color
   subtitle: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: "900",
     textAlign: "center",
     color: "#14b8a6", // Teal accent color
     marginBottom: 12,
@@ -295,6 +305,8 @@ const styles = StyleSheet.create({
     color: "#6b7280", // Medium gray
     lineHeight: 22,
     paddingHorizontal: 10, // Extra side padding for description
+    marginBottom: 12,
+
   },
 
   // INTERACTIVE ELEMENTS
@@ -303,7 +315,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28, // Makes it perfectly circular
-    backgroundColor: "#14b8a6", // Teal background
+    backgroundColor: "#7CB9A9", // Teal background
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center", // Center horizontally
