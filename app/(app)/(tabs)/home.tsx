@@ -515,9 +515,14 @@ const getInitials = () => {
             </View>
           </View>
 
-          {/* Mood Tracking Section */}
+        {/* Recent Mood History Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Moods</Text>
+            <TouchableOpacity 
+              onPress={() => router.push("/mood-history")}
+              style={styles.sectionTitleContainer}
+            >
+              <Text style={styles.sectionTitle}>Recent Moods</Text>
+            </TouchableOpacity>
             {recentMoods.length > 0 ? (
               <View style={styles.recentMoods}>
                 {recentMoods.map((mood) => (
@@ -530,6 +535,7 @@ const getInitials = () => {
                       <Text style={styles.moodText}>{mood.mood_label}</Text>
                     </View>
                   </View>
+                  
                 ))}
               </View>
             ) : (
@@ -713,6 +719,24 @@ const styles = StyleSheet.create({
     color: "#212121",
     marginBottom: 16,
   },
+    sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "500",
+    marginRight: 4,
+  },
 
   profileImage: {
   width: 40,
@@ -804,6 +828,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
+  sectionTitleContainer: {
+  alignSelf: 'flex-start', 
+},
   moodItem: {
     flexDirection: "row",
     alignItems: "center",
