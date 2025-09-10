@@ -1,6 +1,5 @@
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 
 interface Tab {
   id: string;
@@ -8,94 +7,35 @@ interface Tab {
   icon: string;
 }
 
-interface Theme {
-  colors: {
-    background: string;
-    surface: string;
-    text: string;
-    textSecondary: string;
-    textDisabled: string;
-    border: string;
-    borderLight: string;
-    icon: string;
-    iconDisabled: string;
-    primary: string;
-    accent: string;
-    error: string;
-  };
-}
-
 interface BottomNavigationProps {
   tabs: Tab[];
   activeTab: string;
   onTabPress: (tabId: string) => void;
-  theme?: Theme;
 }
 
 export default function BottomNavigation({
   tabs,
   activeTab,
   onTabPress,
-  theme,
 }: BottomNavigationProps) {
-  // Default theme values (original hardcoded colors) when theme is not provided
-  const defaultTheme = {
-    colors: {
-      surface: "#FFFFFF",
-      border: "#E0E0E0", 
-      primary: "#4CAF50",
-      textSecondary: "#757575",
-    }
-  };
-
-  const currentTheme = theme || defaultTheme;
-
-  const dynamicStyles = StyleSheet.create({
-    container: {
-      flexDirection: "row",
-      justifyContent: "space-around",
-      alignItems: "center",
-      paddingVertical: 12,
-      borderTopWidth: 1,
-      borderTopColor: currentTheme.colors.border,
-      backgroundColor: currentTheme.colors.surface,
-    },
-    activeTab: {
-      borderTopWidth: 2,
-      borderTopColor: currentTheme.colors.primary,
-    },
-    tabText: {
-      fontSize: 12,
-      color: currentTheme.colors.textSecondary,
-      marginTop: 4,
-    },
-    activeTabText: {
-      color: currentTheme.colors.primary,
-      fontWeight: "500",
-    },
-  });
-
   return (
-    <View style={dynamicStyles.container}>
+    <View style={styles.bottomNav}>
       {tabs.map((tab) => (
         <TouchableOpacity
           key={tab.id}
-          style={[styles.tab, activeTab === tab.id && dynamicStyles.activeTab]}
+          style={styles.navItem}
           onPress={() => onTabPress(tab.id)}
         >
-          <Ionicons
-            name={tab.icon as any}
-            size={24}
-            color={activeTab === tab.id ? currentTheme.colors.primary : currentTheme.colors.textSecondary}
-          />
-          <Text
-            style={[
-              dynamicStyles.tabText,
-              activeTab === tab.id && dynamicStyles.activeTabText,
-            ]}
-          >
-            {tab.name}
-          </Text>
+          <View style={[
+            styles.navIconContainer,
+            activeTab === tab.id && styles.activeIconContainer
+          ]}>
+            <Ionicons
+              name={tab.icon as any}
+              size={24}
+              color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
+            />
+          </View>
         </TouchableOpacity>
       ))}
     </View>
@@ -103,8 +43,39 @@ export default function BottomNavigation({
 }
 
 const styles = StyleSheet.create({
-  tab: {
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 16,
+    backgroundColor: "#FFFFFF",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 40,    // Add this
+    borderTopRightRadius: 40, 
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  navItem: {
     alignItems: "center",
     padding: 8,
+  },
+  navIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activeIconContainer: {
+    backgroundColor: '#B6D5CF61',
   },
 });

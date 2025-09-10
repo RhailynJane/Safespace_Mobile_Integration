@@ -468,7 +468,7 @@ const getInitials = () => {
             style={styles.menuButton}
             onPress={showSideMenu}
           >
-            <Ionicons name="grid-outline" size={24} color="#666" />
+            <Ionicons name="grid" size={24} color="#666" />
           </TouchableOpacity>
         </View>
       </View>
@@ -537,9 +537,14 @@ const getInitials = () => {
             </View>
           </View>
 
-          {/* Mood Tracking Section */}
+        {/* Recent Mood History Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Moods</Text>
+            <TouchableOpacity 
+              onPress={() => router.push("/mood-history")}
+              style={styles.sectionTitleContainer}
+            >
+              <Text style={styles.sectionTitle}>Recent Moods</Text>
+            </TouchableOpacity>
             {recentMoods.length > 0 ? (
               <View style={styles.recentMoods}>
                 {recentMoods.map((mood) => (
@@ -552,6 +557,7 @@ const getInitials = () => {
                       <Text style={styles.moodText}>{mood.mood_label}</Text>
                     </View>
                   </View>
+                  
                 ))}
               </View>
             ) : (
@@ -594,26 +600,30 @@ const getInitials = () => {
           </View>
         </ScrollView>
 
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.navItem}
-              onPress={() => {
-                setActiveTab(tab.id);
-                if (tab.id !== "home") router.push(`/${tab.id}`);
-              }}
-            >
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.id}
+            style={styles.navItem}
+            onPress={() => {
+              setActiveTab(tab.id);
+              if (tab.id !== "home") router.push(`/${tab.id}`);
+            }}
+          >
+            <View style={[
+              styles.navIconContainer,
+              activeTab === tab.id && styles.activeIconContainer
+            ]}>
               <Ionicons
                 name={tab.icon as any}
                 size={24}
-                color={activeTab === tab.id ? "#4CAF50" : "#9E9E9E"}
+                color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
               />
-            </TouchableOpacity>
-          ))}
-        </View>
-
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
         {/* Side Menu */}
         <Modal
           animationType="none" 
@@ -662,6 +672,7 @@ const getInitials = () => {
 
 
 const styles = StyleSheet.create({
+  
   container: {
     flex: 1,
     backgroundColor: "#F2F2F7",
@@ -737,6 +748,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Epilogue-Regular',
     color: "#212121",
     marginBottom: 16,
+  },
+    sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "500",
+    marginRight: 4,
   },
 
   profileImage: {
@@ -829,6 +858,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
+  sectionTitleContainer: {
+  alignSelf: 'flex-start', 
+},
   moodItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -918,6 +950,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    borderTopLeftRadius: 40,    // Add this
+    borderTopRightRadius: 40, 
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -930,6 +964,17 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: "center",
     padding: 8,
+  },
+  activeIconContainer: {
+  backgroundColor: '#B6D5CF61', // Your ellipse color when tapped
+  },
+
+  navIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20, // Makes it elliptical/circular
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,

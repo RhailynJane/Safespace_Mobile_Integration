@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {
   View,
   Text,
@@ -11,6 +13,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -18,11 +21,14 @@ import { useAuth } from "../../../../context/AuthContext";
 import BottomNavigation from "../../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
+
 export default function CommunityScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("community");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -31,6 +37,52 @@ export default function CommunityScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  const showSideMenu = () => {
+    setSideMenuVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideSideMenu = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      setSideMenuVisible(false);
+    });
+  };
+
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log('Error loading profile image:', error);
+    }
+  };
+
+  const getInitials = () => {
+    const firstName = profile?.firstName || "";
+    const lastName = profile?.lastName || "";
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+  };
+
+  const getGreetingName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    return "User";
+  };
+
+  useEffect(() => {
+    loadProfileImage();
+  }, [user?.uid]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -50,7 +102,7 @@ export default function CommunityScreen() {
       icon: "home",
       title: "Dashboard",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.replace("/(app)/(tabs)/home");
       },
     },
@@ -58,7 +110,7 @@ export default function CommunityScreen() {
       icon: "person",
       title: "Profile",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/(app)/(tabs)/profile");
       },
     },
@@ -66,7 +118,7 @@ export default function CommunityScreen() {
       icon: "bar-chart",
       title: "Self-Assessment",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/self-assessment");
       },
     },
@@ -74,7 +126,7 @@ export default function CommunityScreen() {
       icon: "happy",
       title: "Mood Tracking",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/mood-tracking");
       },
     },
@@ -82,7 +134,7 @@ export default function CommunityScreen() {
       icon: "journal",
       title: "Journaling",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/journaling");
       },
     },
@@ -90,7 +142,7 @@ export default function CommunityScreen() {
       icon: "library",
       title: "Resources",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/resources");
       },
     },
@@ -98,7 +150,7 @@ export default function CommunityScreen() {
       icon: "help-circle",
       title: "Crisis Support",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/crisis-support");
       },
     },
@@ -106,7 +158,7 @@ export default function CommunityScreen() {
       icon: "chatbubble",
       title: "Messages",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/(app)/(tabs)/messages");
       },
     },
@@ -114,7 +166,7 @@ export default function CommunityScreen() {
       icon: "calendar",
       title: "Appointments",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/(app)/(tabs)/appointments");
       },
     },
@@ -122,7 +174,7 @@ export default function CommunityScreen() {
       icon: "people",
       title: "Community Forum",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/community-forum");
       },
     },
@@ -130,7 +182,7 @@ export default function CommunityScreen() {
       icon: "videocam",
       title: "Video Consultations",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/video-consultations");
       },
     },
@@ -138,18 +190,11 @@ export default function CommunityScreen() {
       icon: "log-out",
       title: "Sign Out",
       onPress: async () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         await logout();
       },
     },
   ];
-
-  const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
-    return "User";
-  };
 
   if (loading) {
     return (
@@ -163,59 +208,78 @@ export default function CommunityScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
+        <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+          <View style={styles.profileImageContainer}>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            ) : (
+              <Text style={styles.initialsText}>{getInitials()}</Text>
+            )}
+          </View>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Community</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <Ionicons name="notifications-outline" size={24} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={showSideMenu}
+          >
+            <Ionicons name="grid" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Add the image above the main content */}
-            <View style={styles.imageContainer}>
-              <Image 
-                source={require('../../../../assets/images/community-forum.png')} 
-                style={styles.appointmentImage}
-                resizeMode="contain"
-              />
-            </View>
+      <ScrollView
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Add the image above the main content */}
+        <View style={styles.imageContainer}>
+          <Image 
+            source={require('../../../../assets/images/community-forum.png')} 
+            style={styles.appointmentImage}
+            resizeMode="contain"
+          />
+        </View>
 
-      {/* Main Content */}
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.welcomeContainer}>
-          <Text style={styles.welcomeTitle}>Welcome to Our</Text>
-          <Text style={styles.welcomeTitle}>Community!</Text>
+        {/* Main Content */}
+        <View style={styles.content}>
+          <View style={styles.welcomeContainer}>
+            <Text style={styles.welcomeTitle}>Welcome to Our</Text>
+            <Text style={styles.welcomeTitle}>Community!</Text>
 
-          <Text style={styles.welcomeSubtitle}>
-            Our community is a place of warmth and acceptance, where everyone's
-            voice is valued and respected.
-          </Text>
+            <Text style={styles.welcomeSubtitle}>
+              Our community is a place of warmth and acceptance, where everyone's
+              voice is valued and respected.
+            </Text>
 
-          <TouchableOpacity
-            style={styles.startButton}
-            onPress={handleStartPress}
-          >
-            <Text style={styles.startButtonText}>Start</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={handleStartPress}
+            >
+              <Text style={styles.startButtonText}>Start</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
       {/* Side Menu */}
       <Modal
-        animationType="fade"
+        animationType="none" 
         transparent={true}
         visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
+        onRequestClose={hideSideMenu}
       >
-        <View style={styles.modalContainer}>
+        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
           <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
+            style={StyleSheet.absoluteFillObject}
+            onPress={hideSideMenu}
           />
-          <View style={styles.sideMenu}>
+          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
             <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
+              <Text style={styles.profileName}>{getGreetingName()}</Text>
               <Text style={styles.profileEmail}>{user?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
@@ -225,13 +289,17 @@ export default function CommunityScreen() {
                   style={styles.sideMenuItem}
                   onPress={item.onPress}
                 >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                  <Ionicons
+                    name={item.icon as any}
+                    size={20}
+                    color="#757575"
+                  />
                   <Text style={styles.sideMenuItemText}>{item.title}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
 
       <BottomNavigation
@@ -242,10 +310,11 @@ export default function CommunityScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ead1dc",
+    backgroundColor: "#D2D2F0D6",
   },
   imageContainer: {
     alignItems: "center",
@@ -265,14 +334,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    paddingBottom: 15,
+    backgroundColor: "#D2D2F0D6",
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
+  profileImageContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  initialsText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#4CAF50",
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  menuButton: {
+    padding: 4,
+  },
+  scrollContent: {
+    flex: 1,
   },
   content: {
     flex: 1,
@@ -280,29 +374,54 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
+  welcomeContainer: {
+    alignItems: "center",
+    padding: 20,
   },
-  subtitle: {
+  welcomeTitle: {
+    fontSize: 32,
+    fontWeight: "700",
+    fontFamily: "Epilogue",
+    color: "#000000",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+  welcomeSubtitle: {
     fontSize: 16,
     color: "#666",
     textAlign: "center",
+    fontFamily: "Epilogue",
+    fontWeight: "400",
     lineHeight: 24,
+    marginTop: 20,
+    marginBottom: 25,
   },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
+  startButton: {
+    backgroundColor: "#7CB9A9",
+    paddingVertical: 15,
+    paddingHorizontal: 100,
+    borderRadius: 30,
+    borderColor: "#FFF",
+    borderWidth: 3,
+    marginTop: 20,
+    marginBottom: 100,
+    paddingBottom: 15,
   },
-  modalOverlay: {
+  startButtonText: {
+    fontFamily: "Epilogue",
+    color: "black",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
   },
   sideMenu: {
-    width: "75%",
+    paddingTop: 40,
+    width: width * 0.75,
     backgroundColor: "#FFFFFF",
     height: "100%",
   },
@@ -311,12 +430,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
   },
   profileName: {
     fontSize: 18,
@@ -343,36 +456,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
-  },
-  welcomeContainer: {
-    alignItems: "center",
-    padding: 20,
-  },
-  welcomeTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#2E7D32",
-    textAlign: "center",
-    marginBottom: 5,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
-    marginTop: 20,
-    marginBottom: 25,
-  },
-  startButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    marginTop: 20,
-  },
-  startButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "600",
   },
 });
