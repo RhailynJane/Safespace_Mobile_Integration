@@ -380,7 +380,6 @@ export default function SettingsScreen() {
         tabs={tabs}
         activeTab={activeTab}
         onTabPress={handleTabPress}
-        theme={theme}
       />
 
 

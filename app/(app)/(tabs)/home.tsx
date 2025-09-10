@@ -468,7 +468,7 @@ const getInitials = () => {
             style={styles.menuButton}
             onPress={showSideMenu}
           >
-            <Ionicons name="grid-outline" size={24} color="#666" />
+            <Ionicons name="grid" size={24} color="#666" />
           </TouchableOpacity>
         </View>
       </View>
@@ -600,26 +600,30 @@ const getInitials = () => {
           </View>
         </ScrollView>
 
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.navItem}
-              onPress={() => {
-                setActiveTab(tab.id);
-                if (tab.id !== "home") router.push(`/${tab.id}`);
-              }}
-            >
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.id}
+            style={styles.navItem}
+            onPress={() => {
+              setActiveTab(tab.id);
+              if (tab.id !== "home") router.push(`/${tab.id}`);
+            }}
+          >
+            <View style={[
+              styles.navIconContainer,
+              activeTab === tab.id && styles.activeIconContainer
+            ]}>
               <Ionicons
                 name={tab.icon as any}
                 size={24}
-                color={activeTab === tab.id ? "#4CAF50" : "#9E9E9E"}
+                color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
               />
-            </TouchableOpacity>
-          ))}
-        </View>
-
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
         {/* Side Menu */}
         <Modal
           animationType="none" 
@@ -668,6 +672,7 @@ const getInitials = () => {
 
 
 const styles = StyleSheet.create({
+  
   container: {
     flex: 1,
     backgroundColor: "#F2F2F7",
@@ -957,6 +962,17 @@ const styles = StyleSheet.create({
   navItem: {
     alignItems: "center",
     padding: 8,
+  },
+  activeIconContainer: {
+  backgroundColor: '#B6D5CF61', // Your ellipse color when tapped
+  },
+
+  navIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20, // Makes it elliptical/circular
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
