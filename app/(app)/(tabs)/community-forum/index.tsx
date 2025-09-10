@@ -320,6 +320,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
+    height:200,
   },
   appointmentImage: {
     width: width * 0.9,
@@ -404,7 +405,7 @@ const styles = StyleSheet.create({
     borderColor: "#FFF",
     borderWidth: 3,
     marginTop: 20,
-    marginBottom: 100,
+    marginBottom: 10,
     paddingBottom: 15,
   },
   startButtonText: {
