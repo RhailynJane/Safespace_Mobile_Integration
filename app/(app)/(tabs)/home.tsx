@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -55,6 +56,7 @@ export default function HomeScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -69,6 +71,7 @@ export default function HomeScreen() {
       id: "mood",
       title: "Track Mood",
       icon: "happy-outline",
+      image: require("../../../assets/images/track-mood.png"), 
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/mood-tracking"),
@@ -77,6 +80,7 @@ export default function HomeScreen() {
       id: "journal",
       title: "Journal",
       icon: "journal-outline",
+      image: require("../../../assets/images/journal.png"), 
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/journaling"),
@@ -85,6 +89,7 @@ export default function HomeScreen() {
       id: "resources",
       title: "Resources",
       icon: "library-outline",
+      image: require("../../../assets/images/resources.png"), 
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/resources"),
@@ -93,6 +98,7 @@ export default function HomeScreen() {
       id: "crisis",
       title: "Crisis Support",
       icon: "help-buoy-outline",
+      image: require("../../../assets/images/crisis-support.png"), 
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),
@@ -304,6 +310,15 @@ export default function HomeScreen() {
     }
   };
 
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  useFocusEffect(
+  useCallback(() => {
+    fetchData();
+    loadProfileImage(); // Add this line
+  }, [user?.uid])
+);
+
   // Set up realtime subscription for mood updates
   useEffect(() => {
     if (!user?.uid) return;
@@ -372,6 +387,23 @@ export default function HomeScreen() {
     }
   };
 
+  const loadProfileImage = async () => {
+  try {
+    const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+    if (savedImage) {
+      setProfileImage(savedImage);
+    }
+  } catch (error) {
+    console.log('Error loading profile image:', error);
+  }
+};
+
+const getInitials = () => {
+  const firstName = profile?.firstName || "";
+  const lastName = profile?.lastName || "";
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+};
+
   const getGreetingName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -386,6 +418,8 @@ export default function HomeScreen() {
     );
   }
 
+  
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -393,21 +427,29 @@ export default function HomeScreen() {
     >
       <SafeAreaView style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <View style={styles.profileImageContainer}>
-              <Ionicons name="person" size={20} color="#4CAF50" />
-            </View>
+{/* Header */}
+      <View style={styles.header}>
+       <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+      <View style={styles.profileImageContainer}>
+        {profileImage ? (
+          <Image source={{ uri: profileImage }} style={styles.profileImage} />
+        ) : (
+          <Text style={styles.initialsText}>{getInitials()}</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <Ionicons name="notifications-outline" size={24} color="#666" />
           </TouchableOpacity>
-          <View style={styles.headerIcons}>
-            <TouchableOpacity onPress={() => router.push("/notifications")}>
-              <Ionicons name="notifications-outline" size={24} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuButton}>
-              <Ionicons name="grid-outline" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => setSideMenuVisible(true)}
+          >
+            <Ionicons name="grid-outline" size={24} color="#666" />
+          </TouchableOpacity>
         </View>
+      </View>
 
         <ScrollView
           style={styles.content}
@@ -435,6 +477,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
+
           {/* Quick Actions */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -452,11 +495,19 @@ export default function HomeScreen() {
                   onPress={action.onPress}
                 >
                   <View style={[styles.iconContainer, { backgroundColor: action.borderColor }]}>
-                    <Ionicons
-                      name={action.icon as any}
-                      size={28}
-                      color="white"
-                    />
+                    {action.image ? (
+                      <Image 
+                        source={action.image} 
+                        style={styles.actionImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Ionicons
+                        name={action.icon as any}
+                        size={28}
+                        color="white"
+                      />
+                    )}
                   </View>
                   <Text style={styles.actionTitle}>{action.title}</Text>
                 </TouchableOpacity>
@@ -582,6 +633,9 @@ export default function HomeScreen() {
   );
 }
 
+
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -650,6 +704,7 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 20,
     marginBottom: 24,
+    
   },
   sectionTitle: {
     fontSize: 14,
@@ -657,6 +712,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Epilogue-Regular',
     color: "#212121",
     marginBottom: 16,
+  },
+
+  profileImage: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  },
+  initialsText: {
+  fontSize: 16,
+  fontWeight: "bold",
+  color: "#4CAF50",
   },
   helpButton: {
     backgroundColor: "#DF1D1D",
@@ -685,7 +751,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
     padding: 20,
-
   },
   actionCard: {
     width: 141 ,
@@ -713,24 +778,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+
+  actionImage: {
+    width: 85,
+    height: 120,
+    // tintColor: "white", 
+  },
   actionTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: "#212121",
     textAlign: "center",
+    marginTop: 8,
   },
   recentMoods: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#EDE7EC",
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",
     shadowOffset: {
-      width: 0,
-      height: 1,
+      width: 2,
+      height: 2,
     },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.75,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 3,
   },
   moodItem: {
     flexDirection: "row",
@@ -757,18 +829,18 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   noDataContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#EDE7EC",
     borderRadius: 12,
     padding: 24,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: {
-      width: 0,
-      height: 1,
+      width: 2,
+      height: 2,
     },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.75,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 3,
   },
   noDataText: {
     fontSize: 16,
@@ -785,18 +857,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#EDE7EC",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: {
-      width: 0,
-      height: 1,
+      width: 2,
+      height: 2,
     },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.75,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 3,
   },
   resourceInfo: {
     flex: 1,
