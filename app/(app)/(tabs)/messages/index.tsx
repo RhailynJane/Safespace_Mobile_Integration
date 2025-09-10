@@ -10,11 +10,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  TextInput,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import { useAuth } from "../../../../context/AuthContext";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
@@ -22,6 +25,8 @@ export default function MessagesScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newMessageModalVisible, setNewMessageModalVisible] = useState(false);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -153,6 +158,28 @@ export default function MessagesScreen() {
     );
   }
 
+  // Sample conversations data
+  const conversations = [
+    {
+      id: 1,
+      name: "Eric Young",
+      lastMessage: "I'm glad you're feeling okay now.",
+      time: "30m ago",
+      unread: 0,
+      online: true,
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+    },
+    {
+      id: 2,
+      name: "Support Group",
+      lastMessage: "Jenny: I found this article really helpful...",
+      time: "2d ago",
+      unread: 5,
+      online: false,
+      avatar: "https://randomuser.me/api/portraits/women/4.jpg",
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -166,13 +193,76 @@ export default function MessagesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Messages Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Messages space for you.
-        </Text>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons
+          name="search"
+          size={20}
+          color="#9E9E9E"
+          style={styles.searchIcon}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search conversations..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9E9E9E"
+        />
       </View>
+
+      {/* Conversation List */}
+      <ScrollView style={styles.conversationList}>
+        {conversations.map((conversation) => (
+          <TouchableOpacity
+            key={conversation.id}
+            style={styles.conversationItem}
+            onPress={() => router.replace(`../messages/message-chat-screen?id=${conversation.id}`)}
+          >
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ uri: conversation.avatar }}
+                style={styles.avatar}
+              />
+              {conversation.online && <View style={styles.onlineIndicator} />}
+            </View>
+
+            <View style={styles.conversationContent}>
+              <View style={styles.conversationHeader}>
+                <Text style={styles.conversationName}>{conversation.name}</Text>
+                <Text style={styles.conversationTime}>{conversation.time}</Text>
+              </View>
+              <Text
+                style={[
+                  styles.conversationMessage,
+                  conversation.unread > 0 && styles.unreadMessage,
+                ]}
+                numberOfLines={1}
+              >
+                {conversation.lastMessage}
+              </Text>
+            </View>
+
+            {conversation.unread > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>{conversation.unread}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* New Message Button */}
+      <TouchableOpacity
+        style={styles.newMessageButton}
+        onPress={() => router.push("../messages/new-message")}
+      >
+        <LinearGradient
+          colors={["#4CAF50", "#2E7D32"]}
+          style={styles.newMessageButtonGradient}
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Side Menu */}
       <Modal
@@ -239,6 +329,24 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2E7D32",
   },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    margin: 15,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+
   content: {
     flex: 1,
     justifyContent: "center",
@@ -308,5 +416,94 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  conversationList: {
+    flex: 1,
+    paddingHorizontal: 15,
+  },
+  conversationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  avatarContainer: {
+    position: "relative",
+    marginRight: 15,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  onlineIndicator: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#4CAF50",
+    borderWidth: 2,
+    borderColor: "#FFF",
+  },
+  conversationContent: {
+    flex: 1,
+  },
+  conversationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  conversationName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  conversationTime: {
+    fontSize: 12,
+    color: "#9E9E9E",
+  },
+  conversationMessage: {
+    fontSize: 14,
+    color: "#757575",
+  },
+  unreadMessage: {
+    color: "#333",
+    fontWeight: "500",
+  },
+  unreadBadge: {
+    backgroundColor: "#4CAF50",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  unreadCount: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  newMessageButton: {
+    position: "absolute",
+    bottom: 80,
+    right: 20,
+    zIndex: 10,
+  },
+  newMessageButtonGradient: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
 });

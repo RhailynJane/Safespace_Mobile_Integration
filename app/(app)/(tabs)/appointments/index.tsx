@@ -10,18 +10,21 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../context/AuthContext";
-import BottomNavigation from "../../components/BottomNavigation";
+import { useAuth } from "../../../../context/AuthContext";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
-export default function VideoScreen() {
+
+export default function AppointmentsScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("video");
+  const [activeTab, setActiveTab] = useState("appointments");
+  const [activeView, setActiveView] = useState("main"); // 'main', 'book', 'details', 'confirmation', 'scheduled'
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -153,6 +156,31 @@ export default function VideoScreen() {
     );
   }
 
+  const handleBookAppointment = () => {
+    router.push("../appointments/book");
+  };
+
+  const handleViewScheduled = () => {
+    router.push("../appointments/appointment-list");
+  }
+
+  
+
+  const renderContent = () => (
+    <View style={styles.content}>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleBookAppointment}>
+          <Text style={styles.buttonText}>Book Appointment</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondaryButton} onPress={handleViewScheduled}>
+          <Text style={styles.secondaryButtonText}>Check Scheduled Appointments</Text>
+        </TouchableOpacity>
+      </View>
+      {/* Show the list of appointments below the buttons */}
+      {activeView === "scheduled"}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -160,20 +188,23 @@ export default function VideoScreen() {
         <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
           <Ionicons name="menu" size={28} color="#4CAF50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Video Consultation</Text>
+        <Text style={styles.headerTitle}>Appointments</Text>
         <TouchableOpacity onPress={() => router.push("/notifications")}>
           <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
         </TouchableOpacity>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Video Consultation Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Video Consultation space for
-          you.
-        </Text>
+      {/* Add the image above the main content */}
+      <View style={styles.imageContainer}>
+        <Image 
+          source={require('../../../../assets/images/appointment.png')} 
+          style={styles.appointmentImage}
+          resizeMode="contain"
+        />
       </View>
+
+      {/* Main Content */}
+      {renderContent()}
 
       {/* Side Menu */}
       <Modal
@@ -216,11 +247,14 @@ export default function VideoScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  appointmentImage: {
+    width: width * 0.9,
+    height: 350,
   },
   loadingContainer: {
     flex: 1,
@@ -240,11 +274,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2E7D32",
   },
+  imageContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    marginTop: 10,
+  },
   content: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 20,
+    marginTop: 40,
   },
   title: {
     fontSize: 22,
@@ -310,4 +351,38 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 15,
   },
+  buttonContainer: {
+    width: "100%",
+    alignItems: "center",
+    gap: 16,
+  },
+  primaryButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    backgroundColor: "transparent",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    width: "100%",
+    alignItems: "center",
+  },
+  secondaryButtonText: {
+    color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
 });

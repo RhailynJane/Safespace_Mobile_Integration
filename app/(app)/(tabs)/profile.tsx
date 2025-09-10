@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,15 +9,27 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Image,
 } from "react-native";
 import { useAuth } from "../../../context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const { user, profile, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState<{
+    firstName: string;
+    lastName: string;
+    location: string;
+  }>({
+    firstName: "",
+    lastName: "",
+    location: "",
+  });
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -26,6 +38,37 @@ export default function ProfileScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  // Load profile data when screen loads and refresh periodically
+  useEffect(() => {
+    loadProfileData();
+    
+    // Set up interval to check for updates every 2 seconds
+    const interval = setInterval(() => {
+      loadProfileData();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadProfileData = async () => {
+    try {
+      // Load profile image
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+
+      // Load profile data (name, location)
+      const savedProfileData = await AsyncStorage.getItem(`profileData_${user?.uid}`);
+      if (savedProfileData) {
+        const parsedData = JSON.parse(savedProfileData);
+        setProfileData(parsedData);
+      }
+    } catch (error) {
+      console.log('Error loading profile data:', error);
+    }
+  };
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -46,30 +89,76 @@ export default function ProfileScreen() {
   };
 
   const getGreetingName = () => {
+    // Use saved profile data first, then fallback to auth context
+    if (profileData.firstName) return profileData.firstName;
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
     return "User";
   };
 
+  const getFullName = () => {
+    if (profileData.firstName && profileData.lastName) {
+      return `${profileData.firstName} ${profileData.lastName}`.trim();
+    }
+    if (profile?.firstName && profile?.lastName) {
+      return `${profile.firstName} ${profile.lastName}`.trim();
+    }
+    return getGreetingName();
+  };
+
+  const getLocation = () => {
+    return profileData.location || profile?.location || "";
+  };
+
+  const getInitials = () => {
+    const firstName = profileData.firstName || profile?.firstName || "";
+    const lastName = profileData.lastName || profile?.lastName || "";
+    
+    if (firstName && lastName) {
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    } else if (firstName) {
+      return firstName.charAt(0).toUpperCase();
+    }
+    
+    const name = getGreetingName();
+    if (!name || name.length === 0) {
+      return "U";
+    }
+    return name.charAt(0).toUpperCase();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        onScrollBeginDrag={() => loadProfileData()} // Refresh on scroll
+      >
         {/* Profile Information Section */}
         <View style={styles.profileSection}>
-          <View style={styles.profileInitials}>
-            <Text style={styles.initialsText}>
-              {(getGreetingName() ?? "U").charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <Text style={styles.name}>{getGreetingName()}</Text>
+          {profileImage ? (
+            <Image source={{ uri: profileImage }} style={styles.profileInitials} />
+          ) : (
+            <View style={styles.profileInitials}>
+              <Text style={styles.initialsText}>{getInitials()}</Text>
+            </View>
+          )}
+          <Text style={styles.name}>{getFullName()}</Text>
           <Text style={styles.email}>{user?.email}</Text>
+          {getLocation() && (
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={14} color="#666" />
+              <Text style={styles.location}>{getLocation()}</Text>
+            </View>
+          )}
         </View>
 
         {/* Menu Items Section */}
         <View style={styles.menuSection}>
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/profile/edit")}
+            onPress={() => {
+              router.push("/profile/edit");
+            }}
           >
             <Ionicons name="person-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Edit Profile</Text>
@@ -78,7 +167,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/settings")}
+            onPress={() => router.push("/profile/settings")}
           >
             <Ionicons name="settings-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Settings</Text>
@@ -87,7 +176,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => router.push("/help")}
+            onPress={() => router.push("/profile/help-support")}
           >
             <Ionicons name="help-circle-outline" size={24} color="#666" />
             <Text style={styles.menuText}>Help & Support</Text>
@@ -157,6 +246,16 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 14,
     color: "#666",
+  },
+  locationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  location: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 4,
   },
   menuSection: {
     backgroundColor: "#FFFFFF",

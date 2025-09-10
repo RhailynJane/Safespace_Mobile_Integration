@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -39,6 +40,39 @@ export default function AssessmentScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  const assessmentOptions = [
+    {
+      id: "before-appointment",
+      title: "Before Appointment",
+      description: "Complete assessment before meeting with your provider",
+      icon: "calendar-outline",
+      backgroundColor: "#E8F5E8",
+      iconColor: "#4CAF50",
+    },
+    {
+      id: "provider-requested",
+      title: "Provider Requested",
+      description: "Your healthcare provider asked you to complete this",
+      icon: "person-outline",
+      backgroundColor: "#E3F2FD",
+      iconColor: "#2196F3",
+    },
+    {
+      id: "personal-check-in",
+      title: "Personal Check-in",
+      description: "Monitor your mental health progress",
+      icon: "heart-outline",
+      backgroundColor: "#FCE4EC",
+      iconColor: "#E91E63",
+    },
+  ];
+
+  const handleAssessmentOption = (optionId: string) => {
+    // All assessment options navigate to the same assessment selection screen
+    router.push("/assessment/selection");
+  };
+
   const sideMenuItems = [
     {
       icon: "home",
@@ -157,22 +191,66 @@ export default function AssessmentScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Assessment</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Self Assessment</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={24} color="#333" />
+            <View style={styles.notificationBadge}>
+              <Text style={styles.badgeText}>1</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+            <Ionicons name="grid-outline" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Assessment Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Assessment space for you.
-        </Text>
-      </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Illustration Section */}
+        <View style={styles.illustrationContainer}>
+          {/* You can replace this with your uploaded illustration */}
+          <View style={styles.illustrationPlaceholder}>
+            <View style={styles.cloudShape}>
+              <Ionicons name="heart" size={30} color="#4CAF50" />
+              <Ionicons name="add-circle" size={20} color="#2196F3" />
+              <Ionicons name="heart" size={15} color="#4CAF50" />
+            </View>
+            <View style={styles.personIllustration}>
+              <View style={styles.personHead} />
+              <View style={styles.personBody}>
+                <View style={styles.heartInHands}>
+                  <Ionicons name="heart" size={25} color="#FFFFFF" />
+                  <Ionicons name="add" size={15} color="#FFFFFF" />
+                </View>
+              </View>
+            </View>
+          </View>
+          
+          <Text style={styles.questionText}>Why are you taking this assessment?</Text>
+        </View>
+
+        {/* Assessment Options */}
+        <View style={styles.optionsContainer}>
+          {assessmentOptions.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[styles.optionCard, { backgroundColor: option.backgroundColor }]}
+              onPress={() => handleAssessmentOption(option.id)}
+            >
+              <View style={styles.optionIconContainer}>
+                <Ionicons name={option.icon as any} size={24} color={option.iconColor} />
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>{option.title}</Text>
+                <Text style={styles.optionDescription}>{option.description}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -230,33 +308,154 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "600",
-    color: "#2E7D32",
+    color: "#333",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 15,
+  },
+  notificationButton: {
+    position: "relative",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "#FF5722",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "600",
   },
   content: {
     flex: 1,
-    justifyContent: "center",
+    backgroundColor: "#F8F9FA",
+  },
+  illustrationContainer: {
     alignItems: "center",
+    paddingVertical: 40,
     paddingHorizontal: 20,
   },
-  title: {
+  illustrationPlaceholder: {
+    width: 200,
+    height: 200,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 30,
+    position: "relative",
+  },
+  cloudShape: {
+    position: "absolute",
+    top: 20,
+    right: 30,
+    width: 80,
+    height: 50,
+    backgroundColor: "#E3F2FD",
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+  },
+  personIllustration: {
+    alignItems: "center",
+  },
+  personHead: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFCDD2",
+    marginBottom: 10,
+  },
+  personBody: {
+    width: 60,
+    height: 80,
+    backgroundColor: "#4CAF50",
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  heartInHands: {
+    width: 40,
+    height: 35,
+    backgroundColor: "#2196F3",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  questionText: {
     fontSize: 22,
     fontWeight: "600",
     color: "#333",
-    marginBottom: 12,
     textAlign: "center",
+    lineHeight: 28,
   },
-  subtitle: {
+  optionsContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+    gap: 15,
+  },
+  optionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  optionIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  optionContent: {
+    flex: 1,
+  },
+  optionTitle: {
     fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  optionDescription: {
+    fontSize: 14,
     color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 20,
   },
   modalContainer: {
     flex: 1,
@@ -276,12 +475,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
   },
   profileName: {
     fontSize: 18,

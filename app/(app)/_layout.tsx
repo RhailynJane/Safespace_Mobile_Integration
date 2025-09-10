@@ -1,16 +1,20 @@
 import { Stack } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider } from "../../context/AuthContext";
 
-export default function AppLayout() {
+export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {/* Onboarding Flow - Available to all users */}
-      <Stack.Screen name="splash" />
-      <Stack.Screen name="loading" />
-      <Stack.Screen name="quote" />
-      <Stack.Screen name="onboarding" />
-
-      {/* Main App with Tabs */}
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-    </Stack>
+    <AuthProvider>
+      <SafeAreaProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="loading" />
+          <Stack.Screen name="quote" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(app)" />
+        </Stack>
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }

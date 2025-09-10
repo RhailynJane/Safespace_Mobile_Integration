@@ -1,5 +1,5 @@
 // File: components/AppHeader.tsx
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,14 +8,19 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Image,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, Typography } from "../constants/theme";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../context/AuthContext";
 
+const { width } = Dimensions.get("window");
+
 export interface AppHeaderProps {
-  title: string;
+  title?: string;
   showBack?: boolean;
   showMenu?: boolean;
   rightActions?: React.ReactNode;
@@ -24,18 +29,66 @@ export interface AppHeaderProps {
 
 export const AppHeader = ({
   title,
-  showBack = true,
+  showBack = false,
   showMenu = true,
 }: AppHeaderProps) => {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const { logout } = useAuth();
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const { logout, user, profile } = useAuth();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const showSideMenu = () => {
+    setSideMenuVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideSideMenu = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 800,
+      useNativeDriver: true,
+    }).start(() => {
+      setSideMenuVisible(false);
+    });
+  };
+
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log('Error loading profile image:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadProfileImage();
+  }, [user?.uid]);
+
+  const getInitials = () => {
+    const firstName = profile?.firstName || "";
+    const lastName = profile?.lastName || "";
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+  };
+
+  const getGreetingName = () => {
+    if (profile?.firstName) return profile.firstName;
+    if (user?.displayName) return user.displayName.split(" ")[0];
+    return "User";
+  };
 
   const sideMenuItems = [
     {
       icon: "home",
       title: "Dashboard",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/(app)/(tabs)/home");
       },
     },
@@ -43,7 +96,7 @@ export const AppHeader = ({
       icon: "person",
       title: "Profile",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/(app)/(tabs)/profile");
       },
     },
@@ -51,7 +104,7 @@ export const AppHeader = ({
       icon: "bar-chart",
       title: "Self-Assessment",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/self-assessment");
       },
     },
@@ -59,7 +112,7 @@ export const AppHeader = ({
       icon: "happy",
       title: "Mood Tracking",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/mood-tracking");
       },
     },
@@ -67,7 +120,7 @@ export const AppHeader = ({
       icon: "journal",
       title: "Journaling",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/journaling");
       },
     },
@@ -75,7 +128,7 @@ export const AppHeader = ({
       icon: "library",
       title: "Resources",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/resources");
       },
     },
@@ -83,7 +136,7 @@ export const AppHeader = ({
       icon: "help-circle",
       title: "Crisis Support",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/crisis-support");
       },
     },
@@ -91,7 +144,7 @@ export const AppHeader = ({
       icon: "chatbubble",
       title: "Messages",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/(app)/(tabs)/messages");
       },
     },
@@ -99,7 +152,7 @@ export const AppHeader = ({
       icon: "calendar",
       title: "Appointments",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/(app)/(tabs)/appointments");
       },
     },
@@ -107,7 +160,7 @@ export const AppHeader = ({
       icon: "people",
       title: "Community Forum",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/community-forum");
       },
     },
@@ -115,7 +168,7 @@ export const AppHeader = ({
       icon: "videocam",
       title: "Video Consultations",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/video-consultations");
       },
     },
@@ -124,7 +177,7 @@ export const AppHeader = ({
       title: "Sign Out",
       onPress: async () => {
         try {
-          setSideMenuVisible(false);
+          hideSideMenu();
           await logout();
         } catch (error) {
           console.error("Sign out error:", error);
@@ -144,52 +197,54 @@ export const AppHeader = ({
             <Ionicons
               name="chevron-back"
               size={24}
-              color={Colors.textPrimary}
+              color="#666"
             />
           </TouchableOpacity>
         ) : (
-          <View style={styles.backButton} />
-        )}
-
-        <Text style={styles.headerTitle}>{title}</Text>
-
-        {showMenu ? (
-          <TouchableOpacity
-            onPress={() => setSideMenuVisible(true)}
-            style={styles.menuButton}
-          >
-            <Ionicons
-              name="menu-outline"
-              size={24}
-              color={Colors.textPrimary}
-            />
+          <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+            <View style={styles.profileImageContainer}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              ) : (
+                <Text style={styles.initialsText}>{getInitials()}</Text>
+              )}
+            </View>
           </TouchableOpacity>
-        ) : (
-          <View style={styles.menuButton} />
         )}
+
+        {title && <Text style={styles.headerTitle}>{title}</Text>}
+
+        <View style={styles.headerIcons}>
+          <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <Ionicons name="notifications-outline" size={24} color="#666" />
+          </TouchableOpacity>
+          {showMenu && (
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={showSideMenu}
+            >
+              <Ionicons name="grid" size={24} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Side Menu Modal */}
       <Modal
-        animationType="fade"
+        animationType="none" 
         transparent={true}
         visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
+        onRequestClose={hideSideMenu}
       >
-        <View style={styles.modalContainer}>
+        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
           <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
+            style={StyleSheet.absoluteFillObject}
+            onPress={hideSideMenu}
           />
-          <View style={styles.sideMenu}>
+          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
             <View style={styles.sideMenuHeader}>
-              <Text style={styles.sideMenuTitle}>Menu</Text>
-              <TouchableOpacity
-                onPress={() => setSideMenuVisible(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color={Colors.textPrimary} />
-              </TouchableOpacity>
+              <Text style={styles.profileName}>{getGreetingName()}</Text>
+              <Text style={styles.profileEmail}>{user?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -201,14 +256,14 @@ export const AppHeader = ({
                   <Ionicons
                     name={item.icon as any}
                     size={20}
-                    color={Colors.primary}
+                    color="#757575"
                   />
                   <Text style={styles.sideMenuItemText}>{item.title}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -217,70 +272,97 @@ export const AppHeader = ({
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceSecondary,
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
+    
   },
   backButton: {
-    padding: Spacing.sm,
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileImageContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  initialsText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#4CAF50",
   },
   headerTitle: {
-    ...Typography.title,
     fontSize: 20,
     fontWeight: "600",
+    color: "#000000",
     flex: 1,
     textAlign: "center",
+    marginHorizontal: 10,
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   menuButton: {
-    padding: Spacing.sm,
-    width: 40,
-    alignItems: "flex-end",
+    padding: 4,
   },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
+  fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
   },
   sideMenu: {
-    width: "75%",
-    backgroundColor: Colors.surface,
+    paddingTop: 40,
+    width: width * 0.75,
+    backgroundColor: "#FFFFFF",
     height: "100%",
   },
   sideMenuHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: Spacing.lg,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceSecondary,
+    borderBottomColor: "#E0E0E0",
+    alignItems: "center",
   },
-  sideMenuTitle: {
-    ...Typography.title,
+  profileName: {
     fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
   },
-  closeButton: {
-    padding: Spacing.sm,
+  profileEmail: {
+    fontSize: 14,
+    color: "#757575",
   },
   sideMenuContent: {
-    padding: Spacing.md,
+    padding: 10,
   },
   sideMenuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.md,
+    paddingVertical: 15,
+    paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceSecondary,
+    borderBottomColor: "#F0F0F0",
   },
   sideMenuItemText: {
-    ...Typography.body,
-    marginLeft: Spacing.md,
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 15,
   },
 });

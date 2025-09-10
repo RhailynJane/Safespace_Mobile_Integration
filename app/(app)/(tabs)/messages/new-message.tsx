@@ -10,22 +10,27 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  TextInput,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import { useAuth } from "../../../../context/AuthContext";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
-export default function CommunityScreen() {
+export default function MessagesScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("community");
+  const [activeTab, setActiveTab] = useState("messages");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [newMessageModalVisible, setNewMessageModalVisible] = useState(false);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
+    { id: "community", name: "Community", icon: "people" },
     { id: "appointments", name: "Appointments", icon: "calendar" },
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
@@ -153,65 +158,78 @@ export default function CommunityScreen() {
     );
   }
 
+  const contacts = [
+    {
+      id: 1,
+      name: "Eric Young",
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+      online: true,
+    },
+    {
+      id: 2,
+      name: "Support Group",
+      avatar: "https://randomuser.me/api/portraits/women/4.jpg",
+      online: false,
+    },
+    {
+      id: 3,
+      name: "Sophia Lee",
+      avatar: "https://randomuser.me/api/portraits/women/3.jpg",
+      online: true,
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#2E7D32" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Community</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>New Message</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Community Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Community space for you.
-        </Text>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons
+          name="search"
+          size={20}
+          color="#9E9E9E"
+          style={styles.searchIcon}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search contacts..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholderTextColor="#9E9E9E"
+          autoFocus={true}
+        />
       </View>
 
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+      {/* Contact List */}
+      <ScrollView style={styles.contactList}>
+        <Text style={styles.sectionTitle}>Recent Contacts</Text>
+        {contacts.map((contact) => (
+          <TouchableOpacity
+            key={contact.id}
+            style={styles.contactItem}
+            onPress={() =>
+              router.push(`../messages/message-chat-screen?id=${contact.id}`)
+            }
+          >
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ uri: contact.avatar }}
+                style={styles.contactAvatar}
+              />
+              {contact.online && <View style={styles.onlineIndicator} />}
             </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
+            <Text style={styles.contactName}>{contact.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -239,74 +257,62 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2E7D32",
   },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
-  },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
+  searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
+    backgroundColor: "#F5F5F5",
+    margin: 15,
+    borderRadius: 10,
     paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    height: 50,
   },
-  sideMenuItemText: {
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 16,
     color: "#333",
-    marginLeft: 15,
+  },
+  contactList: {
+    flex: 1,
+    paddingHorizontal: 15,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#9E9E9E",
+    marginBottom: 15,
+    marginTop: 10,
+  },
+  contactItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  avatarContainer: {
+    position: "relative",
+    marginRight: 15,
+  },
+  contactAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  onlineIndicator: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#4CAF50",
+    borderWidth: 2,
+    borderColor: "#FFF",
+  },
+  contactName: {
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "500",
   },
 });

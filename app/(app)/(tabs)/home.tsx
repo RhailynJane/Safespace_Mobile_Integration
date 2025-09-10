@@ -1,6 +1,5 @@
-"use client";
-
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -15,12 +14,14 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
+import { BorderRadius } from "../../../constants/theme";
 
 const { width } = Dimensions.get("window");
 
@@ -44,7 +45,9 @@ export default function HomeScreen() {
   const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);4
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -53,6 +56,7 @@ export default function HomeScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
 
   const handleLogout = async () => {
     try {
@@ -67,32 +71,59 @@ export default function HomeScreen() {
     {
       id: "mood",
       title: "Track Mood",
-      icon: "happy",
-      color: "#E8F5E9",
+      icon: "happy-outline",
+      image: require("../../../assets/images/track-mood.png"), 
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/mood-tracking"),
     },
     {
       id: "journal",
       title: "Journal",
-      icon: "create",
-      color: "#E0F7FA",
+      icon: "journal-outline",
+      image: require("../../../assets/images/journal.png"), 
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/journaling"),
     },
     {
       id: "resources",
       title: "Resources",
-      icon: "book",
-      color: "#E8EAF6",
+      icon: "library-outline",
+      image: require("../../../assets/images/resources.png"), 
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/resources"),
     },
     {
       id: "crisis",
       title: "Crisis Support",
-      icon: "help-buoy",
-      color: "#F3E5F5",
+      icon: "help-buoy-outline",
+      image: require("../../../assets/images/crisis-support.png"), 
+      color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),
     },
   ];
+
+  const showSideMenu = () => {
+  setSideMenuVisible(true);
+  Animated.timing(fadeAnim, {
+    toValue: 1,
+    duration: 800, // 300ms fade in
+    useNativeDriver: true,
+  }).start();
+};
+
+const hideSideMenu = () => {
+  Animated.timing(fadeAnim, {
+    toValue: 0,
+    duration: 800, // 300ms fade out
+    useNativeDriver: true,
+  }).start(() => {
+    setSideMenuVisible(false);
+  });
+};
 
   const sideMenuItems = [
     {
@@ -231,6 +262,13 @@ export default function HomeScreen() {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+
   const fetchRecentMoods = async () => {
     try {
       if (!user?.uid) return;
@@ -291,6 +329,15 @@ export default function HomeScreen() {
       setResources([]);
     }
   };
+
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  useFocusEffect(
+  useCallback(() => {
+    fetchData();
+    loadProfileImage(); // Add this line
+  }, [user?.uid])
+);
 
   // Set up realtime subscription for mood updates
   useEffect(() => {
@@ -360,6 +407,23 @@ export default function HomeScreen() {
     }
   };
 
+  const loadProfileImage = async () => {
+  try {
+    const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+    if (savedImage) {
+      setProfileImage(savedImage);
+    }
+  } catch (error) {
+    console.log('Error loading profile image:', error);
+  }
+};
+
+const getInitials = () => {
+  const firstName = profile?.firstName || "";
+  const lastName = profile?.lastName || "";
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+};
+
   const getGreetingName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -374,6 +438,8 @@ export default function HomeScreen() {
     );
   }
 
+  
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -381,21 +447,44 @@ export default function HomeScreen() {
     >
       <SafeAreaView style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="menu" size={28} color="#4CAF50" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Hello, {getGreetingName()}</Text>
+{/* Header */}
+      <View style={styles.header}>
+       <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+      <View style={styles.profileImageContainer}>
+        {profileImage ? (
+          <Image source={{ uri: profileImage }} style={styles.profileImage} />
+        ) : (
+          <Text style={styles.initialsText}>{getInitials()}</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+        <View style={styles.headerIcons}>
           <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
+            <Ionicons name="notifications-outline" size={24} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={showSideMenu}
+          >
+            <Ionicons name="grid" size={24} color="#666" />
           </TouchableOpacity>
         </View>
+      </View>
 
         <ScrollView
           style={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          
+          {/* Greeting Section */}
+          <View style={styles.greetingSection}>
+            <Text style={styles.greetingText}>
+              {getGreeting()}, <Text style={styles.nameText}>{getGreetingName()}!</Text>
+            </Text>
+            <Text style={styles.subGreetingText}>How are you feeling today?</Text>
+          </View>
+
           {/* Emergency Help Section */}
           <View style={styles.section}>
             <TouchableOpacity
@@ -403,12 +492,11 @@ export default function HomeScreen() {
               onPress={() => router.push("/crisis-support")}
             >
               <View style={styles.helpButtonContent}>
-                <Ionicons name="help-buoy" size={24} color="white" />
                 <Text style={styles.helpButtonText}>Get Help Now</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="white" />
             </TouchableOpacity>
           </View>
+
 
           {/* Quick Actions */}
           <View style={styles.section}>
@@ -417,23 +505,44 @@ export default function HomeScreen() {
               {quickActions.map((action) => (
                 <TouchableOpacity
                   key={action.id}
-                  style={[styles.actionCard, { backgroundColor: action.color }]}
+                  style={[
+                    styles.actionCard,
+                    { 
+                      backgroundColor: action.color,
+                      borderColor: action.borderColor 
+                    }
+                  ]}
                   onPress={action.onPress}
                 >
-                  <Ionicons
-                    name={action.icon as any}
-                    size={24}
-                    color="#4CAF50"
-                  />
+                  <View style={[styles.iconContainer, { backgroundColor: action.borderColor }]}>
+                    {action.image ? (
+                      <Image 
+                        source={action.image} 
+                        style={styles.actionImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Ionicons
+                        name={action.icon as any}
+                        size={28}
+                        color="white"
+                      />
+                    )}
+                  </View>
                   <Text style={styles.actionTitle}>{action.title}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          {/* Mood Tracking Section */}
+        {/* Recent Mood History Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Moods</Text>
+            <TouchableOpacity 
+              onPress={() => router.push("/mood-history")}
+              style={styles.sectionTitleContainer}
+            >
+              <Text style={styles.sectionTitle}>Recent Moods</Text>
+            </TouchableOpacity>
             {recentMoods.length > 0 ? (
               <View style={styles.recentMoods}>
                 {recentMoods.map((mood) => (
@@ -446,10 +555,16 @@ export default function HomeScreen() {
                       <Text style={styles.moodText}>{mood.mood_label}</Text>
                     </View>
                   </View>
+                  
                 ))}
               </View>
             ) : (
-              <Text style={styles.noDataText}>No mood entries yet</Text>
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>No mood entries yet</Text>
+                <Text style={styles.noDataSubtext}>
+                  Start tracking your mood to see insights here
+                </Text>
+              </View>
             )}
           </View>
 
@@ -473,55 +588,53 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={styles.noDataText}>No resources available</Text>
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>No resources available</Text>
+                <Text style={styles.noDataSubtext}>
+                  Check back later for new content
+                </Text>
+              </View>
             )}
           </View>
         </ScrollView>
 
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[
-                styles.navItem,
-                activeTab === tab.id && styles.navItemActive,
-              ]}
-              onPress={() => {
-                setActiveTab(tab.id);
-                if (tab.id !== "home") router.push(`/${tab.id}`);
-              }}
-            >
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        {tabs.map((tab) => (
+          <TouchableOpacity
+            key={tab.id}
+            style={styles.navItem}
+            onPress={() => {
+              setActiveTab(tab.id);
+              if (tab.id !== "home") router.push(`/${tab.id}`);
+            }}
+          >
+            <View style={[
+              styles.navIconContainer,
+              activeTab === tab.id && styles.activeIconContainer
+            ]}>
               <Ionicons
                 name={tab.icon as any}
                 size={24}
-                color={activeTab === tab.id ? "#4CAF50" : "#757575"}
+                color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
               />
-              <Text
-                style={[
-                  styles.navText,
-                  activeTab === tab.id && styles.navTextActive,
-                ]}
-              >
-                {tab.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
         {/* Side Menu */}
         <Modal
-          animationType="fade"
+          animationType="none" 
           transparent={true}
           visible={sideMenuVisible}
-          onRequestClose={() => setSideMenuVisible(false)}
+          onRequestClose={hideSideMenu}
         >
-          <View style={styles.modalContainer}>
+          <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
             <Pressable
-              style={styles.modalOverlay}
-              onPress={() => setSideMenuVisible(false)}
+              style={StyleSheet.absoluteFillObject}
+              onPress={hideSideMenu}
             />
-            <View style={styles.sideMenu}>
+            <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getGreetingName()}</Text>
                 <Text style={styles.profileEmail}>{user?.email}</Text>
@@ -531,29 +644,36 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={index}
                     style={styles.sideMenuItem}
-                    onPress={item.onPress}
+                    onPress={() => {
+                      hideSideMenu(); // Use hideSideMenu instead
+                      item.onPress();
+                    }}
                   >
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color="#4CAF50"
+                      color="#757575"
                     />
                     <Text style={styles.sideMenuItemText}>{item.title}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
-          </View>
+            </Animated.View>
+          </Animated.View>
         </Modal>
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }
 
+
+
+
 const styles = StyleSheet.create({
+  
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F2F2F7",
   },
   loadingContainer: {
     flex: 1,
@@ -564,37 +684,106 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    paddingBottom: 5,
+    backgroundColor: "#7BB8A8",
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
+  profileImageContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  menuButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
-    paddingBottom: 70,
+    paddingBottom: 80,
+  },
+  greetingSection: {
+    backgroundColor: "#7BB8A8",
+    marginHorizontal: 0,
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    borderTopLeftRadius: 0,      // Sharp top left corner
+    borderTopRightRadius: 0,     // Sharp top right corner
+    borderBottomLeftRadius: 50,  // Rounded bottom left
+    borderBottomRightRadius: 50, // Rounded bottom right
+    marginBottom: 20,
+  },
+
+  greetingText: {
+    fontSize: 24,
+    fontWeight: "300",
+    fontFamily: 'Epilogue-Regular',
+    color: "#000000",
+    marginBottom: 4,
+  },
+  subGreetingText: {
+    fontSize: 15,
+    fontFamily: 'Epilogue-Regular',
+
+    color: "#000000",
+    opacity: 0.8,
   },
   section: {
     paddingHorizontal: 20,
     marginBottom: 24,
+    
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2E7D32",
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: 'Epilogue-Regular',
+    color: "#212121",
     marginBottom: 16,
   },
-  helpButton: {
+    sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  viewAllButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F44336",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "500",
+    marginRight: 4,
+  },
+
+  profileImage: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  },
+  initialsText: {
+  fontSize: 16,
+  fontWeight: "bold",
+  color: "#4CAF50",
+  },
+  helpButton: {
+    backgroundColor: "#DF1D1D",
+    fontFamily: 'Epilogue-Regular',
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 50,
   },
   helpButtonContent: {
     flexDirection: "row",
@@ -603,70 +792,138 @@ const styles = StyleSheet.create({
   helpButtonText: {
     fontSize: 16,
     color: "#FFFFFF",
+    fontFamily: 'Epilogue-Regular',
+
     fontWeight: "600",
     marginLeft: 8,
-  },
-  recentMoods: {
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    padding: 12,
-  },
-  moodItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  moodEmoji: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  moodDetails: {
-    flex: 1,
-  },
-  moodDate: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  moodText: {
-    fontSize: 14,
-    color: "#212121",
-    fontWeight: "500",
-  },
-  noDataText: {
-    textAlign: "center",
-    color: "#757575",
-    paddingVertical: 16,
   },
   actionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 12,
+    padding: 20,
   },
   actionCard: {
-    width: "48%",
-    borderRadius: 12,
-    padding: 16,
+    width: 141 ,
+    height: 159,
+    borderRadius: 16,
+    padding: 20,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    minHeight: 120,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 12,
+  },
+
+  actionImage: {
+    width: 85,
+    height: 120,
+    // tintColor: "white", 
   },
   actionTitle: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
     color: "#212121",
+    textAlign: "center",
     marginTop: 8,
+  },
+  recentMoods: {
+    backgroundColor: "#EDE7EC",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  sectionTitleContainer: {
+  alignSelf: 'flex-start', 
+},
+  moodItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
+  },
+  moodEmoji: {
+    fontSize: 28,
+    marginRight: 16,
+  },
+  moodDetails: {
+    flex: 1,
+  },
+  moodDate: {
+    fontSize: 12,
+    color: "#9E9E9E",
+    marginBottom: 2,
+  },
+  moodText: {
+    fontSize: 16,
+    color: "#212121",
+    fontWeight: "500",
+  },
+  noDataContainer: {
+    backgroundColor: "#EDE7EC",
+    borderRadius: 12,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: "#424242",
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  noDataSubtext: {
+    fontSize: 14,
+    color: "#9E9E9E",
+    textAlign: "center",
   },
   resourceCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#EDE7EC",
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   resourceInfo: {
     flex: 1,
@@ -685,44 +942,65 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    paddingVertical: 16,
     backgroundColor: "#FFFFFF",
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
+    borderTopLeftRadius: 40,    
+    borderTopRightRadius: 40, 
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
   },
   navItem: {
     alignItems: "center",
     padding: 8,
   },
-  navItemActive: {
-    borderTopWidth: 2,
-    borderTopColor: "#4CAF50",
+  activeIconContainer: {
+  backgroundColor: '#B6D5CF61', // Your ellipse color when tapped
   },
-  navText: {
-    fontSize: 12,
-    color: "#757575",
-    marginTop: 4,
-  },
-  navTextActive: {
-    color: "#4CAF50",
-    fontWeight: "500",
+
+  navIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20, // Makes it elliptical/circular
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
     flexDirection: "row",
+
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    width: '100%',  
+    height: '100%', 
+    
+    
+  },
+  // Remove modalContainer and modalOverlay, replace with:
+  fullScreenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end', // This positions the sidebar on the right
   },
   sideMenu: {
+ 
+    paddingTop: 40,
     width: width * 0.75,
     backgroundColor: "#FFFFFF",
-    height: "100%",
+    height: "100%", // Full height
+    // Remove marginTop
   },
   sideMenuHeader: {
     padding: 20,
@@ -736,6 +1014,13 @@ const styles = StyleSheet.create({
     color: "#212121",
     marginBottom: 4,
   },
+  nameText: {
+  fontWeight: "700", // Bold for the name
+  color: "#4C4A53",
+  fontFamily: 'Epilogue-Regular',
+
+
+},
   profileEmail: {
     fontSize: 14,
     color: "#757575",
@@ -750,6 +1035,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
+    
   },
   sideMenuItemText: {
     fontSize: 16,

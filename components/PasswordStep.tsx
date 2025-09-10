@@ -229,9 +229,9 @@ const styles = StyleSheet.create({
 
   // Password text input field styling
   input: {
-    flex: 1, // Take remaining space between icons
-    fontSize: 16,
-    color: "#333",
+    flex: 1, // Take remaining space after icons
+    fontSize: 12,
+    color: "#757575",
   },
 
   // Eye icon for password visibility toggle
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
 
   // Primary create account button styling
   continueButton: {
-    backgroundColor: "#7FDBDA", // Teal brand color
+    backgroundColor: "#7BB8A8", // Teal brand color
     borderRadius: 25, // Highly rounded corners
     paddingVertical: 16, // Comfortable touch target
     alignItems: "center",

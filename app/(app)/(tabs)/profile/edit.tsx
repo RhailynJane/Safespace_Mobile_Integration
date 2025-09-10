@@ -1,0 +1,610 @@
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Switch,
+  Alert,
+  Image,
+  FlatList,
+} from "react-native";
+import { useAuth } from "../../../../context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export default function EditProfileScreen() {
+  const { user, profile } = useAuth();
+  const [activeTab, setActiveTab] = useState("profile");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: profile?.firstName || "",
+    lastName: profile?.lastName || "",
+    email: user?.email || "",
+    location: profile?.location || "",
+    notifications: true,
+  });
+  
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Sample cities for autocomplete (you can replace with API call)
+  const sampleCities = [
+    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
+    "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
+    "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
+    "San Francisco, CA", "Indianapolis, IN", "Seattle, WA", "Denver, CO", "Boston, MA",
+    "Toronto, ON", "Vancouver, BC", "Montreal, QC", "Calgary, AB", "Ottawa, ON"
+  ];
+
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  // Load existing profile image when screen loads
+  useEffect(() => {
+    loadProfileImage();
+  }, []);
+
+  // Helper functions
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log('Error loading profile image:', error);
+    }
+  };
+
+  const saveImageToStorage = async (imageUri: string) => {
+    try {
+      await AsyncStorage.setItem(`profileImage_${user?.uid}`, imageUri);
+      console.log('Profile image saved successfully');
+    } catch (error) {
+      console.log('Error saving profile image:', error);
+    }
+  };
+
+  const saveProfileDataToStorage = async () => {
+    try {
+      const profileData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        location: formData.location,
+      };
+      await AsyncStorage.setItem(`profileData_${user?.uid}`, JSON.stringify(profileData));
+      console.log('Profile data saved successfully');
+    } catch (error) {
+      console.log('Error saving profile data:', error);
+    }
+  };
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else if (tabId === "profile") {
+      router.back();
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      // Save profile data to storage
+      await saveProfileDataToStorage();
+      
+      // Here you would implement the actual profile update logic to your backend
+      Alert.alert("Success", "Profile updated successfully!");
+      router.back();
+    } catch (error) {
+      Alert.alert("Error", "Failed to update profile. Please try again.");
+    }
+  };
+
+  const handleEditPhoto = () => {
+    Alert.alert(
+      "Edit Profile Photo",
+      "Choose an option",
+      [
+        { text: "Camera", onPress: openCamera },
+        { text: "Gallery", onPress: openGallery },
+        { text: "Cancel", style: "cancel" },
+      ]
+    );
+  };
+
+  const openCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera permission is required to take photos');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const imageUri = result.assets[0].uri;
+      setProfileImage(imageUri);
+      await saveImageToStorage(imageUri);
+    }
+  };
+
+  const openGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Gallery permission is required to select photos');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const imageUri = result.assets[0].uri;
+      setProfileImage(imageUri);
+      await saveImageToStorage(imageUri);
+    }
+  };
+
+  const handleLocationSearch = (text: string) => {
+    setLocationQuery(text);
+    setFormData({ ...formData, location: text });
+    
+    if (text.length > 0) {
+      // Filter cities based on input
+      const filtered = sampleCities.filter(city =>
+        city.toLowerCase().includes(text.toLowerCase())
+      ).slice(0, 5); // Show max 5 suggestions
+      
+      setLocationSuggestions(filtered);
+      setShowLocationSuggestions(true);
+    } else {
+      setShowLocationSuggestions(false);
+    }
+  };
+
+  const selectLocation = (location: string) => {
+    setLocationQuery(location);
+    setFormData({ ...formData, location });
+    setShowLocationSuggestions(false);
+  };
+
+  const getInitials = () => {
+    const firstName = formData.firstName || profile?.firstName || "";
+    const lastName = formData.lastName || profile?.lastName || "";
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+  };
+
+  const getFullName = () => {
+    return `${formData.firstName} ${formData.lastName}`.trim() || "User";
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Profile Photo Section */}
+        <View style={styles.profilePhotoSection}>
+          <View style={styles.profilePhotoContainer}>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.profilePhoto} />
+            ) : (
+              <View style={styles.profilePhoto}>
+                <Text style={styles.initialsText}>{getInitials()}</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.editPhotoButton} onPress={handleEditPhoto}>
+              <Text style={styles.editPhotoText}>Edit Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Form Section */}
+        <View style={styles.formSection}>
+          {/* Full Name */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Full Name</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                value={getFullName()}
+                onChangeText={(text) => {
+                  const names = text.split(" ");
+                  setFormData({
+                    ...formData,
+                    firstName: names[0] || "",
+                    lastName: names.slice(1).join(" ") || "",
+                  });
+                }}
+                placeholder="Enter your full name"
+              />
+            </View>
+          </View>
+
+          {/* Email Address */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email Address</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                value={formData.email}
+                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          {/* Password */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                value="••••••••••"
+                secureTextEntry={!showPassword}
+                placeholder="Enter your password"
+                editable={false}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons 
+                  name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                  size={20} 
+                  color="#666" 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Location */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Location</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="location-outline" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                value={locationQuery || formData.location}
+                onChangeText={handleLocationSearch}
+                placeholder="Enter your city"
+                placeholderTextColor="#999"
+                onFocus={() => {
+                  if (formData.location) {
+                    setLocationQuery(formData.location);
+                    handleLocationSearch(formData.location);
+                  }
+                }}
+              />
+            </View>
+            
+            {/* Location Suggestions Dropdown */}
+            {showLocationSuggestions && locationSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <FlatList
+                  data={locationSuggestions}
+                  keyExtractor={(item, index) => index.toString()}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={styles.suggestionItem}
+                      onPress={() => selectLocation(item)}
+                    >
+                      <Ionicons name="location-outline" size={16} color="#666" />
+                      <Text style={styles.suggestionText}>{item}</Text>
+                    </TouchableOpacity>
+                  )}
+                  style={styles.suggestionsList}
+                  nestedScrollEnabled={true}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Save Changes Button */}
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
+            <Text style={styles.saveButtonText}>Save Change</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Notification Section */}
+        <View style={styles.notificationSection}>
+          <Text style={styles.sectionTitle}>Notification</Text>
+          <View style={styles.notificationItem}>
+            <View style={styles.notificationLeft}>
+              <View style={styles.notificationIcon}>
+                <Ionicons name="notifications-outline" size={16} color="#4CAF50" />
+              </View>
+              <Text style={styles.notificationText}>Sign up Notification</Text>
+            </View>
+            <Switch
+              value={formData.notifications}
+              onValueChange={(value) => setFormData({ ...formData, notifications: value })}
+              trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        {/* Other Section */}
+        <View style={styles.otherSection}>
+          <Text style={styles.sectionTitle}>Other</Text>
+          
+          <TouchableOpacity style={styles.otherItem}>
+            <View style={styles.otherLeft}>
+              <View style={styles.otherIcon}>
+                <Ionicons name="call-outline" size={16} color="#666" />
+              </View>
+              <Text style={styles.otherText}>Contact Us</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#666" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.otherItem}>
+            <View style={styles.otherLeft}>
+              <View style={styles.otherIcon}>
+                <Ionicons name="shield-outline" size={16} color="#666" />
+              </View>
+              <Text style={styles.otherText}>Privacy Policy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#666" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.otherItem, styles.lastOtherItem]}>
+            <View style={styles.otherLeft}>
+              <View style={styles.otherIcon}>
+                <Ionicons name="settings-outline" size={16} color="#666" />
+              </View>
+              <Text style={styles.otherText}>Settings</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#666" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <BottomNavigation
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  scrollContainer: {
+    paddingBottom: 100,
+  },
+  profilePhotoSection: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 30,
+    marginBottom: 20,
+  },
+  profilePhotoContainer: {
+    position: "relative",
+  },
+  profilePhoto: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  initialsText: {
+    fontSize: 36,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  editPhotoButton: {
+    position: "absolute",
+    bottom: -10,
+    right: -10,
+    backgroundColor: "#8B4513",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  editPhotoText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  formSection: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F8F8",
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  saveButton: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 25,
+    paddingVertical: 15,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  notificationSection: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 15,
+  },
+  notificationItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  notificationLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  notificationIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#E8F5E8",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  notificationText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  otherSection: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 20,
+    borderRadius: 15,
+    padding: 20,
+  },
+  otherItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  lastOtherItem: {
+    borderBottomWidth: 0,
+  },
+  otherLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  otherIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#F8F8F8",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  otherText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  suggestionsContainer: {
+    position: "relative",
+    zIndex: 1000,
+  },
+  suggestionsList: {
+    maxHeight: 150,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    marginTop: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: "#333",
+    marginLeft: 10,
+  },
+});

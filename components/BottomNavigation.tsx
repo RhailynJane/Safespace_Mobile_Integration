@@ -1,6 +1,5 @@
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 
 interface Tab {
   id: string;
@@ -20,26 +19,23 @@ export default function BottomNavigation({
   onTabPress,
 }: BottomNavigationProps) {
   return (
-    <View style={styles.container}>
+    <View style={styles.bottomNav}>
       {tabs.map((tab) => (
         <TouchableOpacity
           key={tab.id}
-          style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+          style={styles.navItem}
           onPress={() => onTabPress(tab.id)}
         >
-          <Ionicons
-            name={tab.icon as any}
-            size={24}
-            color={activeTab === tab.id ? "#4CAF50" : "#757575"}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === tab.id && styles.activeTabText,
-            ]}
-          >
-            {tab.name}
-          </Text>
+          <View style={[
+            styles.navIconContainer,
+            activeTab === tab.id && styles.activeIconContainer
+          ]}>
+            <Ionicons
+              name={tab.icon as any}
+              size={24}
+              color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
+            />
+          </View>
         </TouchableOpacity>
       ))}
     </View>
@@ -47,30 +43,39 @@ export default function BottomNavigation({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  bottomNav: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    paddingVertical: 16,
     backgroundColor: "#FFFFFF",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 40,    // Add this
+    borderTopRightRadius: 40, 
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
   },
-  tab: {
+  navItem: {
     alignItems: "center",
     padding: 8,
   },
-  activeTab: {
-    borderTopWidth: 2,
-    borderTopColor: "#4CAF50",
+  navIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  tabText: {
-    fontSize: 12,
-    color: "#757575",
-    marginTop: 4,
-  },
-  activeTabText: {
-    color: "#4CAF50",
-    fontWeight: "500",
+  activeIconContainer: {
+    backgroundColor: '#B6D5CF61',
   },
 });

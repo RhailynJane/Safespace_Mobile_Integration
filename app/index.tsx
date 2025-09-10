@@ -74,7 +74,7 @@ export default function SplashScreen() {
           ]}
         >
           {/* SafeSpace logo component with 80px size */}
-          <SafeSpaceLogo size={80} />
+          <SafeSpaceLogo size={100} />
         </Animated.View>
 
         {/* 

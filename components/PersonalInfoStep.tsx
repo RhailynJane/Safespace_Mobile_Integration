@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
 
   // Main step title styling
   title: {
-    fontSize: 24,
+    fontSize: 17,
     fontWeight: "600",
     color: "#333",
     textAlign: "center",
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
 
   // Step progress indicator
   subtitle: {
-    fontSize: 16,
+    fontSize: 12,
     color: "#666", // Medium gray for secondary text
     textAlign: "center",
     marginBottom: 32, // Large margin before form content
@@ -250,6 +250,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#333",
     marginBottom: 8,
+
   },
 
   // Wrapper for input field with icon and background
@@ -274,9 +275,9 @@ const styles = StyleSheet.create({
 
   // Text input field styling
   input: {
-    flex: 1, // Take remaining space after icon
-    fontSize: 16,
-    color: "#333",
+    flex: 1, // Take remaining space after icons
+    fontSize: 12,
+    color: "#757575",
   },
 
   // Error message text styling
@@ -288,7 +289,7 @@ const styles = StyleSheet.create({
 
   // Primary continue button styling
   continueButton: {
-    backgroundColor: "#7FDBDA", // Teal brand color
+    backgroundColor: "#7BB8A8", // Teal brand color
     borderRadius: 25, // Highly rounded corners
     paddingVertical: 16, // Comfortable touch target
     alignItems: "center",

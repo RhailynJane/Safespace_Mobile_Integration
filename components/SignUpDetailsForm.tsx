@@ -400,9 +400,9 @@ const styles = StyleSheet.create({
 
   // Text input styling
   input: {
-    flex: 1, // Take remaining space
-    fontSize: 16,
-    color: "#333",
+    flex: 1, // Take remaining space after icons
+    fontSize: 12,
+    color: "#757575",
   },
 
   // Eye icon for password visibility toggle

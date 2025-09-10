@@ -10,6 +10,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Linking,
+  Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -17,11 +20,11 @@ import { useAuth } from "../../../context/AuthContext";
 import BottomNavigation from "../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
-export default function AppointmentsScreen() {
+export default function VideoScreen() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("appointments");
+  const [activeTab, setActiveTab] = useState("video");
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -138,6 +141,21 @@ export default function AppointmentsScreen() {
     },
   ];
 
+  const appointments = [
+    {
+      id: 1,
+      supportWorker: "Eric Young",
+      date: "October 07, 2025",
+      time: "10:30 AM",
+      type: "Video",
+      status: "Upcoming",
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+    },
+  ];
+
+  const handleJoinMeeting = () => {
+    router.push("/video-consultations/video-call");
+  };
   const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -160,19 +178,98 @@ export default function AppointmentsScreen() {
         <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
           <Ionicons name="menu" size={28} color="#4CAF50" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointments</Text>
+        <Text style={styles.headerTitle}>Video Consultation</Text>
         <TouchableOpacity onPress={() => router.push("/notifications")}>
           <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
         </TouchableOpacity>
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
-        <Text style={styles.title}>Appointments Coming Soon</Text>
-        <Text style={styles.subtitle}>
-          We're working on building a supportive Appointments space for you.
-        </Text>
-      </View>
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.content}>
+          <View style={styles.appointmentCard}>
+            <View style={styles.profileContainer}>
+              <Image
+                source={{ uri: appointments[0]?.avatar }}
+                style={styles.avatar}
+              />
+              <View style={styles.nameContainer}>
+                <Text style={styles.name}>
+                  {appointments[0]?.supportWorker ?? ""}
+                </Text>
+                <Text style={styles.date}>{appointments[0]?.date ?? ""}</Text>
+                <Text style={styles.time}>{appointments[0]?.time ?? ""}</Text>
+              </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  appointments[0]?.status === "Upcoming"
+                    ? styles.upcomingBadge
+                    : appointments[0]?.status === "Completed"
+                    ? styles.completedBadge
+                    : styles.canceledBadge,
+                ]}
+              >
+                <Text style={styles.statusText}>
+                  {appointments[0]?.status ?? ""}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <Text style={styles.sectionTitle}>Technical Requirements</Text>
+
+            <Text style={styles.subsectionTitle}>System Requirements</Text>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>
+                Stable internet connection (min 1 Mbps)
+              </Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>Speakers or headphones</Text>
+            </View>
+
+            <Text style={styles.subsectionTitle}>Privacy & Security</Text>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>
+                End to end encrypted video calls
+              </Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>
+                HIPAA/PIPEDA compliant platform
+              </Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>
+                No recordings without consent
+              </Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <View style={styles.bulletPoint} />
+              <Text style={styles.requirementText}>
+                Secure data transmission
+              </Text>
+            </View>
+
+            {appointments[0] && appointments[0].status === "Upcoming" && (
+              <TouchableOpacity
+                style={styles.joinButton}
+                onPress={handleJoinMeeting}
+              >
+                <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                <Text style={styles.joinButtonText}>Join Meeting</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </ScrollView>
 
       {/* Side Menu */}
       <Modal
@@ -215,11 +312,16 @@ export default function AppointmentsScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -308,5 +410,115 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  appointmentCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    width: width - 40,
+  },
+  name: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#212121",
+  },
+  date: {
+    fontSize: 13,
+    color: "#757575",
+  },
+  time: {
+    fontSize: 13,
+    color: "#757575",
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: "flex-end",
+    marginTop: 10,
+  },
+  upcomingBadge: {
+    backgroundColor: "#FFECB3",
+  },
+  completedBadge: {
+    backgroundColor: "#C8E6C9",
+  },
+  canceledBadge: {
+    backgroundColor: "#FFCDD2",
+  },
+  statusText: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  joinButton: {
+    flexDirection: "row",
+    backgroundColor: "#4CAF50",
+    padding: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 24,
+    gap: 8,
+  },
+  joinButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  profileContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  nameContainer: {
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+    marginVertical: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D32",
+    marginBottom: 16,
+  },
+  subsectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  requirementItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  bulletPoint: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#4CAF50",
+    marginTop: 8,
+    marginRight: 12,
+  },
+  requirementText: {
+    fontSize: 16,
+    color: "#424242",
+    flex: 1,
+    lineHeight: 24,
   },
 });
