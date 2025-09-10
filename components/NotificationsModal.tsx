@@ -3,11 +3,15 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  RefreshControl,
+  FlatList,
+  Modal,
+  Animated,
+  Dimensions,
+  Platform,
+  Pressable,
 } from "react-native";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader } from "../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 
 // Define the notification type
@@ -129,7 +133,18 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.container}>
-      <Text>Notifications</Text>
+      <AppHeader title="Notifications" showBack={true} />
+      
+      <View style={styles.headerActions}>
+        <Text style={styles.unreadText}>
+          {unreadCount} unread {unreadCount === 1 ? 'notification' : 'notifications'}
+        </Text>
+        {unreadCount > 0 && (
+          <TouchableOpacity onPress={markAllAsRead}>
+            <Text style={styles.markAllText}>Mark all as read</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -138,5 +153,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  headerActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  unreadText: {
+    fontSize: 14,
+    color: "#757575",
+  },
+  markAllText: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "500",
   },
 });
