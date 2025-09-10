@@ -724,14 +724,11 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 24,
     fontWeight: "300",
-    fontFamily: 'Epilogue-Regular',
     color: "#000000",
     marginBottom: 4,
   },
   subGreetingText: {
     fontSize: 15,
-    fontFamily: 'Epilogue-Regular',
-
     color: "#000000",
     opacity: 0.8,
   },
@@ -743,7 +740,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: "700",
-    fontFamily: 'Epilogue-Regular',
     color: "#212121",
     marginBottom: 16,
   },
@@ -778,7 +774,6 @@ const styles = StyleSheet.create({
   },
   helpButton: {
     backgroundColor: "#DF1D1D",
-    fontFamily: 'Epilogue-Regular',
     padding: 16,
     borderRadius: 30,
     alignItems: "center",
@@ -792,8 +787,6 @@ const styles = StyleSheet.create({
   helpButtonText: {
     fontSize: 16,
     color: "#FFFFFF",
-    fontFamily: 'Epilogue-Regular',
-
     fontWeight: "600",
     marginLeft: 8,
   },
@@ -1017,7 +1010,6 @@ const styles = StyleSheet.create({
   nameText: {
   fontWeight: "700", // Bold for the name
   color: "#4C4A53",
-  fontFamily: 'Epilogue-Regular',
 
 
 },

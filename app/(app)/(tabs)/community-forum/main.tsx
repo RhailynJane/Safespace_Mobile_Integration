@@ -633,7 +633,6 @@ const styles = StyleSheet.create({
     color: "#000",
     borderColor: '#FFF',
     fontWeight: "400",
-    fontFamily: "Epilogue",
     justifyContent: "center",
     lineHeight: 12,
     alignItems: "center",
@@ -680,7 +679,6 @@ const styles = StyleSheet.create({
   },
   postTitle: {
     fontSize: 12,
-    fontFamily: "Epilogue",
     fontWeight: "900",
     color: "#333",
     flex: 1,

@@ -10,6 +10,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
+import { AppHeader } from "../../../../../components/AppHeader";
+
 
 const CATEGORIES = [
   "Self Care",
@@ -81,13 +83,7 @@ export default function SelectCategoryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add New Post</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <AppHeader title="Add New Post" showBack={true} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Select post category</Text>
@@ -106,7 +102,7 @@ export default function SelectCategoryScreen() {
                 <Ionicons
                   name={getCategoryIcon(category)}
                   size={24}
-                  color={selectedCategory === category ? "#FFFFFF" : "#4CAF50"}
+                  color={selectedCategory === category ? "#FFFFFF" : "#000"}
                 />
               </View>
               <Text
@@ -155,15 +151,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
+    backgroundColor: "#D2D2F0D6",
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#2E7D32",
+    color: "#000",
   },
   content: {
     flexGrow: 1,

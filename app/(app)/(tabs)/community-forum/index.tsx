@@ -214,7 +214,7 @@ export default function CommunityScreen() {
               <Image source={{ uri: profileImage }} style={styles.profileImage} />
             ) : (
               <Text style={styles.initialsText}>{getInitials()}</Text>
-            )}
+            )} 
           </View>
         </TouchableOpacity>
         <View style={styles.headerIcons}>
@@ -382,7 +382,6 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 32,
     fontWeight: "700",
-    fontFamily: "Epilogue",
     color: "#000000",
     textAlign: "center",
     marginBottom: 5,
@@ -391,7 +390,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     textAlign: "center",
-    fontFamily: "Epilogue",
     fontWeight: "400",
     lineHeight: 24,
     marginTop: 20,
