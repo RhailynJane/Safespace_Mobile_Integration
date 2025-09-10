@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
@@ -16,6 +16,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -46,7 +47,9 @@ export default function HomeScreen() {
   const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);4
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -104,6 +107,25 @@ export default function HomeScreen() {
       onPress: () => router.push("/crisis-support"),
     },
   ];
+
+  const showSideMenu = () => {
+  setSideMenuVisible(true);
+  Animated.timing(fadeAnim, {
+    toValue: 1,
+    duration: 800, // 300ms fade in
+    useNativeDriver: true,
+  }).start();
+};
+
+const hideSideMenu = () => {
+  Animated.timing(fadeAnim, {
+    toValue: 0,
+    duration: 800, // 300ms fade out
+    useNativeDriver: true,
+  }).start(() => {
+    setSideMenuVisible(false);
+  });
+};
 
   const sideMenuItems = [
     {
@@ -444,7 +466,7 @@ const getInitials = () => {
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => setSideMenuVisible(true)}
+            onPress={showSideMenu}
           >
             <Ionicons name="grid-outline" size={24} color="#666" />
           </TouchableOpacity>
@@ -600,17 +622,17 @@ const getInitials = () => {
 
         {/* Side Menu */}
         <Modal
-          animationType="fade"
+          animationType="none" 
           transparent={true}
           visible={sideMenuVisible}
-          onRequestClose={() => setSideMenuVisible(false)}
+          onRequestClose={hideSideMenu}
         >
-          <View style={styles.modalContainer}>
+          <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
             <Pressable
-              style={styles.modalOverlay}
-              onPress={() => setSideMenuVisible(false)}
+              style={StyleSheet.absoluteFillObject}
+              onPress={hideSideMenu}
             />
-            <View style={styles.sideMenu}>
+            <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getGreetingName()}</Text>
                 <Text style={styles.profileEmail}>{user?.email}</Text>
@@ -620,19 +642,22 @@ const getInitials = () => {
                   <TouchableOpacity
                     key={index}
                     style={styles.sideMenuItem}
-                    onPress={item.onPress}
+                    onPress={() => {
+                      hideSideMenu(); // Use hideSideMenu instead
+                      item.onPress();
+                    }}
                   >
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color="#4CAF50"
+                      color="#757575"
                     />
                     <Text style={styles.sideMenuItemText}>{item.title}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
-          </View>
+            </Animated.View>
+          </Animated.View>
         </Modal>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -936,15 +961,30 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     flexDirection: "row",
+
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    width: '100%',  
+    height: '100%', 
+    
+    
+  },
+  // Remove modalContainer and modalOverlay, replace with:
+  fullScreenOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end', // This positions the sidebar on the right
   },
   sideMenu: {
+ 
+    paddingTop: 40,
     width: width * 0.75,
     backgroundColor: "#FFFFFF",
-    height: "100%",
+    height: "100%", // Full height
+    // Remove marginTop
   },
   sideMenuHeader: {
     padding: 20,
@@ -979,6 +1019,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
+    
   },
   sideMenuItemText: {
     fontSize: 16,
