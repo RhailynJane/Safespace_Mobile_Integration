@@ -235,7 +235,7 @@ export default function CommunityScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Image above main content*/}
+        {/* Add the image above the main content */}
         <View style={styles.imageContainer}>
           <Image 
             source={require('../../../../assets/images/community-forum.png')} 
@@ -314,7 +314,7 @@ export default function CommunityScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#D2D2F0",
+    backgroundColor: "#D2D2F0D6",
   },
   imageContainer: {
     alignItems: "center",
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 15,
-    backgroundColor: "#D2D2F0",
+    backgroundColor: "#D2D2F0D6",
   },
   profileImageContainer: {
     width: 40,
@@ -400,16 +400,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#7CB9A9",
     paddingVertical: 15,
     paddingHorizontal: 100,
-    borderColor: "#FFFF",
-    borderWidth: 2,
     borderRadius: 30,
+    borderColor: "#FFF",
+    borderWidth: 3,
     marginTop: 20,
     marginBottom: 100,
+    paddingBottom: 15,
   },
   startButtonText: {
+    fontFamily: "Epilogue",
     color: "black",
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   fullScreenOverlay: {
     flex: 1,
