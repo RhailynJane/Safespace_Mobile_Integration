@@ -229,9 +229,9 @@ const styles = StyleSheet.create({
 
   // Password text input field styling
   input: {
-    flex: 1, // Take remaining space between icons
-    fontSize: 16,
-    color: "#333",
+    flex: 1, // Take remaining space after icons
+    fontSize: 12,
+    color: "#757575",
   },
 
   // Eye icon for password visibility toggle

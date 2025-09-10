@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#333",
     textAlign: "center",
     marginBottom: 30,
@@ -300,12 +300,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   linkText: {
-    fontWeight: "600",
-    color: "#FF6B6B",
+    fontWeight: "400",
+    color: "#E43232",
+    textDecorationLine: 'underline',
   },
   errorText: {
-    color: "#FF4C4C",
-    fontWeight: "600",
+    color: "#E43232",
+    fontWeight: "400",
     fontSize: 14,
     marginTop: 10,
     textAlign: "center",

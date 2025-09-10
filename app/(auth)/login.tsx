@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   // Screen title styling
   title: {
     fontSize: 20,
-    fontWeight: "600", // Semi-bold weight
+    fontWeight: "700", 
     color: "#333", // Dark gray for good contrast
     textAlign: "center",
     marginBottom: 30, // Space before toggle
@@ -415,11 +415,11 @@ const styles = StyleSheet.create({
 
   // Input field labels
   inputLabel: {
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "400",
     color: "#333",
-    marginBottom: 8, // Small space before input
-    marginTop: 16, // Space above label (except first)
+    marginBottom: 20, // Small space before input
+    marginTop: 2, // Space above label (except first)
   },
 
   // INPUT FIELD STYLING
@@ -448,8 +448,8 @@ const styles = StyleSheet.create({
   // Text input field
   input: {
     flex: 1, // Take remaining space after icons
-    fontSize: 16,
-    color: "#333",
+    fontSize: 12,
+    color: "#",
   },
 
   // Password visibility toggle button
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     borderRadius: 25, // Fully rounded corners
     paddingVertical: 16, // Vertical padding for touch target
     alignItems: "center", // Center text horizontally
-    marginTop: 20, // Space above button
+    marginTop: 30, // Space above button
     marginBottom: 30, // Space below button
   },
 
@@ -521,8 +521,9 @@ const styles = StyleSheet.create({
 
   // Highlighted link text within footer and buttons
   linkText: {
-    fontWeight: "600",
-    color: "#FF6B6B", // Red accent color for links
+    fontWeight: "400",
+    color: "#E43232", // Red accent color for links
+    textDecorationLine: 'underline',
   },
 
   // Forgot password link spacing
@@ -533,7 +534,7 @@ const styles = StyleSheet.create({
   // ERROR MESSAGE STYLING
   // Error text for validation messages
   errorText: {
-    color: "#FF6B6B", // Red color for errors
+    color: "#E43232", // Red color for errors
     marginTop: 4, // Small space above error
     marginLeft: 8, // Align with input content
     fontSize: 13, // Slightly smaller than main text

@@ -250,6 +250,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#333",
     marginBottom: 8,
+
   },
 
   // Wrapper for input field with icon and background
@@ -274,9 +275,9 @@ const styles = StyleSheet.create({
 
   // Text input field styling
   input: {
-    flex: 1, // Take remaining space after icon
-    fontSize: 16,
-    color: "#333",
+    flex: 1, // Take remaining space after icons
+    fontSize: 12,
+    color: "#757575",
   },
 
   // Error message text styling
