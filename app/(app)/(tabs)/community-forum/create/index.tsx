@@ -87,6 +87,7 @@ export default function SelectCategoryScreen() {
       {/* Header with Community Post button */}
       <ScrollView contentContainerStyle={styles.content}> 
       <AppHeader 
+      title = " "
       showBack={true} 
       showMenu={false} 
       showNotifications={false}

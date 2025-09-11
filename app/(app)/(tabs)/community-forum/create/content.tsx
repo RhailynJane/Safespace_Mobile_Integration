@@ -67,10 +67,20 @@ export default function CreatePostScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-
-        <Text style={styles.headerTitle}>Add New Post</Text>
-        <View style={{ width: 24 }} />
+      <AppHeader 
+        title=""
+        showBack={true} 
+        showMenu={false} 
+        showNotifications={false}
+        rightActions={
+          <View style={styles.communityPostButton}>
+           <Text style={styles.communityPostButtonText}>Community Post</Text>
+          </View>
+      }
+      />
+      {/* Title Section */}
+      <View style={styles.titleSection}>
+        <Text style={styles.mainTitle}>Post Content</Text>
       </View>
 
       <ScrollView style={styles.content}>
@@ -108,8 +118,8 @@ export default function CreatePostScreen() {
         </View>
 
         <View style={styles.divider} />
-
-        {/* Privacy Settings */}
+        </View>
+                {/* Privacy Settings */}
         <View style={styles.privacyContainer}>
           <View style={styles.privacyRow}>
             <Text style={styles.privacyText}>Hide from Community?</Text>
@@ -124,9 +134,8 @@ export default function CreatePostScreen() {
             <Text style={styles.privacyNote}>This post will be private.</Text>
           )}
         </View>
-      </ScrollView>
 
-      {/* Action Buttons */}
+              {/* Action Buttons */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.draftButton}
@@ -146,6 +155,9 @@ export default function CreatePostScreen() {
           <Text style={styles.publishButtonText}>Continue</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
+
+
 
       {/* Bottom Navigation */}
       <BottomNavigation
@@ -243,6 +255,7 @@ const styles = StyleSheet.create({
   privacyContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
+    marginTop: 10,
     padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -258,7 +271,8 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     fontSize: 16,
-    color: "#212121",
+    color: "#000",
+    fontWeight: "700",
   },
   privacyNote: {
     fontSize: 14,
@@ -266,39 +280,60 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   footer: {
-    flexDirection: "row",
+    flexDirection: "column",
     padding: 20,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#FFFFFF",
     gap: 12,
+    marginBottom: 40,
   },
   draftButton: {
-    flex: 1,
+    backgroundColor: "#7CB9A9",
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor:"white",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    marginRight: 30,
+    marginLeft: 30,
+    shadowColor: "#999",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   draftButtonText: {
-    color: "#666",
+    color: "#000",
     fontSize: 16,
     fontWeight: "600",
   },
   publishButton: {
-    flex: 2,
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#7CB9A9",
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor:"white",
     alignItems: "center",
+    marginRight: 30,
+    marginLeft: 30,
+    shadowColor: "#999",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   publishButtonDisabled: {
-    backgroundColor: "#CCCCCC",
+    backgroundColor: "#B6D5CF",
   },
   publishButtonText: {
-    color: "#FFFFFF",
+    color: "#000",
     fontSize: 16,
     fontWeight: "600",
   },
