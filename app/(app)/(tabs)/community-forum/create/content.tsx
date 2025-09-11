@@ -11,7 +11,7 @@ import {
   TextInput,
   Switch,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+// import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { useAuth } from "../../../../../context/AuthContext";
@@ -66,22 +66,14 @@ export default function CreatePostScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
       {/* Header */}
-      <AppHeader 
-        showBack={true} 
-        showMenu={false} 
-        showNotifications={false}
-        rightActions={
-          <View style={styles.communityPostButton}>
-           <Text style={styles.communityPostButtonText}>Community Post</Text>
-          </View>
-      }
-      />
-      {/* Title Section */}
-      <View style={styles.titleSection}>
-        <Text style={styles.mainTitle}>Post Content</Text>
+      <View style={styles.header}>
+
+        <Text style={styles.headerTitle}>Add New Post</Text>
+        <View style={{ width: 24 }} />
       </View>
+
+      <ScrollView style={styles.content}>
         {/* User Profile Summary with Post Card Inside */}
         <View style={styles.profileCard}>
           <View style={styles.profileSection}>
@@ -99,7 +91,7 @@ export default function CreatePostScreen() {
               </View>
             </View>
           </View>
-``````
+
           {/* Post Content Card (inside user card) */}
           <View style={styles.postCard}>
             <TextInput
@@ -111,20 +103,6 @@ export default function CreatePostScreen() {
               textAlignVertical="top"
             />
 
-          {/* Icons and Character Count Row */}
-          <View style={styles.postActions}>
-            <View style={styles.actionIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="mic-outline" size={20} color="#666" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="camera-outline" size={20} color="#666" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="images-outline" size={20} color="#666" />
-              </TouchableOpacity>
-            </View>
-            
             <Text style={styles.charCount}>{postContent.length}/300</Text>
           </View>
         </View>
@@ -145,7 +123,6 @@ export default function CreatePostScreen() {
           {isPrivate && (
             <Text style={styles.privacyNote}>This post will be private.</Text>
           )}
-        </View>
         </View>
       </ScrollView>
 
@@ -184,51 +161,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
-  headerContainer: {
-  backgroundColor: "#F8F9FA",
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
   },
-  communityPostButton: {
-  backgroundColor: "#EDE7EC",
-  paddingHorizontal: 40,
-  paddingVertical: 8,
-  borderRadius: 20,
-  borderWidth: 0.5,
-  borderColor: "#000",
-  },
-  communityPostButtonText: {
-    color: "#000",
-    fontSize: 11,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: "600",
-  },
-  titleSection: {
-    paddingHorizontal: 15,
-    backgroundColor: "#F2F2F7",
-  },
-  mainTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: "#000",
-    textAlign: "left",
+    color: "#2E7D32",
   },
   content: {
     flex: 1,
     padding: 16,
-    backgroundColor: "#F2F2F7",
-
   },
   profileCard: {
-    backgroundColor: "#EDE7EC",
+    backgroundColor: "#d7e0e9",
     borderRadius: 12,
     padding: 16,
-    marginTop: 20,
-    shadowColor: "#999",
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.75,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 3,
+    elevation: 2,
   },
   profileSection: {
     marginBottom: 16,
@@ -276,28 +235,20 @@ const styles = StyleSheet.create({
     textAlign: "right",
     marginTop: 8,
   },
-  postActions: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginTop: 8,
-  },
-  actionIcons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  iconButton: {
-    padding: 4,
-  },
   divider: {
     height: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "#F8F8F8",
     marginVertical: 16,
   },
   privacyContainer: {
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   privacyRow: {
     flexDirection: "row",
@@ -317,9 +268,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     padding: 20,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: "#F2F2F7",
+    borderTopColor: "#FFFFFF",
     gap: 12,
   },
   draftButton: {
