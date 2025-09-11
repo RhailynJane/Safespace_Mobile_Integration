@@ -328,7 +328,7 @@ export default function CommunityMainScreen() {
           style={styles.addPostButton}
           onPress={() => router.push("/community-forum/create")}
         >
-          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Ionicons name="add" size={10} color="#FFFFFF" />
           <Text style={styles.addPostButtonText}>Add Post</Text>
         </TouchableOpacity>
           <Text style={styles.browseBySectionTitle}>Browse By</Text>
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F2F7",
   },
   headerContainer: {
-    backgroundColor: "#7BB8A8",
+    backgroundColor: "#BAD6D2",
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
     shadowColor: "grey",
@@ -498,21 +498,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
+    paddingTop: 20,
+    paddingBottom: 25,
   },
   profileImageContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 30,
     backgroundColor: "#E8F5E9",
     justifyContent: "center",
     alignItems: "center",
   },
   profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 30,
   },
   initialsText: {
     fontSize: 16,
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
     },
   addPostButton: {
     backgroundColor: "#2EA78F",
-    height:40,
+    height:35,
     paddingHorizontal: 30,
     paddingVertical: 10,
     borderRadius: 25,
@@ -595,6 +595,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginLeft: 8,
+    paddingVertical:1,
   },
   categoriesSection: {
     paddingHorizontal: 16,

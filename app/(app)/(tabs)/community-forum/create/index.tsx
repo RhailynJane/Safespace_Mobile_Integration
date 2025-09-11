@@ -6,11 +6,13 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { AppHeader } from "../../../../../components/AppHeader";
+import Svg, { Path } from 'react-native-svg';
 
 const CATEGORIES = [
   "Self Care",
@@ -27,23 +29,23 @@ const CATEGORIES = [
 const getCategoryIcon = (category: string) => {
   switch (category) {
     case "Self Care":
-      return "heart-outline";
+      return require('../../../../../assets/images/self-care.png');
     case "Mindfulness":
-      return "leaf-outline";
+      return require('../../../../../assets/images/mindfulness.png');
     case "Stories":
-      return "book-outline";
+      return require('../../../../../assets/images/stories.png');
     case "Support":
-      return "people-outline";
+      return require('../../../../../assets/images/support.png');
     case "Creative":
-      return "color-palette-outline";
+      return require('../../../../../assets/images/creative.png');
     case "Therapy":
-      return "medical-outline";
+      return require('../../../../../assets/images/therapy.png');
     case "Stress":
-      return "flash-outline";
+      return require('../../../../../assets/images/stressed.png');
     case "Affirmation":
-      return "chatbubble-ellipses-outline";
+      return require('../../../../../assets/images/affirmation.png');
     case "Awareness":
-      return "eye-outline";
+      return require('../../../../../assets/images/awareness.png');
     default:
       return "help-outline";
   }
@@ -79,40 +81,54 @@ export default function SelectCategoryScreen() {
     }
   };
 
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <AppHeader title="Add New Post" showBack={true} />
-
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Select post category</Text>
+      {/* Header with Community Post button */}
+      <ScrollView contentContainerStyle={styles.content}> 
+      <AppHeader 
+      showBack={true} 
+      showMenu={false} 
+      showNotifications={false}
+      rightActions={
+      <View style={styles.communityPostButton}>
+      <Text style={styles.communityPostButtonText}>Community Post</Text>
+      </View>
+      }
+      />     
+      {/* Title Section */}
+      <View style={styles.titleSection}>
+        <Text style={styles.mainTitle}>Add New Post</Text>
+      </View>
+        <Text style={styles.subtitle}>Select post category</Text>
 
         <View style={styles.categoriesContainer}>
           {CATEGORIES.map((category) => (
-            <TouchableOpacity
-              key={category}
-              style={[
-                styles.categoryCard,
-                selectedCategory === category && styles.categoryCardActive,
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <View style={styles.categoryIcon}>
-                <Ionicons
-                  name={getCategoryIcon(category)}
-                  size={24}
-                  color={selectedCategory === category ? "#FFFFFF" : "#4CAF50"}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === category && styles.categoryTextActive,
-                ]}
-              >
-                {category}
-              </Text>
-            </TouchableOpacity>
+      <TouchableOpacity
+        key={category}
+        style={[
+          styles.categoryCard,
+          selectedCategory === category && styles.categoryCardActive,
+        ]}
+        onPress={() => setSelectedCategory(category)}
+      >
+        <View style={styles.categoryIcon}>
+          <Image
+            source={getCategoryIcon(category)}
+            style={styles.iconImage}
+            resizeMode="contain"
+          />
+        </View>
+        
+        <Text
+          style={[
+            styles.categoryText,
+            selectedCategory === category && styles.categoryTextActive,
+          ]}
+        >
+          {category}
+        </Text>
+      </TouchableOpacity>
           ))}
         </View>
 
@@ -146,24 +162,55 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
+   communityPostButton: {
+    backgroundColor: "#EDE7EC",
+    paddingHorizontal: 40,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: "#000",
+  },
+  communityPostButtonText: {
+    color: "#000",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  titleSection: {
+    paddingHorizontal: 15,
+    backgroundColor: "#F2F2F7",
+  },
+  mainTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#000",
+    textAlign: "left",
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    paddingHorizontal: 9,
+    paddingTop: 10,
+    paddingBottom: 15,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "800",
+    fontWeight: "500",
     color: "#000",
   },
   content: {
     flexGrow: 1,
-    padding: 20,
+    backgroundColor: "#F2F2F7",
+    padding: 10,
   },
+  subtitle: {
+  fontSize: 16,
+  fontWeight: "300",
+  color: "#212121",
+  marginBottom: 24,
+  textAlign: "left",
+  paddingHorizontal: 20,
+},
   title: {
     fontSize: 16,
     fontWeight: "600",
@@ -178,30 +225,48 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 15,
   },
+  iconImage: {
+  width: 87,
+  height: 87,
+  marginBottom: 8,
+  },
   categoryCard: {
     width: 100,
     height: 150,
-    backgroundColor: "#d7e0e9",
+    backgroundColor: "#EDE7EC",
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    borderWidth: 0.5,
+    borderColor: "#000",
+    shadowColor: "#999",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  categoryCardActive: {
+    width: 100,
+    height: 150,
+    backgroundColor: "#EDE7EC",
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     padding: 12,
     borderWidth: 2,
-    borderColor: "#E0E0E0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderColor: "#D36500",
+    shadowColor: "#999",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
     elevation: 3,
-  },
-  categoryCardActive: {
-    backgroundColor: "#4CAF50",
-    borderColor: "#4CAF50",
-    shadowColor: "#4CAF50",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 6,
   },
   categoryIcon: {
     marginBottom: 8,
@@ -213,30 +278,41 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   categoryTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "600",
+    color: "#666",
+    fontWeight: "500",
   },
   footer: {
     padding: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F2F2F7",
     borderTopWidth: 1,
-    borderTopColor: "#FFFFFF",
+    borderTopColor: "#F2F2F7",
   },
   continueButton: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#7CB9A9",
     paddingVertical: 16,
     borderRadius: 20,
+    borderWidth: 2,
+    borderColor:"white",
     alignItems: "center",
     marginRight: 30,
     marginLeft: 30,
+    marginBottom: 50,
+    shadowColor: "#999",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   continueButtonDisabled: {
-    backgroundColor: "#CCCCCC",
+    backgroundColor: "#B6D5CF",
   },
   continueButtonText: {
-    color: "#FFFFFF",
+    color: "#000",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "800",
   },
 });
 

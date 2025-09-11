@@ -424,19 +424,19 @@ const getInitials = () => {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
 };
 
-  const getGreetingName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    return "User";
-  };
+const getGreetingName = () => {
+  if (profile?.firstName) return profile.firstName;
+  if (user?.displayName) return user.displayName.split(" ")[0];
+  return "User";
+};
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
+if (loading) {
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#4CAF50" />
+    </View>
+  );
+}
 
   
 
@@ -446,8 +446,8 @@ const getInitials = () => {
       style={styles.container}
     >
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-{/* Header */}
+
+      {/* Header */}
       <View style={styles.header}>
        <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
       <View style={styles.profileImageContainer}>
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 5,
-    backgroundColor: "#7BB8A8",
+    backgroundColor: "#BAD6D2",
   },
   profileImageContainer: {
     width: 40,
@@ -710,14 +710,14 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   greetingSection: {
-    backgroundColor: "#7BB8A8",
+    backgroundColor: "#BAD6D2",
     marginHorizontal: 0,
     paddingVertical: 20,
     paddingHorizontal: 32,
-    borderTopLeftRadius: 0,      // Sharp top left corner
-    borderTopRightRadius: 0,     // Sharp top right corner
-    borderBottomLeftRadius: 50,  // Rounded bottom left
-    borderBottomRightRadius: 50, // Rounded bottom right
+    borderTopLeftRadius: 0,     
+    borderTopRightRadius: 0,     
+    borderBottomLeftRadius: 50,  
+    borderBottomRightRadius: 50, 
     marginBottom: 20,
   },
 
@@ -773,7 +773,7 @@ const styles = StyleSheet.create({
   color: "#4CAF50",
   },
   helpButton: {
-    backgroundColor: "#DF1D1D",
+    backgroundColor: "#E4585A",
     padding: 16,
     borderRadius: 30,
     alignItems: "center",

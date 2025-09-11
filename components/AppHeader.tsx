@@ -14,15 +14,45 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Path } from 'react-native-svg'; // Add this import
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
+// Custom Back Arrow Component
+const CustomBackArrow = ({ 
+  width = 24, 
+  height = 24, 
+  fill = "#000", 
+  stroke = "#000", 
+  strokeWidth = 2,
+  ...props 
+}) => (
+  <Svg 
+    width={width} 
+    height={height} 
+    viewBox="0 0 24 24" 
+    fill="none"
+    {...props}
+  >
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M22 20.418C19.5533 17.4313 17.3807 15.7367 15.482 15.334C13.5833 14.9313 11.7757 14.8705 10.059 15.1515V20.5L2 11.7725L10.059 3.5V8.5835C13.2333 8.6085 15.932 9.74733 18.155 12C20.3777 14.2527 21.6593 17.0587 22 20.418Z"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 export interface AppHeaderProps {
   title?: string;
   showBack?: boolean;
   showMenu?: boolean;
+  showNotifications?: boolean;
   rightActions?: React.ReactNode;
   onMenuPress?: () => void;
 }
@@ -31,6 +61,9 @@ export const AppHeader = ({
   title,
   showBack = false,
   showMenu = true,
+  showNotifications = true,
+  rightActions,
+
 }: AppHeaderProps) => {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -194,10 +227,11 @@ export const AppHeader = ({
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Ionicons
-              name="chevron-back"
-              size={24}
-              color="#666"
+            <CustomBackArrow
+              width={24}
+              height={24}
+              fill="#000"
+              stroke="#000"
             />
           </TouchableOpacity>
         ) : (
@@ -215,9 +249,11 @@ export const AppHeader = ({
         {title && <Text style={styles.headerTitle}>{title}</Text>}
 
         <View style={styles.headerIcons}>
+          {rightActions}
+            {showNotifications && (
           <TouchableOpacity onPress={() => router.push("/notifications")}>
             <Ionicons name="notifications-outline" size={24} color="#666" />
-          </TouchableOpacity>
+          </TouchableOpacity> )}
           {showMenu && (
             <TouchableOpacity 
               style={styles.menuButton}
@@ -274,7 +310,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 9,
     paddingTop: 10,
     paddingBottom: 15,
     
@@ -283,7 +319,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#E8F5E9",
     justifyContent: "center",
     alignItems: "center",
   },
