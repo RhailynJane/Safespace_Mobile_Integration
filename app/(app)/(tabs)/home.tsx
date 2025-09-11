@@ -22,6 +22,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
 import { BorderRadius } from "../../../constants/theme";
+import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
 
@@ -101,7 +102,6 @@ export default function HomeScreen() {
       icon: "help-buoy-outline",
       image: require("../../../assets/images/crisis-support.png"), 
       color: "#EDE7EC",
-      borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),
     },
   ];
@@ -445,8 +445,11 @@ if (loading) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
+      <LinearGradient
+      colors={['#Ffff', '#FBD7C5', '#FFD89A', '#EFC380', '#F6AF77']}
+      style={styles.container}
+      >
       <SafeAreaView style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
        <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
@@ -460,13 +463,13 @@ if (loading) {
     </TouchableOpacity>
         <View style={styles.headerIcons}>
           <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#666" />
+            <Ionicons name="notifications-outline" size={24} color="#4e2800ff" />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.menuButton}
             onPress={showSideMenu}
           >
-            <Ionicons name="grid" size={24} color="#666" />
+            <Ionicons name="grid" size={24} color="#4e2800ff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -518,7 +521,12 @@ if (loading) {
                     {action.image ? (
                       <Image 
                         source={action.image} 
-                        style={styles.actionImage}
+                        style={[
+                          styles.actionImage,
+                          action.id === "mood" && styles.trackMoodImage,
+                          action.id === "crisis" && styles.crisisSupportImage
+
+                        ]}
                         resizeMode="contain"
                       />
                     ) : (
@@ -597,6 +605,7 @@ if (loading) {
             )}
           </View>
         </ScrollView>
+        
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
@@ -661,7 +670,10 @@ if (loading) {
             </Animated.View>
           </Animated.View>
         </Modal>
+                
       </SafeAreaView>
+          </LinearGradient>
+
     </KeyboardAvoidingView>
   );
 }
@@ -673,7 +685,6 @@ const styles = StyleSheet.create({
   
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
   },
   loadingContainer: {
     flex: 1,
@@ -687,7 +698,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 5,
-    backgroundColor: "#BAD6D2",
+    backgroundColor: "#FCF4EE",
   },
   profileImageContainer: {
     width: 40,
@@ -710,7 +721,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   greetingSection: {
-    backgroundColor: "#BAD6D2",
+    backgroundColor: "#FCF4EE",
     marginHorizontal: 0,
     paddingVertical: 20,
     paddingHorizontal: 32,
@@ -724,12 +735,12 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 24,
     fontWeight: "300",
-    color: "#000000",
+    color: "#4e2800ff",
     marginBottom: 4,
   },
   subGreetingText: {
     fontSize: 15,
-    color: "#000000",
+    color: "#4e2800ff",
     opacity: 0.8,
   },
   section: {
@@ -740,8 +751,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#212121",
-    marginBottom: 16,
+    color: "#4e2800ff",
+    marginBottom: 20,
   },
     sectionHeader: {
     flexDirection: "row",
@@ -818,7 +829,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 60,
     height: 60,
-    borderRadius: 30,
+    borderRadius: 100,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
@@ -829,10 +840,17 @@ const styles = StyleSheet.create({
     height: 120,
     // tintColor: "white", 
   },
+  trackMoodImage: {
+  width: 130, 
+  height: 140, 
+  },
+  crisisSupportImage: {
+  opacity: 0.6,
+  },
   actionTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#212121",
+    color: "#4e2800ff",
     textAlign: "center",
     marginTop: 8,
   },
@@ -873,7 +891,7 @@ const styles = StyleSheet.create({
   },
   moodText: {
     fontSize: 16,
-    color: "#212121",
+    color: "#4e2800ff",
     fontWeight: "500",
   },
   noDataContainer: {
@@ -892,7 +910,7 @@ const styles = StyleSheet.create({
   },
   noDataText: {
     fontSize: 16,
-    color: "#424242",
+    color: "#4e2800ff",
     fontWeight: "500",
     marginBottom: 4,
   },
@@ -909,7 +927,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: "#000",
+    shadowColor: "#4e2800ff",
     shadowOffset: {
       width: 2,
       height: 2,
@@ -924,7 +942,7 @@ const styles = StyleSheet.create({
   resourceTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#212121",
+    color: "#4e2800ff",
     marginBottom: 4,
   },
   resourceDuration: {
@@ -1004,12 +1022,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    color: "#4e2800ff",
     marginBottom: 4,
   },
   nameText: {
   fontWeight: "700", // Bold for the name
-  color: "#4C4A53",
+  color: "#4e2800ff",
 
 
 },

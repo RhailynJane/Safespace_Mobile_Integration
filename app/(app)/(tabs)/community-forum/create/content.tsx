@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   draftButton: {
-    backgroundColor: "#7CB9A9",
+    backgroundColor: "#B6D5CF",
     paddingVertical: 16,
     borderRadius: 20,
     borderWidth: 2,

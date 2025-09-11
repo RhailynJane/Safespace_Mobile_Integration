@@ -345,8 +345,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1, // Allow growth beyond screen height
     paddingHorizontal: 24, // Side padding for content
-    paddingVertical: 15, // Top/bottom padding
-    justifyContent: "center", // Center content vertically when possible
+    paddingVertical: 2, // Top/bottom padding
   },
 
   // BRANDING SECTION
