@@ -58,9 +58,9 @@ export default function PostSuccessScreen() {
       <View style={styles.content}>
         {/* Success Card */}
         <View style={styles.successCard}>
-          <View style={styles.successIcon}>
+          <View style={styles.successImageBorder}>
             <Image
-              source={{ uri: "https://cdn-icons-png.flaticon.com/512/190/190411.png" }}
+              source={require('../../../../../assets/images/success.png')}
               style={styles.successImage}
             />
           </View>
@@ -128,6 +128,8 @@ const styles = StyleSheet.create({
   },
   successCard: {
     backgroundColor: "#FFFFFF",
+    borderColor: "#000",
+    borderWidth: 0.5,
     borderRadius: 20,
     padding: 30,
     alignItems: "center",
@@ -140,15 +142,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-    borderWidth: 2,
-    borderColor: "#F0F0F0",
   },
   successIcon: {
     marginBottom: 20,
   },
   successImage: {
-    width: 80,
-    height: 80,
+    width:250,
+    height: 250,
+    borderWidth: 1,
+    borderRadius: 30,
+    borderColor: '#B87B7B',
+  },
+  successImageBorder:{
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 10,
+    borderRadius: 5,
+    borderColor: '#B87B7B',
   },
   title: {
     fontSize: 24,

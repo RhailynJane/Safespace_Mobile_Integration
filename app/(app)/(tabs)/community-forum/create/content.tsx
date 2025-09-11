@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,13 +16,32 @@ import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { useAuth } from "../../../../../context/AuthContext";
 import { AppHeader } from "../../../../../components/AppHeader";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function CreatePostScreen() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
   const [postContent, setPostContent] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const { user, profile, logout } = useAuth();
+
+  // Load profile image when component mounts
+  useEffect(() => {
+    loadProfileImage();
+  }, []);
+
+  const loadProfileImage = async () => {
+    try {
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log('Error loading profile image:', error);
+    }
+  };
 
   const handleSaveDraft = () => {
     setIsDraft(true);
@@ -64,6 +83,16 @@ export default function CreatePostScreen() {
     return "User";
   };
 
+  const getInitials = () => {
+    const firstName = profile?.firstName || "";
+    const lastName = profile?.lastName || "";
+    if (firstName && lastName) {
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    }
+    const displayName = getDisplayName() ?? "";
+    return displayName.charAt(0).toUpperCase();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
@@ -88,12 +117,16 @@ export default function CreatePostScreen() {
           <View style={styles.profileSection}>
             <View style={styles.profileContainer}>
               <View style={styles.profileImageContainer}>
-                <Image
-                  source={{
-                    uri: "https://randomuser.me/api/portraits/women/17.jpg",
-                  }}
-                  style={styles.profileImage}
-                />
+                {profileImage ? (
+                  <Image
+                    source={{ uri: profileImage }}
+                    style={styles.profileImage}
+                  />
+                ) : (
+                  <View style={styles.profileImageFallback}>
+                    <Text style={styles.initialsText}>{getInitials()}</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.profileTextContainer}>
                 <Text style={styles.userName}>{getDisplayName()}</Text>
@@ -170,8 +203,6 @@ export default function CreatePostScreen() {
       </View>
       </ScrollView>
 
-
-
       {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
@@ -181,6 +212,7 @@ export default function CreatePostScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -252,6 +284,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+  },
+  profileImageFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  initialsText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#FFFFFF",
   },
   profileTextContainer: {
     justifyContent: "center",
