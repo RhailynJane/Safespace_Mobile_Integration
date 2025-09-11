@@ -11,7 +11,7 @@ import {
   TextInput,
   Switch,
 } from "react-native";
-// import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { useAuth } from "../../../../../context/AuthContext";
@@ -66,6 +66,7 @@ export default function CreatePostScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.content}>
       {/* Header */}
       <AppHeader 
         title=""
@@ -82,8 +83,6 @@ export default function CreatePostScreen() {
       <View style={styles.titleSection}>
         <Text style={styles.mainTitle}>Post Content</Text>
       </View>
-
-      <ScrollView style={styles.content}>
         {/* User Profile Summary with Post Card Inside */}
         <View style={styles.profileCard}>
           <View style={styles.profileSection}>
@@ -101,7 +100,7 @@ export default function CreatePostScreen() {
               </View>
             </View>
           </View>
-
+``````
           {/* Post Content Card (inside user card) */}
           <View style={styles.postCard}>
             <TextInput
@@ -113,6 +112,20 @@ export default function CreatePostScreen() {
               textAlignVertical="top"
             />
 
+          {/* Icons and Character Count Row */}
+          <View style={styles.postActions}>
+            <View style={styles.actionIcons}>
+              <TouchableOpacity style={styles.iconButton}>
+                <Ionicons name="mic-outline" size={20} color="#666" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton}>
+                <Ionicons name="camera-outline" size={20} color="#666" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton}>
+                <Ionicons name="images-outline" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
             <Text style={styles.charCount}>{postContent.length}/300</Text>
           </View>
         </View>
@@ -173,33 +186,51 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+  headerContainer: {
+  backgroundColor: "#F8F9FA",
   },
-  headerTitle: {
-    fontSize: 20,
+  communityPostButton: {
+  backgroundColor: "#EDE7EC",
+  paddingHorizontal: 40,
+  paddingVertical: 8,
+  borderRadius: 20,
+  borderWidth: 0.5,
+  borderColor: "#000",
+  },
+  communityPostButtonText: {
+    color: "#000",
+    fontSize: 11,
     fontWeight: "600",
-    color: "#2E7D32",
+  },
+  titleSection: {
+    paddingHorizontal: 15,
+    backgroundColor: "#F2F2F7",
+  },
+  mainTitle: {
+    fontSize: 19,
+    fontWeight: "800",
+    color: "#000",
+    textAlign: "left",
   },
   content: {
     flex: 1,
     padding: 16,
+    backgroundColor: "#F2F2F7",
+
   },
   profileCard: {
-    backgroundColor: "#d7e0e9",
+    backgroundColor: "#EDE7EC",
     borderRadius: 12,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    marginTop: 20,
+    shadowColor: "#999",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 3,
   },
   profileSection: {
     marginBottom: 16,
@@ -247,21 +278,29 @@ const styles = StyleSheet.create({
     textAlign: "right",
     marginTop: 8,
   },
+  postActions: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginTop: 8,
+  },
+  actionIcons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  iconButton: {
+    padding: 4,
+  },
   divider: {
     height: 1,
-    backgroundColor: "#F8F8F8",
+    backgroundColor: "#F2F2F7",
     marginVertical: 16,
   },
   privacyContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F2F2F7",
     borderRadius: 12,
     marginTop: 10,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   privacyRow: {
     flexDirection: "row",
@@ -282,9 +321,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "column",
     padding: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F2F2F7",
     borderTopWidth: 1,
-    borderTopColor: "#FFFFFF",
+    borderTopColor: "#F2F2F7",
     gap: 12,
     marginBottom: 40,
   },
