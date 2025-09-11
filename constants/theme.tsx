@@ -2,7 +2,7 @@
 
 export const Colors = {
   // Primary Colors
-  primary: '#BAD6D2',      // Teal/mint green
+  primary: '#B2BE9C',      // green
   secondary: '#F7A399',    // Coral/peach
   
   // Background Colors

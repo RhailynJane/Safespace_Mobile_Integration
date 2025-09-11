@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import { useAuth } from "../../../../context/AuthContext";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { LinearGradient } from "expo-linear-gradient";
+import { AppHeader } from "../../../../components/AppHeader"
 
 const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
@@ -183,16 +184,7 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
-
+            <AppHeader title="Messages" showBack={true} />
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons

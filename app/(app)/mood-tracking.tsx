@@ -18,6 +18,7 @@ import { Colors, Spacing, Typography } from "../../constants/theme";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import BottomNavigation from "../../components/BottomNavigation";
+import { AppHeader } from "../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -369,21 +370,7 @@ const MoodTrackingScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mood Tracker</Text>
-        <TouchableOpacity
-          onPress={() => setSideMenuVisible(true)}
-          style={styles.menuButton}
-        >
-          <Ionicons name="menu-outline" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
+      <AppHeader title="Mood Tracker" showBack={true} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Mood selection */}

@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28, // Makes it perfectly circular
-    backgroundColor: "#7CB9A9", // Teal background
+    backgroundColor: "#B2BE9C", // Teal background
     justifyContent: "center",
     alignItems: "center",
     alignSelf: "center", // Center horizontally

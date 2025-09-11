@@ -75,7 +75,7 @@ export default function HomeScreen() {
       icon: "happy-outline",
       image: require("../../../assets/images/track-mood.png"), 
       color: "#EDE7EC",
-      borderColor: "#bab5b9ff",
+      borderColor: "#EDE7EC",
       onPress: () => router.push("/mood-tracking"),
     },
     {
@@ -84,7 +84,7 @@ export default function HomeScreen() {
       icon: "journal-outline",
       image: require("../../../assets/images/journal.png"), 
       color: "#EDE7EC",
-      borderColor: "#bab5b9ff",
+      borderColor: "#EDE7EC",
       onPress: () => router.push("/journaling"),
     },
     {
@@ -93,7 +93,7 @@ export default function HomeScreen() {
       icon: "library-outline",
       image: require("../../../assets/images/resources.png"), 
       color: "#EDE7EC",
-      borderColor: "#bab5b9ff",
+      borderColor: "#EDE7EC",
       onPress: () => router.push("/resources"),
     },
     {
@@ -102,6 +102,8 @@ export default function HomeScreen() {
       icon: "help-buoy-outline",
       image: require("../../../assets/images/crisis-support.png"), 
       color: "#EDE7EC",
+      borderColor: "#EDE7EC",
+
       onPress: () => router.push("/crisis-support"),
     },
   ];
@@ -875,7 +877,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
+    borderBottomColor: "#fafafaff",
   },
   moodEmoji: {
     fontSize: 28,

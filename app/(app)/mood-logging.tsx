@@ -18,6 +18,7 @@ import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 import { MoodService } from "../../lib/supabase";
+import { AppHeader } from "../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -224,15 +225,8 @@ export default function MoodLoggingScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Log Mood</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
+      <AppHeader title="Mood Tracking" showBack={true} />
+
 
       {/* Main Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
