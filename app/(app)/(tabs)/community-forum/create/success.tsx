@@ -19,10 +19,6 @@ export default function PostSuccessScreen() {
     router.replace("/(app)/(tabs)/community-forum/main");
   };
 
-  const handleCreateAnother = () => {
-    router.replace("/community-forum/create");
-  };
-
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -82,15 +78,6 @@ export default function PostSuccessScreen() {
         </View>
       </View>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={handleCreateAnother}
-        >
-          <Text style={styles.secondaryButtonText}>Create another post</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
@@ -122,7 +109,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     backgroundColor: "#F2F2F7",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    marginTop: 30,
     alignItems: "center",
     padding: 20,
   },
@@ -131,8 +119,8 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     borderWidth: 0.5,
     borderRadius: 20,
+    height:418,
     padding: 30,
-    alignItems: "center",
     marginHorizontal: 20,
     shadowColor: "#000",
     shadowOffset: {
@@ -152,6 +140,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 30,
     borderColor: '#B87B7B',
+    marginTop: -18,
   },
   successImageBorder:{
     shadowColor: "#000",
@@ -166,38 +155,44 @@ const styles = StyleSheet.create({
     borderColor: '#B87B7B',
   },
   title: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "800",
     color: "#212121",
     marginBottom: 16,
-    textAlign: "center",
+    marginTop: 20,
+    textAlign: "left",
   },
   message: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 30,
+    textAlign: "left",
+    lineHeight: 12,
+    marginBottom: 10,
+    marginTop: -5,
   },
   cardButton: {
     backgroundColor: "#7CB9A9",
-    paddingVertical: 14,
-    paddingHorizontal: 40,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 25,
+    borderWidth: 2,
+    borderColor: "white",
     alignItems: "center",
+    marginRight: 30,
+    marginLeft: 30,
     shadowColor: "#999",
     shadowOffset: {
       width: 2,
       height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
     elevation: 3,
   },
   cardButtonText: {
     color: "#000",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 15,
+    fontWeight: "800",
   },
   footer: {
     flexDirection: "column",
