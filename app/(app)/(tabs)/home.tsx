@@ -700,7 +700,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 5,
-    backgroundColor: "#FCF4EE",
+    backgroundColor: "#BAD6D2",
   },
   profileImageContainer: {
     width: 40,
@@ -723,7 +723,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   greetingSection: {
-    backgroundColor: "#FCF4EE",
+    backgroundColor: "#BAD6D2",
     marginHorizontal: 0,
     paddingVertical: 20,
     paddingHorizontal: 32,
