@@ -133,7 +133,6 @@ export default function CreatePostScreen() {
               </View>
             </View>
           </View>
-``````
           {/* Post Content Card (inside user card) */}
           <View style={styles.postCard}>
             <TextInput

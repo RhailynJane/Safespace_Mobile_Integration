@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useAuth } from "../../../../context/AuthContext";
 import { AppHeader } from "../../../../components/AppHeader";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 export default function BookAppointment() {
   const { user, profile, logout } = useAuth();
@@ -176,9 +177,9 @@ export default function BookAppointment() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      </CurvedBackground>
     );
   }
 
@@ -196,132 +197,140 @@ export default function BookAppointment() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <AppHeader title="Appointments" showBack={true} />
+      <CurvedBackground>
+        <View style={styles.contentContainer}>
+          {/* Header */}
+          <AppHeader title="Appointments" showBack={true} />
 
-      <ScrollView style={styles.container}>
-        <Text style={styles.title}>
-          Schedule a session with a support worker
-        </Text>
+          <ScrollView style={styles.container}>
+            <Text style={styles.title}>
+              Schedule a session with a support worker
+            </Text>
 
-        {/* Step Indicator */}
-        <View style={styles.stepsContainer}>
-          <View style={styles.stepRow}>
-            {/* Step 1 - Active */}
-            <View style={[styles.stepCircle, styles.stepCircleActive]}>
-              <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                1
-              </Text>
-            </View>
-            <View style={styles.stepConnector} />
+            {/* Step Indicator */}
+            <View style={styles.stepsContainer}>
+              <View style={styles.stepRow}>
+                {/* Step 1 - Active */}
+                <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                  <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                    1
+                  </Text>
+                </View>
+                <View style={styles.stepConnector} />
 
-            {/* Step 2 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>2</Text>
-            </View>
-            <View style={styles.stepConnector} />
+                {/* Step 2 - Inactive */}
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepNumber}>2</Text>
+                </View>
+                <View style={styles.stepConnector} />
 
-            {/* Step 3 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>3</Text>
-            </View>
-            <View style={styles.stepConnector} />
+                {/* Step 3 - Inactive */}
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepNumber}>3</Text>
+                </View>
+                <View style={styles.stepConnector} />
 
-            {/* Step 4 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>4</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={20}
-            color="#666"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search support worker..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        {filteredSupportWorkers.map((supportWorker) => (
-          <TouchableOpacity
-            key={supportWorker.id}
-            style={styles.supportWorkerCard}
-            onPress={() => handleSelectSupportWorker(supportWorker.id)}
-          >
-            {/* Add avatar image here */}
-            <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: supportWorker.avatar }}
-                style={styles.avatar}
-              />
-              <View style={styles.supportWorkerInfo}>
-                <Text style={styles.supportWorkerName}>
-                  {supportWorker.name}
-                </Text>
-                <Text style={styles.supportWorkerTitle}>
-                  {supportWorker.title}
-                </Text>
+                {/* Step 4 - Inactive */}
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepNumber}>4</Text>
+                </View>
               </View>
             </View>
 
-            <View style={styles.specialtiesContainer}>
-              {supportWorker.specialties.map((specialty, index) => (
-                <Text key={index} style={styles.specialtyText}>
-                  {specialty}
-                </Text>
-              ))}
+            <View style={styles.searchContainer}>
+              <Ionicons
+                name="search"
+                size={20}
+                color="#666"
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search support worker..."
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
             </View>
-            <Text style={styles.selectText}>Select Support Worker</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
+            {filteredSupportWorkers.map((supportWorker) => (
+              <TouchableOpacity
+                key={supportWorker.id}
+                style={styles.supportWorkerCard}
+                onPress={() => handleSelectSupportWorker(supportWorker.id)}
+              >
+                {/* Add avatar image here */}
+                <View style={styles.avatarContainer}>
+                  <Image
+                    source={{ uri: supportWorker.avatar }}
+                    style={styles.avatar}
+                  />
+                  <View style={styles.supportWorkerInfo}>
+                    <Text style={styles.supportWorkerName}>
+                      {supportWorker.name}
+                    </Text>
+                    <Text style={styles.supportWorkerTitle}>
+                      {supportWorker.title}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.specialtiesContainer}>
+                  {supportWorker.specialties.map((specialty, index) => (
+                    <Text key={index} style={styles.specialtyText}>
+                      {specialty}
+                    </Text>
+                  ))}
+                </View>
+                <Text style={styles.selectText}>Select Support Worker</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Side Menu */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={sideMenuVisible}
+            onRequestClose={() => setSideMenuVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setSideMenuVisible(false)}
+              />
+              <View style={styles.sideMenu}>
+                <View style={styles.sideMenuHeader}>
+                  <Text style={styles.profileName}>{getDisplayName()}</Text>
+                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                </View>
+                <ScrollView style={styles.sideMenuContent}>
+                  {sideMenuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.sideMenuItem}
+                      onPress={item.onPress}
+                    >
+                      <Ionicons
+                        name={item.icon as any}
+                        size={20}
+                        color="#4CAF50"
+                      />
+                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          <BottomNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
           />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
         </View>
-      </Modal>
-
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
+      </CurvedBackground>
     </SafeAreaView>
   );
 }
@@ -329,7 +338,7 @@ export default function BookAppointment() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
@@ -337,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   supportWorkerCard: {
-    backgroundColor: "#c0d8c1",
+    backgroundColor: "#f0f8ff",
     borderRadius: 10,
     padding: 16,
     marginHorizontal: 15,
@@ -354,7 +363,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontSize: 20,
@@ -486,7 +495,7 @@ const styles = StyleSheet.create({
   stepConnector: {
     width: 40,
     height: 2,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: "#000000",
     marginHorizontal: 8,
   },
   searchContainer: {
@@ -556,5 +565,9 @@ const styles = StyleSheet.create({
   },
   supportWorkerInfo: {
     flex: 1,
+  },
+  contentContainer: {
+    flex: 1,
+    zIndex: 1,
   },
 });
