@@ -187,11 +187,6 @@ export default function MessagesScreen() {
             <AppHeader 
             title="Messages" 
             showBack={true}
-<<<<<<< HEAD
-            titleStyle={{ fontSize: 24, fontWeight: '700' }} 
-            containerStyle={{ backgroundColor: '#your-color' }} 
-=======
->>>>>>> annie-messages-ui-modifications
         />
       {/* Search Bar */}
       <View style={styles.searchContainer}>
