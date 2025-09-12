@@ -2,31 +2,55 @@ import { useState } from "react";
 import {
   View,
   Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
   StyleSheet,
   SafeAreaView,
-  TouchableOpacity,
   Modal,
   Pressable,
-  ScrollView,
   ActivityIndicator,
-  Dimensions,
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../../context/AuthContext";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import { useAuth } from "../../../../context/AuthContext";
 import { AppHeader } from "../../../../components/AppHeader";
-import CurvedBackground from "../../../../components/CurvedBackground"; 
+import CurvedBackground from "../../../../components/CurvedBackground";
 
-const { width } = Dimensions.get("window");
-
-export default function AppointmentsScreen() {
+export default function BookAppointment() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [activeView, setActiveView] = useState("main"); // 'main', 'book', 'details', 'confirmation', 'scheduled'
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSelectSupportWorker = (supportWorkerId: number) => {
+    router.push(`/appointments/details?supportWorkerId=${supportWorkerId}`);
+  };
+
+  // Mock data for support workers
+  const supportWorkers = [
+    {
+      id: 1,
+      name: "Eric Young",
+      title: "Support worker",
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+      specialties: ["Anxiety", "Depression", "Trauma"],
+    },
+    {
+      id: 2,
+      name: "Michael Chen",
+      title: "Support worker",
+      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
+      specialties: ["Anxiety", "Depression", "Trauma"],
+    },
+  ];
+
+  const filteredSupportWorkers = supportWorkers.filter((sw) =>
+    sw.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -44,6 +68,7 @@ export default function AppointmentsScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
   const sideMenuItems = [
     {
       icon: "home",
@@ -122,7 +147,7 @@ export default function AppointmentsScreen() {
       title: "Community Forum",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/community-forum");
+        router.push("/(app)/(tabs)/community-forum");
       },
     },
     {
@@ -158,43 +183,95 @@ export default function AppointmentsScreen() {
     );
   }
 
-  const handleBookAppointment = () => {
-    router.push("../appointments/book");
-  };
-
-  const handleViewScheduled = () => {
-    router.push("../appointments/appointment-list");
-  }
-
-  const renderContent = () => (
-    <View style={styles.content}>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleBookAppointment}>
-          <Text style={styles.buttonText}>Book Appointment</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={handleViewScheduled}>
-          <Text style={styles.secondaryButtonText}>Check Scheduled Appointments</Text>
-        </TouchableOpacity>
-      </View>
-      {/* Show the list of appointments below the buttons */}
-      {activeView === "scheduled"}
-    </View>
-  );
-
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
+        {/* Header */}
         <AppHeader title="Appointments" showBack={true} />
-        <View style={styles.imageContainer}>
-          <Image 
-            source={require('../../../../assets/images/appointment.png')} 
-            style={styles.appointmentImage}
-            resizeMode="contain"
-          />
-        </View>
 
-        {/* Main Content */}
-        {renderContent()}
+        <ScrollView style={styles.scrollContainer}>
+          <Text style={styles.title}>
+            Schedule a session with a support worker
+          </Text>
+
+          {/* Step Indicator */}
+          <View style={styles.stepsContainer}>
+            <View style={styles.stepRow}>
+              {/* Step 1 - Active */}
+              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                  1
+                </Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 2 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>2</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 3 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>3</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 4 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>4</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.searchContainer}>
+            <Ionicons
+              name="search"
+              size={20}
+              color="#666"
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search support worker..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          {filteredSupportWorkers.map((supportWorker) => (
+            <TouchableOpacity
+              key={supportWorker.id}
+              style={styles.supportWorkerCard}
+              onPress={() => handleSelectSupportWorker(supportWorker.id)}
+            >
+              <View style={styles.avatarContainer}>
+                <Image
+                  source={{ uri: supportWorker.avatar }}
+                  style={styles.avatar}
+                />
+                <View style={styles.supportWorkerInfo}>
+                  <Text style={styles.supportWorkerName}>
+                    {supportWorker.name}
+                  </Text>
+                  <Text style={styles.supportWorkerTitle}>
+                    {supportWorker.title}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.specialtiesContainer}>
+                {supportWorker.specialties.map((specialty, index) => (
+                  <Text key={index} style={styles.specialtyText}>
+                    {specialty}
+                  </Text>
+                ))}
+              </View>
+              <Text style={styles.selectText}>Select Support Worker</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Side Menu */}
         <Modal
@@ -220,7 +297,11 @@ export default function AppointmentsScreen() {
                     style={styles.sideMenuItem}
                     onPress={item.onPress}
                   >
-                    <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
                     <Text style={styles.sideMenuItemText}>{item.title}</Text>
                   </TouchableOpacity>
                 ))}
@@ -242,15 +323,28 @@ export default function AppointmentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "transparent",
   },
-  appointmentImage: {
-    width: width * 0.9,
-    height: 350,
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  supportWorkerCard: {
+    backgroundColor: "#e7f5e7ff",
+    borderRadius: 10,
+    padding: 16,
+    marginHorizontal: 15,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   header: {
     flexDirection: "row",
@@ -258,38 +352,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
     color: "#2E7D32",
-  },
-  imageContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 10,
-    marginTop: 10,
-  },
-  content: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginTop: 40,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
   },
   modalContainer: {
     flex: 1,
@@ -374,5 +442,117 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
     fontSize: 16,
     fontWeight: "600",
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+    textAlign: "center",
+  },
+  stepsContainer: {
+    alignItems: "center",
+    marginBottom: 24,
+    marginTop: 16,
+  },
+  stepRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: "#4CAF50",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "white",
+  },
+  stepCircleActive: {
+    backgroundColor: "#4CAF50",
+  },
+  stepNumber: {
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  stepNumberActive: {
+    color: "white",
+  },
+  stepConnector: {
+    width: 40,
+    height: 2,
+    backgroundColor: "#000000",
+    marginHorizontal: 8,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    margin: 15,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  supportWorkerName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  supportWorkerNameHeading: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  supportWorkerTitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 0,
+  },
+  specialtiesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 16,
+    gap: 8,
+  },
+  specialtyText: {
+    backgroundColor: "#d0cad8ff",
+    color: "#00000",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    fontSize: 12,
+  },
+  selectText: {
+    color: "#00000",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  avatarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  supportWorkerInfo: {
+    flex: 1,
   },
 });
