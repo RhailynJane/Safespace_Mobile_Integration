@@ -21,6 +21,8 @@ import BottomNavigation from "../../../../../components/BottomNavigation";
 import { useAuth } from "../../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
 import { BlurView } from "expo-blur";
+import { AppHeader } from "../../../../../components/AppHeader";
+import CurvedBackground from "../../../../../components/CurvedBackground";
 
 export default function AppointmentList() {
   const { user, profile, logout } = useAuth();
@@ -110,9 +112,9 @@ export default function AppointmentList() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      </CurvedBackground>
     );
   }
 
@@ -239,266 +241,266 @@ export default function AppointmentList() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointments</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <AppHeader title="Appointments" showBack={true} />
 
-      <ScrollView style={styles.content}>
-        {/* Appointment Card */}
-        <View style={styles.appointmentCard}>
-          <Text style={styles.supportWorkerName}>
-            {appointment.supportWorker}
-          </Text>
+        <ScrollView style={styles.content}>
+          {/* Appointment Card */}
+          <View style={styles.appointmentCard}>
+            <Text style={styles.supportWorkerName}>
+              {appointment.supportWorker}
+            </Text>
 
-          <View style={styles.detailRow}>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-            <Text style={styles.detailText}>{appointment.date}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="time-outline" size={20} color="#666" />
-            <Text style={styles.detailText}>{appointment.time}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="videocam-outline" size={20} color="#666" />
-            <Text style={styles.detailText}>{appointment.type} Session</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Ionicons
-              name="information-circle-outline"
-              size={20}
-              color="#666"
-            />
-            <Text style={styles.detailText}>Status: {appointment.status}</Text>
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleJoinSession}
-          >
-            <Ionicons name="videocam" size={20} color="#FFF" />
-            <Text style={styles.primaryButtonText}>Join Session</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleReschedule}
-          >
-            <Ionicons name="calendar" size={20} color="#4CAF50" />
-            <Text style={styles.secondaryButtonText}>Reschedule</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.tertiaryButton}
-            onPress={handleCancel}
-          >
-            <Ionicons name="close-circle" size={20} color="#F44336" />
-            <Text style={styles.tertiaryButtonText}>Cancel Appointment</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Cancel Confirmation Modal */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={cancelModalVisible}
-          onRequestClose={() => setCancelModalVisible(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setCancelModalVisible(false)}
-          >
-            <BlurView intensity={20} style={styles.blurContainer}>
-              <View style={styles.confirmationModalContent}>
-                <View style={styles.modalIconContainer}>
-                  <Ionicons name="close-circle" size={48} color="#F44336" />
-                </View>
-                <Text style={styles.modalTitle}>Cancel Appointment?</Text>
-                <Text style={styles.modalText}>
-                  Are you sure you want to cancel your session with{" "}
-                  {appointment.supportWorker} on {appointment.date}?
-                </Text>
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalCancelButton]}
-                    onPress={() => setCancelModalVisible(false)}
-                  >
-                    <Text style={styles.modalCancelButtonText}>
-                      Keep Appointment
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalConfirmButton]}
-                    onPress={confirmCancel}
-                  >
-                    <Text style={styles.modalConfirmButtonText}>
-                      Yes, Cancel
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </BlurView>
-          </Pressable>
-        </Modal>
-
-        {/* Reschedule Modal */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={rescheduleModalVisible}
-          onRequestClose={() => setRescheduleModalVisible(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setRescheduleModalVisible(false)}
-          >
-            <BlurView intensity={20} style={styles.blurContainer}>
-              <View style={styles.confirmationModalContent}>
-                <View style={styles.modalIconContainer}>
-                  <Ionicons name="calendar" size={48} color="#4CAF50" />
-                </View>
-                <Text style={styles.modalTitle}>Reschedule Appointment</Text>
-                <Text style={styles.modalText}>
-                  Select a new date and time for your session with{" "}
-                  {appointment.supportWorker}.
-                </Text>
-
-                <View style={styles.rescheduleOptions}>
-                  <Text style={styles.rescheduleHint}>
-                    Available time slots:
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.timeSlot,
-                      selectedTimeSlot === "slot1" && styles.selectedTimeSlot,
-                    ]}
-                    onPress={() => setSelectedTimeSlot("slot1")}
-                  >
-                    <Text
-                      style={[
-                        styles.timeSlotText,
-                        selectedTimeSlot === "slot1" &&
-                          styles.selectedTimeSlotText,
-                      ]}
-                    >
-                      October 08, 2025 at 2:00 PM
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.timeSlot,
-                      selectedTimeSlot === "slot2" && styles.selectedTimeSlot,
-                    ]}
-                    onPress={() => setSelectedTimeSlot("slot2")}
-                  >
-                    <Text
-                      style={[
-                        styles.timeSlotText,
-                        selectedTimeSlot === "slot2" &&
-                          styles.selectedTimeSlotText,
-                      ]}
-                    >
-                      October 09, 2025 at 11:00 AM
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.timeSlot,
-                      selectedTimeSlot === "slot3" && styles.selectedTimeSlot,
-                    ]}
-                    onPress={() => setSelectedTimeSlot("slot3")}
-                  >
-                    <Text
-                      style={[
-                        styles.timeSlotText,
-                        selectedTimeSlot === "slot3" &&
-                          styles.selectedTimeSlotText,
-                      ]}
-                    >
-                      October 10, 2025 at 4:30 PM
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalCancelButton]}
-                    onPress={() => setRescheduleModalVisible(false)}
-                  >
-                    <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.modalConfirmButton]}
-                    onPress={confirmReschedule}
-                  >
-                    <Text style={styles.modalConfirmButtonText}>
-                      Confirm Reschedule
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </BlurView>
-          </Pressable>
-        </Modal>
-      </ScrollView>
-
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+            <View style={styles.detailRow}>
+              <Ionicons name="calendar-outline" size={20} color="#666" />
+              <Text style={styles.detailText}>{appointment.date}</Text>
             </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+            <View style={styles.detailRow}>
+              <Ionicons name="time-outline" size={20} color="#666" />
+              <Text style={styles.detailText}>{appointment.time}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Ionicons name="videocam-outline" size={20} color="#666" />
+              <Text style={styles.detailText}>{appointment.type} Session</Text>
+            </View>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+            <View style={styles.detailRow}>
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color="#666"
+              />
+              <Text style={styles.detailText}>
+                Status: {appointment.status}
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleJoinSession}
+            >
+              <Ionicons name="videocam" size={20} color="#FFF" />
+              <Text style={styles.primaryButtonText}>Join Session</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleReschedule}
+            >
+              <Ionicons name="calendar" size={20} color="#4CAF50" />
+              <Text style={styles.secondaryButtonText}>Reschedule</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.tertiaryButton}
+              onPress={handleCancel}
+            >
+              <Ionicons name="close-circle" size={20} color="#F44336" />
+              <Text style={styles.tertiaryButtonText}>Cancel Appointment</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Cancel Confirmation Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={cancelModalVisible}
+            onRequestClose={() => setCancelModalVisible(false)}
+          >
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setCancelModalVisible(false)}
+            >
+              <BlurView intensity={20} style={styles.blurContainer}>
+                <View style={styles.confirmationModalContent}>
+                  <View style={styles.modalIconContainer}>
+                    <Ionicons name="close-circle" size={48} color="#F44336" />
+                  </View>
+                  <Text style={styles.modalTitle}>Cancel Appointment?</Text>
+                  <Text style={styles.modalText}>
+                    Are you sure you want to cancel your session with{" "}
+                    {appointment.supportWorker} on {appointment.date}?
+                  </Text>
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.modalCancelButton]}
+                      onPress={() => setCancelModalVisible(false)}
+                    >
+                      <Text style={styles.modalCancelButtonText}>
+                        Keep Appointment
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.modalConfirmButton]}
+                      onPress={confirmCancel}
+                    >
+                      <Text style={styles.modalConfirmButtonText}>
+                        Yes, Cancel
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </BlurView>
+            </Pressable>
+          </Modal>
+
+          {/* Reschedule Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={rescheduleModalVisible}
+            onRequestClose={() => setRescheduleModalVisible(false)}
+          >
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setRescheduleModalVisible(false)}
+            >
+              <BlurView intensity={20} style={styles.blurContainer}>
+                <View style={styles.confirmationModalContent}>
+                  <View style={styles.modalIconContainer}>
+                    <Ionicons name="calendar" size={48} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.modalTitle}>Reschedule Appointment</Text>
+                  <Text style={styles.modalText}>
+                    Select a new date and time for your session with{" "}
+                    {appointment.supportWorker}.
+                  </Text>
+
+                  <View style={styles.rescheduleOptions}>
+                    <Text style={styles.rescheduleHint}>
+                      Available time slots:
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.timeSlot,
+                        selectedTimeSlot === "slot1" && styles.selectedTimeSlot,
+                      ]}
+                      onPress={() => setSelectedTimeSlot("slot1")}
+                    >
+                      <Text
+                        style={[
+                          styles.timeSlotText,
+                          selectedTimeSlot === "slot1" &&
+                            styles.selectedTimeSlotText,
+                        ]}
+                      >
+                        October 08, 2025 at 2:00 PM
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.timeSlot,
+                        selectedTimeSlot === "slot2" && styles.selectedTimeSlot,
+                      ]}
+                      onPress={() => setSelectedTimeSlot("slot2")}
+                    >
+                      <Text
+                        style={[
+                          styles.timeSlotText,
+                          selectedTimeSlot === "slot2" &&
+                            styles.selectedTimeSlotText,
+                        ]}
+                      >
+                        October 09, 2025 at 11:00 AM
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.timeSlot,
+                        selectedTimeSlot === "slot3" && styles.selectedTimeSlot,
+                      ]}
+                      onPress={() => setSelectedTimeSlot("slot3")}
+                    >
+                      <Text
+                        style={[
+                          styles.timeSlotText,
+                          selectedTimeSlot === "slot3" &&
+                            styles.selectedTimeSlotText,
+                        ]}
+                      >
+                        October 10, 2025 at 4:30 PM
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.modalCancelButton]}
+                      onPress={() => setRescheduleModalVisible(false)}
+                    >
+                      <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.modalConfirmButton]}
+                      onPress={confirmReschedule}
+                    >
+                      <Text style={styles.modalConfirmButtonText}>
+                        Confirm Reschedule
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </BlurView>
+            </Pressable>
+          </Modal>
+        </ScrollView>
+
+        {/* Side Menu */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   scrollContainer: {
     flex: 1,
@@ -514,7 +516,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontSize: 20,
@@ -539,7 +541,7 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     height: "100%",
   },
   sideMenuHeader: {
@@ -595,7 +597,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   appointmentCard: {
-    backgroundColor: "#b6d7a8",
+    backgroundColor: "#f1f5f9",
     borderRadius: 12,
     padding: 15,
     marginBottom: 24,
@@ -640,7 +642,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   secondaryButton: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -657,7 +659,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   tertiaryButton: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

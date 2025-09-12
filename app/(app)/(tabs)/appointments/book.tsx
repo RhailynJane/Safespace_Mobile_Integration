@@ -197,7 +197,7 @@ export default function BookAppointment() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CurvedBackground>
+    <CurvedBackground key={Math.random()}>
         <View style={styles.contentContainer}>
           {/* Header */}
           <AppHeader title="Appointments" showBack={true} />

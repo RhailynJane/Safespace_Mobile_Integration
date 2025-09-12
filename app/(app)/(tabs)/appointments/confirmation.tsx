@@ -19,6 +19,7 @@ import { useAuth } from "../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppHeader } from "../../../../components/AppHeader";
+import CurvedBackground from "../../../../components/CurvedBackground";
 export default function BookAppointment() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -217,152 +218,158 @@ export default function BookAppointment() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      </CurvedBackground>
     );
   }
 
   const appointment = appointments.length > 0 ? appointments[0] : null;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <AppHeader title="Appointments" showBack={true} />
+    <CurvedBackground key={Math.random()}>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <AppHeader title="Appointments" showBack={true} />
 
-      <ScrollView style={styles.scrollContainer}>
-        <Text style={styles.title}>
-          Schedule a session with a support worker
-        </Text>
-
-        {/* Step Indicator */}
-        <View style={styles.stepsContainer}>
-          <View style={styles.stepRow}>
-            {/* Step 1 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>1</Text>
-            </View>
-            <View style={styles.stepConnector} />
-
-            {/* Step 2 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>2</Text>
-            </View>
-            <View style={styles.stepConnector} />
-
-            {/* Step 3 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>3</Text>
-            </View>
-            <View style={styles.stepConnector} />
-
-            {/* Step 4 - Active */}
-            <View style={[styles.stepCircle, styles.stepCircleActive]}>
-              <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                4
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Confirmation Card */}
-        <View style={styles.confirmationCard}>
-          <Text style={styles.confirmationTitle}>Appointment Booked</Text>
-          <Text style={styles.confirmationMessage}>
-            Your appointment has been successfully scheduled.
+        <ScrollView style={styles.scrollContainer}>
+          <Text style={styles.title}>
+            Schedule a session with a support worker
           </Text>
 
-          <View style={styles.appointmentDetails}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Support Worker:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? appointment.supportWorker : ""}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Date:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? `${appointment.date}` : ""}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Time:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? `${appointment.time}` : ""}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Session Type:</Text>
-              <Text style={styles.detailValue}>
-                {appointment ? appointment.type : ""}
-              </Text>
-            </View>
+          {/* Step Indicator */}
+          <View style={styles.stepsContainer}>
+            <View style={styles.stepRow}>
+              {/* Step 1 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>1</Text>
+              </View>
+              <View style={styles.stepConnector} />
 
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => router.replace("/appointments/appointment-list")}
-            >
-              <Text style={styles.buttonText}>Check Appointments</Text>
-            </TouchableOpacity>
+              {/* Step 2 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>2</Text>
+              </View>
+              <View style={styles.stepConnector} />
 
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => router.replace("/appointments/book")}
-            >
-              <Text style={styles.secondaryButtonText}>
-                Book Another Appointment
-              </Text>
-            </TouchableOpacity>
+              {/* Step 3 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>3</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 4 - Active */}
+              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                  4
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
-      </ScrollView>
 
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+          {/* Confirmation Card */}
+          <View style={styles.confirmationCard}>
+            <Text style={styles.confirmationTitle}>Appointment Booked</Text>
+            <Text style={styles.confirmationMessage}>
+              Your appointment has been successfully scheduled.
+            </Text>
+
+            <View style={styles.appointmentDetails}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Support Worker:</Text>
+                <Text style={styles.detailValue}>
+                  {appointment ? appointment.supportWorker : ""}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Date:</Text>
+                <Text style={styles.detailValue}>
+                  {appointment ? `${appointment.date}` : ""}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Time:</Text>
+                <Text style={styles.detailValue}>
+                  {appointment ? `${appointment.time}` : ""}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Session Type:</Text>
+                <Text style={styles.detailValue}>
+                  {appointment ? appointment.type : ""}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => router.replace("/appointments/appointment-list")}
+              >
+                <Text style={styles.buttonText}>Check Appointments</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => router.replace("/appointments/book")}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  Book Another Appointment
+                </Text>
+              </TouchableOpacity>
             </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
           </View>
-        </View>
-      </Modal>
+        </ScrollView>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Side Menu */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   scrollContainer: {
     flex: 1,
@@ -378,7 +385,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontSize: 20,
@@ -427,7 +434,7 @@ const styles = StyleSheet.create({
   stepConnector: {
     width: 40,
     height: 2,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: "#000000",
     marginHorizontal: 8,
   },
   card: {
@@ -527,7 +534,7 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     height: "100%",
   },
   sideMenuHeader: {
@@ -580,7 +587,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   confirmationCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#f1f5f9",
     borderRadius: 12,
     padding: 24,
     marginHorizontal: 15,

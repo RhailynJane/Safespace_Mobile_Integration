@@ -182,7 +182,7 @@ export default function AppointmentsScreen() {
   );
 
   return (
-    <CurvedBackground>
+    <CurvedBackground key={Math.random()}>
       <SafeAreaView style={styles.container}>
         <AppHeader title="Appointments" showBack={true} />
         <View style={styles.imageContainer}>

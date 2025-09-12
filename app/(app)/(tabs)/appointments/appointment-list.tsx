@@ -19,7 +19,7 @@ import { useAuth } from "../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppHeader } from "../../../../components/AppHeader";
-
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 export default function AppointmentList() {
   const { user, profile, logout } = useAuth();
@@ -37,7 +37,9 @@ export default function AppointmentList() {
   const [appointmentNotes, setAppointmentNotes] = useState<string>("");
   const [activeView, setActiveView] = useState<string>("confirmation");
   const [bookingStep, setBookingStep] = useState<number>(1);
-  const [activeAppointmentsTab, setActiveAppointmentsTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [activeAppointmentsTab, setActiveAppointmentsTab] = useState<
+    "upcoming" | "past"
+  >("upcoming");
 
   // Mock data for support workers
   const supportWorkers = [
@@ -193,179 +195,221 @@ export default function AppointmentList() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      </CurvedBackground>
     );
   }
 
   const appointment = appointments.length > 0 ? appointments[0] : null;
 
-const handleAppointmentPress = (appointmentId: number) => {
+  const handleAppointmentPress = (appointmentId: number) => {
     // Navigate to appointment details or show details modal
     if (appointment) {
-      router.push(`/(app)/(tabs)/appointments/${appointment.id}/appointment-detail`);
+      router.push(
+        `/(app)/(tabs)/appointments/${appointment.id}/appointment-detail`
+      );
     }
-};
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-            <AppHeader title="Appointments" showBack={true} />
+    <CurvedBackground key={Math.random()}>
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <AppHeader title="Appointments" showBack={true} />
 
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Appointments</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
+        {/* Appointments Tabs */}
+        <View style={styles.appointmentsTabs}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeAppointmentsTab === "upcoming" && styles.activeTab,
+            ]}
+            onPress={() => setActiveAppointmentsTab("upcoming")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeAppointmentsTab === "upcoming" && styles.activeTabText,
+              ]}
+            >
+              Upcoming (
+              {appointments.filter((a) => a.status === "upcoming").length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeAppointmentsTab === "past" && styles.activeTab,
+            ]}
+            onPress={() => setActiveAppointmentsTab("past")}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeAppointmentsTab === "past" && styles.activeTabText,
+              ]}
+            >
+              Past ({appointments.filter((a) => a.status === "past").length})
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-       {/* Appointments Tabs */}
-      <View style={styles.appointmentsTabs}>
-        <TouchableOpacity 
-          style={[styles.tab, activeAppointmentsTab === 'upcoming' && styles.activeTab]} 
-          onPress={() => setActiveAppointmentsTab('upcoming')}
-        >
-          <Text style={[styles.tabText, activeAppointmentsTab === 'upcoming' && styles.activeTabText]}>
-            Upcoming ({appointments.filter(a => a.status === 'upcoming').length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeAppointmentsTab === 'past' && styles.activeTab]} 
-          onPress={() => setActiveAppointmentsTab('past')}
-        >
-          <Text style={[styles.tabText, activeAppointmentsTab === 'past' && styles.activeTabText]}>
-            Past ({appointments.filter(a => a.status === 'past').length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Appointments List */}
-      <ScrollView style={styles.appointmentsContainer}>
-        {activeAppointmentsTab === 'upcoming' ? (
-          appointments.filter(a => a.status === 'upcoming').length > 0 ? (
-            appointments.filter(a => a.status === 'upcoming').map((appointment) => (
-              <TouchableOpacity 
-                key={appointment.id} 
-                style={styles.appointmentCard}
-                onPress={() => handleAppointmentPress(appointment.id)}
-              >
-                <Text style={styles.supportWorker}>{appointment.supportWorker}</Text>
-                <View style={styles.appointmentDetails}>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="calendar-outline" size={16} color="#666" />
-                    <Text style={styles.detailText}>{appointment.date}</Text>
+        {/* Appointments List */}
+        <ScrollView style={styles.appointmentsContainer}>
+          {activeAppointmentsTab === "upcoming" ? (
+            appointments.filter((a) => a.status === "upcoming").length > 0 ? (
+              appointments
+                .filter((a) => a.status === "upcoming")
+                .map((appointment) => (
+                  <TouchableOpacity
+                    key={appointment.id}
+                    style={styles.appointmentCard}
+                    onPress={() => handleAppointmentPress(appointment.id)}
+                  >
+                    <Text style={styles.supportWorker}>
+                      {appointment.supportWorker}
+                    </Text>
+                    <View style={styles.appointmentDetails}>
+                      <View style={styles.detailRow}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={16}
+                          color="#666"
+                        />
+                        <Text style={styles.detailText}>
+                          {appointment.date}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Ionicons name="time-outline" size={16} color="#666" />
+                        <Text style={styles.detailText}>
+                          {appointment.time}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.sessionType}>
+                      <Ionicons name="videocam" size={14} color="#4CAF50" />
+                      <Text style={styles.sessionTypeText}>
+                        {appointment.type} Session
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="calendar-outline" size={48} color="#CCC" />
+                <Text style={styles.emptyStateText}>
+                  No upcoming appointments
+                </Text>
+              </View>
+            )
+          ) : appointments.filter((a) => a.status === "past").length > 0 ? (
+            appointments
+              .filter((a) => a.status === "past")
+              .map((appointment) => (
+                <TouchableOpacity
+                  key={appointment.id}
+                  style={styles.appointmentCard}
+                  onPress={() => handleAppointmentPress(appointment.id)}
+                >
+                  <Text style={styles.supportWorker}>
+                    {appointment.supportWorker}
+                  </Text>
+                  <View style={styles.appointmentDetails}>
+                    <View style={styles.detailRow}>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={16}
+                        color="#666"
+                      />
+                      <Text style={styles.detailText}>{appointment.date}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Ionicons name="time-outline" size={16} color="#666" />
+                      <Text style={styles.detailText}>{appointment.time}</Text>
+                    </View>
                   </View>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="time-outline" size={16} color="#666" />
-                    <Text style={styles.detailText}>{appointment.time}</Text>
+                  <View style={styles.sessionType}>
+                    <Ionicons name="videocam" size={14} color="#4CAF50" />
+                    <Text style={styles.sessionTypeText}>
+                      {appointment.type} Session
+                    </Text>
                   </View>
-                </View>
-                <View style={styles.sessionType}>
-                  <Ionicons name="videocam" size={14} color="#4CAF50" />
-                  <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
-                </View>
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              ))
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={48} color="#CCC" />
-              <Text style={styles.emptyStateText}>No upcoming appointments</Text>
+              <Text style={styles.emptyStateText}>No past appointments</Text>
             </View>
-          )
-        ) : appointments.filter(a => a.status === 'past').length > 0 ? (
-          appointments.filter(a => a.status === 'past').map((appointment) => (
-            <TouchableOpacity 
-              key={appointment.id} 
-              style={styles.appointmentCard}
-              onPress={() => handleAppointmentPress(appointment.id)}
-            >
-              <Text style={styles.supportWorker}>{appointment.supportWorker}</Text>
-              <View style={styles.appointmentDetails}>
-                <View style={styles.detailRow}>
-                  <Ionicons name="calendar-outline" size={16} color="#666" />
-                  <Text style={styles.detailText}>{appointment.date}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="time-outline" size={16} color="#666" />
-                  <Text style={styles.detailText}>{appointment.time}</Text>
-                </View>
-              </View>
-              <View style={styles.sessionType}>
-                <Ionicons name="videocam" size={14} color="#4CAF50" />
-                <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="calendar-outline" size={48} color="#CCC" />
-            <Text style={styles.emptyStateText}>No past appointments</Text>
-          </View>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
 
-      {/* Schedule New Appointment Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.scheduleButton}
-          onPress={() => router.push('/appointments/book')}
-        >
-          <Ionicons name="add" size={24} color="#FFF" />
-          <Text style={styles.scheduleButtonText}>Schedule New Appointment</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+        {/* Schedule New Appointment Button */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.scheduleButton}
+            onPress={() => router.push("/appointments/book")}
+          >
+            <Ionicons name="add" size={24} color="#FFF" />
+            <Text style={styles.scheduleButtonText}>
+              Schedule New Appointment
+            </Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Side Menu */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   scrollContainer: {
     flex: 1,
@@ -381,7 +425,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontSize: 20,
@@ -406,7 +450,7 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     height: "100%",
   },
   sideMenuHeader: {
