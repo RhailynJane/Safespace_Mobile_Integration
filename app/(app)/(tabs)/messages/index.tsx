@@ -184,7 +184,12 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-            <AppHeader title="Messages" showBack={true} />
+            <AppHeader 
+            title="Messages" 
+            showBack={true}
+            titleStyle={{ fontSize: 24, fontWeight: '700' }} 
+            containerStyle={{ backgroundColor: '#your-color' }} 
+        />
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons
@@ -314,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#BAD6D2",
   },
   headerTitle: {
     fontSize: 20,
@@ -347,7 +352,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: "600",
+    fontWeight: "800",
     color: "#333",
     marginBottom: 12,
     textAlign: "center",
