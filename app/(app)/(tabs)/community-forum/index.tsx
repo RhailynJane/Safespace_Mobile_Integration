@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import {
   View,
@@ -198,129 +199,139 @@ export default function CommunityScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <LinearGradient
+        colors={['#E8E4F0', '#E2DDF2', '#DDD7F1', '#D8D2EF']}
+        style={styles.loadingContainer}
+      >
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
-          <View style={styles.profileImageContainer}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} />
-            ) : (
-              <Text style={styles.initialsText}>{getInitials()}</Text>
-            )} 
-          </View>
-        </TouchableOpacity>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#666" />
+    <LinearGradient
+      colors={['#E8E4F0', '#E2DDF2', '#DDD7F1', '#D8D2EF']}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+            <View style={styles.profileImageContainer}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              ) : (
+                <Text style={styles.initialsText}>{getInitials()}</Text>
+              )} 
+            </View>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.menuButton}
-            onPress={showSideMenu}
-          >
-            <Ionicons name="grid" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView
-        style={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Add the image above the main content */}
-        <View style={styles.imageContainer}>
-          <Image 
-            source={require('../../../../assets/images/community-forum.png')} 
-            style={styles.appointmentImage}
-            resizeMode="contain"
-          />
-        </View>
-
-        {/* Main Content */}
-        <View style={styles.content}>
-          <View style={styles.welcomeContainer}>
-            <Text style={styles.welcomeTitle}>Welcome to Our</Text>
-            <Text style={styles.welcomeTitle}>Community!</Text>
-
-            <Text style={styles.welcomeSubtitle}>
-              Our community is a place of warmth and acceptance, where everyone's
-              voice is valued and respected.
-            </Text>
-
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={handleStartPress}
+          <View style={styles.headerIcons}>
+            <TouchableOpacity onPress={() => router.push("/notifications")}>
+              <Ionicons name="notifications-outline" size={24} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={showSideMenu}
             >
-              <Text style={styles.startButtonText}>Start</Text>
+              <Ionicons name="grid" size={24} color="#666" />
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
 
-      {/* Side Menu */}
-      <Modal
-        animationType="none" 
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={hideSideMenu}
-      >
-        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
-          <Pressable
-            style={StyleSheet.absoluteFillObject}
-            onPress={hideSideMenu}
-          />
-          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getGreetingName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+        <ScrollView
+          style={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Add the image above the main content */}
+          <View style={styles.imageContainer}>
+            <Image 
+              source={require('../../../../assets/images/community-forum.png')} 
+              style={styles.appointmentImage}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* Main Content */}
+          <View style={styles.content}>
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.welcomeTitle}>Welcome to Our</Text>
+              <Text style={styles.welcomeTitle}>Community!</Text>
+
+              <Text style={styles.welcomeSubtitle}>
+                Our community is a place of warmth and acceptance, where everyone's
+                voice is valued and respected.
+              </Text>
+
+              <TouchableOpacity
+                style={styles.startButton}
+                onPress={handleStartPress}
+              >
+                <Text style={styles.startButtonText}>Start</Text>
+              </TouchableOpacity>
             </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons
-                    name={item.icon as any}
-                    size={20}
-                    color="#757575"
-                  />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+          </View>
+        </ScrollView>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Side Menu */}
+        <Modal
+          animationType="none" 
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={hideSideMenu}
+        >
+          <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
+            <Pressable
+              style={StyleSheet.absoluteFillObject}
+              onPress={hideSideMenu}
+            />
+            <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getGreetingName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#757575"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#D2D2F0D6",
+  },
+  safeArea: {
+    flex: 1,
   },
   imageContainer: {
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
-    height:200,
+    height: 200,
   },
   appointmentImage: {
     width: width * 0.9,
@@ -338,7 +349,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 15,
-    backgroundColor: "#D2D2F0D6",
   },
   profileImageContainer: {
     width: 40,
@@ -382,7 +392,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 32,
     fontWeight: "700",
-    color: "#000000",
+    color: "#462401ff",
     textAlign: "center",
     marginBottom: 5,
   },
@@ -408,7 +418,7 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     fontFamily: "Epilogue",
-    color: "black",
+    color: "#412100ff",
     fontSize: 18,
     fontWeight: "700",
   },

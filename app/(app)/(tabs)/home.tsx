@@ -102,6 +102,8 @@ export default function HomeScreen() {
       icon: "help-buoy-outline",
       image: require("../../../assets/images/crisis-support.png"), 
       color: "#EDE7EC",
+      borderColor: "#bab5b9ff",
+
       onPress: () => router.push("/crisis-support"),
     },
   ];
@@ -446,7 +448,7 @@ if (loading) {
       style={styles.container}
     >
       <LinearGradient
-      colors={['#Ffff', '#FBD7C5', '#FFD89A', '#EFC380', '#F6AF77']}
+      colors={['#FFFFFF', '#F8F8FC', '#F2F2F7', '#EEEEEF', '#F5F5F0']}
       style={styles.container}
       >
       <SafeAreaView style={styles.container}>
@@ -463,13 +465,13 @@ if (loading) {
     </TouchableOpacity>
         <View style={styles.headerIcons}>
           <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#4e2800ff" />
+            <Ionicons name="notifications-outline" size={24} color="#000" />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.menuButton}
             onPress={showSideMenu}
           >
-            <Ionicons name="grid" size={24} color="#4e2800ff" />
+            <Ionicons name="grid" size={24} color="#000" />
           </TouchableOpacity>
         </View>
       </View>
@@ -523,7 +525,6 @@ if (loading) {
                         source={action.image} 
                         style={[
                           styles.actionImage,
-                          action.id === "mood" && styles.trackMoodImage,
                           action.id === "crisis" && styles.crisisSupportImage
 
                         ]}
@@ -698,7 +699,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 5,
-    backgroundColor: "#FCF4EE",
+    backgroundColor: "#BAD6D2",
   },
   profileImageContainer: {
     width: 40,
@@ -721,7 +722,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   greetingSection: {
-    backgroundColor: "#FCF4EE",
+    backgroundColor: "#BAD6D2",
     marginHorizontal: 0,
     paddingVertical: 20,
     paddingHorizontal: 32,
@@ -735,12 +736,12 @@ const styles = StyleSheet.create({
   greetingText: {
     fontSize: 24,
     fontWeight: "300",
-    color: "#4e2800ff",
+    color: "#000",
     marginBottom: 4,
   },
   subGreetingText: {
     fontSize: 15,
-    color: "#4e2800ff",
+    color: "#000",
     opacity: 0.8,
   },
   section: {
@@ -751,7 +752,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#4e2800ff",
+    color: "#000",
     marginBottom: 20,
   },
     sectionHeader: {
@@ -850,7 +851,7 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#4e2800ff",
+    color: "#000",
     textAlign: "center",
     marginTop: 8,
   },
@@ -891,7 +892,7 @@ const styles = StyleSheet.create({
   },
   moodText: {
     fontSize: 16,
-    color: "#4e2800ff",
+    color: "#000",
     fontWeight: "500",
   },
   noDataContainer: {
@@ -910,7 +911,7 @@ const styles = StyleSheet.create({
   },
   noDataText: {
     fontSize: 16,
-    color: "#4e2800ff",
+    color: "#000",
     fontWeight: "500",
     marginBottom: 4,
   },
@@ -927,7 +928,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: "#4e2800ff",
+    shadowColor: "#000",
     shadowOffset: {
       width: 2,
       height: 2,
@@ -942,7 +943,7 @@ const styles = StyleSheet.create({
   resourceTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#4e2800ff",
+    color: "#000",
     marginBottom: 4,
   },
   resourceDuration: {
@@ -1022,12 +1023,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#4e2800ff",
+    color: "#000",
     marginBottom: 4,
   },
   nameText: {
   fontWeight: "700", // Bold for the name
-  color: "#4e2800ff",
+  color: "#000",
 
 
 },
