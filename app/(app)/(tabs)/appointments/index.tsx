@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import { useAuth } from "../../../../context/AuthContext";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { AppHeader } from "../../../../components/AppHeader";
+import CurvedBackground from "../../../../components/CurvedBackground"; 
 
 const { width } = Dimensions.get("window");
 
@@ -151,9 +152,9 @@ export default function AppointmentsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      </CurvedBackground>
     );
   }
 
@@ -164,8 +165,6 @@ export default function AppointmentsScreen() {
   const handleViewScheduled = () => {
     router.push("../appointments/appointment-list");
   }
-
-  
 
   const renderContent = () => (
     <View style={styles.content}>
@@ -183,64 +182,66 @@ export default function AppointmentsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <AppHeader title="Appointments" showBack={true} />
-      <View style={styles.imageContainer}>
-        <Image 
-          source={require('../../../../assets/images/appointment.png')} 
-          style={styles.appointmentImage}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Main Content */}
-      {renderContent()}
-
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Appointments" showBack={true} />
+        <View style={styles.imageContainer}>
+          <Image 
+            source={require('../../../../assets/images/appointment.png')} 
+            style={styles.appointmentImage}
+            resizeMode="contain"
           />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
         </View>
-      </Modal>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Main Content */}
+        {renderContent()}
+
+        {/* Side Menu */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
   appointmentImage: {
     width: width * 0.9,
@@ -374,5 +375,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-
 });
