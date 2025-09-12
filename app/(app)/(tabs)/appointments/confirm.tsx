@@ -17,10 +17,10 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useAuth } from "../../../../context/AuthContext";
 import { useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { AppHeader } from "../../../../components/AppHeader";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
-export default function BookAppointment() {
+export default function ConfirmAppointment() {
   const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -211,158 +211,172 @@ export default function BookAppointment() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <CurvedBackground style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </CurvedBackground>
+      </SafeAreaView>
     );
   }
 
   const appointment = appointments.length > 0 ? appointments[0] : null;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <AppHeader title="Appointments" showBack={true} />
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.contentContainer}>
+          {/* Header */}
+          <AppHeader title="Appointments" showBack={true} />
 
-      <ScrollView style={styles.scrollContainer}>
-        <Text style={styles.title}>
-          Schedule a session with a support worker
-        </Text>
+          <ScrollView style={styles.scrollContainer}>
+            <Text style={styles.title}>
+              Schedule a session with a support worker
+            </Text>
 
-        {/* Step Indicator */}
-        <View style={styles.stepsContainer}>
-          <View style={styles.stepRow}>
-            {/* Step 1 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>1</Text>
+            {/* Step Indicator */}
+            <View style={styles.stepsContainer}>
+              <View style={styles.stepRow}>
+                {/* Step 1 - Inactive */}
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepNumber}>1</Text>
+                </View>
+                <View style={styles.stepConnector} />
+
+                {/* Step 2 - Inactive */}
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepNumber}>2</Text>
+                </View>
+                <View style={styles.stepConnector} />
+
+                {/* Step 3 - Active */}
+                <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                  <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                    3
+                  </Text>
+                </View>
+                <View style={styles.stepConnector} />
+
+                {/* Step 4 - Inactive */}
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepNumber}>4</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.stepConnector} />
 
-            {/* Step 2 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>2</Text>
-            </View>
-            <View style={styles.stepConnector} />
+            {/* Booking Details Card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Booking Details</Text>
+              <Text style={styles.subSectionTitle}>Appointment Summary</Text>
 
-            {/* Step 3 - Active */}
-            <View style={[styles.stepCircle, styles.stepCircleActive]}>
-              <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                3
+              {appointment ? (
+                <View style={styles.summaryContainer}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Support Worker:</Text>
+                    <Text style={styles.summaryValue}>
+                      {appointment.supportWorker}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Date:</Text>
+                    <Text style={styles.summaryValue}>{appointment.date}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Time:</Text>
+                    <Text style={styles.summaryValue}>{appointment.time}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Session Type:</Text>
+                    <Text style={styles.summaryValue}>{appointment.type}</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text>No appointment data available</Text>
+              )}
+
+              <View style={styles.divider} />
+
+              <Text style={styles.subSectionTitle}>
+                Notes for Support Worker (Optional)
               </Text>
-            </View>
-            <View style={styles.stepConnector} />
+              <TextInput
+                style={styles.notesInput}
+                multiline
+                numberOfLines={4}
+                placeholder="Share any specific concerns or topics you'd like to discuss..."
+                placeholderTextColor="#999"
+                value={appointmentNotes}
+                onChangeText={setAppointmentNotes}
+              />
 
-            {/* Step 4 - Inactive */}
-            <View style={styles.stepCircle}>
-              <Text style={styles.stepNumber}>4</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Booking Details Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Booking Details</Text>
-          <Text style={styles.subSectionTitle}>Appointment Summary</Text>
-          
-          {appointment ? (
-            <View style={styles.summaryContainer}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Support Worker:</Text>
-                <Text style={styles.summaryValue}>{appointment.supportWorker}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Date:</Text>
-                <Text style={styles.summaryValue}>{appointment.date}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Time:</Text>
-                <Text style={styles.summaryValue}>{appointment.time}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Session Type:</Text>
-                <Text style={styles.summaryValue}>{appointment.type}</Text>
-              </View>
-            </View>
-          ) : (
-            <Text>No appointment data available</Text>
-          )}
-
-          <View style={styles.divider} />
-
-          <Text style={styles.subSectionTitle}>Notes for Support Worker (Optional)</Text>
-          <TextInput
-            style={styles.notesInput}
-            multiline
-            numberOfLines={4}
-            placeholder="Share any specific concerns or topics you'd like to discuss..."
-            placeholderTextColor="#999"
-            value={appointmentNotes}
-            onChangeText={setAppointmentNotes}
-          />
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <Text style={styles.backButtonText}>Back</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.bookButton}
-              onPress={handleConfirmBooking}
-            >
-              <Text style={styles.bookButtonText}>Book Appointment</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
+              <View style={styles.buttonRow}>
                 <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
+                  style={styles.backButton}
+                  onPress={() => router.back()}
                 >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+                <TouchableOpacity
+                  style={styles.bookButton}
+                  onPress={handleConfirmBooking}
+                >
+                  <Text style={styles.bookButtonText}>Book Appointment</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+          {/* Side Menu */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={sideMenuVisible}
+            onRequestClose={() => setSideMenuVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setSideMenuVisible(false)}
+              />
+              <View style={styles.sideMenu}>
+                <View style={styles.sideMenuHeader}>
+                  <Text style={styles.profileName}>{getDisplayName()}</Text>
+                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                </View>
+                <ScrollView style={styles.sideMenuContent}>
+                  {sideMenuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.sideMenuItem}
+                      onPress={item.onPress}
+                    >
+                      <Ionicons
+                        name={item.icon as any}
+                        size={20}
+                        color="#4CAF50"
+                      />
+                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          <BottomNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        </View>
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   scrollContainer: {
     flex: 1,
@@ -378,7 +392,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontSize: 20,
@@ -427,7 +441,7 @@ const styles = StyleSheet.create({
   stepConnector: {
     width: 40,
     height: 2,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: "#000000",
     marginHorizontal: 8,
   },
   card: {
@@ -440,7 +454,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    backgroundColor: "#d0e0e3",
+    backgroundColor: "#f1f5f9",
   },
   cardTitle: {
     fontSize: 20,
@@ -486,6 +500,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     minHeight: 100,
     fontSize: 14,
+    backgroundColor: "white",
   },
   buttonRow: {
     flexDirection: "row",
@@ -499,6 +514,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#4CAF50",
     alignItems: "center",
+    backgroundColor: "white",
   },
   backButtonText: {
     color: "#4CAF50",
@@ -527,7 +543,7 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "white",
     height: "100%",
   },
   sideMenuHeader: {
@@ -578,5 +594,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     color: "#333",
+  },
+  contentContainer: {
+    flex: 1,
+    zIndex: 1,
   },
 });
