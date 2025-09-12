@@ -236,12 +236,16 @@ export const AppHeader = ({
           </TouchableOpacity>
         )}
 
-        {/* Center Section: Title */}
-        {title && (
-          <Text style={styles.headerTitle} accessibilityRole="header">
-            {title}
-          </Text>
-        )}
+        {/* Center Section: Title - FIXED: Ensure text is always wrapped in Text component */}
+        <View style={styles.titleContainer}>
+          {title ? (
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              {title}
+            </Text>
+          ) : (
+            <View style={styles.emptyTitle} /> // Empty view to maintain layout
+          )}
+        </View>
 
         {/* Right Section: Icons and Actions */}
         <View style={styles.headerIcons}>
@@ -354,13 +358,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#4CAF50", // Green color for initials
   },
+  titleContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 10,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
     color: "#000000",
-    flex: 1,
     textAlign: "center",
-    marginHorizontal: 10,
+  },
+  emptyTitle: {
+    // Empty view to maintain layout when no title is present
   },
   headerIcons: {
     flexDirection: "row",
