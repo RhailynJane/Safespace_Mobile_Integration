@@ -332,7 +332,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical:2,
     height: 48,
-    
+  },
+  emptyTitle: {
+    flex: 1,
   },
   headerTitle: {
     fontWeight: "500", 
@@ -373,15 +375,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 10,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#000000",
-    textAlign: "center",
-  },
-  emptyTitle: {
-    // Empty view to maintain layout when no title is present
-  },
+
   headerIcons: {
     flexDirection: "row",
     alignItems: "center",
