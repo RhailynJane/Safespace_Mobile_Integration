@@ -184,23 +184,29 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
+      <View style={styles.headerWrapper}>
             <AppHeader 
             title="Messages" 
             showBack={true}
-<<<<<<< HEAD
-            titleStyle={{ fontSize: 24, fontWeight: '700' }} 
-            containerStyle={{ backgroundColor: '#your-color' }} 
-=======
->>>>>>> annie-messages-ui-modifications
         />
+        </View>
+
+      {/* New Message Button */}
+      <View>
+      <TouchableOpacity
+        style={styles.newMessageButton}
+        onPress={() => router.push("../messages/new-message")}
+      >
+        <LinearGradient
+          colors={['#5296EA', '#489EEA', '#459EEA', '#4896EA']}
+          style={styles.newMessageButtonGradient}
+        >
+          <Text style={styles.newMessageButtonText}>+ New Message</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons
-          name="search"
-          size={20}
-          color="#9E9E9E"
-          style={styles.searchIcon}
-        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
@@ -208,9 +214,16 @@ export default function MessagesScreen() {
           onChangeText={setSearchQuery}
           placeholderTextColor="#9E9E9E"
         />
+        <Ionicons
+          name="search"
+          size={22}
+          color="#333"
+          style={styles.searchIcon}
+        />
       </View>
 
       {/* Conversation List */}
+      <View style={styles.conversationContainer}>
       <ScrollView style={styles.conversationList}>
         {conversations.map((conversation) => (
           <TouchableOpacity
@@ -250,19 +263,8 @@ export default function MessagesScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+      </View>
 
-      {/* New Message Button */}
-      <TouchableOpacity
-        style={styles.newMessageButton}
-        onPress={() => router.push("../messages/new-message")}
-      >
-        <LinearGradient
-          colors={["#4CAF50", "#2E7D32"]}
-          style={styles.newMessageButtonGradient}
-        >
-          <Ionicons name="add" size={28} color="#FFFFFF" />
-        </LinearGradient>
-      </TouchableOpacity>
 
       {/* Side Menu */}
       <Modal
@@ -309,12 +311,26 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#F2F2F7",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  headerWrapper: {
+    backgroundColor: "#BAD6D2",
+    height: 50,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "grey",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   header: {
     flexDirection: "row",
@@ -332,19 +348,29 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
+    borderRadius:30,
+    backgroundColor: "#fff",
+    marginTop: -1,
     margin: 15,
-    borderRadius: 10,
     paddingHorizontal: 15,
     height: 50,
+    shadowColor: "grey",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: .5,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 13,
     color: "#333",
+    fontStyle: "italic",
   },
 
   content: {
@@ -352,6 +378,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
+    backgroundColor:"#F2F2F7",
   },
   title: {
     fontSize: 22,
@@ -419,23 +446,38 @@ const styles = StyleSheet.create({
   },
   conversationList: {
     flex: 1,
-    paddingHorizontal: 15,
+    paddingHorizontal: 5,
+  },
+  conversationContainer: {
+    flex: 1,
+    backgroundColor: "#FAFAFA", 
+    borderWidth: 1,
+    margin: 15,
+    padding: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   conversationItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
+    paddingVertical: 4,
+    paddingBottom: 10,
+    paddingTop: 3,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#000",
+    width: "100%",
   },
   avatarContainer: {
     position: "relative",
     marginRight: 15,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 60,
   },
   onlineIndicator: {
     position: "absolute",
@@ -454,17 +496,18 @@ const styles = StyleSheet.create({
   conversationHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 5,
+    alignItems: "flex-end",
+    marginBottom: 10,
   },
   conversationName: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "800",
     color: "#333",
   },
   conversationTime: {
     fontSize: 12,
-    color: "#9E9E9E",
+    fontStyle: "italic",
+    color: "#000",
   },
   conversationMessage: {
     fontSize: 14,
@@ -476,8 +519,8 @@ const styles = StyleSheet.create({
   },
   unreadBadge: {
     backgroundColor: "#4CAF50",
-    width: 20,
-    height: 20,
+    width: 15,
+    height: 15,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
@@ -485,25 +528,32 @@ const styles = StyleSheet.create({
   },
   unreadCount: {
     color: "#FFF",
-    fontSize: 12,
+    fontSize: 5,
     fontWeight: "bold",
   },
   newMessageButton: {
-    position: "absolute",
-    bottom: 80,
-    right: 20,
-    zIndex: 10,
+    marginHorizontal:40,
+    marginTop:10,
+    marginBottom:15,
+    shadowColor: "grey",
+    shadowOffset: {
+      width: 2,
+      height: 2,
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
+    elevation: 3,
   },
   newMessageButtonGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: "100%",
+    height: 50,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
+  newMessageButtonText: {
+  color: "#000",
+  fontSize: 16,
+  fontWeight: "800",
+},
 });

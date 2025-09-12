@@ -311,9 +311,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 9,
-    paddingTop: 10,
-    paddingBottom: 15,
+    paddingVertical:2,
+    height: 48,
     
+  },
+  headerTitle: {
+    fontWeight: "500", 
+    fontSize: 17,      
+    textAlign: "left",
+    letterSpacing: .5, 
+    marginLeft: 10,    
+    flex: 1,         
   },
   backButton: {
     width: 40,
@@ -340,14 +348,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#4CAF50",
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#000000",
-    flex: 1,
-    textAlign: "center",
-    marginHorizontal: 10,
-  },
+
   headerIcons: {
     flexDirection: "row",
     alignItems: "center",
