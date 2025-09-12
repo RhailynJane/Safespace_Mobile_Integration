@@ -14,47 +14,19 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Svg, { Path } from 'react-native-svg'; // Add this import
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
-// Custom Back Arrow Component
-const CustomBackArrow = ({ 
-  width = 24, 
-  height = 24, 
-  fill = "#000", 
-  stroke = "#000", 
-  strokeWidth = 2,
-  ...props 
-}) => (
-  <Svg 
-    width={width} 
-    height={height} 
-    viewBox="0 0 24 24" 
-    fill="none"
-    {...props}
-  >
-    <Path
-      fillRule="evenodd"
-      clipRule="evenodd"
-      d="M22 20.418C19.5533 17.4313 17.3807 15.7367 15.482 15.334C13.5833 14.9313 11.7757 14.8705 10.059 15.1515V20.5L2 11.7725L10.059 3.5V8.5835C13.2333 8.6085 15.932 9.74733 18.155 12C20.3777 14.2527 21.6593 17.0587 22 20.418Z"
-      fill={fill}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeLinejoin="round"
-    />
-  </Svg>
-);
-
+// Props interface for the AppHeader component
 export interface AppHeaderProps {
-  title?: string;
-  showBack?: boolean;
-  showMenu?: boolean;
-  showNotifications?: boolean;
-  rightActions?: React.ReactNode;
-  onMenuPress?: () => void;
+  title?: string;               // Optional header title
+  showBack?: boolean;           // Whether to show back button instead of profile
+  showMenu?: boolean;           // Whether to show menu button
+  showNotifications?: boolean;  // Whether to show notifications button
+  rightActions?: React.ReactNode; // Custom right-side actions/components
+  onMenuPress?: () => void;     // Optional custom menu press handler
 }
 
 export const AppHeader = ({
@@ -63,13 +35,18 @@ export const AppHeader = ({
   showMenu = true,
   showNotifications = true,
   rightActions,
-
 }: AppHeaderProps) => {
+  // State for managing side menu visibility and profile image
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  
+  // Auth context for user data and logout functionality
   const { logout, user, profile } = useAuth();
+  
+  // Animation value for fade effects
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Function to show the side menu with animation
   const showSideMenu = () => {
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
@@ -79,6 +56,7 @@ export const AppHeader = ({
     }).start();
   };
 
+  // Function to hide the side menu with animation
   const hideSideMenu = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -89,6 +67,7 @@ export const AppHeader = ({
     });
   };
 
+  // Load profile image from AsyncStorage
   const loadProfileImage = async () => {
     try {
       const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
@@ -100,22 +79,26 @@ export const AppHeader = ({
     }
   };
 
+  // Load profile image when component mounts or user ID changes
   useEffect(() => {
     loadProfileImage();
   }, [user?.uid]);
 
+  // Generate initials from user's name for profile placeholder
   const getInitials = () => {
     const firstName = profile?.firstName || "";
     const lastName = profile?.lastName || "";
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
   };
 
+  // Get greeting name from profile or user data
   const getGreetingName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
     return "User";
   };
 
+  // Menu items for the side navigation drawer
   const sideMenuItems = [
     {
       icon: "home",
@@ -221,24 +204,31 @@ export const AppHeader = ({
 
   return (
     <>
+      {/* Main Header Container */}
       <View style={styles.header}>
+        {/* Left Section: Back Button or Profile Image */}
         {showBack ? (
+          // Back button for navigation
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
+            accessibilityLabel="Go back"
           >
-            <CustomBackArrow
-              width={24}
-              height={24}
-              fill="#000"
-              stroke="#000"
-            />
+            <Ionicons name="arrow-undo-sharp" size={24} color="black" />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+          // Profile image/initials that navigate to profile edit
+          <TouchableOpacity 
+            onPress={() => router.push("/(app)/(tabs)/profile/edit")}
+            accessibilityLabel="Edit profile"
+          >
             <View style={styles.profileImageContainer}>
               {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                <Image 
+                  source={{ uri: profileImage }} 
+                  style={styles.profileImage} 
+                  accessibilityLabel="Profile photo"
+                />
               ) : (
                 <Text style={styles.initialsText}>{getInitials()}</Text>
               )}
@@ -246,18 +236,38 @@ export const AppHeader = ({
           </TouchableOpacity>
         )}
 
-        {title && <Text style={styles.headerTitle}>{title}</Text>}
+        {/* Center Section: Title - FIXED: Ensure text is always wrapped in Text component */}
+        <View style={styles.titleContainer}>
+          {title ? (
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              {title}
+            </Text>
+          ) : (
+            <View style={styles.emptyTitle} /> // Empty view to maintain layout
+          )}
+        </View>
 
+        {/* Right Section: Icons and Actions */}
         <View style={styles.headerIcons}>
+          {/* Custom right-side actions passed as props */}
           {rightActions}
-            {showNotifications && (
-          <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#666" />
-          </TouchableOpacity> )}
+          
+          {/* Notifications Icon */}
+          {showNotifications && (
+            <TouchableOpacity 
+              onPress={() => router.push("/notifications")}
+              accessibilityLabel="View notifications"
+            >
+              <Ionicons name="notifications-outline" size={24} color="#666" />
+            </TouchableOpacity>
+          )}
+          
+          {/* Menu Icon - Opens side navigation drawer */}
           {showMenu && (
             <TouchableOpacity 
               style={styles.menuButton}
               onPress={showSideMenu}
+              accessibilityLabel="Open menu"
             >
               <Ionicons name="grid" size={24} color="#666" />
             </TouchableOpacity>
@@ -265,29 +275,37 @@ export const AppHeader = ({
         </View>
       </View>
 
-      {/* Side Menu Modal */}
+      {/* Side Menu Modal - Navigation Drawer */}
       <Modal
         animationType="none" 
         transparent={true}
         visible={sideMenuVisible}
-        onRequestClose={hideSideMenu}
+        onRequestClose={hideSideMenu} // Android back button support
       >
+        {/* Overlay with press-to-close functionality */}
         <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
           <Pressable
             style={StyleSheet.absoluteFillObject}
             onPress={hideSideMenu}
+            accessibilityLabel="Close menu"
           />
+          
+          {/* Side Menu Content */}
           <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+            {/* User Profile Section in Menu Header */}
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getGreetingName()}</Text>
               <Text style={styles.profileEmail}>{user?.email}</Text>
             </View>
+            
+            {/* Scrollable List of Menu Items */}
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
                 <TouchableOpacity
                   key={index}
                   style={styles.sideMenuItem}
                   onPress={item.onPress}
+                  accessibilityLabel={item.title}
                 >
                   <Ionicons
                     name={item.icon as any}
@@ -305,6 +323,7 @@ export const AppHeader = ({
   );
 };
 
+// Styles for the component
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
@@ -313,7 +332,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingTop: 10,
     paddingBottom: 15,
-    
   },
   backButton: {
     width: 40,
@@ -326,7 +344,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#E8F5E9",
+    backgroundColor: "#E8F5E9", // Light green background for initials
     justifyContent: "center",
     alignItems: "center",
   },
@@ -338,51 +356,58 @@ const styles = StyleSheet.create({
   initialsText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#4CAF50",
+    color: "#4CAF50", // Green color for initials
+  },
+  titleContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 10,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
     color: "#000000",
-    flex: 1,
     textAlign: "center",
-    marginHorizontal: 10,
+  },
+  emptyTitle: {
+    // Empty view to maintain layout when no title is present
   },
   headerIcons: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 12, // Space between icons
   },
   menuButton: {
     padding: 4,
   },
   fullScreenOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent black overlay
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
   },
   sideMenu: {
-    paddingTop: 40,
-    width: width * 0.75,
+    paddingTop: 40, // Extra padding at top for status bar
+    width: width * 0.75, // 75% of screen width
     backgroundColor: "#FFFFFF",
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "#E0E0E0", // Light gray border
     alignItems: "center",
   },
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    color: "#212121", // Dark gray
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
+    color: "#757575", // Medium gray
   },
   sideMenuContent: {
     padding: 10,
@@ -393,11 +418,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "#F0F0F0", // Very light gray border
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
+    color: "#333", // Dark text color
+    marginLeft: 15, // Space between icon and text
   },
 });

@@ -184,9 +184,7 @@ export default function AppointmentsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <AppHeader title="Appointments" showBack={true} />
-      {/* Add the image above the main content */}
       <View style={styles.imageContainer}>
         <Image 
           source={require('../../../../assets/images/appointment.png')} 
