@@ -200,7 +200,7 @@ export default function CommunityScreen() {
   if (loading) {
     return (
       <LinearGradient
-        colors={[ '#9E91CB','#D2D2F0D6','#C5B5FE','#A18FFF',]}
+        colors={['#E8E4F0', '#E2DDF2', '#DDD7F1', '#D8D2EF']}
         style={styles.loadingContainer}
       >
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -210,7 +210,7 @@ export default function CommunityScreen() {
 
   return (
     <LinearGradient
-      colors={[ '#D2D2F0D6','#A18FFF',]}
+      colors={['#E8E4F0', '#E2DDF2', '#DDD7F1', '#D8D2EF']}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
