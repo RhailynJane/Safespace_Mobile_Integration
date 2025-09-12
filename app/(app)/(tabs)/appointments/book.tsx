@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   supportWorkerCard: {
-    backgroundColor: "#c0d8c1",
+    backgroundColor: "#f0f8ff",
     borderRadius: 10,
     padding: 16,
     marginHorizontal: 15,
