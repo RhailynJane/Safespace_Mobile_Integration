@@ -1,4 +1,3 @@
-// File: components/AppHeader.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -15,7 +14,6 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -40,9 +38,18 @@ export const AppHeader = ({
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   
-  // Auth context for user data and logout functionality
-  const { logout, user, profile } = useAuth();
+  // Mock user data for frontend-only version
+  const [user] = useState({
+    uid: "demo-user-id",
+    email: "demo@gmail.com",
+    displayName: "Demo User"
+  });
   
+  const [profile] = useState({
+    firstName: "Demo",
+    lastName: "User"
+  });
+
   // Animation value for fade effects
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -67,10 +74,16 @@ export const AppHeader = ({
     });
   };
 
+  // Mock logout function for frontend-only version
+  const logout = async () => {
+    console.log("User logged out (frontend simulation)");
+    router.replace("/login");
+  };
+
   // Load profile image from AsyncStorage
   const loadProfileImage = async () => {
     try {
-      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
+      const savedImage = await AsyncStorage.getItem(`profileImage_${user.uid}`);
       if (savedImage) {
         setProfileImage(savedImage);
       }
@@ -79,10 +92,10 @@ export const AppHeader = ({
     }
   };
 
-  // Load profile image when component mounts or user ID changes
+  // Load profile image when component mounts
   useEffect(() => {
     loadProfileImage();
-  }, [user?.uid]);
+  }, []);
 
   // Generate initials from user's name for profile placeholder
   const getInitials = () => {
@@ -236,7 +249,7 @@ export const AppHeader = ({
           </TouchableOpacity>
         )}
 
-        {/* Center Section: Title - FIXED: Ensure text is always wrapped in Text component */}
+        {/* Center Section: Title */}
         <View style={styles.titleContainer}>
           {title ? (
             <Text style={styles.headerTitle} accessibilityRole="header">
