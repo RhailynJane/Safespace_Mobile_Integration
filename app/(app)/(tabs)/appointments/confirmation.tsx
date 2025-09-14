@@ -227,7 +227,7 @@ export default function BookAppointment() {
   const appointment = appointments.length > 0 ? appointments[0] : null;
 
   return (
-    <CurvedBackground key={Math.random()}>
+    <CurvedBackground>
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <AppHeader title="Appointments" showBack={true} />

@@ -213,7 +213,7 @@ export default function AppointmentList() {
   };
 
   return (
-    <CurvedBackground key={Math.random()}>
+    <CurvedBackground>
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <AppHeader title="Appointments" showBack={true} />
