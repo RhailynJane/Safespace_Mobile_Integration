@@ -7,6 +7,13 @@ export default function LoadingScreen() {
   // Track loading progress percentage
   const [progress, setProgress] = useState(1);
 
+
+/**
+ * LLM DeepSeek: 
+ * Create a comprehensive React Native animation system with multiple animated circles 
+ * that have different behaviors and timing patterns.
+ */
+
   // Animation values for scaling effects on decorative circles
   const circle1Anim = new Animated.Value(1); // Primary large circle
   const circle2Anim = new Animated.Value(1); // Secondary medium circle
