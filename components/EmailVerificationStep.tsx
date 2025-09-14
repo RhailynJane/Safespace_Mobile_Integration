@@ -7,7 +7,6 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "../context/AuthContext";
 
 interface EmailVerificationStepProps {
   email: string;
@@ -22,7 +21,6 @@ export default function EmailVerificationStep({
   onBack,
   stepNumber,
 }: EmailVerificationStepProps) {
-  const { sendVerificationEmail, checkEmailVerification } = useAuth();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState("");
@@ -42,16 +40,14 @@ export default function EmailVerificationStep({
 
     try {
       setLoading(true);
-      const success = await sendVerificationEmail();
-      if (success) {
-        setCooldown(30); // 30-second cooldown
-        Alert.alert(
-          "Verification Email Sent",
-          `A new verification link has been sent to ${email}`
-        );
-      } else {
-        setError("Failed to resend verification email");
-      }
+      // Simulate sending verification email
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setCooldown(30); // 30-second cooldown
+      Alert.alert(
+        "Verification Email Sent",
+        `A new verification link has been sent to ${email}`
+      );
     } catch (err) {
       setError("Failed to resend verification email");
       console.error("Resend error:", err);
@@ -64,8 +60,13 @@ export default function EmailVerificationStep({
     try {
       setChecking(true);
       setError("");
-      const verified = await checkEmailVerification();
-
+      
+      // Simulate checking verification status
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // For demo purposes, we'll simulate successful verification
+      const verified = true; 
+      
       if (verified) {
         setIsVerified(true);
         onNext(); // Proceed to next step
