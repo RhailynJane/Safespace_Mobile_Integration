@@ -14,7 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CurvedBackground from "../../../components/CurvedBackground";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 /**
  * ProfileScreen Component
