@@ -15,19 +15,17 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../../context/AuthContext";
-import BottomNavigation from "../../../../components/BottomNavigation";
 import { LinearGradient } from "expo-linear-gradient";
-import { AppHeader } from "../../../../components/AppHeader"
+import BottomNavigation from "../../../../components/BottomNavigation";
+import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
-  const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
-  const [newMessageModalVisible, setNewMessageModalVisible] = useState(false);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -45,6 +43,7 @@ export default function MessagesScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+  
   const sideMenuItems = [
     {
       icon: "home",
@@ -139,15 +138,13 @@ export default function MessagesScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Simulate logout
+        console.log("User signed out");
       },
     },
   ];
 
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
     return "User";
   };
 
@@ -179,131 +176,151 @@ export default function MessagesScreen() {
       online: false,
       avatar: "https://randomuser.me/api/portraits/women/4.jpg",
     },
+    {
+      id: 3,
+      name: "Dr. Sarah Johnson",
+      lastMessage: "Let's schedule our next appointment.",
+      time: "1d ago",
+      unread: 1,
+      online: false,
+      avatar: "https://randomuser.me/api/portraits/women/32.jpg",
+    },
+    {
+      id: 4,
+      name: "Therapist Group",
+      lastMessage: "Mark: Has anyone tried the new technique?",
+      time: "3d ago",
+      unread: 0,
+      online: false,
+      avatar: "https://randomuser.me/api/portraits/men/22.jpg",
+    },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerWrapper}>
-            <AppHeader 
+      <CurvedBackground>
+        {/* Header */}
+        <View style={styles.headerWrapper}>
+          <AppHeader 
             title="Messages" 
             showBack={true}
-        />
-        </View>
-
-      {/* New Message Button */}
-      <View>
-      <TouchableOpacity
-        style={styles.newMessageButton}
-        onPress={() => router.push("../messages/new-message")}
-      >
-        <LinearGradient
-          colors={['#5296EA', '#489EEA', '#459EEA', '#4896EA']}
-          style={styles.newMessageButtonGradient}
-        >
-          <Text style={styles.newMessageButtonText}>+ New Message</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search conversations..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor="#9E9E9E"
-        />
-        <Ionicons
-          name="search"
-          size={22}
-          color="#333"
-          style={styles.searchIcon}
-        />
-      </View>
-
-      {/* Conversation List */}
-      <View style={styles.conversationContainer}>
-      <ScrollView style={styles.conversationList}>
-        {conversations.map((conversation) => (
-          <TouchableOpacity
-            key={conversation.id}
-            style={styles.conversationItem}
-            onPress={() => router.replace(`../messages/message-chat-screen?id=${conversation.id}`)}
-          >
-            <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: conversation.avatar }}
-                style={styles.avatar}
-              />
-              {conversation.online && <View style={styles.onlineIndicator} />}
-            </View>
-
-            <View style={styles.conversationContent}>
-              <View style={styles.conversationHeader}>
-                <Text style={styles.conversationName}>{conversation.name}</Text>
-                <Text style={styles.conversationTime}>{conversation.time}</Text>
-              </View>
-              <Text
-                style={[
-                  styles.conversationMessage,
-                  conversation.unread > 0 && styles.unreadMessage,
-                ]}
-                numberOfLines={1}
-              >
-                {conversation.lastMessage}
-              </Text>
-            </View>
-
-            {conversation.unread > 0 && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadCount}>{conversation.unread}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-      </View>
-
-
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
           />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
         </View>
-      </Modal>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
+        {/* New Message Button */}
+        <View>
+          <TouchableOpacity
+            style={styles.newMessageButton}
+            onPress={() => router.push("../messages/new-message")}
+          >
+            <LinearGradient
+              colors={['#5296EA', '#489EEA', '#459EEA', '#4896EA']}
+              style={styles.newMessageButtonGradient}
+            >
+              <Text style={styles.newMessageButtonText}>+ New Message</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+        
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#9E9E9E"
+          />
+          <Ionicons
+            name="search"
+            size={22}
+            color="#333"
+            style={styles.searchIcon}
+          />
+        </View>
+
+        {/* Conversation List */}
+        <View style={styles.conversationContainer}>
+          <ScrollView style={styles.conversationList}>
+            {conversations.map((conversation) => (
+              <TouchableOpacity
+                key={conversation.id}
+                style={styles.conversationItem}
+                onPress={() => router.replace(`../messages/message-chat-screen?id=${conversation.id}`)}
+              >
+                <View style={styles.avatarContainer}>
+                  <Image
+                    source={{ uri: conversation.avatar }}
+                    style={styles.avatar}
+                  />
+                  {conversation.online && <View style={styles.onlineIndicator} />}
+                </View>
+
+                <View style={styles.conversationContent}>
+                  <View style={styles.conversationHeader}>
+                    <Text style={styles.conversationName}>{conversation.name}</Text>
+                    <Text style={styles.conversationTime}>{conversation.time}</Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.conversationMessage,
+                      conversation.unread > 0 && styles.unreadMessage,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {conversation.lastMessage}
+                  </Text>
+                </View>
+
+                {conversation.unread > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadCount}>{conversation.unread}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Side Menu */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>user@example.com</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </CurvedBackground>
     </SafeAreaView>
   );
 }
@@ -311,15 +328,15 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#fff",
   },
   headerWrapper: {
-    backgroundColor: "#BAD6D2",
+    backgroundColor: "transparent",
     height: 50,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
@@ -338,7 +355,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#BAD6D2",
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontSize: 20,
@@ -378,7 +395,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
-    backgroundColor:"#F2F2F7",
+    backgroundColor:"transparent",
   },
   title: {
     fontSize: 22,
@@ -450,7 +467,7 @@ const styles = StyleSheet.create({
   },
   conversationContainer: {
     flex: 1,
-    backgroundColor: "#FAFAFA", 
+    backgroundColor: "rgba(250, 250, 250, 0.8)", 
     borderWidth: 1,
     margin: 15,
     padding: 10,
@@ -459,6 +476,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    borderRadius: 10,
+    borderColor: "rgba(0, 0, 0, 0.1)",
   },
   conversationItem: {
     flexDirection: "row",
@@ -467,7 +486,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     paddingTop: 3,
     borderBottomWidth: 1,
-    borderBottomColor: "#000",
+    borderBottomColor: "rgba(0, 0, 0, 0.1)",
     width: "100%",
   },
   avatarContainer: {
@@ -519,8 +538,8 @@ const styles = StyleSheet.create({
   },
   unreadBadge: {
     backgroundColor: "#4CAF50",
-    width: 15,
-    height: 15,
+    width: 20,
+    height: 20,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
@@ -528,7 +547,7 @@ const styles = StyleSheet.create({
   },
   unreadCount: {
     color: "#FFF",
-    fontSize: 5,
+    fontSize: 12,
     fontWeight: "bold",
   },
   newMessageButton: {
@@ -552,8 +571,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   newMessageButtonText: {
-  color: "#000",
-  fontSize: 16,
-  fontWeight: "800",
-},
+    color: "#000",
+    fontSize: 16,
+    fontWeight: "800",
+  },
 });
