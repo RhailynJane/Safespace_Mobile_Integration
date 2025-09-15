@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 // Sample messages data for each conversation
 const conversationMessages: {
@@ -161,6 +162,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <CurvedBackground />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -272,6 +274,7 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      <CurvedBackground />
     </SafeAreaView>
   );
 }
