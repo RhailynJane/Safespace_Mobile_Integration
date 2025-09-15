@@ -10,20 +10,34 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../context/AuthContext";
-import BottomNavigation from "../../components/BottomNavigation";
+import BottomNavigation from "../../../components/BottomNavigation";
+import CurvedBackground from "../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
+
 export default function AssessmentScreen() {
-  const { user, profile, logout } = useAuth();
+  // State for managing side menu visibility
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  // State for loading indicator (not currently used but kept for structure)
   const [loading, setLoading] = useState(false);
+  // State to track active tab in bottom navigation
   const [activeTab, setActiveTab] = useState("assessment");
 
+  // Mock user data to replace backend implementation
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
+  // Configuration for bottom navigation tabs
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -32,6 +46,7 @@ export default function AssessmentScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // Handler for tab press in bottom navigation
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -41,6 +56,7 @@ export default function AssessmentScreen() {
     }
   };
 
+  // Assessment options data with styling and metadata
   const assessmentOptions = [
     {
       id: "before-appointment",
@@ -68,11 +84,13 @@ export default function AssessmentScreen() {
     },
   ];
 
+  // Handler for when user selects an assessment option
   const handleAssessmentOption = (optionId: string) => {
     // All assessment options navigate to the same assessment selection screen
     router.push("/assessment/selection");
   };
 
+  // Side menu navigation items with icons and actions
   const sideMenuItems = [
     {
       icon: "home",
@@ -167,18 +185,21 @@ export default function AssessmentScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock sign out functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  // Helper function to get display name from user data
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Loading state UI (not currently triggered but kept for structure)
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -189,7 +210,10 @@ export default function AssessmentScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Curved background component for visual enhancement */}
+      <CurvedBackground />
+      
+      {/* Header section with navigation controls */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -208,10 +232,10 @@ export default function AssessmentScreen() {
         </View>
       </View>
 
+      {/* Main scrollable content area */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Illustration Section */}
+        {/* Illustration section with custom graphics */}
         <View style={styles.illustrationContainer}>
-          {/* You can replace this with your uploaded illustration */}
           <View style={styles.illustrationPlaceholder}>
             <View style={styles.cloudShape}>
               <Ionicons name="heart" size={30} color="#4CAF50" />
@@ -232,7 +256,7 @@ export default function AssessmentScreen() {
           <Text style={styles.questionText}>Why are you taking this assessment?</Text>
         </View>
 
-        {/* Assessment Options */}
+        {/* Assessment options selection cards */}
         <View style={styles.optionsContainer}>
           {assessmentOptions.map((option) => (
             <TouchableOpacity
@@ -252,7 +276,7 @@ export default function AssessmentScreen() {
         </View>
       </ScrollView>
 
-      {/* Side Menu */}
+      {/* Side menu modal for additional navigation options */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -267,7 +291,7 @@ export default function AssessmentScreen() {
           <View style={styles.sideMenu}>
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -285,6 +309,7 @@ export default function AssessmentScreen() {
         </View>
       </Modal>
 
+      {/* Bottom navigation component */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
