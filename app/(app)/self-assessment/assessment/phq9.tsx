@@ -13,13 +13,28 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import CurvedBackground from "../../../../components/CurvedBackground";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 
+// Mock user data for frontend-only implementation
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
 export default function PHQ9QuestionnaireScreen() {
-  const { user, profile, logout } = useAuth();
+  // Using mock data instead of AuthContext
+  const user = mockUser;
+  const profile = mockProfile;
+  
+  // State management for UI components
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("assessment");
@@ -27,6 +42,7 @@ export default function PHQ9QuestionnaireScreen() {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [isCompleted, setIsCompleted] = useState(false);
 
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -35,6 +51,7 @@ export default function PHQ9QuestionnaireScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // PHQ-9 assessment questions
   const questions = [
     {
       id: 0,
@@ -83,6 +100,7 @@ export default function PHQ9QuestionnaireScreen() {
     }
   ];
 
+  // Answer options for PHQ-9 questions
   const answerOptions = [
     { value: 0, label: "Not At All" },
     { value: 1, label: "Several days" },
@@ -90,6 +108,7 @@ export default function PHQ9QuestionnaireScreen() {
     { value: 3, label: "Nearly every day" }
   ];
 
+  // Handle tab navigation
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -99,10 +118,12 @@ export default function PHQ9QuestionnaireScreen() {
     }
   };
 
+  // Handle answer selection for current question
   const handleAnswerSelect = (value: number) => {
     setAnswers({ ...answers, [currentQuestion]: value });
   };
 
+  // Navigate to next question or complete assessment
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
@@ -112,22 +133,26 @@ export default function PHQ9QuestionnaireScreen() {
     }
   };
 
+  // Navigate to previous question
   const handleBack = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
     }
   };
 
+  // Reset the assessment to start over
   const handleStartOver = () => {
     setCurrentQuestion(0);
     setAnswers({});
     setIsCompleted(false);
   };
 
+  // Navigate to assessment selection screen
   const handleTakeAnotherAssessment = () => {
     router.push("/assessment/selection");
   };
 
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -222,11 +247,13 @@ export default function PHQ9QuestionnaireScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Frontend-only implementation - just navigate to login
+        router.replace("/login");
       },
     },
   ];
 
+  // Get display name from profile or user data
   const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -234,6 +261,7 @@ export default function PHQ9QuestionnaireScreen() {
     return "User";
   };
 
+  // Show loading indicator while processing
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -242,9 +270,13 @@ export default function PHQ9QuestionnaireScreen() {
     );
   }
 
+  // Show completion screen when assessment is finished
   if (isCompleted) {
     return (
       <SafeAreaView style={styles.container}>
+        {/* Add CurvedBackground to the completion screen */}
+        <CurvedBackground />
+        
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
@@ -331,8 +363,12 @@ export default function PHQ9QuestionnaireScreen() {
     );
   }
 
+  // Main assessment screen
   return (
     <SafeAreaView style={styles.container}>
+      {/* Add CurvedBackground to the main assessment screen */}
+      <CurvedBackground />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
