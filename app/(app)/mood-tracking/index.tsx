@@ -293,7 +293,7 @@ const MoodTrackingScreen = () => {
 
   // Navigate to mood logging screen with selected mood
   const handleMoodPress = (moodId: MoodType) => {
-    router.push(`/(app)/mood-logging?selectedMood=${moodId}`);
+    router.push(`/(app)/mood-tracking/mood-logging?selectedMood=${moodId}`);
   };
 
   // Render individual mood emoji with animations
@@ -418,7 +418,7 @@ const MoodTrackingScreen = () => {
         {/* Navigation to view full mood history */}
         <TouchableOpacity
           style={styles.historyLink}
-          onPress={() => router.push("/(app)/mood-history")}
+          onPress={() => router.push("/(app)/mood-tracking/mood-history")}
         >
           <Text style={styles.historyLinkText}>View Mood History</Text>
           <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
