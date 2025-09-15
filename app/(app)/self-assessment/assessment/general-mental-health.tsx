@@ -13,13 +13,24 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 
-export default function GAD7QuestionnaireScreen() {
-  const { user, profile, logout } = useAuth();
+// Mock user data for demonstration purposes
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+export default function GeneralMentalHealthAssessmentScreen() {
+  // State management for UI components and assessment progress
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("assessment");
@@ -27,6 +38,7 @@ export default function GAD7QuestionnaireScreen() {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [isCompleted, setIsCompleted] = useState(false);
 
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -35,51 +47,153 @@ export default function GAD7QuestionnaireScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // Comprehensive mental health assessment questions organized by domains
   const questions = [
+    // Overall Well-being
     {
       id: 0,
-      text: "Over the last 2 weeks, how often have you been bothered by feeling nervous, anxious or on edge?",
-      shortText: "Feeling nervous, anxious or on edge"
+      text: "Over the past 2 weeks, how would you rate your overall mental health?",
+      shortText: "Overall mental health rating",
+      domain: "Overall Well-being"
     },
     {
       id: 1,
-      text: "Over the last 2 weeks, how often have you been bothered by not being able to stop or control worrying?",
-      shortText: "Not being able to stop or control worrying"
+      text: "Over the past 2 weeks, how often have you felt cheerful and in good spirits?",
+      shortText: "Feeling cheerful and in good spirits",
+      domain: "Overall Well-being"
     },
     {
       id: 2,
-      text: "Over the last 2 weeks, how often have you been bothered by worrying too much about different things?",
-      shortText: "Worrying too much about different things"
+      text: "Over the past 2 weeks, how often have you felt calm and relaxed?",
+      shortText: "Feeling calm and relaxed",
+      domain: "Overall Well-being"
     },
+    
+    // Mood & Emotions
     {
       id: 3,
-      text: "Over the last 2 weeks, how often have you been bothered by trouble relaxing?",
-      shortText: "Trouble relaxing"
+      text: "Over the past 2 weeks, how often have you felt sad or down?",
+      shortText: "Feeling sad or down",
+      domain: "Mood & Emotions"
     },
     {
       id: 4,
-      text: "Over the last 2 weeks, how often have you been bothered by being so restless that it is hard to sit still?",
-      shortText: "Being so restless that it is hard to sit still"
+      text: "Over the past 2 weeks, how often have you felt hopeless about the future?",
+      shortText: "Feeling hopeless about the future",
+      domain: "Mood & Emotions"
     },
     {
       id: 5,
-      text: "Over the last 2 weeks, how often have you been bothered by becoming easily annoyed or irritable?",
-      shortText: "Becoming easily annoyed or irritable"
+      text: "Over the past 2 weeks, how often have you experienced mood swings?",
+      shortText: "Experiencing mood swings",
+      domain: "Mood & Emotions"
     },
     {
       id: 6,
-      text: "Over the last 2 weeks, how often have you been bothered by feeling afraid as if something awful might happen?",
-      shortText: "Feeling afraid as if something awful might happen"
+      text: "Over the past 2 weeks, how often have you felt emotionally overwhelmed?",
+      shortText: "Feeling emotionally overwhelmed",
+      domain: "Mood & Emotions"
+    },
+    
+    // Anxiety & Stress
+    {
+      id: 7,
+      text: "Over the past 2 weeks, how often have you felt nervous, anxious, or on edge?",
+      shortText: "Feeling nervous, anxious, or on edge",
+      domain: "Anxiety & Stress"
+    },
+    {
+      id: 8,
+      text: "Over the past 2 weeks, how often have you felt stressed or under pressure?",
+      shortText: "Feeling stressed or under pressure",
+      domain: "Anxiety & Stress"
+    },
+    {
+      id: 9,
+      text: "Over the past 2 weeks, how often have you had trouble relaxing?",
+      shortText: "Having trouble relaxing",
+      domain: "Anxiety & Stress"
+    },
+    
+    // Sleep & Energy
+    {
+      id: 10,
+      text: "Over the past 2 weeks, how often have you had trouble falling or staying asleep?",
+      shortText: "Having trouble with sleep",
+      domain: "Sleep & Energy"
+    },
+    {
+      id: 11,
+      text: "Over the past 2 weeks, how often have you felt tired or had little energy?",
+      shortText: "Feeling tired or lacking energy",
+      domain: "Sleep & Energy"
+    },
+    {
+      id: 12,
+      text: "Over the past 2 weeks, how often has your sleep been restful and refreshing?",
+      shortText: "Sleep being restful and refreshing",
+      domain: "Sleep & Energy"
+    },
+    
+    // Concentration & Daily Functioning
+    {
+      id: 13,
+      text: "Over the past 2 weeks, how often have you had trouble concentrating on things?",
+      shortText: "Having trouble concentrating",
+      domain: "Concentration & Daily Functioning"
+    },
+    {
+      id: 14,
+      text: "Over the past 2 weeks, how often have you felt productive and accomplished tasks well?",
+      shortText: "Feeling productive and accomplishing tasks",
+      domain: "Concentration & Daily Functioning"
+    },
+    {
+      id: 15,
+      text: "Over the past 2 weeks, how often have daily activities felt overwhelming?",
+      shortText: "Daily activities feeling overwhelming",
+      domain: "Concentration & Daily Functioning"
+    },
+    
+    // Social & Relationships
+    {
+      id: 16,
+      text: "Over the past 2 weeks, how often have you felt connected to friends and family?",
+      shortText: "Feeling connected to friends and family",
+      domain: "Social & Relationships"
+    },
+    {
+      id: 17,
+      text: "Over the past 2 weeks, how often have you withdrawn from social activities?",
+      shortText: "Withdrawing from social activities",
+      domain: "Social & Relationships"
+    },
+    
+    // Coping & Self-care
+    {
+      id: 18,
+      text: "Over the past 2 weeks, how often have you been taking good care of yourself?",
+      shortText: "Taking good care of yourself",
+      domain: "Coping & Self-care"
+    },
+    {
+      id: 19,
+      text: "Over the past 2 weeks, how often have you been able to cope with daily challenges?",
+      shortText: "Coping with daily challenges",
+      domain: "Coping & Self-care"
     }
   ];
 
+  // Answer options with numerical values for scoring
   const answerOptions = [
-    { value: 0, label: "Not At All" },
-    { value: 1, label: "Several days" },
-    { value: 2, label: "More than half the days" },
-    { value: 3, label: "Nearly every day" }
+    { value: 0, label: "Never" },
+    { value: 1, label: "Rarely" },
+    { value: 2, label: "Sometimes" },
+    { value: 3, label: "Often" },
+    { value: 4, label: "Always" }
   ];
 
+  // Handle navigation between tabs
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -89,10 +203,12 @@ export default function GAD7QuestionnaireScreen() {
     }
   };
 
+  // Record user's answer for the current question
   const handleAnswerSelect = (value: number) => {
     setAnswers({ ...answers, [currentQuestion]: value });
   };
 
+  // Navigate to the next question or complete assessment
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
@@ -102,22 +218,26 @@ export default function GAD7QuestionnaireScreen() {
     }
   };
 
+  // Navigate back to the previous question
   const handleBack = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
     }
   };
 
+  // Reset the assessment to start from the beginning
   const handleStartOver = () => {
     setCurrentQuestion(0);
     setAnswers({});
     setIsCompleted(false);
   };
 
+  // Navigate to assessment selection screen
   const handleTakeAnotherAssessment = () => {
     router.push("/assessment/selection");
   };
 
+  // Side menu navigation options
   const sideMenuItems = [
     {
       icon: "home",
@@ -212,18 +332,21 @@ export default function GAD7QuestionnaireScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // For demo purposes, just navigate to home instead of actual logout
+        router.replace("/(app)/(tabs)/home");
       },
     },
   ];
 
+  // Get display name from profile or user data
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Show loading indicator while processing
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -232,10 +355,14 @@ export default function GAD7QuestionnaireScreen() {
     );
   }
 
+  // Render completion screen when assessment is finished
   if (isCompleted) {
     return (
       <SafeAreaView style={styles.container}>
-        {/* Header */}
+        {/* Curved background for visual appeal */}
+        <CurvedBackground />
+        
+        {/* Header with navigation and notification icons */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -256,11 +383,11 @@ export default function GAD7QuestionnaireScreen() {
 
         {/* Completion Content */}
         <View style={styles.completionContainer}>
-          <Text style={styles.completionTitle}>Self Assessment Completed!</Text>
+          <Text style={styles.completionTitle}>Mental Health Assessment Completed!</Text>
           
           <View style={styles.completionIconContainer}>
             <View style={styles.completionIcon}>
-              <Ionicons name="person" size={40} color="#FF9800" />
+              <Ionicons name="checkmark-circle" size={40} color="#4CAF50" />
               <View style={styles.checkmarkBadge}>
                 <Ionicons name="checkmark" size={16} color="#FFFFFF" />
               </View>
@@ -268,7 +395,7 @@ export default function GAD7QuestionnaireScreen() {
           </View>
 
           <Text style={styles.completionMessage}>
-            Your therapist will review the result of your assessment!
+            Your comprehensive mental health assessment has been completed. Your therapist will review the results before your appointment.
           </Text>
 
           <TouchableOpacity 
@@ -279,7 +406,7 @@ export default function GAD7QuestionnaireScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Side Menu */}
+        {/* Side Menu Modal */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -294,7 +421,7 @@ export default function GAD7QuestionnaireScreen() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -312,6 +439,7 @@ export default function GAD7QuestionnaireScreen() {
           </View>
         </Modal>
 
+        {/* Bottom navigation bar */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -321,14 +449,18 @@ export default function GAD7QuestionnaireScreen() {
     );
   }
 
+  // Main assessment screen with questions and navigation
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Curved background for visual appeal */}
+      <CurvedBackground />
+      
+      {/* Header with navigation and notification icons */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Self Assessment</Text>
+        <Text style={styles.headerTitle}>General Mental Health</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
             <Ionicons name="notifications-outline" size={24} color="#333" />
@@ -342,10 +474,29 @@ export default function GAD7QuestionnaireScreen() {
         </View>
       </View>
 
+      {/* Scrollable content area for questions */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Progress Bar */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { width: `${((currentQuestion + 1) / questions.length) * 100}%` }
+              ]} 
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {currentQuestion + 1} of {questions.length}
+          </Text>
+        </View>
+
         {/* Question Header */}
         <View style={styles.questionHeader}>
-          <Text style={styles.questionNumber}>Question {currentQuestion + 1} of {questions.length}</Text>
+          <View style={styles.questionNumberContainer}>
+            <Text style={styles.questionNumber}>Question {currentQuestion + 1}</Text>
+            <Text style={styles.domainText}>{questions[currentQuestion]?.domain}</Text>
+          </View>
           <TouchableOpacity style={styles.startOverButton} onPress={handleStartOver}>
             <Text style={styles.startOverText}>Start Over</Text>
           </TouchableOpacity>
@@ -409,7 +560,7 @@ export default function GAD7QuestionnaireScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Side Menu */}
+      {/* Side Menu Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -424,7 +575,7 @@ export default function GAD7QuestionnaireScreen() {
           <View style={styles.sideMenu}>
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -442,6 +593,7 @@ export default function GAD7QuestionnaireScreen() {
         </View>
       </Modal>
 
+      {/* Bottom navigation bar */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -451,6 +603,7 @@ export default function GAD7QuestionnaireScreen() {
   );
 }
 
+// Styles remain unchanged from the original implementation
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -504,6 +657,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
+  progressContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#4CAF50",
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
   questionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -514,10 +690,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
+  questionNumberContainer: {
+    flex: 1,
+  },
   questionNumber: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
+  },
+  domainText: {
+    fontSize: 12,
+    color: "#4CAF50",
+    fontWeight: "500",
+    marginTop: 2,
   },
   startOverButton: {
     backgroundColor: "#2196F3",
@@ -633,7 +818,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#FFF3E0",
+    backgroundColor: "#E8F5E8",
     justifyContent: "center",
     alignItems: "center",
     position: "relative",

@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
-import CurvedBackground from "../../components/CurvedBackground";
+import CurvedBackground from "../../../components/CurvedBackground";
 
 
  // Type definition for a Notification object.
