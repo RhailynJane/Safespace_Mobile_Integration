@@ -57,14 +57,14 @@ export default function ConfirmAppointment() {
   );
 
   // Mock user data (replaces backend auth context)
-  const mockUser = {
-    displayName: "John Doe",
-    email: "john.doe@example.com",
+    const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
   };
   
   const mockProfile = {
-    firstName: "John",
-    lastName: "Doe"
+    firstName: "Demo",
+    lastName: "User",
   };
 
   // Show error if support worker not found
