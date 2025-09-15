@@ -10,22 +10,39 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
-  Linking,
-  Alert,
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
 import BottomNavigation from "../../../components/BottomNavigation";
+import CurvedBackground from "../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
+
+// Mock user data 
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+/**
+ * VideoScreen Component
+ * 
+ * A screen that displays video consultation details and technical requirements.
+ * Users can view their upcoming appointments and join video meetings.
+ * Features a beautiful curved background and comprehensive navigation.
+ */
 export default function VideoScreen() {
-  const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("video");
 
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -34,6 +51,10 @@ export default function VideoScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles navigation tab presses
+   * @param tabId - The ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -42,6 +63,8 @@ export default function VideoScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -136,11 +159,13 @@ export default function VideoScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // In a real app, this would handle logout
+        console.log("User signed out");
       },
     },
   ];
 
+  // Mock appointment data for demonstration
   const appointments = [
     {
       id: 1,
@@ -153,27 +178,43 @@ export default function VideoScreen() {
     },
   ];
 
+  /**
+   * Handles joining a video meeting
+   * Navigates to the video call screen
+   */
   const handleJoinMeeting = () => {
     router.push("/video-consultations/video-call");
   };
+
+  /**
+   * Gets the display name for the user
+   * @returns The user's display name or a fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Show loading state while data is being fetched
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <CurvedBackground>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+          </View>
+        </CurvedBackground>
+      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      <CurvedBackground />
+      
+      {/* Header with menu button and title */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
           <Ionicons name="menu" size={28} color="#4CAF50" />
@@ -188,6 +229,7 @@ export default function VideoScreen() {
       <ScrollView style={styles.scrollContent}>
         <View style={styles.content}>
           <View style={styles.appointmentCard}>
+            {/* Support Worker Profile */}
             <View style={styles.profileContainer}>
               <Image
                 source={{ uri: appointments[0]?.avatar }}
@@ -218,6 +260,7 @@ export default function VideoScreen() {
 
             <View style={styles.divider} />
 
+            {/* Technical Requirements Section */}
             <Text style={styles.sectionTitle}>Technical Requirements</Text>
 
             <Text style={styles.subsectionTitle}>System Requirements</Text>
@@ -258,6 +301,7 @@ export default function VideoScreen() {
               </Text>
             </View>
 
+            {/* Join Meeting Button (only for upcoming appointments) */}
             {appointments[0] && appointments[0].status === "Upcoming" && (
               <TouchableOpacity
                 style={styles.joinButton}
@@ -271,7 +315,7 @@ export default function VideoScreen() {
         </View>
       </ScrollView>
 
-      {/* Side Menu */}
+      {/* Side Menu Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -286,7 +330,7 @@ export default function VideoScreen() {
           <View style={styles.sideMenu}>
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -304,6 +348,7 @@ export default function VideoScreen() {
         </View>
       </Modal>
 
+      {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -312,6 +357,7 @@ export default function VideoScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -335,6 +381,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 10,
     backgroundColor: "#FFFFFF",
+    zIndex: 10,
   },
   headerTitle: {
     fontSize: 20,
@@ -427,6 +474,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
     width: width - 40,
+    marginVertical: 20,
   },
   name: {
     fontSize: 15,
