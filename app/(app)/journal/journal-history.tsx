@@ -9,12 +9,58 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, Typography } from "../../constants/theme";
-import { useAuth } from "../../context/AuthContext";
-import { JournalService, supabase } from "../../lib/supabase";
-import { AppHeader } from "../../components/AppHeader";
-import BottomNavigation from "../../components/BottomNavigation";
+import { Colors, Spacing, Typography } from "../../../constants/theme";
+import { AppHeader } from "../../../components/AppHeader";
+import BottomNavigation from "../../../components/BottomNavigation";
+import CurvedBackground from "../../../components/CurvedBackground";
 
+// Mock data for demonstration 
+const mockJournalEntries = [
+  {
+    id: "1",
+    title: "A Productive Day",
+    content: "Today I accomplished all my goals and felt really productive. I finished my work tasks ahead of schedule and even had time for a relaxing walk in the park. The weather was beautiful and it helped clear my mind. I'm grateful for these moments of peace and accomplishment.",
+    mood_type: "happy",
+    emoji: "😊",
+    date: "2023-10-15",
+    formattedDate: "October 15, 2023",
+    tags: ["productivity", "gratitude", "mindfulness"]
+  },
+  {
+    id: "2",
+    title: "Feeling Anxious",
+    content: "I've been feeling anxious about the upcoming presentation. I need to remember to practice my breathing exercises and take things one step at a time. It's normal to feel this way before important events, and I know I've prepared well.",
+    mood_type: "anxious",
+    emoji: "😰",
+    date: "2023-10-14",
+    formattedDate: "October 14, 2023",
+    tags: ["anxiety", "self-care"]
+  },
+  {
+    id: "3",
+    title: "Quality Time with Family",
+    content: "Spent the day with family today. We had a wonderful picnic at the lake and enjoyed each other's company. It's important to cherish these moments and create lasting memories with loved ones.",
+    mood_type: "loved",
+    emoji: "❤️",
+    date: "2023-10-12",
+    formattedDate: "October 12, 2023",
+    tags: ["family", "gratitude", "memories"]
+  }
+];
+
+// Mock user data 
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+// Mock profile data
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+// Interface for journal entries
 interface JournalEntry {
   id: string;
   title: string;
@@ -26,8 +72,10 @@ interface JournalEntry {
   tags: string[];
 }
 
+// Filter types for organizing entries
 type FilterType = "all" | "week" | "month";
 
+// Bottom navigation tabs configuration
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community-forum", name: "Community", icon: "people" },
@@ -212,13 +260,14 @@ const styles = StyleSheet.create({
 });
 
 export default function JournalHistoryScreen() {
-  const { user } = useAuth();
+  // State for journal entries, loading status, and UI controls
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("journal");
 
+  // Handle tab navigation
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -228,27 +277,26 @@ export default function JournalHistoryScreen() {
     }
   };
 
+  // Simulate data fetching with useEffect
   useEffect(() => {
     const fetchEntries = async () => {
-      if (!user) return;
-
       try {
         setLoading(true);
-        const { data: clientData, error: clientError } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("firebase_uid", user.uid)
-          .single();
-
-        if (clientError || !clientData) {
-          throw clientError || new Error("Client not found");
+        // Simulate network request delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Filter entries based on active filter (mock implementation)
+        let filteredEntries = [...mockJournalEntries];
+        
+        if (activeFilter === "week") {
+          // In a real app, this would filter to show only last week's entries
+          filteredEntries = filteredEntries.slice(0, 2);
+        } else if (activeFilter === "month") {
+          // In a real app, this would filter to show only last month's entries
+          filteredEntries = filteredEntries.slice(0, 1);
         }
-
-        const entries = await JournalService.getEntries(
-          clientData.id,
-          activeFilter
-        );
-        setEntries(entries);
+        
+        setEntries(filteredEntries);
       } catch (error) {
         console.error("Error fetching journal entries:", error);
       } finally {
@@ -257,16 +305,19 @@ export default function JournalHistoryScreen() {
     };
 
     fetchEntries();
-  }, [user, activeFilter]);
+  }, [activeFilter]);
 
+  // Navigate to individual journal entry view
   const handleEntryPress = (entryId: string) => {
     router.push(`/(app)/journal-entry/${entryId}`);
   };
 
+  // Change the active filter for entries
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
   };
 
+  // Render filter button with active state styling
   const renderFilterButton = (filter: FilterType, label: string) => (
     <TouchableOpacity
       style={[
@@ -286,6 +337,7 @@ export default function JournalHistoryScreen() {
     </TouchableOpacity>
   );
 
+  // Render individual journal entry card
   const renderJournalEntry = (entry: JournalEntry) => {
     const isExpanded = expandedEntry === entry.id;
 
@@ -339,16 +391,21 @@ export default function JournalHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Elegant curved background for visual appeal */}
+      <CurvedBackground />
+      
       <AppHeader title="Journal Entries" showBack={true} showMenu={true} />
       <ScrollView style={styles.content}>
         <Text style={styles.pageTitle}>My Journal Entries</Text>
 
+        {/* Filter controls for organizing entries */}
         <View style={styles.filterContainer}>
           {renderFilterButton("all", "All")}
           {renderFilterButton("week", "Week")}
           {renderFilterButton("month", "Month")}
         </View>
 
+        {/* Journal entries list or empty state */}
         <View style={styles.entriesContainer}>
           {loading ? (
             <Text style={styles.loadingText}>Loading entries...</Text>
@@ -375,6 +432,7 @@ export default function JournalHistoryScreen() {
           )}
         </View>
 
+        {/* Floating action button for adding new entries */}
         {entries.length > 0 && (
           <TouchableOpacity
             style={styles.floatingAddButton}
@@ -384,6 +442,8 @@ export default function JournalHistoryScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      
+      {/* Bottom navigation for app navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
