@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { AppHeader } from "../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
+import CurvedBackground from "../../components/CurvedBackground";
 
 
  // Type definition for a Notification object.
@@ -158,6 +159,7 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.container}>
+      <CurvedBackground />
       <AppHeader title="Notifications" showBack={true} />
       
       {/* Top bar showing unread count & "Mark all as read" action */}
