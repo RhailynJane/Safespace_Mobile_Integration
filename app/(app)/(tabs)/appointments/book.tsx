@@ -15,19 +15,41 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { useAuth } from "../../../../context/AuthContext";
-import { AppHeader } from "../../../../components/AppHeader";
 import CurvedBackground from "../../../../components/CurvedBackground";
 
+/**
+ * BookAppointment Component
+ * 
+ * Initial screen for booking appointments that allows users to:
+ * - Browse available support workers
+ * - Search for specific support workers
+ * - View support worker specialties and profiles
+ * - Select a support worker to proceed with booking
+ * Features an elegant curved background and intuitive interface.
+ */
 export default function BookAppointment() {
-  const { user, profile, logout } = useAuth();
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "John Doe",
+    email: "john.doe@example.com",
+  };
+  
+  const mockProfile = {
+    firstName: "John",
+    lastName: "Doe"
+  };
+
+  /**
+   * Handles navigation to support worker details screen
+   * @param supportWorkerId - ID of the selected support worker
+   */
   const handleSelectSupportWorker = (supportWorkerId: number) => {
-    // Navigate to the details screen, passing the ID as a parameter
     router.push(`/appointments/details?supportWorkerId=${supportWorkerId}`);
   };
 
@@ -49,10 +71,12 @@ export default function BookAppointment() {
     },
   ];
 
+  // Filter support workers based on search query
   const filteredSupportWorkers = supportWorkers.filter((sw) =>
     sw.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -61,6 +85,10 @@ export default function BookAppointment() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -69,6 +97,8 @@ export default function BookAppointment() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -163,18 +193,24 @@ export default function BookAppointment() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Show loading indicator if data is being fetched
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
@@ -183,34 +219,32 @@ export default function BookAppointment() {
     );
   }
 
-  // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 06, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "upcoming",
-    },
-  ];
-
   return (
     <SafeAreaView style={styles.container}>
-    <CurvedBackground>
+      <CurvedBackground>
         <View style={styles.contentContainer}>
-          {/* Header */}
-          <AppHeader title="Appointments" showBack={true} />
+          {/* Custom Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+            </TouchableOpacity>
+            
+            <Text style={styles.headerTitle}>Book Appointment</Text>
+            
+            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+              <Ionicons name="menu" size={24} color="#2E7D32" />
+            </TouchableOpacity>
+          </View>
 
           <ScrollView style={styles.container}>
             <Text style={styles.title}>
               Schedule a session with a support worker
             </Text>
 
-            {/* Step Indicator */}
+            {/* Step Indicator - Shows progress through booking process */}
             <View style={styles.stepsContainer}>
               <View style={styles.stepRow}>
-                {/* Step 1 - Active */}
+                {/* Step 1 - Active (Current Step) */}
                 <View style={[styles.stepCircle, styles.stepCircleActive]}>
                   <Text style={[styles.stepNumber, styles.stepNumberActive]}>
                     1
@@ -237,6 +271,7 @@ export default function BookAppointment() {
               </View>
             </View>
 
+            {/* Search Bar */}
             <View style={styles.searchContainer}>
               <Ionicons
                 name="search"
@@ -253,13 +288,14 @@ export default function BookAppointment() {
               />
             </View>
 
+            {/* Support Workers List */}
             {filteredSupportWorkers.map((supportWorker) => (
               <TouchableOpacity
                 key={supportWorker.id}
                 style={styles.supportWorkerCard}
                 onPress={() => handleSelectSupportWorker(supportWorker.id)}
               >
-                {/* Add avatar image here */}
+                {/* Support Worker Avatar and Info */}
                 <View style={styles.avatarContainer}>
                   <Image
                     source={{ uri: supportWorker.avatar }}
@@ -275,6 +311,7 @@ export default function BookAppointment() {
                   </View>
                 </View>
 
+                {/* Support Worker Specialties */}
                 <View style={styles.specialtiesContainer}>
                   {supportWorker.specialties.map((specialty, index) => (
                     <Text key={index} style={styles.specialtyText}>
@@ -282,12 +319,14 @@ export default function BookAppointment() {
                     </Text>
                   ))}
                 </View>
+                
+                {/* Selection Prompt */}
                 <Text style={styles.selectText}>Select Support Worker</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
-          {/* Side Menu */}
+          {/* Side Menu Modal */}
           <Modal
             animationType="fade"
             transparent={true}
@@ -302,7 +341,7 @@ export default function BookAppointment() {
               <View style={styles.sideMenu}>
                 <View style={styles.sideMenuHeader}>
                   <Text style={styles.profileName}>{getDisplayName()}</Text>
-                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                  <Text style={styles.profileEmail}>{mockUser?.email}</Text>
                 </View>
                 <ScrollView style={styles.sideMenuContent}>
                   {sideMenuItems.map((item, index) => (
@@ -324,6 +363,7 @@ export default function BookAppointment() {
             </View>
           </Modal>
 
+          {/* Bottom Navigation */}
           <BottomNavigation
             tabs={tabs}
             activeTab={activeTab}
