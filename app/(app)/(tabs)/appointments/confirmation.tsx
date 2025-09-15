@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   SafeAreaView,
   Modal,
@@ -13,31 +12,28 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { useAuth } from "../../../../context/AuthContext";
-import { useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
-import { AppHeader } from "../../../../components/AppHeader";
 import CurvedBackground from "../../../../components/CurvedBackground";
-export default function BookAppointment() {
-  const { user, profile, logout } = useAuth();
+
+/**
+ * ConfirmAppointment Component
+ * 
+ * Final confirmation screen that shows after successfully booking an appointment.
+ * Displays appointment details, confirmation message, and navigation options
+ * to view appointments or book another. Features an elegant curved background.
+ */
+export default function ConfirmAppointment() {
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeView, setActiveView] = useState("confirmation");
 
+  // Get support worker ID from navigation params
   const { supportWorkerId } = useLocalSearchParams();
 
-  // Add state for selectedType, selectedDate, selectedTime
-  const [selectedType, setSelectedType] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedTime, setSelectedTime] = useState<string>("");
-  const [appointmentNotes, setAppointmentNotes] = useState<string>("");
-  const [activeView, setActiveView] = useState<string>("confirmation");
-  const [bookingStep, setBookingStep] = useState<number>(1);
-
-  // Mock data for support workers
+  // Mock data for support workers (replaces backend data)
   const supportWorkers = [
     {
       id: 1,
@@ -60,10 +56,29 @@ export default function BookAppointment() {
     (sw) => sw.id === Number(supportWorkerId)
   );
 
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "John Doe",
+    email: "john.doe@example.com",
+  };
+  
+  const mockProfile = {
+    firstName: "John",
+    lastName: "Doe"
+  };
+
+  // Show error if support worker not found
   if (!supportWorker) {
-    return <Text>Support worker not found</Text>;
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <Text style={styles.errorText}>Support worker not found</Text>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
   }
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -72,6 +87,10 @@ export default function BookAppointment() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -80,6 +99,8 @@ export default function BookAppointment() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -174,35 +195,31 @@ export default function BookAppointment() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
-  const handleBackToMain = () => {
-    setActiveView("main");
-    setSelectedDate("");
-    setSelectedTime("");
-    setSelectedType("Video Call");
-    setBookingStep(1);
-    setAppointmentNotes("");
-  };
-
-  const handleBookAnother = () => {
-    setActiveView("book");
-    setBookingStep(1);
-    setSelectedDate("");
-    setSelectedTime("");
-    setSelectedType("Video Call");
-    setAppointmentNotes("");
-  };
+  // Show loading indicator if data is being fetched
+  if (loading) {
+    return (
+      <CurvedBackground style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </CurvedBackground>
+    );
+  }
 
   // Mock data for appointments
   const appointments = [
@@ -216,28 +233,30 @@ export default function BookAppointment() {
     },
   ];
 
-  if (loading) {
-    return (
-      <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </CurvedBackground>
-    );
-  }
-
   const appointment = appointments.length > 0 ? appointments[0] : null;
 
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <AppHeader title="Appointments" showBack={true} />
+        {/* Custom Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle}>Appointment Confirmation</Text>
+          
+          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+            <Ionicons name="menu" size={24} color="#2E7D32" />
+          </TouchableOpacity>
+        </View>
 
         <ScrollView style={styles.scrollContainer}>
           <Text style={styles.title}>
             Schedule a session with a support worker
           </Text>
 
-          {/* Step Indicator */}
+          {/* Step Indicator - Shows progress through booking process */}
           <View style={styles.stepsContainer}>
             <View style={styles.stepRow}>
               {/* Step 1 - Inactive */}
@@ -258,7 +277,7 @@ export default function BookAppointment() {
               </View>
               <View style={styles.stepConnector} />
 
-              {/* Step 4 - Active */}
+              {/* Step 4 - Active (Final Step) */}
               <View style={[styles.stepCircle, styles.stepCircleActive]}>
                 <Text style={[styles.stepNumber, styles.stepNumberActive]}>
                   4
@@ -275,24 +294,31 @@ export default function BookAppointment() {
             </Text>
 
             <View style={styles.appointmentDetails}>
+              {/* Support Worker Details */}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Support Worker:</Text>
                 <Text style={styles.detailValue}>
                   {appointment ? appointment.supportWorker : ""}
                 </Text>
               </View>
+              
+              {/* Appointment Date */}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Date:</Text>
                 <Text style={styles.detailValue}>
                   {appointment ? `${appointment.date}` : ""}
                 </Text>
               </View>
+              
+              {/* Appointment Time */}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Time:</Text>
                 <Text style={styles.detailValue}>
                   {appointment ? `${appointment.time}` : ""}
                 </Text>
               </View>
+              
+              {/* Session Type */}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Session Type:</Text>
                 <Text style={styles.detailValue}>
@@ -300,6 +326,7 @@ export default function BookAppointment() {
                 </Text>
               </View>
 
+              {/* Primary Action Button - View Appointments */}
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={() => router.replace("/appointments/appointment-list")}
@@ -307,6 +334,7 @@ export default function BookAppointment() {
                 <Text style={styles.buttonText}>Check Appointments</Text>
               </TouchableOpacity>
 
+              {/* Secondary Action Button - Book Another Appointment */}
               <TouchableOpacity
                 style={styles.secondaryButton}
                 onPress={() => router.replace("/appointments/book")}
@@ -319,7 +347,7 @@ export default function BookAppointment() {
           </View>
         </ScrollView>
 
-        {/* Side Menu */}
+        {/* Side Menu Modal */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -334,7 +362,7 @@ export default function BookAppointment() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -356,6 +384,7 @@ export default function BookAppointment() {
           </View>
         </Modal>
 
+        {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -370,6 +399,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 50,
   },
   scrollContainer: {
     flex: 1,
@@ -436,155 +471,6 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: "#000000",
     marginHorizontal: 8,
-  },
-  card: {
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 15,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    backgroundColor: "#d0e0e3",
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  subSectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-  },
-  summaryContainer: {
-    marginBottom: 20,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: "#000000",
-    fontWeight: "600",
-  },
-  summaryValue: {
-    fontSize: 14,
-    color: "#333",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#000000",
-    marginVertical: 20,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: "#000000",
-    borderRadius: 8,
-    padding: 16,
-    textAlignVertical: "top",
-    marginBottom: 20,
-    minHeight: 100,
-    fontSize: 14,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
-  },
-  backButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    alignItems: "center",
-  },
-  backButtonText: {
-    color: "#4CAF50",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  bookButton: {
-    flex: 2,
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  bookButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "transparent",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    margin: 15,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: "#333",
   },
   confirmationCard: {
     backgroundColor: "#f1f5f9",
@@ -663,5 +549,50 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
     fontSize: 16,
     fontWeight: "600",
+  },
+  modalContainer: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  sideMenu: {
+    width: "75%",
+    backgroundColor: "transparent",
+    height: "100%",
+  },
+  sideMenuHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    alignItems: "center",
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 14,
+    color: "#757575",
+  },
+  sideMenuContent: {
+    padding: 10,
+  },
+  sideMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  sideMenuItemText: {
+    fontSize: 16,
+    color: "#333",
+    marginLeft: 15,
   },
 });
