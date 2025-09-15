@@ -14,11 +14,12 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../../context/AuthContext";
-import { MoodService } from "../../lib/supabase";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader } from "../../../components/AppHeader";
+import CurvedBackground from "../../../components/CurvedBackground";
+
 const { width } = Dimensions.get("window");
 
+// Interface for mood entry data structure
 interface MoodEntry {
   id: string;
   client_id: string;
@@ -32,6 +33,7 @@ interface MoodEntry {
   mood_factors?: { factor: string }[];
 }
 
+// Navigation tabs configuration
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community-forum", name: "Community", icon: "people" },
@@ -40,6 +42,7 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
+// Side menu navigation options
 const sideMenuItems = [
   {
     icon: "home",
@@ -99,54 +102,80 @@ const sideMenuItems = [
   {
     icon: "log-out",
     title: "Sign Out",
-    onPress: async () => {
-      const { logout } = useAuth();
-      await logout();
-    },
+    onPress: () => console.log("Sign Out pressed"),
   },
 ];
 
 export default function MoodHistoryScreen() {
-  const { user, profile, logout } = useAuth();
-  const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([]);
+  // Mock user data for frontend demonstration
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("mood");
 
   useEffect(() => {
-    const loadMoodHistory = async () => {
-      if (profile?.id) {
-        try {
-          const history = await MoodService.getMoodHistory(profile.id);
-          // Map the returned history to match MoodEntry interface
-          const mappedHistory: MoodEntry[] = history.map((item: any) => ({
-            id: item.id,
-            client_id: item.client_id ?? "",
-            mood_type: item.mood_type ?? item.mood ?? "neutral",
-            intensity: item.intensity,
-            notes: item.notes,
-            created_at: item.created_at ?? item.date ?? "",
-            updated_at: item.updated_at ?? "",
-            mood_emoji: item.mood_emoji ?? item.emoji ?? "",
-            mood_label: item.mood_label ?? item.mood ?? "",
-            mood_factors:
-              item.mood_factors ??
-              item.factors?.map((f: any) => ({ factor: f })) ??
-              [],
-          }));
-          setMoodHistory(mappedHistory);
-        } catch (error) {
-          console.error("Error loading mood history:", error);
-        } finally {
-          setLoading(false);
-        }
-      }
+    // Simulate loading mood history data
+    const loadMockData = () => {
+      setTimeout(() => {
+        // Mock mood history data for demonstration
+        const mockData: MoodEntry[] = [
+          {
+            id: "1",
+            client_id: "demo-user",
+            mood_type: "happy",
+            intensity: 4,
+            notes: "Had a great day at work!",
+            created_at: "2023-11-15T14:30:00Z",
+            updated_at: "2023-11-15T14:30:00Z",
+            mood_emoji: "🙂",
+            mood_label: "Happy",
+            mood_factors: [{ factor: "Work" }, { factor: "Exercise" }],
+          },
+          {
+            id: "2",
+            client_id: "demo-user",
+            mood_type: "neutral",
+            intensity: 3,
+            notes: "Regular day, nothing special",
+            created_at: "2023-11-14T18:45:00Z",
+            updated_at: "2023-11-14T18:45:00Z",
+            mood_emoji: "😐",
+            mood_label: "Neutral",
+            mood_factors: [{ factor: "Routine" }],
+          },
+          {
+            id: "3",
+            client_id: "demo-user",
+            mood_type: "very-happy",
+            intensity: 5,
+            notes: "Amazing weekend with friends!",
+            created_at: "2023-11-12T20:15:00Z",
+            updated_at: "2023-11-12T20:15:00Z",
+            mood_emoji: "😄",
+            mood_label: "Very Happy",
+            mood_factors: [{ factor: "Social" }, { factor: "Leisure" }],
+          },
+        ];
+        
+        setMoodHistory(mockData);
+        setLoading(false);
+      }, 1000); // Simulate network delay
     };
 
-    loadMoodHistory();
-  }, [profile?.id]);
+    loadMockData();
+  }, []);
 
+  // Handle tab navigation
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -156,13 +185,15 @@ export default function MoodHistoryScreen() {
     }
   };
 
+  // Get display name from user profile
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Render individual mood entry card
   const renderMoodEntry = ({ item }: { item: MoodEntry }) => (
     <View style={styles.entryCard}>
       <View style={styles.entryHeader}>
@@ -188,6 +219,7 @@ export default function MoodHistoryScreen() {
     </View>
   );
 
+  // Show loading indicator while data is being fetched
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -198,7 +230,10 @@ export default function MoodHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Elegant curved background with gradient colors */}
+      <CurvedBackground />
+      
+      {/* Header with navigation controls */}
       <AppHeader title="Mood Tracking" showBack={true} />
 
       {/* Main Content */}
@@ -224,7 +259,7 @@ export default function MoodHistoryScreen() {
         )}
       </ScrollView>
 
-      {/* Side Menu */}
+      {/* Side Menu Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -239,7 +274,7 @@ export default function MoodHistoryScreen() {
           <View style={styles.sideMenu}>
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
