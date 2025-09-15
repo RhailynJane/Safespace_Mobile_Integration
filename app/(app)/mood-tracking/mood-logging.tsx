@@ -16,14 +16,15 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../../context/AuthContext";
-import { MoodService } from "../../lib/supabase";
-import { AppHeader } from "../../components/AppHeader";
+import { AppHeader } from "../../../components/AppHeader";
+import CurvedBackground from "../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 
+// Define mood types for type safety
 type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad";
 
+// Configuration for different mood types with emojis and labels
 const moodConfig = {
   "very-happy": { emoji: "😄", label: "Very Happy" },
   happy: { emoji: "🙂", label: "Happy" },
@@ -32,6 +33,7 @@ const moodConfig = {
   "very-sad": { emoji: "😢", label: "Very Sad" },
 };
 
+// Predefined list of mood factors for user selection
 const moodFactors = [
   "Family",
   "Health Concerns",
@@ -43,6 +45,7 @@ const moodFactors = [
   "Weather",
 ];
 
+// Navigation tabs configuration
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community-forum", name: "Community", icon: "people" },
@@ -52,18 +55,33 @@ const tabs = [
 ];
 
 export default function MoodLoggingScreen() {
-  const { user, profile, logout } = useAuth();
+  // Mock user data for frontend demonstration
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
+  // Get selected mood from navigation parameters
   const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
+  
+  // State for mood data including type, intensity, factors, and notes
   const [moodData, setMoodData] = useState({
     type: selectedMood as MoodType,
     intensity: 3,
     factors: [] as string[],
     notes: "",
   });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("mood");
 
+  // Side menu navigation options
   const sideMenuItems = [
     {
       icon: "home",
@@ -156,24 +174,27 @@ export default function MoodLoggingScreen() {
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
+      onPress: () => {
         setSideMenuVisible(false);
-        await logout();
+        console.log("Sign Out pressed");
       },
     },
   ];
 
+  // Get display name from user profile for personalization
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Handle intensity slider value change
   const handleIntensityChange = (value: number) => {
     setMoodData((prev) => ({ ...prev, intensity: value }));
   };
 
+  // Toggle mood factors selection
   const handleFactorToggle = (factor: string) => {
     setMoodData((prev) => ({
       ...prev,
@@ -183,36 +204,28 @@ export default function MoodLoggingScreen() {
     }));
   };
 
+  // Handle notes text input change
   const handleNotesChange = (text: string) => {
     setMoodData((prev) => ({ ...prev, notes: text }));
   };
 
+  // Handle form submission with mock success response
   const handleSubmit = async () => {
-    if (!profile?.id) {
-      Alert.alert("Error", "No user profile found");
-      return;
-    }
-
     setIsSubmitting(true);
-    try {
-      await MoodService.logMood(profile.id, {
-        type: moodData.type,
-        intensity: moodData.intensity,
-        factors: moodData.factors,
-        notes: moodData.notes,
-      });
-
+    
+    // Simulate API call delay
+    setTimeout(() => {
       Alert.alert("Mood Logged!", "Your mood has been saved successfully.", [
-        { text: "OK", onPress: () => router.replace("/(app)/mood-history") },
+        { 
+          text: "OK", 
+          onPress: () => router.replace("/(app)/mood-history") 
+        },
       ]);
-    } catch (error) {
-      console.error("Error saving mood:", error);
-      Alert.alert("Error", "Failed to save mood entry. Please try again.");
-    } finally {
       setIsSubmitting(false);
-    }
+    }, 1000);
   };
 
+  // Handle bottom navigation tab presses
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -224,12 +237,15 @@ export default function MoodLoggingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Elegant curved background with gradient colors */}
+      <CurvedBackground />
+      
+      {/* Header with navigation controls */}
       <AppHeader title="Mood Tracking" showBack={true} />
-
 
       {/* Main Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Mood display section showing selected mood */}
         <View style={styles.moodDisplay}>
           <Text style={styles.moodEmoji}>
             {moodConfig[moodData.type].emoji}
@@ -239,6 +255,7 @@ export default function MoodLoggingScreen() {
           </Text>
         </View>
 
+        {/* Intensity selection section with slider */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Intensity (1-5)</Text>
           <View style={styles.sliderContainer}>
@@ -261,6 +278,7 @@ export default function MoodLoggingScreen() {
           </Text>
         </View>
 
+        {/* Mood factors selection section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Factors</Text>
           <View style={styles.factorsContainer}>
@@ -288,6 +306,7 @@ export default function MoodLoggingScreen() {
           </View>
         </View>
 
+        {/* Notes input section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notes</Text>
           <TextInput
@@ -299,6 +318,7 @@ export default function MoodLoggingScreen() {
           />
         </View>
 
+        {/* Submit button */}
         <TouchableOpacity
           style={styles.submitButton}
           onPress={handleSubmit}
@@ -312,7 +332,7 @@ export default function MoodLoggingScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Side Menu */}
+      {/* Side Menu Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -327,7 +347,7 @@ export default function MoodLoggingScreen() {
           <View style={styles.sideMenu}>
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
