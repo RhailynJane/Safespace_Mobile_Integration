@@ -176,7 +176,7 @@ export default function JournalCreateScreen() {
    * Handles closing the success screen
    */
   const handleClose = () => {
-    router.replace("/(app)/journaling");
+    router.replace("/(app)/journal/index");
   };
 
   /**

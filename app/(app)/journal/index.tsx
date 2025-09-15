@@ -91,14 +91,14 @@ export default function JournalScreen() {
    * Navigates to the journal creation screen
    */
   const handleCreateJournal = () => {
-    router.push("/(app)/journal-create");
+    router.push("/(app)/journal/journal-create");
   };
 
   /**
    * Navigates to view all journal entries
    */
   const handleViewAllEntries = () => {
-    router.push("/(app)/journal-history");
+    router.push("/(app)/journal/journal-history");
   };
 
   /**
@@ -106,7 +106,7 @@ export default function JournalScreen() {
    * @param entryId - The ID of the journal entry to view
    */
   const handleEntryPress = (entryId: string) => {
-    router.push(`/(app)/journal-entry/${entryId}`);
+    router.push(`/(app)/journal/journal-entry/${entryId}`);
   };
 
   return (

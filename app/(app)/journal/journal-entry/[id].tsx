@@ -10,12 +10,58 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, Typography } from "../../../constants/theme";
-import { useAuth } from "../../../context/AuthContext";
-import { JournalService, supabase } from "../../../lib/supabase";
-import { AppHeader } from "../../../components/AppHeader";
-import BottomNavigation from "../../../components/BottomNavigation";
+import { Colors, Spacing, Typography } from "../../../../constants/theme";
+import { AppHeader } from "../../../../components/AppHeader";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
+// Mock data for demonstration (replaces backend implementation)
+const mockJournalEntries = [
+  {
+    id: "1",
+    title: "A Productive Day",
+    content: "Today I accomplished all my goals and felt really productive. I finished my work tasks ahead of schedule and even had time for a relaxing walk in the park. The weather was beautiful and it helped clear my mind. I'm grateful for these moments of peace and accomplishment.",
+    mood_type: "happy",
+    emoji: "😊",
+    date: "2023-10-15",
+    formattedDate: "October 15, 2023",
+    tags: ["productivity", "gratitude", "mindfulness"]
+  },
+  {
+    id: "2",
+    title: "Feeling Anxious",
+    content: "I've been feeling anxious about the upcoming presentation. I need to remember to practice my breathing exercises and take things one step at a time. It's normal to feel this way before important events, and I know I've prepared well.",
+    mood_type: "anxious",
+    emoji: "😰",
+    date: "2023-10-14",
+    formattedDate: "October 14, 2023",
+    tags: ["anxiety", "self-care"]
+  },
+  {
+    id: "3",
+    title: "Quality Time with Family",
+    content: "Spent the day with family today. We had a wonderful picnic at the lake and enjoyed each other's company. It's important to cherish these moments and create lasting memories with loved ones.",
+    mood_type: "loved",
+    emoji: "❤️",
+    date: "2023-10-12",
+    formattedDate: "October 12, 2023",
+    tags: ["family", "gratitude", "memories"]
+  }
+];
+
+// Mock user data (replaces auth implementation)
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+// Mock profile data
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+// Bottom navigation tabs configuration
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community", name: "Community", icon: "people" },
@@ -93,16 +139,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: Colors.surfaceSecondary,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });
 
 export default function JournalEntryScreen() {
+  // Get the entry ID from the URL parameters
   const { id } = useLocalSearchParams();
-  const { user } = useAuth();
+  
+  // State for the journal entry, loading status, and UI controls
   const [entry, setEntry] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journal");
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
 
+  // Handle tab navigation
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -112,27 +171,17 @@ export default function JournalEntryScreen() {
     }
   };
 
+  // Simulate fetching a specific journal entry
   useEffect(() => {
     const fetchEntry = async () => {
-      if (!user || !id) return;
-
       try {
         setLoading(true);
-        const { data: clientData, error: clientError } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("firebase_uid", user.uid)
-          .single();
-
-        if (clientError || !clientData) {
-          throw clientError || new Error("Client not found");
-        }
-
-        const entryData = await JournalService.getEntryById(
-          clientData.id,
-          id as string
-        );
-        setEntry(entryData);
+        // Simulate network request delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Find the entry with the matching ID
+        const foundEntry = mockJournalEntries.find(e => e.id === id);
+        setEntry(foundEntry);
       } catch (error) {
         console.error("Error fetching journal entry:", error);
         Alert.alert("Error", "Failed to load journal entry");
@@ -142,11 +191,10 @@ export default function JournalEntryScreen() {
     };
 
     fetchEntry();
-  }, [user, id]);
+  }, [id]);
 
+  // Handle delete entry action
   const handleDelete = async () => {
-    if (!user || !id) return;
-
     Alert.alert(
       "Delete Entry",
       "Are you sure you want to delete this journal entry?",
@@ -161,18 +209,14 @@ export default function JournalEntryScreen() {
           onPress: async () => {
             try {
               setLoading(true);
-              const { data: clientData, error: clientError } = await supabase
-                .from("clients")
-                .select("id")
-                .eq("firebase_uid", user.uid)
-                .single();
-
-              if (clientError || !clientData) {
-                throw clientError || new Error("Client not found");
-              }
-
-              await JournalService.deleteEntry(clientData.id, id as string);
-              router.replace("/(app)/journaling");
+              // Simulate deletion process
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // In a real app, this would actually delete the entry
+              console.log(`Entry ${id} would be deleted in a real app`);
+              
+              // Navigate back to the journal list
+              router.replace("/(app)/journal/index");
             } catch (error) {
               console.error("Error deleting journal entry:", error);
               Alert.alert("Error", "Failed to delete journal entry");
@@ -185,28 +229,42 @@ export default function JournalEntryScreen() {
     );
   };
 
+  // Navigate to the edit screen for this entry
   const handleEdit = () => {
-    router.push(`/(app)/journal-edit/${id}`);
+    router.push(`/(app)/journal/journal-edit/${id}`);
   };
 
+  // Show loading state while fetching data
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Loading...</Text>
+        <CurvedBackground />
+        <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
+        <View style={styles.loadingContainer}>
+          <Text>Loading...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
+  // Show not found state if entry doesn't exist
   if (!entry) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text>Entry not found</Text>
+        <CurvedBackground />
+        <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
+        <View style={styles.notFoundContainer}>
+          <Text>Entry not found</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Elegant curved background for visual appeal */}
+      <CurvedBackground />
+      
       <AppHeader
         title="Journal Entry"
         showBack={true}
@@ -215,6 +273,7 @@ export default function JournalEntryScreen() {
       />
 
       <ScrollView style={styles.content}>
+        {/* Entry header with date, title, and mood */}
         <View style={styles.entryHeader}>
           <Text style={styles.entryDate}>{entry.formattedDate}</Text>
           <Text style={styles.entryTitle}>{entry.title}</Text>
@@ -225,8 +284,10 @@ export default function JournalEntryScreen() {
           )}
         </View>
 
+        {/* Main content of the journal entry */}
         <Text style={styles.entryContent}>{entry.content}</Text>
 
+        {/* Tags associated with the entry */}
         {entry.tags && entry.tags.length > 0 && (
           <View style={styles.tagsContainer}>
             {entry.tags.map((tag: string) => (
@@ -237,7 +298,7 @@ export default function JournalEntryScreen() {
           </View>
         )}
 
-        {/* Added entry actions buttons */}
+        {/* Action buttons for editing and deleting the entry */}
         <View style={styles.entryActions}>
           <TouchableOpacity
             style={styles.entryActionButton}
@@ -254,6 +315,7 @@ export default function JournalEntryScreen() {
         </View>
       </ScrollView>
 
+      {/* Bottom navigation for app navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}

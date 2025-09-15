@@ -309,7 +309,7 @@ export default function JournalHistoryScreen() {
 
   // Navigate to individual journal entry view
   const handleEntryPress = (entryId: string) => {
-    router.push(`/(app)/journal-entry/${entryId}`);
+    router.push(`/(app)/journal/journal-entry/${entryId}`);
   };
 
   // Change the active filter for entries
@@ -424,7 +424,7 @@ export default function JournalHistoryScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.addEntryButton}
-                onPress={() => router.push("/(app)/journal-create")}
+                onPress={() => router.push("/(app)/journal/journal-create")}
               >
                 <Text style={styles.addEntryButtonText}>Write First Entry</Text>
               </TouchableOpacity>
@@ -436,7 +436,7 @@ export default function JournalHistoryScreen() {
         {entries.length > 0 && (
           <TouchableOpacity
             style={styles.floatingAddButton}
-            onPress={() => router.push("/(app)/journal-create")}
+            onPress={() => router.push("/(app)/journal/journal-create")}
           >
             <Ionicons name="add" size={28} color={Colors.surface} />
           </TouchableOpacity>
