@@ -13,23 +13,33 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { useAuth } from "../../../../context/AuthContext";
-import { useLocalSearchParams } from "expo-router";
-import { AppHeader } from "../../../../components/AppHeader";
 import CurvedBackground from "../../../../components/CurvedBackground";
 
+/**
+ * BookAppointment Component
+ * 
+ * Screen for booking appointments with support workers. Allows users to:
+ * - Select session type (Video Call, Phone Call, In Person)
+ * - Choose available dates and times
+ * - View support worker details
+ * - Navigate to confirmation screen
+ * Features a multi-step process with visual indicators and elegant curved background.
+ */
 export default function BookAppointment() {
-  const { user, profile, logout } = useAuth();
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState("Video Call");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
+  // Get support worker ID from navigation params
   const { supportWorkerId } = useLocalSearchParams();
 
-  // Mock data for support workers
+  // Mock data for support workers (replaces backend data)
   const supportWorkers = [
     {
       id: 1,
@@ -52,14 +62,29 @@ export default function BookAppointment() {
     (sw) => sw.id === Number(supportWorkerId)
   );
 
-  const [selectedType, setSelectedType] = useState("Video Call");
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "John Doe",
+    email: "john.doe@example.com",
+  };
+  
+  const mockProfile = {
+    firstName: "John",
+    lastName: "Doe"
+  };
 
+  // Show error if support worker not found
   if (!supportWorker) {
-    return <Text>Support worker not found</Text>;
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <Text style={styles.errorText}>Support worker not found</Text>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
   }
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -68,6 +93,10 @@ export default function BookAppointment() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -76,6 +105,8 @@ export default function BookAppointment() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -170,18 +201,24 @@ export default function BookAppointment() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Show loading indicator if data is being fetched
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
@@ -190,8 +227,10 @@ export default function BookAppointment() {
     );
   }
 
+  // Available session types
   const SESSION_TYPES = ["Video Call", "Phone Call", "In Person"];
 
+  // Mock available dates and times
   const AVAILABLE_DATES = [
     "Monday, October 7, 2025",
     "Wednesday, October 9, 2025",
@@ -207,8 +246,10 @@ export default function BookAppointment() {
     "5:00 PM",
   ];
 
+  /**
+   * Handles navigation to confirmation screen with selected appointment details
+   */
   const handleContinue = () => {
-    // Navigate to confirmation, passing all selected data as parameters
     router.push({
       pathname: "/appointments/confirm",
       params: {
@@ -224,15 +265,25 @@ export default function BookAppointment() {
     <SafeAreaView style={styles.container}>
       <CurvedBackground>
         <View style={styles.contentContainer}>
-          {/* Header */}
-          <AppHeader title="Appointments" showBack={true} />
+          {/* Custom Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+            </TouchableOpacity>
+            
+            <Text style={styles.headerTitle}>Book Appointment</Text>
+            
+            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+              <Ionicons name="menu" size={24} color="#2E7D32" />
+            </TouchableOpacity>
+          </View>
 
           <ScrollView style={styles.container}>
             <Text style={styles.title}>
               Schedule a session with a support worker
             </Text>
 
-            {/* Step Indicator */}
+            {/* Step Indicator - Shows progress through booking process */}
             <View style={styles.stepsContainer}>
               <View style={styles.stepRow}>
                 {/* Step 1 - Inactive */}
@@ -366,9 +417,9 @@ export default function BookAppointment() {
               </View>
             </View>
 
+            {/* Available Times Card (only shown when date is selected) */}
             {selectedDate ? (
               <>
-                {/* Available Times Card */}
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>Available Times</Text>
                   <View style={styles.timesContainer}>
@@ -410,6 +461,7 @@ export default function BookAppointment() {
               </View>
             )}
 
+            {/* Continue Button (disabled until both date and time are selected) */}
             <TouchableOpacity
               style={[
                 styles.continueButton,
@@ -423,7 +475,7 @@ export default function BookAppointment() {
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Side Menu */}
+          {/* Side Menu Modal */}
           <Modal
             animationType="fade"
             transparent={true}
@@ -438,7 +490,7 @@ export default function BookAppointment() {
               <View style={styles.sideMenu}>
                 <View style={styles.sideMenuHeader}>
                   <Text style={styles.profileName}>{getDisplayName()}</Text>
-                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                  <Text style={styles.profileEmail}>{mockUser?.email}</Text>
                 </View>
                 <ScrollView style={styles.sideMenuContent}>
                   {sideMenuItems.map((item, index) => (
@@ -460,6 +512,7 @@ export default function BookAppointment() {
             </View>
           </Modal>
 
+          {/* Bottom Navigation */}
           <BottomNavigation
             tabs={tabs}
             activeTab={activeTab}
@@ -475,6 +528,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 50,
   },
   loadingContainer: {
     flex: 1,
