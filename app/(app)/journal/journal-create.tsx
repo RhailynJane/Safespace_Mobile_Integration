@@ -13,15 +13,27 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, Typography } from "../../constants/theme";
-import { useAuth } from "../../context/AuthContext";
-import { JournalService, supabase } from "../../lib/supabase";
-import { AppHeader } from "../../components/AppHeader";
-import BottomNavigation from "../../components/BottomNavigation";
+import { Colors, Spacing, Typography } from "../../../constants/theme";
+import { AppHeader } from "../../../components/AppHeader";
+import BottomNavigation from "../../../components/BottomNavigation";
+import CurvedBackground from "../../../components/CurvedBackground"; 
 
+// Mock user data 
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+// Emotion type definitions for the journal entry
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 type CreateStep = "create" | "success";
 
+// Emotion option interface and data
 interface EmotionOption {
   id: EmotionType;
   emoji: string;
@@ -36,6 +48,7 @@ const emotionOptions: EmotionOption[] = [
   { id: "very-happy", emoji: "😄", label: "Very Happy" },
 ];
 
+// Journal data interface
 interface JournalData {
   title: string;
   content: string;
@@ -43,6 +56,7 @@ interface JournalData {
   emoji: string;
 }
 
+// Navigation tabs configuration
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community-forum", name: "Community", icon: "people" },
@@ -51,8 +65,14 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
+/**
+ * JournalCreateScreen Component
+ * 
+ * A screen for creating new journal entries with emotion selection.
+ * Features a two-step process: creation and success confirmation.
+ * Uses mock data for frontend demonstration purposes.
+ */
 export default function JournalCreateScreen() {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
   const [journalData, setJournalData] = useState<JournalData>({
@@ -63,14 +83,26 @@ export default function JournalCreateScreen() {
   });
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Handles title input change
+   * @param text - The new title text
+   */
   const handleTitleChange = (text: string) => {
     setJournalData((prev) => ({ ...prev, title: text }));
   };
 
+  /**
+   * Handles content input change
+   * @param text - The new content text
+   */
   const handleContentChange = (text: string) => {
     setJournalData((prev) => ({ ...prev, content: text }));
   };
 
+  /**
+   * Handles emotion selection
+   * @param emotion - The selected emotion option
+   */
   const handleEmotionSelect = (emotion: EmotionOption) => {
     setJournalData((prev) => ({
       ...prev,
@@ -79,6 +111,10 @@ export default function JournalCreateScreen() {
     }));
   };
 
+  /**
+   * Handles tab press navigation
+   * @param tabId - The ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -88,6 +124,10 @@ export default function JournalCreateScreen() {
     }
   };
 
+  /**
+   * Handles saving the journal entry (mock implementation)
+   * Validates inputs and simulates a successful save
+   */
   const handleSave = async () => {
     if (
       !journalData.title.trim() ||
@@ -101,21 +141,10 @@ export default function JournalCreateScreen() {
     setLoading(true);
 
     try {
-      const { data: clientData, error: clientError } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("firebase_uid", user!.uid)
-        .single();
-
-      if (clientError || !clientData)
-        throw clientError || new Error("Client not found");
-
-      const entryId = await JournalService.createEntry(clientData.id, {
-        title: journalData.title,
-        content: journalData.content,
-        mood_type: journalData.emotion,
-      });
-
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock successful save
       setCurrentStep("success");
     } catch (error) {
       console.error("Error saving journal entry:", error);
@@ -125,6 +154,9 @@ export default function JournalCreateScreen() {
     }
   };
 
+  /**
+   * Handles cancel action with confirmation
+   */
   const handleCancel = () => {
     Alert.alert(
       "Discard Entry?",
@@ -140,10 +172,16 @@ export default function JournalCreateScreen() {
     );
   };
 
+  /**
+   * Handles closing the success screen
+   */
   const handleClose = () => {
     router.replace("/(app)/journaling");
   };
 
+  /**
+   * Renders the journal creation form
+   */
   const renderCreateStep = () => (
     <View style={styles.createContainer}>
       <Text style={styles.pageTitle}>Add New Journal</Text>
@@ -196,6 +234,9 @@ export default function JournalCreateScreen() {
     </View>
   );
 
+  /**
+   * Renders the success confirmation screen
+   */
   const renderSuccessStep = () => (
     <View style={styles.successContainer}>
       <Text style={styles.pageTitle}>Express your thoughts and feelings</Text>
@@ -259,6 +300,9 @@ export default function JournalCreateScreen() {
     </View>
   );
 
+  /**
+   * Renders the action buttons (Cancel/Save)
+   */
   const renderActionButtons = () => {
     if (currentStep === "success") return null;
 
@@ -283,6 +327,9 @@ export default function JournalCreateScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Add CurvedBackground as the first element for the background */}
+      <CurvedBackground />
+      
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
