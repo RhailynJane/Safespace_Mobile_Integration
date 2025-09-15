@@ -11,23 +11,34 @@ import {
   ActivityIndicator,
   Dimensions,
   TextInput,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../context/AuthContext";
-import BottomNavigation from "../../components/BottomNavigation";
+import BottomNavigation from "../../../components/BottomNavigation";
+import CurvedBackground from "../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 
 export default function ResourcesScreen() {
-  const { user, profile, logout } = useAuth();
+  // State management for UI components
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("resources");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
 
+  // Mock user data for frontend demonstration
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -36,6 +47,7 @@ export default function ResourcesScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // Resource categories with visual identifiers
   const categories = [
     { id: "stress", name: "Stress", icon: "💧", color: "#FF8A65" },
     { id: "anxiety", name: "Anxiety", icon: "🧠", color: "#81C784" },
@@ -43,6 +55,7 @@ export default function ResourcesScreen() {
     { id: "sleep", name: "Sleep", icon: "🛏️", color: "#4DD0E1" },
   ];
 
+  // Sample resources data with metadata
   const resources = [
     {
       id: 1,
@@ -82,6 +95,7 @@ export default function ResourcesScreen() {
     },
   ];
 
+  // Handle tab navigation with proper routing
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -91,6 +105,7 @@ export default function ResourcesScreen() {
     }
   };
 
+  // Side menu navigation items with icons and actions
   const sideMenuItems = [
     {
       icon: "home",
@@ -185,24 +200,28 @@ export default function ResourcesScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality for frontend
+        console.log("User signed out");
       },
     },
   ];
 
+  // Helper function to get display name from mock user data
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Filter resources based on search query and selected category
   const filteredResources = resources.filter((resource) => {
     const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "" || resource.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
+  // Show loading indicator while data is being fetched
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -213,7 +232,10 @@ export default function ResourcesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Curved background component for visual appeal */}
+      <CurvedBackground />
+      
+      {/* Header with navigation controls and notifications */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -233,7 +255,7 @@ export default function ResourcesScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Search Bar */}
+        {/* Search bar for filtering resources */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -247,7 +269,7 @@ export default function ResourcesScreen() {
           </View>
         </View>
 
-        {/* Suggested Categories */}
+        {/* Category selection section with horizontal scrolling */}
         <View style={styles.categoriesSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Suggested Category</Text>
@@ -278,7 +300,7 @@ export default function ResourcesScreen() {
           </ScrollView>
         </View>
 
-        {/* All Resources */}
+        {/* Main resources listing section */}
         <View style={styles.resourcesSection}>
           <Text style={styles.resourcesSectionTitle}>All Resources</Text>
           
@@ -315,7 +337,7 @@ export default function ResourcesScreen() {
         </View>
       </ScrollView>
 
-      {/* Side Menu */}
+      {/* Side menu modal for additional navigation options */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -330,7 +352,7 @@ export default function ResourcesScreen() {
           <View style={styles.sideMenu}>
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -348,6 +370,7 @@ export default function ResourcesScreen() {
         </View>
       </Modal>
 
+      {/* Bottom navigation component for main app navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
