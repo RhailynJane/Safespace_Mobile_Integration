@@ -418,7 +418,7 @@ const MoodTrackingScreen = () => {
         {/* Navigation to view full mood history */}
         <TouchableOpacity
           style={styles.historyLink}
-          onPress={() => router.push("/(app)/mood-tracking/mood-history")}
+          onPress={() => router.push("../mood-tracking/mood-history.tsx")}
         >
           <Text style={styles.historyLinkText}>View Mood History</Text>
           <Ionicons name="chevron-forward" size={20} color={Colors.primary} />

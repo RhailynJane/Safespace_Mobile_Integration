@@ -218,7 +218,7 @@ export default function MoodLoggingScreen() {
       Alert.alert("Mood Logged!", "Your mood has been saved successfully.", [
         { 
           text: "OK", 
-          onPress: () => router.replace("/(app)/mood-history") 
+          onPress: () => router.replace("../mood-tracking/mood-history.tsx") 
         },
       ]);
       setIsSubmitting(false);
