@@ -313,6 +313,7 @@ export default function CommentsScreen() {
           <Ionicons name="send" size={20} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+      <CurvedBackground />
     </SafeAreaView>
   );
 }

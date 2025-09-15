@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import { AppHeader } from "../../../../../components/AppHeader";
 import Svg, { Path } from 'react-native-svg';
+import CurvedBackground from "../../../../../components/CurvedBackground";
 
 const CATEGORIES = [
   "Self Care",
@@ -84,6 +85,7 @@ export default function SelectCategoryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <CurvedBackground />
       {/* Header with Community Post button */}
       <ScrollView contentContainerStyle={styles.content}> 
       <AppHeader 
@@ -154,6 +156,7 @@ export default function SelectCategoryScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
       />
+      <CurvedBackground />
     </SafeAreaView>
   );
 }
