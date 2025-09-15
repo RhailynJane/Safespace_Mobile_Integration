@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 const POSTS = [
   {
@@ -240,6 +241,7 @@ export default function CommentsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <CurvedBackground />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>

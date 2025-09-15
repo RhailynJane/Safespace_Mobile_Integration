@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   View,
   Text,
@@ -16,11 +15,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { useAuth } from "../../../../context/AuthContext";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 
-// Mock data for posts
+// Mock data for posts (frontend-only implementation)
 const POSTS = [
   {
     id: 1,
@@ -63,47 +62,60 @@ const POSTS = [
   },
 ];
 
+// Available categories for filtering posts
 const CATEGORIES = ["Trending", "Stress", "Support", "Stories", "Bookmark", "Favorites"];
+
+/**
+ * CommunityMainScreen Component
+ * 
+ * Main community forum screen displaying posts, categories, and user interactions.
+ * Features a curved background, category filtering, and post interactions.
+ */
 export default function CommunityMainScreen() {
+  // State management
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeTab, setActiveTab] = useState("community-forum");
-  const { user, profile, logout } = useAuth();
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const [commentedPosts, setCommentedPosts] = useState<Set<number>>(new Set());
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
-    new Set()
-  );
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const loadProfileImage = async () => {
-    try {
-      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
-      if (savedImage) {
-        setProfileImage(savedImage);
-      }
-    } catch (error) {
-      console.log('Error loading profile image:', error);
-    }
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "John Doe",
+    email: "john.doe@example.com",
+    uid: "mock-user-id"
+  };
+  
+  const mockProfile = {
+    firstName: "John",
+    lastName: "Doe"
   };
 
+  /**
+   * Generates user initials from profile data
+   * @returns String containing user initials
+   */
   const getInitials = () => {
-    const firstName = profile?.firstName || "";
-    const lastName = profile?.lastName || "";
+    const firstName = mockProfile?.firstName || "";
+    const lastName = mockProfile?.lastName || "";
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
   };
 
+  /**
+   * Gets greeting name from available user data
+   * @returns String with user's first name or fallback
+   */
   const getGreetingName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
     return "User";
   };
 
-  useEffect(() => {
-    loadProfileImage();
-  }, [user?.uid]);
-
+  /**
+   * Shows the side menu with animation
+   */
   const showSideMenu = () => {
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
@@ -113,6 +125,9 @@ export default function CommunityMainScreen() {
     }).start();
   };
 
+  /**
+   * Hides the side menu with animation
+   */
   const hideSideMenu = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -123,6 +138,7 @@ export default function CommunityMainScreen() {
     });
   };
 
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -217,11 +233,16 @@ export default function CommunityMainScreen() {
       title: "Sign Out",
       onPress: async () => {
         hideSideMenu();
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Handles like button press for posts
+   * @param postId - ID of the post to like/unlike
+   */
   const handleLikePress = (postId: number) => {
     const newLikedPosts = new Set(likedPosts);
     if (newLikedPosts.has(postId)) {
@@ -232,6 +253,10 @@ export default function CommunityMainScreen() {
     setLikedPosts(newLikedPosts);
   };
 
+  /**
+   * Handles bookmark button press for posts
+   * @param postId - ID of the post to bookmark/unbookmark
+   */
   const handleBookmarkPress = (postId: number) => {
     const newBookmarkedPosts = new Set(bookmarkedPosts);
     if (newBookmarkedPosts.has(postId)) {
@@ -242,10 +267,10 @@ export default function CommunityMainScreen() {
     setBookmarkedPosts(newBookmarkedPosts);
   };
 
-  const handleBackPress = () => {
-    router.back();
-  };
-
+  /**
+   * Navigates to the comments screen for a specific post
+   * @param postId - ID of the post to view comments for
+   */
   const handlePostPress = (postId: number) => {
     router.push({
       pathname: "/community-forum/comments",
@@ -253,6 +278,7 @@ export default function CommunityMainScreen() {
     });
   };
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -261,6 +287,10 @@ export default function CommunityMainScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -270,36 +300,38 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName + " " + (profile.lastName || "");
-    if (user?.displayName) return user.displayName;
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName + " " + (mockProfile.lastName || "");
+    if (mockUser?.displayName) return mockUser.displayName;
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "John Doe";
   };
 
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Curved background component */}
+      <CurvedBackground style={styles.curvedBackground} />
+      
+      {/* Header Section */}
       <View style={styles.headerContainer}>
         {/* Top Header Row */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
             <View style={styles.profileImageContainer}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profileImage} />
-              ) : (
-                <Text style={styles.initialsText}>{getInitials()}</Text>
-              )}
+              <Text style={styles.initialsText}>{getInitials()}</Text>
             </View>
           </TouchableOpacity>
           
-      <View style={styles.profileTextContainer}>
-        <Text style={styles.userName}>{getDisplayName()}</Text>
-        <Text style={styles.userStats}>
-          <Ionicons name="document-text" size={16} color="#666" /> 0 Total Posts
-        </Text>          
-      </View>
+          <View style={styles.profileTextContainer}>
+            <Text style={styles.userName}>{getDisplayName()}</Text>
+            <Text style={styles.userStats}>
+              <Ionicons name="document-text" size={16} color="#666" /> 0 Total Posts
+            </Text>          
+          </View>
 
           <View style={styles.headerRight}>
             <TouchableOpacity onPress={() => router.push("/notifications")}>
@@ -314,24 +346,28 @@ export default function CommunityMainScreen() {
           </View>
         </View>
 
-          {/* User Profile Summary */}
-          <View style={styles.profileSection}>
-            <View style={styles.profileContainer}>
-            </View>
+        {/* User Profile Summary */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileContainer}>
           </View>
-          </View>
+        </View>
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Browse By Categories */}
+        {/* Browse By Categories Section */}
         <View style={styles.categoriesSection}>
-                  <TouchableOpacity
-          style={styles.addPostButton}
-          onPress={() => router.push("/community-forum/create")}
-        >
-          <Ionicons name="add" size={10} color="#FFFFFF" />
-          <Text style={styles.addPostButtonText}>Add Post</Text>
-        </TouchableOpacity>
+          {/* Add Post Button */}
+          <TouchableOpacity
+            style={styles.addPostButton}
+            onPress={() => router.push("/community-forum/create")}
+          >
+            <Ionicons name="add" size={10} color="#FFFFFF" />
+            <Text style={styles.addPostButtonText}>Add Post</Text>
+          </TouchableOpacity>
+          
           <Text style={styles.browseBySectionTitle}>Browse By</Text>
+          
+          {/* Category Filter Buttons */}
           <View style={styles.categoriesContainer}>
             {CATEGORIES.map((category) => (
               <TouchableOpacity
@@ -355,7 +391,7 @@ export default function CommunityMainScreen() {
           </View>
         </View>
 
-        {/* Posts List */}
+        {/* Posts List Section */}
         <View style={styles.postsSection}>
           {POSTS.map((post) => (
             <TouchableOpacity
@@ -386,6 +422,7 @@ export default function CommunityMainScreen() {
 
               <View style={styles.postFooter}>
                 <View style={styles.interactionButtons}>
+                  {/* Like Button */}
                   <TouchableOpacity
                     style={styles.interactionButton}
                     onPress={() => handleLikePress(post.id)}
@@ -398,14 +435,10 @@ export default function CommunityMainScreen() {
                     <Text style={styles.interactionText}>{post.likes}</Text>
                   </TouchableOpacity>
 
+                  {/* Comment Button */}
                   <TouchableOpacity
                     style={styles.interactionButton}
-                    onPress={() =>
-                      router.push({
-                        pathname: "/community-forum/comments",
-                        params: { id: post.id },
-                      })
-                    }
+                    onPress={() => handlePostPress(post.id)}
                   >
                     <Ionicons
                       name="chatbubble-outline"
@@ -415,6 +448,8 @@ export default function CommunityMainScreen() {
                     <Text style={styles.interactionText}>{post.comments}</Text>
                   </TouchableOpacity>
                 </View>
+                
+                {/* Bookmark Button */}
                 <TouchableOpacity onPress={() => handleBookmarkPress(post.id)}>
                   <Ionicons
                     name={bookmarkedPosts.has(post.id) ? "bookmark" : "bookmark-outline"}
@@ -443,7 +478,7 @@ export default function CommunityMainScreen() {
           <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
             <View style={styles.sideMenuHeader}>
               <Text style={styles.profileName}>{getGreetingName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -479,6 +514,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F2F2F7",
+  },
+  curvedBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
   },
   headerContainer: {
     backgroundColor: "#BAD6D2",
@@ -545,14 +588,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     flex: 1,
-    borderTopLeftRadius: 40,    // Add this
+    borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
   },
   profileTextContainer: {
     flex: 1,
     alignItems: "flex-start",
     marginLeft: 15,
-    
   },
   userName: {
     fontSize: 16,
@@ -568,7 +610,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     justifyContent: "flex-end",
-    },
+  },
   addPostButton: {
     backgroundColor: "#2EA78F",
     height:35,
@@ -589,7 +631,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.75,
     shadowRadius: 2,
     elevation: 3,
-    },
+  },
   addPostButtonText: {
     color: "#FFFFFF",
     fontSize: 12,
@@ -615,7 +657,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: "auto", 
   },
-  categoryButton: { // for bookmark and favorites
+  categoryButton: {
     width: "30%",
     paddingHorizontal: 20,
     paddingVertical: 6,
@@ -624,7 +666,6 @@ const styles = StyleSheet.create({
     height: 30,
     justifyContent: "center",
     alignItems: "center",
-
   },
   categoryButtonActive: {
     backgroundColor: "#757575",
@@ -665,7 +706,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-
   },
   postUserInfo: {
     flexDirection: "row",
@@ -694,8 +734,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingVertical: 8,
     paddingHorizontal: 0,
-
-
   },
   postFooter: {
     flexDirection: "row",
