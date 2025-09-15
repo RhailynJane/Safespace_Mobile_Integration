@@ -8,17 +8,28 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
-import { useAuth } from "../../../../../context/AuthContext";
-import { AppHeader } from "../../../../../components/AppHeader";
+import CurvedBackground from "../../../../../components/CurvedBackground";
 
+/**
+ * PostSuccessScreen Component
+ * 
+ * Success confirmation screen shown after a user successfully creates a post.
+ * Features a success message, image, and navigation options to view the post
+ * or continue browsing. Includes an elegant curved background.
+ */
 export default function PostSuccessScreen() {
   const [activeTab, setActiveTab] = useState("community-forum");
+
+  /**
+   * Handles navigation to view the newly created post
+   */
   const handleViewPost = () => {
     router.replace("/(app)/(tabs)/community-forum/main");
   };
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -27,6 +38,10 @@ export default function PostSuccessScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -38,18 +53,23 @@ export default function PostSuccessScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Curved background component */}
+      <CurvedBackground style={styles.curvedBackground} />
+      
       {/* Header */}
-      <AppHeader 
-        title=""
-        showBack={true} 
-        showMenu={false} 
-        showNotifications={false}
-        rightActions={
+      <View style={styles.headerContainer}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#000" />
+          </TouchableOpacity>
+          
           <View style={styles.communityPostButton}>
             <Text style={styles.communityPostButtonText}>Community Post</Text>
           </View>
-        }
-      />  
+          
+          <View style={styles.headerRight} />
+        </View>
+      </View>  
 
       <View style={styles.content}>
         {/* Success Card */}
@@ -74,7 +94,6 @@ export default function PostSuccessScreen() {
           >
             <Text style={styles.cardButtonText}>See my post</Text>
           </TouchableOpacity>
-          
         </View>
       </View>
 
@@ -93,6 +112,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F2F2F7",
   },
+  curvedBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
+  },
+  headerContainer: {
+    backgroundColor: "#F8F9FA",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
   communityPostButton: {
     backgroundColor: "#EDE7EC",
     paddingHorizontal: 40,
@@ -105,6 +142,9 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 11,
     fontWeight: "600",
+  },
+  headerRight: {
+    width: 24, // Placeholder for balance
   },
   content: {
     flex: 1,
@@ -119,7 +159,7 @@ const styles = StyleSheet.create({
     borderColor: "#000",
     borderWidth: 0.5,
     borderRadius: 20,
-    height:418,
+    height: 418,
     padding: 30,
     marginHorizontal: 20,
     shadowColor: "#000",
@@ -131,18 +171,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  successIcon: {
-    marginBottom: 20,
-  },
   successImage: {
-    width:250,
+    width: 250,
     height: 250,
     borderWidth: 1,
     borderRadius: 30,
     borderColor: '#B87B7B',
     marginTop: -18,
   },
-  successImageBorder:{
+  successImageBorder: {
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
