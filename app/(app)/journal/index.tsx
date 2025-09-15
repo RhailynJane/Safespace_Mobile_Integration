@@ -9,59 +9,63 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, Typography } from "../../constants/theme";
-import BottomNavigation from "../../components/BottomNavigation";
-import { AppHeader } from "../../components/AppHeader";
-import { useAuth } from "../../context/AuthContext";
-import { JournalService, supabase } from "../../lib/supabase";
+import { Colors, Spacing, Typography } from "../../../constants/theme";
+import BottomNavigation from "../../../components/BottomNavigation";
+import { AppHeader } from "../../../components/AppHeader";
+import CurvedBackground from "../../../components/CurvedBackground"; 
 
-interface JournalEntry {
-  id: string;
-  title: string;
-  content: string;
-  mood_type: string | null;
-  emoji: string;
-  date: string;
-  formattedDate: string;
-  tags: string[];
-}
+// Mock data 
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+// Mock journal entries data 
+const mockJournalEntries = [
+  {
+    id: "1",
+    title: "A Reflective Day",
+    content: "Today I spent time thinking about my goals and aspirations. It was a productive day overall.",
+    mood_type: "reflective",
+    emoji: "🤔",
+    date: "2023-10-15",
+    formattedDate: "Oct 15, 2023",
+    tags: ["reflection", "goals"],
+  },
+  {
+    id: "2",
+    title: "Morning Gratitude",
+    content: "I'm grateful for the beautiful sunrise and the opportunity to start a new day fresh.",
+    mood_type: "grateful",
+    emoji: "🙏",
+    date: "2023-10-14",
+    formattedDate: "Oct 14, 2023",
+    tags: ["gratitude", "morning"],
+  },
+];
 
 export default function JournalScreen() {
-  const { user } = useAuth();
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [journalEntries, setJournalEntries] = useState(mockJournalEntries);
+  const [loading, setLoading] = useState(false); // Set to false since we're using mock data
   const [activeTab, setActiveTab] = useState("journal");
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
 
+  // No need for backend fetch in this frontend-only version
   useEffect(() => {
-    const fetchEntries = async () => {
-      if (!user) return;
+    // Simulate loading delay for demonstration
+    const timer = setTimeout(() => {
+      setJournalEntries(mockJournalEntries);
+      setLoading(false);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
-      try {
-        setLoading(true);
-        // First get the client_id for the current user
-        const { data: clientData, error: clientError } = await supabase
-          .from("clients")
-          .select("id")
-          .eq("firebase_uid", user.uid)
-          .single();
-
-        if (clientError || !clientData) {
-          throw clientError || new Error("Client not found");
-        }
-
-        const entries = await JournalService.getEntries(clientData.id, "week");
-        setJournalEntries(entries);
-      } catch (error) {
-        console.error("Error fetching journal entries:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEntries();
-  }, [user]);
-
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -70,6 +74,10 @@ export default function JournalScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles tab press navigation
+   * @param tabId - The ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -79,27 +87,40 @@ export default function JournalScreen() {
     }
   };
 
+  /**
+   * Navigates to the journal creation screen
+   */
   const handleCreateJournal = () => {
     router.push("/(app)/journal-create");
   };
 
+  /**
+   * Navigates to view all journal entries
+   */
   const handleViewAllEntries = () => {
     router.push("/(app)/journal-history");
   };
 
+  /**
+   * Handles pressing on a specific journal entry
+   * @param entryId - The ID of the journal entry to view
+   */
   const handleEntryPress = (entryId: string) => {
     router.push(`/(app)/journal-entry/${entryId}`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Add CurvedBackground as the first element for the background */}
+      <CurvedBackground />
+      
       <AppHeader title="Journal" showBack={true} showMenu={true} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.content}>
           <Text style={styles.subText}>Express your thoughts and feelings</Text>
 
-          {/* Create Journal Card */}
+          {/* Create Journal Card - Main call to action */}
           <TouchableOpacity
             style={styles.createCard}
             onPress={handleCreateJournal}
@@ -129,7 +150,7 @@ export default function JournalScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Recent Journal Entries */}
+          {/* Recent Journal Entries Section */}
           <View style={styles.recentSection}>
             <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
 
@@ -185,6 +206,7 @@ export default function JournalScreen() {
         </View>
       </ScrollView>
 
+      {/* Bottom Navigation Component */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -193,8 +215,6 @@ export default function JournalScreen() {
     </SafeAreaView>
   );
 }
-
-// ... keep your existing styles ...
 
 const styles = StyleSheet.create({
   container: {
@@ -206,28 +226,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xxl, // Extra padding for bottom nav
   },
-  // Updated header to match mood tracking
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceSecondary,
-  },
-  backButton: {
-    padding: Spacing.sm,
-  },
-  headerTitle: {
-    ...Typography.title,
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  menuButton: {
-    padding: Spacing.sm,
-  },
-  // Rest of your existing styles...
   content: {
     flex: 1,
     paddingTop: Spacing.xxl,
