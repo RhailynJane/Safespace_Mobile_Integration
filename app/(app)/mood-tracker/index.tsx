@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -10,15 +10,13 @@ import {
   Dimensions,
   Modal,
   Pressable,
-  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Spacing, Typography } from "../../constants/theme";
-import { useAuth } from "../../context/AuthContext";
-import { supabase } from "../../lib/supabase";
-import BottomNavigation from "../../components/BottomNavigation";
-import { AppHeader } from "../../components/AppHeader";
+import { Colors, Spacing, Typography } from "../../../constants/theme";
+import BottomNavigation from "../../../components/BottomNavigation";
+import { AppHeader } from "../../../components/AppHeader";
+import CurvedBackground from "../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -35,13 +33,24 @@ interface MoodOption {
 }
 
 const MoodTrackingScreen = () => {
-  const { user, logout } = useAuth();
+  // Mock user data for frontend demonstration
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [recentEntries, setRecentEntries] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeEmoji, setActiveEmoji] = useState<MoodType | null>(null);
   const [activeTab, setActiveTab] = useState("mood");
 
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -59,7 +68,7 @@ const MoodTrackingScreen = () => {
     }
   };
 
-  // Initialize animated values
+  // Initialize animated values for mood emojis with visual feedback
   const moodOptions = useRef<MoodOption[]>([
     {
       id: "very-happy",
@@ -103,6 +112,7 @@ const MoodTrackingScreen = () => {
     },
   ]).current;
 
+  // Side menu navigation options
   const sideMenuItems = [
     {
       icon: "home",
@@ -197,8 +207,8 @@ const MoodTrackingScreen = () => {
       title: "Sign Out",
       onPress: async () => {
         try {
-          await logout();
           setSideMenuVisible(false);
+          console.log("Sign Out pressed");
         } catch (error) {
           console.error("Logout error:", error);
         }
@@ -206,65 +216,7 @@ const MoodTrackingScreen = () => {
     },
   ];
 
-  useEffect(() => {
-    if (user?.uid) {
-      loadRecentEntries();
-    }
-
-    return () => {
-      moodOptions.forEach((emoji) => {
-        emoji.scale.stopAnimation();
-        emoji.opacity.stopAnimation();
-      });
-    };
-  }, [user?.uid]);
-
-  const loadRecentEntries = async () => {
-    setLoading(true);
-    try {
-      // First get the client_id for the current user
-      const { data: clientData, error: clientError } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("firebase_uid", user!.uid)
-        .single();
-
-      if (clientError || !clientData) {
-        throw clientError || new Error("Client record not found");
-      }
-
-      // Then get mood entries for this client_id
-      const { data, error } = await supabase
-        .from("mood_entries")
-        .select(
-          `
-        *,
-        mood_factors: mood_factors(factor)
-      `
-        )
-        .eq("client_id", clientData.id)
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (error) throw error;
-
-      // Transform data to include emoji and label
-      const transformedEntries = (data || []).map((entry) => ({
-        ...entry,
-        mood_emoji: getEmojiForMood(entry.mood_type),
-        mood_label: getLabelForMood(entry.mood_type),
-      }));
-
-      setRecentEntries(transformedEntries);
-    } catch (error) {
-      console.error("Failed to load mood history:", error);
-      setRecentEntries([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Helper functions
+  // Helper function to get emoji representation for mood type
   const getEmojiForMood = (moodType: string) => {
     switch (moodType) {
       case "very-happy":
@@ -282,6 +234,7 @@ const MoodTrackingScreen = () => {
     }
   };
 
+  // Helper function to get label for mood type
   const getLabelForMood = (moodType: string) => {
     switch (moodType) {
       case "very-happy":
@@ -299,6 +252,7 @@ const MoodTrackingScreen = () => {
     }
   };
 
+  // Handle emoji press animation for visual feedback
   const handleEmojiPressIn = (moodId: MoodType) => {
     setActiveEmoji(moodId);
     moodOptions.forEach((emoji) => {
@@ -318,6 +272,7 @@ const MoodTrackingScreen = () => {
     });
   };
 
+  // Reset emoji animations when press is released
   const handleEmojiPressOut = () => {
     setActiveEmoji(null);
     moodOptions.forEach((emoji) => {
@@ -336,10 +291,12 @@ const MoodTrackingScreen = () => {
     });
   };
 
+  // Navigate to mood logging screen with selected mood
   const handleMoodPress = (moodId: MoodType) => {
     router.push(`/(app)/mood-logging?selectedMood=${moodId}`);
   };
 
+  // Render individual mood emoji with animations
   const renderMoodEmoji = (mood: MoodOption) => {
     return (
       <Pressable
@@ -367,13 +324,41 @@ const MoodTrackingScreen = () => {
     );
   };
 
+  // Mock recent mood entries for demonstration
+  const mockRecentEntries = [
+    {
+      id: 1,
+      mood_type: "happy",
+      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      mood_emoji: getEmojiForMood("happy"),
+      mood_label: getLabelForMood("happy"),
+    },
+    {
+      id: 2,
+      mood_type: "neutral",
+      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+      mood_emoji: getEmojiForMood("neutral"),
+      mood_label: getLabelForMood("neutral"),
+    },
+    {
+      id: 3,
+      mood_type: "very-happy",
+      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      mood_emoji: getEmojiForMood("very-happy"),
+      mood_label: getLabelForMood("very-happy"),
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Elegant curved background with gradient colors */}
+      <CurvedBackground />
+      
+      {/* Header with navigation controls */}
       <AppHeader title="Mood Tracker" showBack={true} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Mood selection */}
+        {/* Mood selection section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>How are you feeling?</Text>
           <Text style={styles.sectionSubtitle}>
@@ -390,14 +375,14 @@ const MoodTrackingScreen = () => {
           </View>
         </View>
 
-        {/* Recent moods */}
+        {/* Recent moods section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Moods</Text>
 
           {loading ? (
             <Text style={styles.loadingText}>Loading...</Text>
-          ) : recentEntries.length > 0 ? (
-            recentEntries.map((entry, index) => (
+          ) : mockRecentEntries.length > 0 ? (
+            mockRecentEntries.map((entry, index) => (
               <View key={index} style={styles.moodCard}>
                 <Text
                   style={[
@@ -430,7 +415,7 @@ const MoodTrackingScreen = () => {
           )}
         </View>
 
-        {/* View Mood History Link */}
+        {/* Navigation to view full mood history */}
         <TouchableOpacity
           style={styles.historyLink}
           onPress={() => router.push("/(app)/mood-history")}
@@ -440,7 +425,7 @@ const MoodTrackingScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Side Menu */}
+      {/* Side Menu Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -456,7 +441,7 @@ const MoodTrackingScreen = () => {
             <View style={styles.sideMenuHeader}>
               <View style={styles.profileContainer}>
                 <Text style={styles.profileName}>
-                  {user?.displayName?.split(" ")[0] || "User"}
+                  {mockProfile.firstName || "User"}
                 </Text>
               </View>
               <TouchableOpacity
@@ -482,6 +467,7 @@ const MoodTrackingScreen = () => {
         </View>
       </Modal>
 
+      {/* Bottom navigation bar */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
