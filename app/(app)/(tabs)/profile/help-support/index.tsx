@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import CurvedBackground from '../../../../../components/CurvedBackground';
 
 interface HelpSection {
   id: string;
@@ -285,6 +286,7 @@ const HelpSupportScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <CurvedBackground />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Text style={styles.screenTitle}>Help & Support</Text>
         <Text style={styles.screenSubtitle}>
@@ -305,6 +307,7 @@ const HelpSupportScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <CurvedBackground />
     </SafeAreaView>
   );
 };
