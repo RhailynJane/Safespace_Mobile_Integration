@@ -13,13 +13,28 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 
+// Mock user data for frontend-only implementation
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
 export default function StressQuestionnaireScreen() {
-  const { user, profile, logout } = useAuth();
+  // Using mock data instead of auth context
+  const user = mockUser;
+  const profile = mockProfile;
+  
+  // State management for UI components
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("assessment");
@@ -27,6 +42,7 @@ export default function StressQuestionnaireScreen() {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [isCompleted, setIsCompleted] = useState(false);
 
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -35,67 +51,70 @@ export default function StressQuestionnaireScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // Stress assessment questions based on the Perceived Stress Scale (PSS)
   const questions = [
-  {
-    id: 0,
-    text: "In the last month, how often have you been upset because of something that happened unexpectedly?",
-    shortText: "Upset because of something unexpected"
-  },
-  {
-    id: 1,
-    text: "In the last month, how often have you felt that you were unable to control the important things in your life?",
-    shortText: "Unable to control important things"
-  },
-  {
-    id: 2,
-    text: "In the last month, how often have you felt nervous and stressed?",
-    shortText: "Felt nervous and stressed"
-  },
-  {
-    id: 3,
-    text: "In the last month, how often have you felt confident about your ability to handle your personal problems?",
-    shortText: "Confident about handling personal problems"
-  },
-  {
-    id: 4,
-    text: "In the last month, how often have you felt that things were going your way?",
-    shortText: "Things were going your way"
-  },
-  {
-    id: 5,
-    text: "In the last month, how often have you found that you could not cope with all the things that you had to do?",
-    shortText: "Could not cope with all the things to do"
-  },
-  {
-    id: 6,
-    text: "In the last month, how often have you been able to control irritations in your life?",
-    shortText: "Able to control irritations"
-  },
-  {
-    id: 7,
-    text: "In the last month, how often have you felt that you were on top of things?",
-    shortText: "Felt on top of things"
-  },
-  {
-    id: 8,
-    text: "In the last month, how often have you been angered because of things that were outside of your control?",
-    shortText: "Angered by things outside your control"
-  },
-  {
-    id: 9,
-    text: "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?",
-    shortText: "Difficulties piling up too high to overcome"
-  }
-];
+    {
+      id: 0,
+      text: "In the last month, how often have you been upset because of something that happened unexpectedly?",
+      shortText: "Upset because of something unexpected"
+    },
+    {
+      id: 1,
+      text: "In the last month, how often have you felt that you were unable to control the important things in your life?",
+      shortText: "Unable to control important things"
+    },
+    {
+      id: 2,
+      text: "In the last month, how often have you felt nervous and stressed?",
+      shortText: "Felt nervous and stressed"
+    },
+    {
+      id: 3,
+      text: "In the last month, how often have you felt confident about your ability to handle your personal problems?",
+      shortText: "Confident about handling personal problems"
+    },
+    {
+      id: 4,
+      text: "In the last month, how often have you felt that things were going your way?",
+      shortText: "Things were going your way"
+    },
+    {
+      id: 5,
+      text: "In the last month, how often have you found that you could not cope with all the things that you had to do?",
+      shortText: "Could not cope with all the things to do"
+    },
+    {
+      id: 6,
+      text: "In the last month, how often have you been able to control irritations in your life?",
+      shortText: "Able to control irritations"
+    },
+    {
+      id: 7,
+      text: "In the last month, how often have you felt that you were on top of things?",
+      shortText: "Felt on top of things"
+    },
+    {
+      id: 8,
+      text: "In the last month, how often have you been angered because of things that were outside of your control?",
+      shortText: "Angered by things outside your control"
+    },
+    {
+      id: 9,
+      text: "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?",
+      shortText: "Difficulties piling up too high to overcome"
+    }
+  ];
 
-const answerOptions = [
-  { value: 0, label: "Never" },
-  { value: 1, label: "Almost Never" },
-  { value: 2, label: "Sometimes" },
-  { value: 3, label: "Fairly Often" },
-  { value: 4, label: "Very Often" }
-];
+  // Response options for the stress assessment
+  const answerOptions = [
+    { value: 0, label: "Never" },
+    { value: 1, label: "Almost Never" },
+    { value: 2, label: "Sometimes" },
+    { value: 3, label: "Fairly Often" },
+    { value: 4, label: "Very Often" }
+  ];
 
+  // Handle tab navigation in the bottom navigation bar
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -105,10 +124,12 @@ const answerOptions = [
     }
   };
 
+  // Record user's answer selection
   const handleAnswerSelect = (value: number) => {
     setAnswers({ ...answers, [currentQuestion]: value });
   };
 
+  // Navigate to the next question or complete the assessment
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
@@ -118,22 +139,26 @@ const answerOptions = [
     }
   };
 
+  // Navigate back to the previous question
   const handleBack = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
     }
   };
 
+  // Reset the assessment to start from the beginning
   const handleStartOver = () => {
     setCurrentQuestion(0);
     setAnswers({});
     setIsCompleted(false);
   };
 
+  // Navigate to assessment selection screen
   const handleTakeAnotherAssessment = () => {
     router.push("/assessment/selection");
   };
 
+  // Side menu navigation options
   const sideMenuItems = [
     {
       icon: "home",
@@ -228,11 +253,13 @@ const answerOptions = [
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Frontend-only: Just navigate to login instead of actual logout
+        router.replace("/login");
       },
     },
   ];
 
+  // Get display name from user profile or email
   const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -240,6 +267,7 @@ const answerOptions = [
     return "User";
   };
 
+  // Show loading indicator while processing
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -248,10 +276,14 @@ const answerOptions = [
     );
   }
 
+  // Show completion screen when assessment is finished
   if (isCompleted) {
     return (
       <SafeAreaView style={styles.container}>
-        {/* Header */}
+        {/* Curved background for visual appeal */}
+        <CurvedBackground />
+        
+        {/* Header with navigation and notification icons */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#333" />
@@ -295,7 +327,7 @@ const answerOptions = [
           </TouchableOpacity>
         </View>
 
-        {/* Side Menu */}
+        {/* Side Menu Modal */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -328,6 +360,7 @@ const answerOptions = [
           </View>
         </Modal>
 
+        {/* Bottom Navigation Bar */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -337,9 +370,13 @@ const answerOptions = [
     );
   }
 
+  // Main assessment screen with questions and answer options
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Curved background for visual appeal */}
+      <CurvedBackground />
+      
+      {/* Header with navigation and notification icons */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -358,8 +395,9 @@ const answerOptions = [
         </View>
       </View>
 
+      {/* Scrollable content area for questions */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Question Header */}
+        {/* Question progress indicator and reset button */}
         <View style={styles.questionHeader}>
           <Text style={styles.questionNumber}>Question {currentQuestion + 1} of {questions.length}</Text>
           <TouchableOpacity style={styles.startOverButton} onPress={handleStartOver}>
@@ -367,12 +405,12 @@ const answerOptions = [
           </TouchableOpacity>
         </View>
 
-        {/* Question Content */}
+        {/* Current question display */}
         <View style={styles.questionContainer}>
           <Text style={styles.questionText}>{questions[currentQuestion]?.text}</Text>
         </View>
 
-        {/* Answer Options */}
+        {/* Answer options for the current question */}
         <View style={styles.optionsContainer}>
           {answerOptions.map((option) => (
             <TouchableOpacity
@@ -394,7 +432,7 @@ const answerOptions = [
         </View>
       </ScrollView>
 
-      {/* Navigation Buttons */}
+      {/* Navigation buttons for moving between questions */}
       <View style={styles.navigationContainer}>
         <TouchableOpacity
           style={[styles.navButton, styles.backButton]}
@@ -425,7 +463,7 @@ const answerOptions = [
         </TouchableOpacity>
       </View>
 
-      {/* Side Menu */}
+      {/* Side Menu Modal */}
       <Modal
         animationType="fade"
         transparent={true}
@@ -458,6 +496,7 @@ const answerOptions = [
           </View>
         </Modal>
 
+        {/* Bottom Navigation Bar */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
