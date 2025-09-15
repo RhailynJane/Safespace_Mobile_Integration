@@ -13,17 +13,33 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import BottomNavigation from "../../../components/BottomNavigation";
+import BottomNavigation from "../../../../components/BottomNavigation";
+import CurvedBackground from "../../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 
+// Mock user data for frontend-only implementation
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
 export default function AssessmentSelectionScreen() {
-  const { user, profile, logout } = useAuth();
+  // Using mock data instead of AuthContext
+  const user = mockUser;
+  const profile = mockProfile;
+  
+  // State management for UI components
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("assessment");
 
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -32,6 +48,7 @@ export default function AssessmentSelectionScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // Available assessment types with their details
   const assessmentTypes = [
     {
       id: "depression-phq9",
@@ -71,6 +88,7 @@ export default function AssessmentSelectionScreen() {
     },
   ];
 
+  // Handle tab navigation
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -80,6 +98,7 @@ export default function AssessmentSelectionScreen() {
     }
   };
 
+  // Navigate to the selected assessment type
   const handleAssessmentType = (assessmentId: string) => {
     // Navigate to the specific assessment questionnaire
     if (assessmentId === "depression-phq9") {
@@ -96,6 +115,7 @@ export default function AssessmentSelectionScreen() {
     }
   };
 
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -190,11 +210,13 @@ export default function AssessmentSelectionScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Frontend-only implementation - just navigate to login
+        router.replace("/login");
       },
     },
   ];
 
+  // Get display name from profile or user data
   const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -202,6 +224,7 @@ export default function AssessmentSelectionScreen() {
     return "User";
   };
 
+  // Show loading indicator while processing
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -212,6 +235,9 @@ export default function AssessmentSelectionScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Add CurvedBackground to the assessment selection screen */}
+      <CurvedBackground />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
