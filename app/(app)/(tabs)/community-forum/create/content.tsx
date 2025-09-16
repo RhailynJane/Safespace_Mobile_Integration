@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../../components/AppHeader";
 
 /**
  * CreatePostScreen Component
@@ -33,13 +34,13 @@ export default function CreatePostScreen() {
 
   // Mock user data (replaces backend auth context)
   const mockUser = {
-    displayName: "John Doe",
-    email: "john.doe@example.com",
+    displayName: "Demo user",
+    email: "demo@gmail.com",
   };
   
   const mockProfile = {
-    firstName: "John",
-    lastName: "Doe"
+    firstName: "Demo",
+    lastName: "User"
   };
 
   /**
@@ -114,25 +115,10 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Curved background component */}
-      <CurvedBackground style={styles.curvedBackground} />
-      
-      <ScrollView style={styles.content}>
-        {/* Header Section */}
-        <View style={styles.headerContainer}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#000" />
-            </TouchableOpacity>
-            
-            <View style={styles.communityPostButton}>
-              <Text style={styles.communityPostButtonText}>Community Post</Text>
-            </View>
-            
-            <View style={styles.headerRight} />
-          </View>
-        </View>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+          <AppHeader title="Community Forum" showBack={true} />
+          <ScrollView style={styles.content}>
 
         {/* Title Section */}
         <View style={styles.titleSection}>
@@ -231,14 +217,16 @@ export default function CreatePostScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
       />
-    </SafeAreaView>
+ </SafeAreaView>
+
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   curvedBackground: {
     position: 'absolute',
@@ -249,7 +237,7 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   headerContainer: {
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#transparent",
   },
   header: {
     flexDirection: "row",
@@ -276,19 +264,19 @@ const styles = StyleSheet.create({
   },
   titleSection: {
     paddingHorizontal: 15,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
     paddingVertical: 16,
   },
   mainTitle: {
     fontSize: 19,
     fontWeight: "800",
     color: "#000",
-    textAlign: "left",
+    textAlign: "center",
   },
   content: {
     flex: 1,
     padding: 16,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
   },
   profileCard: {
     backgroundColor: "#EDE7EC",
@@ -378,11 +366,10 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#F2F2F7",
     marginVertical: 16,
   },
   privacyContainer: {
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
     borderRadius: 12,
     marginTop: 10,
     padding: 16,
@@ -406,9 +393,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "column",
     padding: 20,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
     borderTopWidth: 1,
-    borderTopColor: "#F2F2F7",
+    borderTopColor: "transparent",
     gap: 12,
     marginBottom: 40,
   },
