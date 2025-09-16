@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
@@ -15,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -31,7 +33,7 @@ export default function AssessmentScreen() {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -87,7 +89,7 @@ export default function AssessmentScreen() {
   // Handler for when user selects an assessment option
   const handleAssessmentOption = (optionId: string) => {
     // All assessment options navigate to the same assessment selection screen
-    router.push("/assessment/selection");
+    router.push("../self-assessment/assessment/selection");
   };
 
   // Side menu navigation items with icons and actions
@@ -209,51 +211,15 @@ export default function AssessmentScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Curved background component for visual enhancement */}
-      <CurvedBackground />
-      
-      {/* Header section with navigation controls */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Self Assessment</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#333" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>1</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="grid-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Self-Assessment" showBack={true} />
 
-      {/* Main scrollable content area */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Illustration section with custom graphics */}
-        <View style={styles.illustrationContainer}>
-          <View style={styles.illustrationPlaceholder}>
-            <View style={styles.cloudShape}>
-              <Ionicons name="heart" size={30} color="#4CAF50" />
-              <Ionicons name="add-circle" size={20} color="#2196F3" />
-              <Ionicons name="heart" size={15} color="#4CAF50" />
-            </View>
-            <View style={styles.personIllustration}>
-              <View style={styles.personHead} />
-              <View style={styles.personBody}>
-                <View style={styles.heartInHands}>
-                  <Ionicons name="heart" size={25} color="#FFFFFF" />
-                  <Ionicons name="add" size={15} color="#FFFFFF" />
-                </View>
-              </View>
-            </View>
-          </View>
-          
-          <Text style={styles.questionText}>Why are you taking this assessment?</Text>
+        {/* Main scrollable content area */}
+        <View style={styles.content}>
+          <Text style={styles.questionText}>
+            Why are you taking this assessment?
+          </Text>
         </View>
 
         {/* Assessment options selection cards */}
@@ -261,68 +227,80 @@ export default function AssessmentScreen() {
           {assessmentOptions.map((option) => (
             <TouchableOpacity
               key={option.id}
-              style={[styles.optionCard, { backgroundColor: option.backgroundColor }]}
+              style={[
+                styles.optionCard,
+                { backgroundColor: option.backgroundColor },
+              ]}
               onPress={() => handleAssessmentOption(option.id)}
             >
               <View style={styles.optionIconContainer}>
-                <Ionicons name={option.icon as any} size={24} color={option.iconColor} />
+                <Ionicons
+                  name={option.icon as any}
+                  size={24}
+                  color={option.iconColor}
+                />
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>{option.title}</Text>
-                <Text style={styles.optionDescription}>{option.description}</Text>
+                <Text style={styles.optionDescription}>
+                  {option.description}
+                </Text>
               </View>
             </TouchableOpacity>
           ))}
         </View>
-      </ScrollView>
 
-      {/* Side menu modal for additional navigation options */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+        {/* Side menu modal for additional navigation options */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Bottom navigation component */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Bottom navigation component */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
@@ -370,60 +348,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
-  },
-  illustrationContainer: {
-    alignItems: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  illustrationPlaceholder: {
-    width: 200,
-    height: 200,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 30,
-    position: "relative",
-  },
-  cloudShape: {
-    position: "absolute",
-    top: 20,
-    right: 30,
-    width: 80,
-    height: 50,
-    backgroundColor: "#E3F2FD",
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 5,
-  },
-  personIllustration: {
-    alignItems: "center",
-  },
-  personHead: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#FFCDD2",
-    marginBottom: 10,
-  },
-  personBody: {
-    width: 60,
-    height: 80,
-    backgroundColor: "#4CAF50",
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  heartInHands: {
-    width: 40,
-    height: 35,
-    backgroundColor: "#2196F3",
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "row",
+    backgroundColor: "transparent",
   },
   questionText: {
     fontSize: 22,
@@ -431,11 +356,15 @@ const styles = StyleSheet.create({
     color: "#333",
     textAlign: "center",
     lineHeight: 28,
+    marginTop: 50,
+    marginBottom: 10,
+    paddingHorizontal: 20,
   },
   optionsContainer: {
     paddingHorizontal: 20,
     paddingBottom: 100,
     gap: 15,
+    marginBottom: 250,
   },
   optionCard: {
     flexDirection: "row",
@@ -467,6 +396,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    marginTop: 10
   },
   optionContent: {
     flex: 1,
