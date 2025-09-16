@@ -84,87 +84,76 @@ export default function SelectCategoryScreen() {
 
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CurvedBackground />
-      {/* Header with Community Post button */}
-      <ScrollView contentContainerStyle={styles.content}> 
-      <AppHeader 
-      title=""
-      showBack={true} 
-      showMenu={false} 
-      showNotifications={false}
-      rightActions={
-      <View style={styles.communityPostButton}>
-      <Text style={styles.communityPostButtonText}>Community Post</Text>
-      </View>
-      }
-      />     
-      {/* Title Section */}
-      <View style={styles.titleSection}>
-        <Text style={styles.mainTitle}>Add New Post</Text>
-      </View>
-        <Text style={styles.subtitle}>Select post category</Text>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          <AppHeader title="Community Forum" showBack={true} />   
+          
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.mainTitle}>Add New Post</Text>
+          </View>
+          <Text style={styles.subtitle}>Select post category</Text>
 
-        <View style={styles.categoriesContainer}>
-          {CATEGORIES.map((category) => (
-      <TouchableOpacity
-        key={category}
-        style={[
-          styles.categoryCard,
-          selectedCategory === category && styles.categoryCardActive,
-        ]}
-        onPress={() => setSelectedCategory(category)}
-      >
-        <View style={styles.categoryIcon}>
-          <Image
-            source={getCategoryIcon(category)}
-            style={styles.iconImage}
-            resizeMode="contain"
-          />
-        </View>
-        
-        <Text
-          style={[
-            styles.categoryText,
-            selectedCategory === category && styles.categoryTextActive,
-          ]}
-        >
-          {category}
-        </Text>
-      </TouchableOpacity>
-          ))}
-        </View>
+          <View style={styles.categoriesContainer}>
+            {CATEGORIES.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryCard,
+                  selectedCategory === category && styles.categoryCardActive,
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <View style={styles.categoryIcon}>
+                  <Image
+                    source={getCategoryIcon(category)}
+                    style={styles.iconImage}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.categoryText,
+                    selectedCategory === category && styles.categoryTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        {/* Continue Button */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[
-              styles.continueButton,
-              !selectedCategory && styles.continueButtonDisabled,
-            ]}
-            onPress={handleContinue}
-            disabled={!selectedCategory}
-          >
-            <Text style={styles.continueButtonText}>Continue</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+          {/* Continue Button */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[
+                styles.continueButton,
+                !selectedCategory && styles.continueButtonDisabled,
+              ]}
+              onPress={handleContinue}
+              disabled={!selectedCategory}
+            >
+              <Text style={styles.continueButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
 
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-      <CurvedBackground />
-    </SafeAreaView>
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
    communityPostButton: {
     backgroundColor: "#EDE7EC",
@@ -181,13 +170,15 @@ const styles = StyleSheet.create({
   },
   titleSection: {
     paddingHorizontal: 15,
-    backgroundColor: "#F2F2F7",
+    justifyContent: "center",
+    alignItems: "center"
   },
   mainTitle: {
     fontSize: 24,
     fontWeight: "800",
     color: "#000",
-    textAlign: "left",
+    justifyContent: "center",
+    alignItems: "center"
   },
   header: {
     flexDirection: "row",
@@ -211,8 +202,9 @@ const styles = StyleSheet.create({
   fontSize: 16,
   fontWeight: "300",
   color: "#212121",
+  marginTop: 10,
   marginBottom: 24,
-  textAlign: "left",
+  textAlign: "center",
   paddingHorizontal: 20,
 },
   title: {
@@ -286,10 +278,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   footer: {
-    padding: 20,
-    backgroundColor: "#F2F2F7",
-    borderTopWidth: 1,
-    borderTopColor: "#F2F2F7",
+    backgroundColor: "transparent",
+    borderTopColor: "#transparent",
+    marginTop: 20,
   },
   continueButton: {
     backgroundColor: "#7CB9A9",
