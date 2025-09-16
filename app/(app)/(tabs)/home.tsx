@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -42,20 +42,20 @@ type Resource = {
 const MOCK_USER = {
   uid: "demo-user-id",
   email: "demo@gmail.com",
-  displayName: "Demo User"
+  displayName: "Demo User",
 };
 
 const MOCK_PROFILE = {
   firstName: "Demo",
-  lastName: "User"
+  lastName: "User",
 };
 
 /**
  * HomeScreen Component
- * 
+ *
  * Main dashboard screen featuring user greeting, quick actions, mood tracking,
  * and resource recommendations. Designed with a clean, modern UI and smooth animations.
- * 
+ *
  * This is a frontend-only implementation.
  */
 export default function HomeScreen() {
@@ -95,7 +95,7 @@ export default function HomeScreen() {
       id: "mood",
       title: "Track Mood",
       icon: "happy-outline",
-      image: require("../../../assets/images/track-mood.png"), 
+      image: require("../../../assets/images/track-mood.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/mood-tracking"),
@@ -104,7 +104,7 @@ export default function HomeScreen() {
       id: "journal",
       title: "Journal",
       icon: "journal-outline",
-      image: require("../../../assets/images/journal.png"), 
+      image: require("../../../assets/images/journal.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/journal"),
@@ -113,7 +113,7 @@ export default function HomeScreen() {
       id: "resources",
       title: "Resources",
       icon: "library-outline",
-      image: require("../../../assets/images/resources.png"), 
+      image: require("../../../assets/images/resources.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/resources"),
@@ -122,7 +122,7 @@ export default function HomeScreen() {
       id: "crisis",
       title: "Crisis Support",
       icon: "help-buoy-outline",
-      image: require("../../../assets/images/crisis-support.png"), 
+      image: require("../../../assets/images/crisis-support.png"),
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),
@@ -314,8 +314,8 @@ export default function HomeScreen() {
   const fetchRecentMoods = async () => {
     try {
       // Try to load moods from local storage first
-      const storedMoods = await AsyncStorage.getItem('recentMoods');
-      
+      const storedMoods = await AsyncStorage.getItem("recentMoods");
+
       if (storedMoods) {
         setRecentMoods(JSON.parse(storedMoods));
       } else {
@@ -326,26 +326,26 @@ export default function HomeScreen() {
             mood_type: "happy",
             created_at: new Date().toISOString(),
             mood_emoji: getEmojiForMood("happy"),
-            mood_label: getLabelForMood("happy")
+            mood_label: getLabelForMood("happy"),
           },
           {
-            id: "2", 
+            id: "2",
             mood_type: "neutral",
             created_at: new Date(Date.now() - 86400000).toISOString(),
             mood_emoji: getEmojiForMood("neutral"),
-            mood_label: getLabelForMood("neutral")
+            mood_label: getLabelForMood("neutral"),
           },
           {
             id: "3",
             mood_type: "sad",
             created_at: new Date(Date.now() - 172800000).toISOString(),
             mood_emoji: getEmojiForMood("sad"),
-            mood_label: getLabelForMood("sad")
-          }
+            mood_label: getLabelForMood("sad"),
+          },
         ];
-        
+
         setRecentMoods(mockMoods);
-        await AsyncStorage.setItem('recentMoods', JSON.stringify(mockMoods));
+        await AsyncStorage.setItem("recentMoods", JSON.stringify(mockMoods));
       }
     } catch (error) {
       console.log("Error loading mood data");
@@ -363,20 +363,20 @@ export default function HomeScreen() {
         {
           id: "1",
           title: "Mindfulness Meditation",
-          duration: "10 min"
+          duration: "10 min",
         },
         {
           id: "2",
           title: "Stress Management Techniques",
-          duration: "15 min"
+          duration: "15 min",
         },
         {
           id: "3",
           title: "Sleep Improvement Guide",
-          duration: "20 min"
-        }
+          duration: "20 min",
+        },
       ];
-      
+
       setResources(mockResources);
     } catch (error) {
       setResources([]);
@@ -434,12 +434,12 @@ export default function HomeScreen() {
    */
   const loadProfileImage = async () => {
     try {
-      const savedImage = await AsyncStorage.getItem('profileImage');
+      const savedImage = await AsyncStorage.getItem("profileImage");
       if (savedImage) {
         setProfileImage(savedImage);
       }
     } catch (error) {
-      console.log('Error loading profile image:', error);
+      console.log("Error loading profile image:", error);
     }
   };
 
@@ -447,7 +447,9 @@ export default function HomeScreen() {
    * Generates initials from user's name for fallback avatar
    */
   const getInitials = () => {
-    return `${MOCK_PROFILE.firstName.charAt(0)}${MOCK_PROFILE.lastName.charAt(0)}`.toUpperCase();
+    return `${MOCK_PROFILE.firstName.charAt(0)}${MOCK_PROFILE.lastName.charAt(
+      0
+    )}`.toUpperCase();
   };
 
   /**
@@ -466,242 +468,251 @@ export default function HomeScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <CurvedBackground>
-        <LinearGradient
-          colors={['#FFFFFF', '#F8F8FC', '#F2F2F7', '#EEEEEF', '#F5F5F0']}
-          style={styles.container}
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/(tabs)/profile/edit")}
+          >
+            <View style={styles.profileImageContainer}>
+              {profileImage ? (
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <Text style={styles.initialsText}>{getInitials()}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity onPress={() => router.push("/notifications")}>
+              <Ionicons name="notifications-outline" size={24} color="#000" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton} onPress={showSideMenu}>
+              <Ionicons name="grid" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <KeyboardAvoidingView
+          style={styles.contentContainer}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <SafeAreaView style={styles.container}>
-            {/* Header with profile and navigation icons */}
-            <View style={styles.header}>
-              <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
-                <View style={styles.profileImageContainer}>
-                  {profileImage ? (
-                    <Image source={{ uri: profileImage }} style={styles.profileImage} />
-                  ) : (
-                    <Text style={styles.initialsText}>{getInitials()}</Text>
-                  )}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Greeting Section */}
+            <View style={styles.greetingSection}>
+              <Text style={styles.greetingText}>
+                {getGreeting()},{" "}
+                <Text style={styles.nameText}>{getGreetingName()}!</Text>
+              </Text>
+              <Text style={styles.subGreetingText}>
+                How are you feeling today?
+              </Text>
+            </View>
+
+            {/* Emergency Help Section */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.helpButton}
+                onPress={() => router.push("/crisis-support")}
+              >
+                <View style={styles.helpButtonContent}>
+                  <Text style={styles.helpButtonText}>Get Help Now</Text>
                 </View>
               </TouchableOpacity>
-              <View style={styles.headerIcons}>
-                <TouchableOpacity onPress={() => router.push("/notifications")}>
-                  <Ionicons name="notifications-outline" size={24} color="#000" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.menuButton}
-                  onPress={showSideMenu}
-                >
-                  <Ionicons name="grid" size={24} color="#000" />
-                </TouchableOpacity>
+            </View>
+
+            {/* Quick Actions Grid */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <View style={styles.actionsGrid}>
+                {quickActions.map((action) => (
+                  <TouchableOpacity
+                    key={action.id}
+                    style={[
+                      styles.actionCard,
+                      {
+                        backgroundColor: action.color,
+                        borderColor: action.borderColor,
+                      },
+                    ]}
+                    onPress={action.onPress}
+                  >
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: action.borderColor },
+                      ]}
+                    >
+                      {action.image ? (
+                        <Image
+                          source={action.image}
+                          style={[
+                            styles.actionImage,
+                            action.id === "crisis" && styles.crisisSupportImage,
+                          ]}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Ionicons
+                          name={action.icon as any}
+                          size={28}
+                          color="white"
+                        />
+                      )}
+                    </View>
+                    <Text style={styles.actionTitle}>{action.title}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
 
-            <ScrollView
-              style={styles.content}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              
-              {/* Greeting Section */}
-              <View style={styles.greetingSection}>
-                <Text style={styles.greetingText}>
-                  {getGreeting()}, <Text style={styles.nameText}>{getGreetingName()}!</Text>
-                </Text>
-                <Text style={styles.subGreetingText}>How are you feeling today?</Text>
-              </View>
-
-              {/* Emergency Help Section */}
-              <View style={styles.section}>
-                <TouchableOpacity
-                  style={styles.helpButton}
-                  onPress={() => router.push("/crisis-support")}
-                >
-                  <View style={styles.helpButtonContent}>
-                    <Text style={styles.helpButtonText}>Get Help Now</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Actions Grid */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
-                <View style={styles.actionsGrid}>
-                  {quickActions.map((action) => (
-                    <TouchableOpacity
-                      key={action.id}
-                      style={[
-                        styles.actionCard,
-                        { 
-                          backgroundColor: action.color,
-                          borderColor: action.borderColor 
-                        }
-                      ]}
-                      onPress={action.onPress}
-                    >
-                      <View style={[styles.iconContainer, { backgroundColor: action.borderColor }]}>
-                        {action.image ? (
-                          <Image 
-                            source={action.image} 
-                            style={[
-                              styles.actionImage,
-                              action.id === "crisis" && styles.crisisSupportImage
-                            ]}
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <Ionicons
-                            name={action.icon as any}
-                            size={28}
-                            color="white"
-                          />
-                        )}
+            {/* Recent Mood History Section */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                onPress={() => router.push("/mood-history")}
+                style={styles.sectionTitleContainer}
+              >
+                <Text style={styles.sectionTitle}>Recent Moods</Text>
+              </TouchableOpacity>
+              {recentMoods.length > 0 ? (
+                <View style={styles.recentMoods}>
+                  {recentMoods.map((mood) => (
+                    <View key={mood.id} style={styles.moodItem}>
+                      <Text style={styles.moodEmoji}>{mood.mood_emoji}</Text>
+                      <View style={styles.moodDetails}>
+                        <Text style={styles.moodDate}>
+                          {formatDate(mood.created_at)}
+                        </Text>
+                        <Text style={styles.moodText}>{mood.mood_label}</Text>
                       </View>
-                      <Text style={styles.actionTitle}>{action.title}</Text>
-                    </TouchableOpacity>
+                    </View>
                   ))}
                 </View>
-              </View>
-
-              {/* Recent Mood History Section */}
-              <View style={styles.section}>
-                <TouchableOpacity 
-                  onPress={() => router.push("/mood-history")}
-                  style={styles.sectionTitleContainer}
-                >
-                  <Text style={styles.sectionTitle}>Recent Moods</Text>
-                </TouchableOpacity>
-                {recentMoods.length > 0 ? (
-                  <View style={styles.recentMoods}>
-                    {recentMoods.map((mood) => (
-                      <View key={mood.id} style={styles.moodItem}>
-                        <Text style={styles.moodEmoji}>{mood.mood_emoji}</Text>
-                        <View style={styles.moodDetails}>
-                          <Text style={styles.moodDate}>
-                            {formatDate(mood.created_at)}
-                          </Text>
-                          <Text style={styles.moodText}>{mood.mood_label}</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.noDataContainer}>
-                    <Text style={styles.noDataText}>No mood entries yet</Text>
-                    <Text style={styles.noDataSubtext}>
-                      Start tracking your mood to see insights here
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Resources Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Recommended Resources</Text>
-                {resources.length > 0 ? (
-                  resources.map((resource) => (
-                    <TouchableOpacity
-                      key={resource.id}
-                      style={styles.resourceCard}
-                      onPress={() => router.push(`/resources/${resource.id}`)}
-                    >
-                      <View style={styles.resourceInfo}>
-                        <Text style={styles.resourceTitle}>{resource.title}</Text>
-                        <Text style={styles.resourceDuration}>
-                          {resource.duration}
-                        </Text>
-                      </View>
-                      <Ionicons name="play-circle" size={32} color="#4CAF50" />
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <View style={styles.noDataContainer}>
-                    <Text style={styles.noDataText}>No resources available</Text>
-                    <Text style={styles.noDataSubtext}>
-                      Check back later for new content
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-            
-            {/* Bottom Navigation */}
-            <View style={styles.bottomNav}>
-              {tabs.map((tab) => (
-                <TouchableOpacity
-                  key={tab.id}
-                  style={styles.navItem}
-                  onPress={() => {
-                    setActiveTab(tab.id);
-                    if (tab.id !== "home") router.push(`/${tab.id}`);
-                  }}
-                >
-                  <View style={[
-                    styles.navIconContainer,
-                    activeTab === tab.id && styles.activeIconContainer
-                  ]}>
-                    <Ionicons
-                      name={tab.icon as any}
-                      size={24}
-                      color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
+              ) : (
+                <View style={styles.noDataContainer}>
+                  <Text style={styles.noDataText}>No mood entries yet</Text>
+                  <Text style={styles.noDataSubtext}>
+                    Start tracking your mood to see insights here
+                  </Text>
+                </View>
+              )}
             </View>
-            
-            {/* Side Menu Modal */}
-            <Modal
-              animationType="none" 
-              transparent={true}
-              visible={sideMenuVisible}
-              onRequestClose={hideSideMenu}
+
+            {/* Resources Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recommended Resources</Text>
+              {resources.length > 0 ? (
+                resources.map((resource) => (
+                  <TouchableOpacity
+                    key={resource.id}
+                    style={styles.resourceCard}
+                    onPress={() => router.push(`/resources/${resource.id}`)}
+                  >
+                    <View style={styles.resourceInfo}>
+                      <Text style={styles.resourceTitle}>{resource.title}</Text>
+                      <Text style={styles.resourceDuration}>
+                        {resource.duration}
+                      </Text>
+                    </View>
+                    <Ionicons name="play-circle" size={32} color="#4CAF50" />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.noDataContainer}>
+                  <Text style={styles.noDataText}>No resources available</Text>
+                  <Text style={styles.noDataSubtext}>
+                    Check back later for new content
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.bottomSpacing} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+        {/* Bottom Navigation */}
+        <View style={styles.bottomNav}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={styles.navItem}
+              onPress={() => {
+                setActiveTab(tab.id);
+                if (tab.id !== "home") router.push(`/${tab.id}`);
+              }}
             >
-              <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
-                <Pressable
-                  style={StyleSheet.absoluteFillObject}
-                  onPress={hideSideMenu}
+              <View
+                style={[
+                  styles.navIconContainer,
+                  activeTab === tab.id && styles.activeIconContainer,
+                ]}
+              >
+                <Ionicons
+                  name={tab.icon as any}
+                  size={24}
+                  color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
                 />
-                <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
-                  <View style={styles.sideMenuHeader}>
-                    <Text style={styles.profileName}>{getGreetingName()}</Text>
-                    <Text style={styles.profileEmail}>{MOCK_USER.email}</Text>
-                  </View>
-                  <ScrollView style={styles.sideMenuContent}>
-                    {sideMenuItems.map((item, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.sideMenuItem}
-                        onPress={() => {
-                          hideSideMenu();
-                          item.onPress();
-                        }}
-                      >
-                        <Ionicons
-                          name={item.icon as any}
-                          size={20}
-                          color="#757575"
-                        />
-                        <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </Animated.View>
-              </Animated.View>
-            </Modal>
-          </SafeAreaView>
-        </LinearGradient>
-      </CurvedBackground>
-    </KeyboardAvoidingView>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Side Menu Modal */}
+        <Modal
+          animationType="none"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={hideSideMenu}
+        >
+          <Animated.View
+            style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFillObject}
+              onPress={hideSideMenu}
+            />
+            <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getGreetingName()}</Text>
+                <Text style={styles.profileEmail}>{MOCK_USER.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={() => {
+                      hideSideMenu();
+                      item.onPress();
+                    }}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#757575"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
@@ -742,10 +753,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     paddingVertical: 20,
     paddingHorizontal: 32,
-    borderTopLeftRadius: 0,     
-    borderTopRightRadius: 0,     
-    borderBottomLeftRadius: 50,  
-    borderBottomRightRadius: 50, 
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 50,
+    borderBottomRightRadius: 50,
     marginBottom: 20,
   },
   greetingText: {
@@ -761,7 +772,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 24,
+    marginBottom: 30,
   },
   sectionTitle: {
     fontSize: 14,
@@ -880,7 +891,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitleContainer: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   moodItem: {
     flexDirection: "row",
@@ -987,20 +998,20 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   activeIconContainer: {
-    backgroundColor: '#B6D5CF61',
+    backgroundColor: "#B6D5CF61",
   },
   navIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
   },
   sideMenu: {
     paddingTop: 40,
@@ -1043,5 +1054,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  contentContainer: {
+    flex: 1,
+      marginBottom: 80, // Space for bottom navigation
+    },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 30, 
+  },
+  bottomSpacing: {
+    height: 30, // Additional spacing at the bottom
   },
 });
