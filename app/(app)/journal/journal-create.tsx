@@ -176,7 +176,7 @@ export default function JournalCreateScreen() {
    * Handles closing the success screen
    */
   const handleClose = () => {
-    router.replace("../journal/index");
+    router.push("/(app)/journal");
   };
 
   /**
@@ -356,7 +356,7 @@ export default function JournalCreateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "transparent",
   },
   scrollContainer: {
     flexGrow: 1,

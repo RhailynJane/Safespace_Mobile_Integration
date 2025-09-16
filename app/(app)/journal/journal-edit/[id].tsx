@@ -18,7 +18,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 
-// Mock user data 
+// Mock user data
 const mockUser = {
   displayName: "Demo User",
   email: "demo@gmail.com",
@@ -60,7 +60,8 @@ const emotionOptions: EmotionOption[] = [
 const mockJournalEntry = {
   id: "1",
   title: "My Journal Entry",
-  content: "Today was a productive day. I accomplished many tasks and felt satisfied with my progress.",
+  content:
+    "Today was a productive day. I accomplished many tasks and felt satisfied with my progress.",
   mood_type: "happy" as EmotionType,
   emoji: "🙂",
   tags: ["productive", "satisfied"],
@@ -69,7 +70,7 @@ const mockJournalEntry = {
 
 /**
  * JournalEditScreen Component
- * 
+ *
  * A screen for editing existing journal entries with a beautiful curved background.
  * Users can modify the title, content, and emotional state of their journal entry.
  * Includes navigation controls and a visually appealing interface.
@@ -107,8 +108,8 @@ export default function JournalEditScreen() {
       try {
         setLoading(true);
         // Simulate network request delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         // Use mock data for frontend demonstration
         setJournalData({
           title: mockJournalEntry.title,
@@ -169,14 +170,14 @@ export default function JournalEditScreen() {
 
     try {
       // Simulate network request delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // In a real app, this would call an API to save the changes
       console.log("Saving journal entry:", {
         ...journalData,
         id: id || "new-entry",
       });
-      
+
       // Navigate back after successful "save"
       router.back();
     } catch (error) {
@@ -219,104 +220,104 @@ export default function JournalEditScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CurvedBackground />
-      
-      <AppHeader
-        title="Edit Journal"
-        showBack={true}
-        showMenu={true}
-        onMenuPress={() => setSideMenuVisible(true)}
-      />
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader
+          title="Edit Journal"
+          showBack={true}
+          showMenu={true}
+          onMenuPress={() => setSideMenuVisible(true)}
+        />
 
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.createContainer}>
-            {/* Journal Title Input */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Journal Title</Text>
-              <TextInput
-                style={styles.titleInput}
-                placeholder="Give your entry a title..."
-                value={journalData.title}
-                onChangeText={handleTitleChange}
-                placeholderTextColor={Colors.textTertiary}
-              />
-            </View>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView contentContainerStyle={styles.scrollContainer}>
+            <View style={styles.createContainer}>
+              {/* Journal Title Input */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Journal Title</Text>
+                <TextInput
+                  style={styles.titleInput}
+                  placeholder="Give your entry a title..."
+                  value={journalData.title}
+                  onChangeText={handleTitleChange}
+                  placeholderTextColor={Colors.textTertiary}
+                />
+              </View>
 
-            {/* Journal Content Input */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Write your Entry</Text>
-              <TextInput
-                style={styles.contentInput}
-                placeholder="Write about your day, feelings or anything on your mind..."
-                value={journalData.content}
-                onChangeText={handleContentChange}
-                multiline
-                textAlignVertical="top"
-                placeholderTextColor={Colors.textTertiary}
-              />
-            </View>
+              {/* Journal Content Input */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Write your Entry</Text>
+                <TextInput
+                  style={styles.contentInput}
+                  placeholder="Write about your day, feelings or anything on your mind..."
+                  value={journalData.content}
+                  onChangeText={handleContentChange}
+                  multiline
+                  textAlignVertical="top"
+                  placeholderTextColor={Colors.textTertiary}
+                />
+              </View>
 
-            {/* Emotion Selection */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Select your Emotion</Text>
-              <View style={styles.emotionsContainer}>
-                {emotionOptions.map((emotion) => (
-                  <TouchableOpacity
-                    key={emotion.id}
-                    style={[
-                      styles.emotionButton,
-                      journalData.emotion === emotion.id &&
-                        styles.emotionButtonSelected,
-                    ]}
-                    onPress={() => handleEmotionSelect(emotion)}
-                  >
-                    <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
-                  </TouchableOpacity>
-                ))}
+              {/* Emotion Selection */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Select your Emotion</Text>
+                <View style={styles.emotionsContainer}>
+                  {emotionOptions.map((emotion) => (
+                    <TouchableOpacity
+                      key={emotion.id}
+                      style={[
+                        styles.emotionButton,
+                        journalData.emotion === emotion.id &&
+                          styles.emotionButtonSelected,
+                      ]}
+                      onPress={() => handleEmotionSelect(emotion)}
+                    >
+                      <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {/* Action Buttons */}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.saveButton, saving && styles.disabledButton]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              <Text style={styles.saveButtonText}>
-                {saving ? "Saving..." : "Save Changes"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              <TouchableOpacity
+                style={[styles.saveButton, saving && styles.disabledButton]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {saving ? "Saving..." : "Save Changes"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "transparent",
   },
   scrollContainer: {
     flexGrow: 1,
