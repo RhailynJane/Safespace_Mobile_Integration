@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 /**
  * EditProfileScreen Component
@@ -310,16 +311,9 @@ export default function EditProfileScreen() {
   );
 
   return (
-    <CurvedBackground>
+  <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
-          <View style={{ width: 24 }} />
-        </View>
+          <AppHeader title="Edit Profile" showBack={true} />
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Profile Photo Section */}
@@ -536,7 +530,7 @@ const styles = StyleSheet.create({
   },
   profilePhotoSection: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     paddingVertical: 30,
     marginBottom: 20,
   },

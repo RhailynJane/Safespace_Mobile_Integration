@@ -15,17 +15,18 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
 /**
  * MessagesScreen Component
- * 
+ *
  * Screen for viewing and managing messages with contacts. Features a search bar,
  * contact list with online status indicators, and navigation to individual chat screens.
- * 
+ *
  * This is a frontend-only implementation with mock data for demonstration.
  */
 export default function MessagesScreen() {
@@ -38,12 +39,12 @@ export default function MessagesScreen() {
   // Mock user data for frontend-only implementation
   const MOCK_USER = {
     email: "demo@gmail.com",
-    displayName: "Demo User"
+    displayName: "Demo User",
   };
 
   const MOCK_PROFILE = {
     firstName: "Demo",
-    lastName: "User"
+    lastName: "User",
   };
 
   const tabs = [
@@ -198,7 +199,7 @@ export default function MessagesScreen() {
       avatar: "https://randomuser.me/api/portraits/men/1.jpg",
       online: true,
       lastMessage: "Thanks for checking in!",
-      timestamp: "2:30 PM"
+      timestamp: "2:30 PM",
     },
     {
       id: 2,
@@ -206,7 +207,7 @@ export default function MessagesScreen() {
       avatar: "https://randomuser.me/api/portraits/women/4.jpg",
       online: false,
       lastMessage: "Weekly meeting reminder",
-      timestamp: "Yesterday"
+      timestamp: "Yesterday",
     },
     {
       id: 3,
@@ -214,7 +215,7 @@ export default function MessagesScreen() {
       avatar: "https://randomuser.me/api/portraits/women/3.jpg",
       online: true,
       lastMessage: "How are you feeling today?",
-      timestamp: "10:45 AM"
+      timestamp: "10:45 AM",
     },
     {
       id: 4,
@@ -222,7 +223,7 @@ export default function MessagesScreen() {
       avatar: "https://randomuser.me/api/portraits/men/5.jpg",
       online: false,
       lastMessage: "Appointment confirmation",
-      timestamp: "Monday"
+      timestamp: "Monday",
     },
     {
       id: 5,
@@ -230,14 +231,18 @@ export default function MessagesScreen() {
       avatar: "https://randomuser.me/api/portraits/women/6.jpg",
       online: true,
       lastMessage: "Exercise routine update",
-      timestamp: "Just now"
+      timestamp: "Just now",
     },
   ];
 
   /**
    * Custom BottomNavigation component for tab navigation
    */
-  const BottomNavigation = ({ tabs, activeTab, onTabPress }: {
+  const BottomNavigation = ({
+    tabs,
+    activeTab,
+    onTabPress,
+  }: {
     tabs: Array<{ id: string; name: string; icon: string }>;
     activeTab: string;
     onTabPress: (tabId: string) => void;
@@ -254,10 +259,12 @@ export default function MessagesScreen() {
             size={24}
             color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
           />
-          <Text style={[
-            bottomNavStyles.tabText,
-            { color: activeTab === tab.id ? "#2EA78F" : "#9E9E9E" }
-          ]}>
+          <Text
+            style={[
+              bottomNavStyles.tabText,
+              { color: activeTab === tab.id ? "#2EA78F" : "#9E9E9E" },
+            ]}
+          >
             {tab.name}
           </Text>
         </TouchableOpacity>
@@ -268,14 +275,7 @@ export default function MessagesScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>New Message</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <AppHeader title="New Message" showBack={true} />
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
