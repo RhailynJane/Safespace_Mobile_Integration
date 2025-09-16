@@ -304,6 +304,11 @@ const styles = StyleSheet.create({
     padding: 10,
     borderTopWidth: 1,
     borderTopColor: "rgba(224,224,224,0.5)",
+    marginBottom: 100,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 360,
+    marginLeft: (width - Math.min(width, 360)) / 2,
   },
   cancelButton: {
     flex: 1,
