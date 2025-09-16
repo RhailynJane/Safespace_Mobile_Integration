@@ -16,10 +16,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
-// Mock data for posts (frontend-only implementation)
+// Mock data for posts
 const POSTS = [
   {
     id: 1,
@@ -63,11 +64,18 @@ const POSTS = [
 ];
 
 // Available categories for filtering posts
-const CATEGORIES = ["Trending", "Stress", "Support", "Stories", "Bookmark", "Favorites"];
+const CATEGORIES = [
+  "Trending",
+  "Stress",
+  "Support",
+  "Stories",
+  "Bookmark",
+  "Favorites",
+];
 
 /**
  * CommunityMainScreen Component
- * 
+ *
  * Main community forum screen displaying posts, categories, and user interactions.
  * Features a curved background, category filtering, and post interactions.
  */
@@ -77,20 +85,22 @@ export default function CommunityMainScreen() {
   const [activeTab, setActiveTab] = useState("community-forum");
   const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
   const [commentedPosts, setCommentedPosts] = useState<Set<number>>(new Set());
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
+    new Set()
+  );
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Mock user data (replaces backend auth context)
   const mockUser = {
-    displayName: "John Doe",
-    email: "john.doe@example.com",
-    uid: "mock-user-id"
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+    uid: "demo-user-id",
   };
-  
+
   const mockProfile = {
-    firstName: "John",
-    lastName: "Doe"
+    firstName: "Demo",
+    lastName: "User",
   };
 
   /**
@@ -274,7 +284,7 @@ export default function CommunityMainScreen() {
   const handlePostPress = (postId: number) => {
     router.push({
       pathname: "/community-forum/comments",
-      params: { id: postId }
+      params: { id: postId },
     });
   };
 
@@ -305,7 +315,8 @@ export default function CommunityMainScreen() {
    * @returns String with user's display name or fallback
    */
   const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName + " " + (mockProfile.lastName || "");
+    if (mockProfile?.firstName)
+      return mockProfile.firstName + " " + (mockProfile.lastName || "");
     if (mockUser?.displayName) return mockUser.displayName;
     if (mockUser?.email) return mockUser.email.split("@")[0];
     return "John Doe";
@@ -315,162 +326,151 @@ export default function CommunityMainScreen() {
     <SafeAreaView style={styles.container}>
       {/* Curved background component */}
       <CurvedBackground style={styles.curvedBackground} />
-      
-      {/* Header Section */}
-      <View style={styles.headerContainer}>
-        {/* Top Header Row */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
-            <View style={styles.profileImageContainer}>
-              <Text style={styles.initialsText}>{getInitials()}</Text>
-            </View>
-          </TouchableOpacity>
-          
-          <View style={styles.profileTextContainer}>
-            <Text style={styles.userName}>{getDisplayName()}</Text>
-            <Text style={styles.userStats}>
-              <Ionicons name="document-text" size={16} color="#666" /> 0 Total Posts
-            </Text>          
-          </View>
+      <AppHeader title="Community Forum" showBack={true} />
 
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={() => router.push("/notifications")}>
-              <Ionicons name="notifications-outline" size={24} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuButton}
-              onPress={showSideMenu}
+      <View style={styles.scrollContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Browse By Categories Section */}
+          <View style={styles.categoriesSection}>
+            {/* Add Post Button */}
+            <TouchableOpacity
+              style={styles.addPostButton}
+              onPress={() => router.push("/community-forum/create")}
             >
-              <Ionicons name="grid" size={24} color="#666" />
+              <Ionicons name="add" size={10} color="#FFFFFF" />
+              <Text style={styles.addPostButtonText}>Add Post</Text>
             </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* User Profile Summary */}
-        <View style={styles.profileSection}>
-          <View style={styles.profileContainer}>
-          </View>
-        </View>
-      </View>
+            <Text style={styles.browseBySectionTitle}>Browse By</Text>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Browse By Categories Section */}
-        <View style={styles.categoriesSection}>
-          {/* Add Post Button */}
-          <TouchableOpacity
-            style={styles.addPostButton}
-            onPress={() => router.push("/community-forum/create")}
-          >
-            <Ionicons name="add" size={10} color="#FFFFFF" />
-            <Text style={styles.addPostButtonText}>Add Post</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.browseBySectionTitle}>Browse By</Text>
-          
-          {/* Category Filter Buttons */}
-          <View style={styles.categoriesContainer}>
-            {CATEGORIES.map((category) => (
-              <TouchableOpacity
-                key={category}
-                style={[
-                  styles.categoryButton,
-                  selectedCategory === category && styles.categoryButtonActive,
-                ]}
-                onPress={() => setSelectedCategory(category)}
-              >
-                <Text
+            {/* Category Filter Buttons */}
+            <View style={styles.categoriesContainer}>
+              {CATEGORIES.map((category) => (
+                <TouchableOpacity
+                  key={category}
                   style={[
-                    styles.categoryText,
-                    selectedCategory === category && styles.categoryTextActive,
+                    styles.categoryButton,
+                    selectedCategory === category &&
+                      styles.categoryButtonActive,
                   ]}
+                  onPress={() => setSelectedCategory(category)}
                 >
-                  {category}
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      selectedCategory === category &&
+                        styles.categoryTextActive,
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Posts List Section */}
+          <View style={styles.postsSection}>
+            {POSTS.map((post) => (
+              <TouchableOpacity
+                key={post.id}
+                style={styles.postCard}
+                onPress={() => handlePostPress(post.id)}
+              >
+                <View style={styles.postHeader}>
+                  <View style={styles.postUserInfo}>
+                    <Image
+                      source={{
+                        uri: `https://randomuser.me/api/portraits/${
+                          post.user.name.includes("Sarah") ? "women" : "men"
+                        }/${post.id + 10}.jpg`,
+                      }}
+                      style={styles.postUserImage}
+                    />
+                    <Text style={styles.postTitle}>{post.title}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.moreButton}>
+                    <Ionicons name="ellipsis-vertical" size={18} color="#999" />
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.postContent} numberOfLines={4}>
+                  {post.content}
                 </Text>
+
+                <View style={styles.postFooter}>
+                  <View style={styles.interactionButtons}>
+                    {/* Like Button */}
+                    <TouchableOpacity
+                      style={styles.interactionButton}
+                      onPress={() => handleLikePress(post.id)}
+                    >
+                      <Ionicons
+                        name={
+                          likedPosts.has(post.id) ? "heart" : "heart-outline"
+                        }
+                        size={18}
+                        color={likedPosts.has(post.id) ? "#E53935" : "#FF6B35"}
+                      />
+                      <Text style={styles.interactionText}>{post.likes}</Text>
+                    </TouchableOpacity>
+
+                    {/* Comment Button */}
+                    <TouchableOpacity
+                      style={styles.interactionButton}
+                      onPress={() => handlePostPress(post.id)}
+                    >
+                      <Ionicons
+                        name="chatbubble-outline"
+                        size={18}
+                        color="#FF6B35"
+                      />
+                      <Text style={styles.interactionText}>
+                        {post.comments}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Bookmark Button */}
+                  <TouchableOpacity
+                    onPress={() => handleBookmarkPress(post.id)}
+                  >
+                    <Ionicons
+                      name={
+                        bookmarkedPosts.has(post.id)
+                          ? "bookmark"
+                          : "bookmark-outline"
+                      }
+                      size={18}
+                      color={
+                        bookmarkedPosts.has(post.id) ? "#FFA000" : "#FF6B35"
+                      }
+                    />
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
-        </View>
 
-        {/* Posts List Section */}
-        <View style={styles.postsSection}>
-          {POSTS.map((post) => (
-            <TouchableOpacity
-              key={post.id}
-              style={styles.postCard}
-              onPress={() => handlePostPress(post.id)}
-            >
-              <View style={styles.postHeader}>
-                <View style={styles.postUserInfo}>
-                  <Image
-                    source={{
-                      uri: `https://randomuser.me/api/portraits/${
-                        post.user.name.includes("Sarah") ? "women" : "men"
-                      }/${post.id + 10}.jpg`,
-                    }}
-                    style={styles.postUserImage}
-                  />
-                  <Text style={styles.postTitle}>{post.title}</Text>
-                </View>
-                <TouchableOpacity style={styles.moreButton}>
-                  <Ionicons name="ellipsis-vertical" size={18} color="#999" />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.postContent} numberOfLines={4}>
-                {post.content}
-              </Text>
-
-              <View style={styles.postFooter}>
-                <View style={styles.interactionButtons}>
-                  {/* Like Button */}
-                  <TouchableOpacity
-                    style={styles.interactionButton}
-                    onPress={() => handleLikePress(post.id)}
-                  >
-                    <Ionicons
-                      name={likedPosts.has(post.id) ? "heart" : "heart-outline"}
-                      size={18}
-                      color={likedPosts.has(post.id) ? "#E53935" : "#FF6B35"}
-                    />
-                    <Text style={styles.interactionText}>{post.likes}</Text>
-                  </TouchableOpacity>
-
-                  {/* Comment Button */}
-                  <TouchableOpacity
-                    style={styles.interactionButton}
-                    onPress={() => handlePostPress(post.id)}
-                  >
-                    <Ionicons
-                      name="chatbubble-outline"
-                      size={18}
-                      color="#FF6B35"
-                    />
-                    <Text style={styles.interactionText}>{post.comments}</Text>
-                  </TouchableOpacity>
-                </View>
-                
-                {/* Bookmark Button */}
-                <TouchableOpacity onPress={() => handleBookmarkPress(post.id)}>
-                  <Ionicons
-                    name={bookmarkedPosts.has(post.id) ? "bookmark" : "bookmark-outline"}
-                    size={18}
-                    color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#FF6B35"}
-                  />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
+          {/* Add extra spacing at the bottom to ensure all content is visible */}
+          <View style={styles.bottomSpacing} />
+        </ScrollView>
+      </View>
 
       {/* Side Menu Modal */}
       <Modal
-        animationType="none" 
+        animationType="none"
         transparent={true}
         visible={sideMenuVisible}
         onRequestClose={hideSideMenu}
       >
-        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
+        <Animated.View
+          style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
+        >
           <Pressable
             style={StyleSheet.absoluteFillObject}
             onPress={hideSideMenu}
@@ -487,11 +487,7 @@ export default function CommunityMainScreen() {
                   style={styles.sideMenuItem}
                   onPress={item.onPress}
                 >
-                  <Ionicons
-                    name={item.icon as any}
-                    size={20}
-                    color="#757575"
-                  />
+                  <Ionicons name={item.icon as any} size={20} color="#757575" />
                   <Text style={styles.sideMenuItemText}>{item.title}</Text>
                 </TouchableOpacity>
               ))}
@@ -513,98 +509,25 @@ export default function CommunityMainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
   },
   curvedBackground: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     zIndex: -1,
   },
-  headerContainer: {
-    backgroundColor: "#BAD6D2",
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    shadowColor: "grey",
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 25,
-  },
-  profileImageContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 30,
-    backgroundColor: "#E8F5E9",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 30,
-  },
-  initialsText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#4CAF50",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  menuButton: {
-    padding: 4,
-  },
-  content: {
+  scrollContainer: {
     flex: 1,
-    marginTop: 10,
+    marginBottom: 80, // Space for bottom navigation
   },
-  profileSection: {
-    backgroundColor: "#7BB8A8",
-    marginHorizontal: 16,
-    borderRadius: 12,
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
-    borderBottomLeftRadius: 40,    
-    borderBottomRightRadius: 40,
-  },
-  profileContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+  scrollView: {
     flex: 1,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
   },
-  profileTextContainer: {
-    flex: 1,
-    alignItems: "flex-start",
-    marginLeft: 15,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
-  },
-  userStats: {
-    fontSize: 14,
-    color: "#666",
+  scrollContent: {
+    paddingBottom: 30, // Extra padding for scrollable content
   },
   addPostContainer: {
     paddingHorizontal: 16,
@@ -613,7 +536,7 @@ const styles = StyleSheet.create({
   },
   addPostButton: {
     backgroundColor: "#2EA78F",
-    height:35,
+    height: 35,
     paddingHorizontal: 30,
     paddingVertical: 10,
     borderRadius: 25,
@@ -622,7 +545,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "flex-end",  
+    alignSelf: "flex-end",
     shadowColor: "grey",
     shadowOffset: {
       width: 2,
@@ -637,7 +560,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginLeft: 8,
-    paddingVertical:1,
+    paddingVertical: 1,
   },
   categoriesSection: {
     paddingHorizontal: 16,
@@ -655,14 +578,14 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "center",
     alignItems: "center",
-    padding: "auto", 
+    padding: "auto",
   },
   categoryButton: {
     width: "30%",
     paddingHorizontal: 20,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: "#FFFFFF",
     height: 30,
     justifyContent: "center",
     alignItems: "center",
@@ -673,7 +596,7 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 9,
     color: "#000",
-    borderColor: '#FFF',
+    borderColor: "#FFF",
     fontWeight: "400",
     justifyContent: "center",
     lineHeight: 12,
@@ -755,12 +678,16 @@ const styles = StyleSheet.create({
     color: "#FF6B35",
     fontWeight: "500",
   },
+  // Bottom spacing to ensure all content is visible
+  bottomSpacing: {
+    height: 30,
+  },
   // Side Menu Styles
   fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
   },
   sideMenu: {
     paddingTop: 40,
