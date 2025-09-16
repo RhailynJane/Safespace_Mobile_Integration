@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -33,7 +34,7 @@ export default function GAD7QuestionnaireScreen() {
   // Using mock data instead of backend context
   const user = mockUser;
   const profile = mockProfile;
-  
+
   // State management for UI components
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,38 +57,38 @@ export default function GAD7QuestionnaireScreen() {
     {
       id: 0,
       text: "Over the last 2 weeks, how often have you been bothered by feeling nervous, anxious or on edge?",
-      shortText: "Feeling nervous, anxious or on edge"
+      shortText: "Feeling nervous, anxious or on edge",
     },
     {
       id: 1,
       text: "Over the last 2 weeks, how often have you been bothered by not being able to stop or control worrying?",
-      shortText: "Not being able to stop or control worrying"
+      shortText: "Not being able to stop or control worrying",
     },
     {
       id: 2,
       text: "Over the last 2 weeks, how often have you been bothered by worrying too much about different things?",
-      shortText: "Worrying too much about different things"
+      shortText: "Worrying too much about different things",
     },
     {
       id: 3,
       text: "Over the last 2 weeks, how often have you been bothered by trouble relaxing?",
-      shortText: "Trouble relaxing"
+      shortText: "Trouble relaxing",
     },
     {
       id: 4,
       text: "Over the last 2 weeks, how often have you been bothered by being so restless that it is hard to sit still?",
-      shortText: "Being so restless that it is hard to sit still"
+      shortText: "Being so restless that it is hard to sit still",
     },
     {
       id: 5,
       text: "Over the last 2 weeks, how often have you been bothered by becoming easily annoyed or irritable?",
-      shortText: "Becoming easily annoyed or irritable"
+      shortText: "Becoming easily annoyed or irritable",
     },
     {
       id: 6,
       text: "Over the last 2 weeks, how often have you been bothered by feeling afraid as if something awful might happen?",
-      shortText: "Feeling afraid as if something awful might happen"
-    }
+      shortText: "Feeling afraid as if something awful might happen",
+    },
   ];
 
   // Answer options for the GAD-7 questionnaire
@@ -95,7 +96,7 @@ export default function GAD7QuestionnaireScreen() {
     { value: 0, label: "Not At All" },
     { value: 1, label: "Several days" },
     { value: 2, label: "More than half the days" },
-    { value: 3, label: "Nearly every day" }
+    { value: 3, label: "Nearly every day" },
   ];
 
   // Handle tab navigation
@@ -263,51 +264,176 @@ export default function GAD7QuestionnaireScreen() {
   // Show completion screen when assessment is finished
   if (isCompleted) {
     return (
-      <SafeAreaView style={styles.container}>
-        {/* Curved background for visual appeal */}
-        <CurvedBackground />
-        
-        {/* Header with navigation and notifications */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Self Assessment</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-              <Ionicons name="notifications-outline" size={24} color="#333" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>1</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-              <Ionicons name="grid-outline" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-        </View>
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <AppHeader title="GAD7-Assessment" showBack={true} />
 
-        {/* Completion Content */}
-        <View style={styles.completionContainer}>
-          <Text style={styles.completionTitle}>Self Assessment Completed!</Text>
-          
-          <View style={styles.completionIconContainer}>
-            <View style={styles.completionIcon}>
-              <Ionicons name="person" size={40} color="#FF9800" />
-              <View style={styles.checkmarkBadge}>
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          {/* Completion Content */}
+          <View style={styles.completionContainer}>
+            <Text style={styles.completionTitle}>
+              Self Assessment Completed!
+            </Text>
+
+            <View style={styles.completionIconContainer}>
+              <View style={styles.completionIcon}>
+                <Ionicons name="person" size={40} color="#FF9800" />
+                <View style={styles.checkmarkBadge}>
+                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                </View>
               </View>
             </View>
+
+            <Text style={styles.completionMessage}>
+              Your therapist will review the result of your assessment!
+            </Text>
+
+            <TouchableOpacity
+              style={styles.anotherAssessmentButton}
+              onPress={handleTakeAnotherAssessment}
+            >
+              <Text style={styles.anotherAssessmentText}>
+                Take another assessment
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.completionMessage}>
-            Your therapist will review the result of your assessment!
-          </Text>
-
-          <TouchableOpacity 
-            style={styles.anotherAssessmentButton}
-            onPress={handleTakeAnotherAssessment}
+          {/* Side Menu Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={sideMenuVisible}
+            onRequestClose={() => setSideMenuVisible(false)}
           >
-            <Text style={styles.anotherAssessmentText}>Take another assessment</Text>
+            <View style={styles.modalContainer}>
+              <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setSideMenuVisible(false)}
+              />
+              <View style={styles.sideMenu}>
+                <View style={styles.sideMenuHeader}>
+                  <Text style={styles.profileName}>{getDisplayName()}</Text>
+                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                </View>
+                <ScrollView style={styles.sideMenuContent}>
+                  {sideMenuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.sideMenuItem}
+                      onPress={item.onPress}
+                    >
+                      <Ionicons
+                        name={item.icon as keyof typeof Ionicons.glyphMap}
+                        size={20}
+                        color="#4CAF50"
+                      />
+                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Bottom navigation bar */}
+          <BottomNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
+  // Main assessment screen with questions and answers
+  return (
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="GAD7-Assessment" showBack={true} />
+
+        {/* Scrollable content area for questions */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Question progress indicator */}
+          <View style={styles.questionHeader}>
+            <Text style={styles.questionNumber}>
+              Question {currentQuestion + 1} of {questions.length}
+            </Text>
+            <TouchableOpacity
+              style={styles.startOverButton}
+              onPress={handleStartOver}
+            >
+              <Text style={styles.startOverText}>Start Over</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Current question display */}
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionText}>
+              {questions[currentQuestion]?.text}
+            </Text>
+          </View>
+
+          {/* Answer options for the current question */}
+          <View style={styles.optionsContainer}>
+            {answerOptions.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.optionButton,
+                  answers[currentQuestion] === option.value &&
+                    styles.selectedOption,
+                ]}
+                onPress={() => handleAnswerSelect(option.value)}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    answers[currentQuestion] === option.value &&
+                      styles.selectedOptionText,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Navigation buttons for moving between questions */}
+        <View style={styles.navigationContainer}>
+          <TouchableOpacity
+            style={[styles.navButton, styles.backButton]}
+            onPress={handleBack}
+            disabled={currentQuestion === 0}
+          >
+            <Text
+              style={[
+                styles.navButtonText,
+                currentQuestion === 0 && styles.disabledText,
+              ]}
+            >
+              Back
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.navButton,
+              styles.nextButton,
+              answers[currentQuestion] === undefined && styles.disabledButton,
+            ]}
+            onPress={handleNext}
+            disabled={answers[currentQuestion] === undefined}
+          >
+            <Text
+              style={[
+                styles.navButtonText,
+                styles.nextButtonText,
+                answers[currentQuestion] === undefined && styles.disabledText,
+              ]}
+            >
+              {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -335,7 +461,11 @@ export default function GAD7QuestionnaireScreen() {
                     style={styles.sideMenuItem}
                     onPress={item.onPress}
                   >
-                    <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
+                    <Ionicons
+                      name={item.icon as keyof typeof Ionicons.glyphMap}
+                      size={20}
+                      color="#4CAF50"
+                    />
                     <Text style={styles.sideMenuItemText}>{item.title}</Text>
                   </TouchableOpacity>
                 ))}
@@ -351,142 +481,7 @@ export default function GAD7QuestionnaireScreen() {
           onTabPress={handleTabPress}
         />
       </SafeAreaView>
-    );
-  }
-
-  // Main assessment screen with questions and answers
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Curved background for visual appeal */}
-      <CurvedBackground />
-      
-      {/* Header with navigation and notifications */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Self Assessment</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#333" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>1</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="grid-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Scrollable content area for questions */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Question progress indicator */}
-        <View style={styles.questionHeader}>
-          <Text style={styles.questionNumber}>Question {currentQuestion + 1} of {questions.length}</Text>
-          <TouchableOpacity style={styles.startOverButton} onPress={handleStartOver}>
-            <Text style={styles.startOverText}>Start Over</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Current question display */}
-        <View style={styles.questionContainer}>
-          <Text style={styles.questionText}>{questions[currentQuestion]?.text}</Text>
-        </View>
-
-        {/* Answer options for the current question */}
-        <View style={styles.optionsContainer}>
-          {answerOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.optionButton,
-                answers[currentQuestion] === option.value && styles.selectedOption
-              ]}
-              onPress={() => handleAnswerSelect(option.value)}
-            >
-              <Text style={[
-                styles.optionText,
-                answers[currentQuestion] === option.value && styles.selectedOptionText
-              ]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Navigation buttons for moving between questions */}
-      <View style={styles.navigationContainer}>
-        <TouchableOpacity
-          style={[styles.navButton, styles.backButton]}
-          onPress={handleBack}
-          disabled={currentQuestion === 0}
-        >
-          <Text style={[styles.navButtonText, currentQuestion === 0 && styles.disabledText]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            styles.nextButton,
-            answers[currentQuestion] === undefined && styles.disabledButton
-          ]}
-          onPress={handleNext}
-          disabled={answers[currentQuestion] === undefined}
-        >
-          <Text style={[
-            styles.navButtonText,
-            styles.nextButtonText,
-            answers[currentQuestion] === undefined && styles.disabledText
-          ]}>
-            {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Side Menu Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Bottom navigation bar */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
@@ -494,7 +489,7 @@ export default function GAD7QuestionnaireScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
@@ -542,7 +537,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   questionHeader: {
     flexDirection: "row",
@@ -550,9 +545,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "transparent",
   },
   questionNumber: {
     fontSize: 16,
@@ -573,7 +568,7 @@ const styles = StyleSheet.create({
   questionContainer: {
     paddingHorizontal: 20,
     paddingVertical: 30,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   questionText: {
     fontSize: 18,
@@ -621,9 +616,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: "transparent",
+    marginBottom: 120,
   },
   navButton: {
     paddingHorizontal: 30,
@@ -644,20 +640,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
-    color: "#FFFFFF",
+    color: "#000000",
   },
   nextButtonText: {
     color: "#FFFFFF",
   },
   disabledText: {
-    color: "#9E9E9E",
+    color: "#000000",
   },
   completionContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   completionTitle: {
     fontSize: 24,
