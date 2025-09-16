@@ -12,6 +12,7 @@ import { router } from "expo-router";
 
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -93,25 +94,9 @@ export default function VideoCallScreen() {
   };
 
   return (
-    // CurvedBackground provides an elegant SVG background.
-    <CurvedBackground style={{ flex: 1 }}>
-      {/* SafeAreaView ensures content doesn't overlap the device UI (notch/status bar) */}
-      <SafeAreaView style={styles.meetingContainer}>
-        {/* Header */}
-        <View style={styles.meetingHeader}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
-          </TouchableOpacity>
-
-          <Text style={styles.meetingTitle}>Safespace Meeting</Text>
-
-          {/* Placeholder for spacing or future header actions */}
-          <View style={{ width: 24 }} />
-        </View>
+   <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+          <AppHeader title="Safespace Meeting" showBack={true} />
 
         {/* Main meeting content */}
         <View style={styles.meetingContent}>
@@ -207,9 +192,15 @@ export default function VideoCallScreen() {
 
 /* Styles for the VideoCallScreen */
 const styles = StyleSheet.create({
+  // container added to match usage in JSX (SafeAreaView style={styles.container})
+  container: {
+    flex: 1,
+    backgroundColor: "transparent", 
+    justifyContent: "space-between",
+  },
   meetingContainer: {
     flex: 1,
-    backgroundColor: "transparent", // let CurvedBackground show through
+    backgroundColor: "transparent", 
     justifyContent: "space-between",
   },
   meetingHeader: {
@@ -267,9 +258,11 @@ const styles = StyleSheet.create({
   audioOptions: {
     width: "100%",
     maxWidth: 360,
-    marginRight: 15,
-    marginLeft: 50,
     justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 40,
+    marginLeft: (width - Math.min(width, 360)) / 2,
   },
   audioTitle: {
     fontSize: 14,
