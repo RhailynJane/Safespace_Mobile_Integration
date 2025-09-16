@@ -235,6 +235,7 @@ export default function AppointmentsScreen() {
           <AppHeader title="Appointments" showBack={true} />
         
         {/* Appointment Illustration */}
+        {/* Image Reference: https://iconscout.com/free-illustration/free-task-appointment-management-illustration_3485590*/}
         <View style={styles.imageContainer}>
           <Image 
             source={require('../../../../assets/images/appointment.png')} 
