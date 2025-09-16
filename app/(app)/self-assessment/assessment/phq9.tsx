@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -29,525 +30,19 @@ const mockProfile = {
   lastName: "User",
 };
 
-export default function PHQ9QuestionnaireScreen() {
-  // Using mock data instead of AuthContext
-  const user = mockUser;
-  const profile = mockProfile;
-  
-  // State management for UI components
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("assessment");
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [isCompleted, setIsCompleted] = useState(false);
-
-  // Navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
-
-  // PHQ-9 assessment questions
-  const questions = [
-    {
-      id: 0,
-      text: "Over the past 2 weeks, how often have you been bothered by little interest or pleasure in doing things?",
-      shortText: "Little interest or pleasure in doing things"
-    },
-    {
-      id: 1,
-      text: "Over the past 2 weeks, how often have you been bothered by feeling down, depressed, or hopeless?",
-      shortText: "Feeling down, depressed, or hopeless"
-    },
-    {
-      id: 2,
-      text: "Over the past 2 weeks, how often have you been bothered by trouble falling or staying asleep, or sleeping too much?",
-      shortText: "Trouble falling or staying asleep, or sleeping too much"
-    },
-    {
-      id: 3,
-      text: "Over the past 2 weeks, how often have you been bothered by feeling tired or having little energy?",
-      shortText: "Feeling tired or having little energy"
-    },
-    {
-      id: 4,
-      text: "Over the past 2 weeks, how often have you been bothered by poor appetite or overeating?",
-      shortText: "Poor appetite or overeating"
-    },
-    {
-      id: 5,
-      text: "Over the past 2 weeks, how often have you been bothered by feeling bad about yourself – or that you are a failure or have let yourself or your family down?",
-      shortText: "Feeling bad about yourself or that you are a failure"
-    },
-    {
-      id: 6,
-      text: "Over the past 2 weeks, how often have you been bothered by trouble concentrating on things, such as reading the newspaper or watching television?",
-      shortText: "Trouble concentrating on things"
-    },
-    {
-      id: 7,
-      text: "Over the past 2 weeks, how often have you been moving or speaking so slowly that other people could have noticed? Or the opposite – being so fidgety or restless that you have been moving around a lot more than usual?",
-      shortText: "Moving or speaking slowly, or being fidgety or restless"
-    },
-    {
-      id: 8,
-      text: "Over the past 2 weeks, how often have you been bothered by thoughts that you would be better off dead or of hurting yourself in some way?",
-      shortText: "Thoughts that you would be better off dead or of hurting yourself"
-    }
-  ];
-
-  // Answer options for PHQ-9 questions
-  const answerOptions = [
-    { value: 0, label: "Not At All" },
-    { value: 1, label: "Several days" },
-    { value: 2, label: "More than half the days" },
-    { value: 3, label: "Nearly every day" }
-  ];
-
-  // Handle tab navigation
-  const handleTabPress = (tabId: string) => {
-    setActiveTab(tabId);
-    if (tabId === "home") {
-      router.replace("/(app)/(tabs)/home");
-    } else {
-      router.push(`/(app)/(tabs)/${tabId}`);
-    }
-  };
-
-  // Handle answer selection for current question
-  const handleAnswerSelect = (value: number) => {
-    setAnswers({ ...answers, [currentQuestion]: value });
-  };
-
-  // Navigate to next question or complete assessment
-  const handleNext = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    } else {
-      // Complete the assessment
-      setIsCompleted(true);
-    }
-  };
-
-  // Navigate to previous question
-  const handleBack = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
-    }
-  };
-
-  // Reset the assessment to start over
-  const handleStartOver = () => {
-    setCurrentQuestion(0);
-    setAnswers({});
-    setIsCompleted(false);
-  };
-
-  // Navigate to assessment selection screen
-  const handleTakeAnotherAssessment = () => {
-    router.push("/assessment/selection");
-  };
-
-  // Side menu navigation items
-  const sideMenuItems = [
-    {
-      icon: "home",
-      title: "Dashboard",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.replace("/(app)/(tabs)/home");
-      },
-    },
-    {
-      icon: "person",
-      title: "Profile",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/profile");
-      },
-    },
-    {
-      icon: "bar-chart",
-      title: "Self-Assessment",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/self-assessment");
-      },
-    },
-    {
-      icon: "happy",
-      title: "Mood Tracking",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/mood-tracking");
-      },
-    },
-    {
-      icon: "journal",
-      title: "Journaling",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/journaling");
-      },
-    },
-    {
-      icon: "library",
-      title: "Resources",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/resources");
-      },
-    },
-    {
-      icon: "help-circle",
-      title: "Crisis Support",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/crisis-support");
-      },
-    },
-    {
-      icon: "chatbubble",
-      title: "Messages",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/messages");
-      },
-    },
-    {
-      icon: "calendar",
-      title: "Appointments",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/appointments");
-      },
-    },
-    {
-      icon: "people",
-      title: "Community Forum",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/community-forum");
-      },
-    },
-    {
-      icon: "videocam",
-      title: "Video Consultations",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/video-consultations");
-      },
-    },
-    {
-      icon: "log-out",
-      title: "Sign Out",
-      onPress: async () => {
-        setSideMenuVisible(false);
-        // Frontend-only implementation - just navigate to login
-        router.replace("/login");
-      },
-    },
-  ];
-
-  // Get display name from profile or user data
-  const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
-    return "User";
-  };
-
-  // Show loading indicator while processing
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
-
-  // Show completion screen when assessment is finished
-  if (isCompleted) {
-    return (
-      <SafeAreaView style={styles.container}>
-        {/* Add CurvedBackground to the completion screen */}
-        <CurvedBackground />
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Self Assessment</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-              <Ionicons name="notifications-outline" size={24} color="#333" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>1</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-              <Ionicons name="grid-outline" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Completion Content */}
-        <View style={styles.completionContainer}>
-          <Text style={styles.completionTitle}>Self Assessment Completed!</Text>
-          
-          <View style={styles.completionIconContainer}>
-            <View style={styles.completionIcon}>
-              <Ionicons name="person" size={40} color="#9C27B0" />
-              <View style={styles.checkmarkBadge}>
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-              </View>
-            </View>
-          </View>
-
-          <Text style={styles.completionMessage}>
-            Your therapist will review the result of your assessment!
-          </Text>
-
-          <TouchableOpacity 
-            style={styles.anotherAssessmentButton}
-            onPress={handleTakeAnotherAssessment}
-          >
-            <Text style={styles.anotherAssessmentText}>Take another assessment</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Side Menu */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={sideMenuVisible}
-          onRequestClose={() => setSideMenuVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <Pressable
-              style={styles.modalOverlay}
-              onPress={() => setSideMenuVisible(false)}
-            />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
-              </View>
-              <ScrollView style={styles.sideMenuContent}>
-                {sideMenuItems.map((item, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.sideMenuItem}
-                    onPress={item.onPress}
-                  >
-                    <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        <BottomNavigation
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabPress={handleTabPress}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  // Main assessment screen
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Add CurvedBackground to the main assessment screen */}
-      <CurvedBackground />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Self Assessment</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#333" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>1</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="grid-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Question Header */}
-        <View style={styles.questionHeader}>
-          <Text style={styles.questionNumber}>Question {currentQuestion + 1} of {questions.length}</Text>
-          <TouchableOpacity style={styles.startOverButton} onPress={handleStartOver}>
-            <Text style={styles.startOverText}>Start Over</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Question Content */}
-        <View style={styles.questionContainer}>
-            <Text style={styles.questionText}>{questions[currentQuestion]?.text}</Text>
-        </View>
-
-        {/* Answer Options */}
-        <View style={styles.optionsContainer}>
-          {answerOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.optionButton,
-                answers[currentQuestion] === option.value && styles.selectedOption
-              ]}
-              onPress={() => handleAnswerSelect(option.value)}
-            >
-              <Text style={[
-                styles.optionText,
-                answers[currentQuestion] === option.value && styles.selectedOptionText
-              ]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Navigation Buttons */}
-      <View style={styles.navigationContainer}>
-        <TouchableOpacity
-          style={[styles.navButton, styles.backButton]}
-          onPress={handleBack}
-          disabled={currentQuestion === 0}
-        >
-          <Text style={[styles.navButtonText, currentQuestion === 0 && styles.disabledText]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            styles.nextButton,
-            answers[currentQuestion] === undefined && styles.disabledButton
-          ]}
-          onPress={handleNext}
-          disabled={answers[currentQuestion] === undefined}
-        >
-          <Text style={[
-            styles.navButtonText,
-            styles.nextButtonText,
-            answers[currentQuestion] === undefined && styles.disabledText
-          ]}>
-            {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  notificationButton: {
-    position: "relative",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF5722",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "600",
-  },
   content: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   questionHeader: {
     flexDirection: "row",
@@ -555,9 +50,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "transparent",
   },
   questionNumber: {
     fontSize: 16,
@@ -578,7 +73,7 @@ const styles = StyleSheet.create({
   questionContainer: {
     paddingHorizontal: 20,
     paddingVertical: 30,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   questionText: {
     fontSize: 18,
@@ -626,9 +121,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: "transparent",
   },
   navButton: {
     paddingHorizontal: 30,
@@ -662,7 +157,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   completionTitle: {
     fontSize: 24,
@@ -758,3 +253,336 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
 });
+
+export default function PHQ9QuestionnaireScreen() {
+  // Using mock data instead of AuthContext
+  const user = mockUser;
+  const profile = mockProfile;
+
+  // State management for UI components
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("assessment");
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  // Navigation tabs configuration
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community-forum", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  // PHQ-9 assessment questions
+  const questions = [
+    {
+      id: 0,
+      text: "Over the past 2 weeks, how often have you been bothered by little interest or pleasure in doing things?",
+      shortText: "Little interest or pleasure in doing things",
+    },
+    {
+      id: 1,
+      text: "Over the past 2 weeks, how often have you been bothered by feeling down, depressed, or hopeless?",
+      shortText: "Feeling down, depressed, or hopeless",
+    },
+    {
+      id: 2,
+      text: "Over the past 2 weeks, how often have you been bothered by trouble falling or staying asleep, or sleeping too much?",
+      shortText: "Trouble falling or staying asleep, or sleeping too much",
+    },
+    {
+      id: 3,
+      text: "Over the past 2 weeks, how often have you been bothered by feeling tired or having little energy?",
+      shortText: "Feeling tired or having little energy",
+    },
+    {
+      id: 4,
+      text: "Over the past 2 weeks, how often have you been bothered by poor appetite or overeating?",
+      shortText: "Poor appetite or overeating",
+    },
+    {
+      id: 5,
+      text: "Over the past 2 weeks, how often have you been bothered by feeling bad about yourself – or that you are a failure or have let yourself or your family down?",
+      shortText: "Feeling bad about yourself or that you are a failure",
+    },
+    {
+      id: 6,
+      text: "Over the past 2 weeks, how often have you been bothered by trouble concentrating on things, such as reading the newspaper or watching television?",
+      shortText: "Trouble concentrating on things",
+    },
+    {
+      id: 7,
+      text: "Over the past 2 weeks, how often have you been moving or speaking so slowly that other people could have noticed? Or the opposite – being so fidgety or restless that you have been moving around a lot more than usual?",
+      shortText: "Moving or speaking slowly, or being fidgety or restless",
+    },
+    {
+      id: 8,
+      text: "Over the past 2 weeks, how often have you been bothered by thoughts that you would be better off dead or of hurting yourself in some way?",
+      shortText:
+        "Thoughts that you would be better off dead or of hurting yourself",
+    },
+  ];
+
+  // Answer options for PHQ-9 questions
+  const answerOptions = [
+    { value: 0, label: "Not At All" },
+    { value: 1, label: "Several days" },
+    { value: 2, label: "More than half the days" },
+    { value: 3, label: "Nearly every day" },
+  ];
+
+  // Handle tab navigation
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
+
+  // Handle answer selection for current question
+  const handleAnswerSelect = (value: number) => {
+    setAnswers({ ...answers, [currentQuestion]: value });
+  };
+
+  // Navigate to next question or complete assessment
+  const handleNext = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else {
+      // Complete the assessment
+      setIsCompleted(true);
+    }
+  };
+
+  // Navigate to previous question
+  const handleBack = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
+    }
+  };
+
+  // Reset the assessment to start over
+  const handleStartOver = () => {
+    setCurrentQuestion(0);
+    setAnswers({});
+    setIsCompleted(false);
+  };
+
+  // Navigate to assessment selection screen
+  const handleTakeAnotherAssessment = () => {
+    router.push("../assessment/selection");
+  };
+
+  // Side menu navigation items
+  const sideMenuItems = [
+    {
+      icon: "home",
+      title: "Dashboard",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.replace("/(app)/(tabs)/home");
+      },
+    },
+    {
+      icon: "person",
+      title: "Profile",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/profile");
+      },
+    },
+    {
+      icon: "bar-chart",
+      title: "Self-Assessment",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/self-assessment");
+      },
+    },
+    {
+      icon: "happy",
+      title: "Mood Tracking",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/mood-tracking");
+      },
+    },
+    {
+      icon: "journal",
+      title: "Journaling",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/journaling");
+      },
+    },
+    {
+      icon: "library",
+      title: "Resources",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/resources");
+      },
+    },
+    {
+      icon: "help-circle",
+      title: "Crisis Support",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/crisis-support");
+      },
+    },
+    {
+      icon: "chatbubble",
+      title: "Messages",
+      onPress: () => {
+        setSideMenuVisible(false);
+        router.push("/(app)/(tabs)/messages");
+      },
+    },
+  ];
+
+  return (
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="PHQ-9 Assessment" showBack={true} />
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          <View style={styles.content}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+              </View>
+            ) : isCompleted ? (
+              <View style={styles.completionContainer}>
+                <Text style={styles.completionTitle}>Assessment Complete</Text>
+                <Text style={styles.completionMessage}>
+                  Thank you, {user.displayName}. Your responses have been
+                  recorded.
+                </Text>
+                <TouchableOpacity
+                  style={styles.anotherAssessmentButton}
+                  onPress={handleTakeAnotherAssessment}
+                >
+                  <Text style={styles.anotherAssessmentText}>
+                    Take Another Assessment
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <View style={styles.questionHeader}>
+                  <Text style={styles.questionNumber}>
+                    Question {currentQuestion + 1} of {questions.length}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.startOverButton}
+                    onPress={handleStartOver}
+                  >
+                    <Text style={styles.startOverText}>Start Over</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.questionContainer}>
+                  <Text style={styles.questionText}>
+                    {questions[currentQuestion]?.text ?? ""}
+                  </Text>
+                </View>
+
+                <View style={styles.optionsContainer}>
+                  {answerOptions.map((opt) => {
+                    const selected = answers[currentQuestion] === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[
+                          styles.optionButton,
+                          selected ? styles.selectedOption : {},
+                        ]}
+                        onPress={() => handleAnswerSelect(opt.value)}
+                      >
+                        <Text
+                          style={[
+                            styles.optionText,
+                            selected ? styles.selectedOptionText : {},
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.navigationContainer}>
+                  <TouchableOpacity
+                    style={[styles.navButton, styles.backButton]}
+                    onPress={handleBack}
+                    disabled={currentQuestion === 0}
+                  >
+                    <Text style={styles.navButtonText}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.navButton,
+                      styles.nextButton,
+                      answers[currentQuestion] === undefined
+                        ? styles.disabledButton
+                        : {},
+                    ]}
+                    onPress={handleNext}
+                    disabled={answers[currentQuestion] === undefined}
+                  >
+                    <Text style={styles.navButtonText}>
+                      {currentQuestion === questions.length - 1
+                        ? "Complete"
+                        : "Next"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+
+        <Modal visible={sideMenuVisible} animationType="slide" transparent>
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>
+                  {profile.firstName} {profile.lastName}
+                </Text>
+                <Text style={styles.profileEmail}>{user.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons name={item.icon as any} size={20} color="#333" />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    </CurvedBackground>
+  );
+}
