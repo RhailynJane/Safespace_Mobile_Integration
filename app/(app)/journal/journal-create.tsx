@@ -176,7 +176,7 @@ export default function JournalCreateScreen() {
    * Handles closing the success screen
    */
   const handleClose = () => {
-    router.replace("/(app)/journal/index");
+    router.replace("../journal/index");
   };
 
   /**
@@ -341,12 +341,13 @@ export default function JournalCreateScreen() {
             {currentStep === "success" && renderSuccessStep()}
             {renderActionButtons()}
           </ScrollView>
-          <BottomNavigation
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabPress={handleTabPress}
-          />
         </KeyboardAvoidingView>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
