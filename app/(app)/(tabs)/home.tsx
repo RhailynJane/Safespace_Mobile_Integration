@@ -36,6 +36,7 @@ type Resource = {
   id: string;
   title: string;
   duration: string;
+  onPress?: () => void;
 };
 
 // Mock user data for frontend-only implementation
@@ -362,18 +363,8 @@ export default function HomeScreen() {
       const mockResources: Resource[] = [
         {
           id: "1",
-          title: "Mindfulness Meditation",
+          title: "Understanding Anxiety",
           duration: "10 min",
-        },
-        {
-          id: "2",
-          title: "Stress Management Techniques",
-          duration: "15 min",
-        },
-        {
-          id: "3",
-          title: "Sleep Improvement Guide",
-          duration: "20 min",
         },
       ];
 
@@ -613,7 +604,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={resource.id}
                     style={styles.resourceCard}
-                    onPress={() => router.push(`/resources/${resource.id}`)}
+                    onPress={() => router.push(`../resources/understanding-anxiety`)}
                   >
                     <View style={styles.resourceInfo}>
                       <Text style={styles.resourceTitle}>{resource.title}</Text>
