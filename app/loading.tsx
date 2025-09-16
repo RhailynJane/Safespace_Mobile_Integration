@@ -1,3 +1,8 @@
+/**
+ * LLM Prompt: how to make a loading screen with animated circles and a progress counter that goes to 100% and then changes screens?
+ * Reference: chat.deepseek.com
+ */
+
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";

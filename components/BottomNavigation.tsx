@@ -1,3 +1,8 @@
+/**
+ * LLM Prompt: Add concise inline comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
+
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -24,16 +29,18 @@ export default function BottomNavigation({
         <TouchableOpacity
           key={tab.id}
           style={styles.navItem}
-          onPress={() => onTabPress(tab.id)}
+          onPress={() => onTabPress(tab.id)} // Handles tab selection
+          accessibilityRole="button"
+          accessibilityLabel={`Navigate to ${tab.name}`}
         >
           <View style={[
             styles.navIconContainer,
-            activeTab === tab.id && styles.activeIconContainer
+            activeTab === tab.id && styles.activeIconContainer // Highlights active tab
           ]}>
             <Ionicons
               name={tab.icon as any}
               size={24}
-              color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
+              color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"} // Active/inactive colors
             />
           </View>
         </TouchableOpacity>
@@ -49,20 +56,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 16,
     backgroundColor: "#FFFFFF",
-    position: "absolute",
+    position: "absolute", // Fixed at bottom
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 40,   
+    borderTopLeftRadius: 40,   // Rounded top corners
     borderTopRightRadius: 40, 
-    shadowColor: "#000",
+    shadowColor: "#000",       // Android shadow
     shadowOffset: {
       width: 0,
-      height: -1,
+      height: -1,              // Shadow above the nav
     },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 8,
+    elevation: 8,              // Android elevation
   },
   navItem: {
     alignItems: "center",
@@ -71,11 +78,11 @@ const styles = StyleSheet.create({
   navIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 20,          // Circular container
     justifyContent: 'center',
     alignItems: 'center',
   },
   activeIconContainer: {
-    backgroundColor: '#B6D5CF61',
+    backgroundColor: '#B6D5CF61', // Light green background for active tab
   },
 });

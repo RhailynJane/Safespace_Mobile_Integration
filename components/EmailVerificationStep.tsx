@@ -1,3 +1,8 @@
+/**
+ * LLM Prompt: Add concise inline comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
+
 import { useState, useEffect } from "react";
 import {
   View,
@@ -21,34 +26,34 @@ export default function EmailVerificationStep({
   onBack,
   stepNumber,
 }: EmailVerificationStepProps) {
-  const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(false);
-  const [error, setError] = useState("");
-  const [cooldown, setCooldown] = useState(0);
-  const [isVerified, setIsVerified] = useState(false);
+  const [loading, setLoading] = useState(false); // Loading state for resend operation
+  const [checking, setChecking] = useState(false); // Loading state for verification check
+  const [error, setError] = useState(""); // Error message display
+  const [cooldown, setCooldown] = useState(0); // Cooldown timer for resend button
+  const [isVerified, setIsVerified] = useState(false); // Track verification status
 
   // Handle cooldown timer for resend button
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (cooldown > 0) {
-      timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      timer = setTimeout(() => setCooldown(cooldown - 1), 1000); // Decrement cooldown every second
     }
     return () => {
       if (timer !== null) {
-        clearTimeout(timer as any);
+        clearTimeout(timer as any); // Cleanup timer on unmount
       }
     };
   }, [cooldown]);
 
   const handleResend = async () => {
-    if (cooldown > 0) return;
+    if (cooldown > 0) return; // Prevent resend during cooldown
 
     try {
       setLoading(true);
-      // Simulate sending verification email
+      // Simulate sending verification email (replace with actual API call)
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      setCooldown(30); // 30-second cooldown
+      setCooldown(30); // 30-second cooldown before allowing resend
       Alert.alert(
         "Verification Email Sent",
         `A new verification link has been sent to ${email}`
@@ -64,17 +69,17 @@ export default function EmailVerificationStep({
   const checkVerificationStatus = async () => {
     try {
       setChecking(true);
-      setError("");
+      setError(""); // Clear previous errors
       
-      // Simulate checking verification status
+      // Simulate checking verification status (replace with actual API call)
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // For demo purposes, we'll simulate successful verification
+      // For demo purposes, simulate successful verification
       const verified = true; 
       
       if (verified) {
         setIsVerified(true);
-        onNext(); // Proceed to next step
+        onNext(); // Proceed to next step after verification
       } else {
         setError("Email not verified yet. Please check your inbox.");
       }
@@ -105,7 +110,7 @@ export default function EmailVerificationStep({
       <TouchableOpacity
         style={[
           styles.button,
-          (checking || isVerified) && styles.disabledButton,
+          (checking || isVerified) && styles.disabledButton, // Disable when checking or verified
         ]}
         onPress={checkVerificationStatus}
         disabled={checking || isVerified}
@@ -124,24 +129,24 @@ export default function EmailVerificationStep({
       <View style={styles.resendContainer}>
         <TouchableOpacity
           onPress={handleResend}
-          disabled={loading || cooldown > 0}
+          disabled={loading || cooldown > 0} // Disable during loading or cooldown
         >
           <Text
             style={[
               styles.resendLink,
-              (loading || cooldown > 0) && styles.disabledLink,
+              (loading || cooldown > 0) && styles.disabledLink, // Visual disabled state
             ]}
           >
             {loading
               ? "Sending..."
               : cooldown > 0
-              ? `Resend in ${cooldown}s`
+              ? `Resend in ${cooldown}s` // Show cooldown timer
               : "Resend Email"}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {onBack && (
+      {onBack && ( // Only show back button if onBack prop provided
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
@@ -188,14 +193,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   button: {
-    backgroundColor: "#7BB8A8",
+    backgroundColor: "#7BB8A8", // Primary brand color
     padding: 16,
     borderRadius: 8,
     alignItems: "center",
     marginBottom: 16,
   },
   disabledButton: {
-    opacity: 0.6,
+    opacity: 0.6, // Visual indicator for disabled state
   },
   buttonText: {
     color: "#fff",
@@ -206,16 +211,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   resendLink: {
-    color: "#FF6B6B",
+    color: "#FF6B6B", // Attention-grabbing color for resend
     fontWeight: "600",
     textAlign: "center",
   },
   disabledLink: {
     opacity: 0.6,
-    color: "#999",
+    color: "#999", // Muted color when disabled
   },
   errorText: {
-    color: "#FF6B6B",
+    color: "#FF6B6B", // Error color
     marginTop: 8,
     textAlign: "center",
   },

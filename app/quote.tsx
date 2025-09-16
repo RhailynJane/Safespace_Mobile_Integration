@@ -2,6 +2,10 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 import { Animated, StyleSheet, Text, View, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+/**
+ * LLM Prompt: how to make a splash screen in react native that shows my logo and a quote, then automatically goes to the next screen after a few seconds?
+ * Reference; chat.deepseek.com
+ */
 
 /**
  * QuoteScreen - Displays an inspirational mental health quote with smooth animations

@@ -1,3 +1,7 @@
+/**
+ * LLM Prompt: Add concise inline comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
 // File: components/SafeSpaceLogo.tsx
 import React from "react";
 import { View, StyleSheet, Image, ImageSourcePropType } from "react-native";
