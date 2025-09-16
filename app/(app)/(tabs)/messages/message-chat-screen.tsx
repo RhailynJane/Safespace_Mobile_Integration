@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 // Sample messages data for each conversation
 const conversationMessages: {
@@ -161,128 +162,129 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CurvedBackground />
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-        </TouchableOpacity>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+          </TouchableOpacity>
 
-        <View style={styles.contactInfo}>
-          <Image source={{ uri: contact.avatar }} style={styles.headerAvatar} />
-          <View>
-            <Text style={styles.contactName}>{contact.name}</Text>
-            <Text style={styles.contactStatus}>
-              {contact.online ? "Online" : "Offline"}
-              {contact.online && <View style={styles.onlineIndicator} />}
-            </Text>
+          <View style={styles.contactInfo}>
+            <Image
+              source={{ uri: contact.avatar }}
+              style={styles.headerAvatar}
+            />
+            <View>
+              <Text style={styles.contactName}>{contact.name}</Text>
+              <Text style={styles.contactStatus}>
+                {contact.online ? "Online" : "Offline"}
+              </Text>
+            </View>
           </View>
+
+          <TouchableOpacity onPress={() => router.push("../appointments/book")}>
+            <Ionicons name="call-outline" size={24} color="#2E7D32" />
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => router.push("../appointments/book")}>
-          <Ionicons name="call-outline" size={24} color="#2E7D32" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Chat Messages */}
-      <ScrollView
-        style={styles.messagesContainer}
-        ref={scrollViewRef}
-        contentContainerStyle={styles.messagesContent}
-      >
-        {messages.map((message) => (
-          <View
-            key={message.id}
-            style={[
-              styles.messageContainer,
-              message.sender === "me"
-                ? styles.myMessageContainer
-                : styles.theirMessageContainer,
-            ]}
-          >
-            {message.sender === "other" && (
-              <Image
-                source={{ uri: contact.avatar }}
-                style={styles.messageAvatar}
-              />
-            )}
-
+        {/* Chat Messages */}
+        <ScrollView
+          style={styles.messagesContainer}
+          ref={scrollViewRef}
+          contentContainerStyle={styles.messagesContent}
+        >
+          {messages.map((message) => (
             <View
+              key={message.id}
               style={[
-                styles.messageBubble,
+                styles.messageContainer,
                 message.sender === "me"
-                  ? styles.myMessage
-                  : styles.theirMessage,
+                  ? styles.myMessageContainer
+                  : styles.theirMessageContainer,
               ]}
             >
-              <Text
+              {message.sender === "other" && (
+                <Image
+                  source={{ uri: contact.avatar }}
+                  style={styles.messageAvatar}
+                />
+              )}
+
+              <View
                 style={[
-                  styles.messageText,
+                  styles.messageBubble,
                   message.sender === "me"
-                    ? styles.myMessageText
-                    : styles.theirMessageText,
+                    ? styles.myMessage
+                    : styles.theirMessage,
                 ]}
               >
-                {message.text}
-              </Text>
-              <Text style={styles.messageTime}>{message.time}</Text>
+                <Text
+                  style={[
+                    styles.messageText,
+                    message.sender === "me"
+                      ? styles.myMessageText
+                      : styles.theirMessageText,
+                  ]}
+                >
+                  {message.text}
+                </Text>
+                <Text style={styles.messageTime}>{message.time}</Text>
+              </View>
+
+              {message.sender === "me" && (
+                <Image
+                  source={{ uri: userAvatar }}
+                  style={styles.messageAvatar}
+                />
+              )}
             </View>
+          ))}
+        </ScrollView>
 
-            {message.sender === "me" && (
-              <Image
-                source={{ uri: userAvatar }}
-                style={styles.messageAvatar}
-              />
-            )}
-          </View>
-        ))}
-      </ScrollView>
+        {/* Message Input */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.inputContainer}
+        >
+          <View style={styles.inputWrapper}>
+            <TouchableOpacity style={styles.attachmentButton}>
+              <Ionicons name="attach" size={24} color="#4CAF50" />
+            </TouchableOpacity>
 
-      {/* Message Input */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.inputContainer}
-      >
-        <View style={styles.inputWrapper}>
-          <TouchableOpacity style={styles.attachmentButton}>
-            <Ionicons name="attach" size={24} color="#4CAF50" />
-          </TouchableOpacity>
-
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type a message..."
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            maxLength={500}
-          />
-
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              newMessage.trim() === "" && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSendMessage}
-            disabled={newMessage.trim() === ""}
-          >
-            <Ionicons
-              name="send"
-              size={24}
-              color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
+            <TextInput
+              style={styles.textInput}
+              placeholder="Type a message..."
+              value={newMessage}
+              onChangeText={setNewMessage}
+              multiline
+              maxLength={500}
             />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-      <CurvedBackground />
-    </SafeAreaView>
+
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                newMessage.trim() === "" && styles.sendButtonDisabled,
+              ]}
+              onPress={handleSendMessage}
+              disabled={newMessage.trim() === ""}
+            >
+              <Ionicons
+                name="send"
+                size={24}
+                color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
+              />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   headerGradient: {
     paddingTop: 10,
@@ -320,16 +322,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  onlineIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#FFFFFF",
-    marginLeft: 5,
-  },
+
   messagesContainer: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "transparent",
   },
   messagesContent: {
     padding: 15,
