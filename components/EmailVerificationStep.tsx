@@ -29,10 +29,15 @@ export default function EmailVerificationStep({
 
   // Handle cooldown timer for resend button
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     if (cooldown > 0) {
-      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
-      return () => clearTimeout(timer);
+      timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
     }
+    return () => {
+      if (timer !== null) {
+        clearTimeout(timer as any);
+      }
+    };
   }, [cooldown]);
 
   const handleResend = async () => {

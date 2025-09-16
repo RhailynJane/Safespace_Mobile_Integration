@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import CurvedBackground from "../../../../../components/CurvedBackground";
-import { AppHeader } from "../../../../../components/AppHeader";
+import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 interface HelpSection {
   id: string;
