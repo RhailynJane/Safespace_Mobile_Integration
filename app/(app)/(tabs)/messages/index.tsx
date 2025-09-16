@@ -200,12 +200,10 @@ export default function MessagesScreen() {
     <SafeAreaView style={styles.container}>
       <CurvedBackground>
         {/* Header */}
-        <View style={styles.headerWrapper}>
           <AppHeader 
             title="Messages" 
             showBack={true}
           />
-        </View>
 
         {/* New Message Button */}
         <View>
@@ -335,33 +333,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
   },
-  headerWrapper: {
-    backgroundColor: "transparent",
-    height: 50,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    shadowColor: "grey",
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "transparent",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
-  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -478,6 +449,8 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderRadius: 10,
     borderColor: "rgba(0, 0, 0, 0.1)",
+    marginBottom: 100,
+    marginTop: 5,
   },
   conversationItem: {
     flexDirection: "row",
