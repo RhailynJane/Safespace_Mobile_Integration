@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 /**
  * SettingsScreen Component
@@ -286,16 +287,9 @@ export default function SettingsScreen() {
   );
 
   return (
-    <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Settings</Text>
-          <View style={{ width: 24 }} />
-        </View>
+  <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+          <AppHeader title="Profile Settings" showBack={true} />
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Display & Accessibility */}
