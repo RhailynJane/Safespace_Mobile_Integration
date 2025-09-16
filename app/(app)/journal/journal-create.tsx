@@ -16,9 +16,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
 import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
-import CurvedBackground from "../../../components/CurvedBackground"; 
+import CurvedBackground from "../../../components/CurvedBackground";
 
-// Mock user data 
+// Mock user data
 const mockUser = {
   displayName: "Demo User",
   email: "demo@gmail.com",
@@ -67,7 +67,7 @@ const tabs = [
 
 /**
  * JournalCreateScreen Component
- * 
+ *
  * A screen for creating new journal entries with emotion selection.
  * Features a two-step process: creation and success confirmation.
  * Uses mock data for frontend demonstration purposes.
@@ -142,8 +142,8 @@ export default function JournalCreateScreen() {
 
     try {
       // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // Mock successful save
       setCurrentStep("success");
     } catch (error) {
@@ -326,30 +326,29 @@ export default function JournalCreateScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Add CurvedBackground as the first element for the background */}
-      <CurvedBackground />
-      
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <AppHeader title="Journal" showBack={true} showMenu={true} />
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          style={{ marginBottom: 60 }}
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          {currentStep === "create" && renderCreateStep()}
-          {currentStep === "success" && renderSuccessStep()}
-          {renderActionButtons()}
-        </ScrollView>
-        <BottomNavigation
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabPress={handleTabPress}
-        />
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <AppHeader title="Journal" showBack={true} showMenu={true} />
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            style={{ marginBottom: 60 }}
+          >
+            {currentStep === "create" && renderCreateStep()}
+            {currentStep === "success" && renderSuccessStep()}
+            {renderActionButtons()}
+          </ScrollView>
+          <BottomNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
@@ -438,6 +437,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: Spacing.lg,
+    marginBottom: Spacing.huge,
   },
   cancelButton: {
     flex: 1,
@@ -509,6 +509,7 @@ const styles = StyleSheet.create({
   },
   createButton: {
     padding: Spacing.sm,
+    marginBottom: 20,
   },
   successMessage: {
     alignItems: "center",

@@ -107,7 +107,7 @@ export default function HomeScreen() {
       image: require("../../../assets/images/journal.png"), 
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
-      onPress: () => router.push("/journaling"),
+      onPress: () => router.push("/journal"),
     },
     {
       id: "resources",

@@ -12,9 +12,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
-import CurvedBackground from "../../../components/CurvedBackground"; 
+import CurvedBackground from "../../../components/CurvedBackground";
 
-// Mock data 
+// Mock data
 const mockUser = {
   displayName: "Demo User",
   email: "demo@gmail.com",
@@ -25,12 +25,13 @@ const mockProfile = {
   lastName: "User",
 };
 
-// Mock journal entries data 
+// Mock journal entries data
 const mockJournalEntries = [
   {
     id: "1",
     title: "A Reflective Day",
-    content: "Today I spent time thinking about my goals and aspirations. It was a productive day overall.",
+    content:
+      "Today I spent time thinking about my goals and aspirations. It was a productive day overall.",
     mood_type: "reflective",
     emoji: "🤔",
     date: "2023-10-15",
@@ -40,7 +41,8 @@ const mockJournalEntries = [
   {
     id: "2",
     title: "Morning Gratitude",
-    content: "I'm grateful for the beautiful sunrise and the opportunity to start a new day fresh.",
+    content:
+      "I'm grateful for the beautiful sunrise and the opportunity to start a new day fresh.",
     mood_type: "grateful",
     emoji: "🙏",
     date: "2023-10-14",
@@ -61,7 +63,7 @@ export default function JournalScreen() {
       setJournalEntries(mockJournalEntries);
       setLoading(false);
     }, 500);
-    
+
     return () => clearTimeout(timer);
   }, []);
 
@@ -110,112 +112,118 @@ export default function JournalScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Add CurvedBackground as the first element for the background */}
-      <CurvedBackground />
-      
-      <AppHeader title="Journal" showBack={true} showMenu={true} />
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Journal" showBack={true} showMenu={true} />
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.content}>
-          <Text style={styles.subText}>Express your thoughts and feelings</Text>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.content}>
+            <Text style={styles.subText}>
+              Express your thoughts and feelings
+            </Text>
 
-          {/* Create Journal Card - Main call to action */}
-          <TouchableOpacity
-            style={styles.createCard}
-            onPress={handleCreateJournal}
-          >
-            <View style={styles.createCardContent}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="book" size={32} color={Colors.warning} />
+            {/* Create Journal Card - Main call to action */}
+            <TouchableOpacity
+              style={styles.createCard}
+              onPress={handleCreateJournal}
+            >
+              <View style={styles.createCardContent}>
+                <View style={styles.iconContainer}>
+                  <Ionicons name="book" size={32} color={Colors.warning} />
+                </View>
+
+                <View style={styles.createTextContainer}>
+                  <Text style={styles.createTitle}>Create Journal</Text>
+                  <Text style={styles.createSubtitle}>
+                    Set up a journal based on your current mood & conditions
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.createButton}
+                  onPress={handleCreateJournal}
+                >
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={28}
+                    color={Colors.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
+            </TouchableOpacity>
 
-              <View style={styles.createTextContainer}>
-                <Text style={styles.createTitle}>Create Journal</Text>
-                <Text style={styles.createSubtitle}>
-                  Set up a journal based on your current mood & conditions
-                </Text>
-              </View>
+            {/* Recent Journal Entries Section */}
+            <View style={styles.recentSection}>
+              <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
 
-              <TouchableOpacity
-                style={styles.createButton}
-                onPress={handleCreateJournal}
-              >
-                <Ionicons
-                  name="add-circle-outline"
-                  size={28}
-                  color={Colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-
-          {/* Recent Journal Entries Section */}
-          <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
-
-            <View style={styles.recentContainer}>
-              {loading ? (
-                <Text style={styles.noEntriesText}>Loading...</Text>
-              ) : journalEntries.length > 0 ? (
-                <>
-                  {journalEntries.slice(0, 2).map((entry) => (
-                    <TouchableOpacity
-                      key={entry.id}
-                      style={styles.entryCard}
-                      onPress={() => handleEntryPress(entry.id)}
-                    >
-                      <View style={styles.entryHeader}>
-                        {entry.emoji ? (
-                          <Text style={styles.entryEmoji}>{entry.emoji}</Text>
-                        ) : null}
-                        <View style={styles.entryInfo}>
-                          <Text style={styles.entryTitle}>{entry.title}</Text>
-                          <Text style={styles.entryDate}>
-                            {entry.formattedDate}
-                          </Text>
+              <View style={styles.recentContainer}>
+                {loading ? (
+                  <Text style={styles.noEntriesText}>Loading...</Text>
+                ) : journalEntries.length > 0 ? (
+                  <>
+                    {journalEntries.slice(0, 2).map((entry) => (
+                      <TouchableOpacity
+                        key={entry.id}
+                        style={styles.entryCard}
+                        onPress={() => handleEntryPress(entry.id)}
+                      >
+                        <View style={styles.entryHeader}>
+                          {entry.emoji ? (
+                            <Text style={styles.entryEmoji}>{entry.emoji}</Text>
+                          ) : null}
+                          <View style={styles.entryInfo}>
+                            <Text style={styles.entryTitle}>{entry.title}</Text>
+                            <Text style={styles.entryDate}>
+                              {entry.formattedDate}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                      <Text style={styles.entryPreview} numberOfLines={2}>
-                        {entry.content}
+                        <Text style={styles.entryPreview} numberOfLines={2}>
+                          {entry.content}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+
+                    <TouchableOpacity
+                      style={styles.viewAllButton}
+                      onPress={handleViewAllEntries}
+                    >
+                      <Text style={styles.viewAllText}>
+                        View Journal Entries
                       </Text>
                     </TouchableOpacity>
-                  ))}
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.noEntriesText}>
+                      No entries recorded
+                    </Text>
 
-                  <TouchableOpacity
-                    style={styles.viewAllButton}
-                    onPress={handleViewAllEntries}
-                  >
-                    <Text style={styles.viewAllText}>View Journal Entries</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.noEntriesText}>No entries recorded</Text>
-
-                  <TouchableOpacity
-                    style={styles.viewAllButton}
-                    onPress={handleViewAllEntries}
-                  >
-                    <Text style={styles.viewAllText}>View Journal Entries</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+                    <TouchableOpacity
+                      style={styles.viewAllButton}
+                      onPress={handleViewAllEntries}
+                    >
+                      <Text style={styles.viewAllText}>
+                        View Journal Entries
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
-      {/* Bottom Navigation Component */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Bottom Navigation Component */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
