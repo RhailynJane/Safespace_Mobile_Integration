@@ -61,7 +61,7 @@ export default function MoodLoggingScreen() {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -69,7 +69,7 @@ export default function MoodLoggingScreen() {
 
   // Get selected mood from navigation parameters
   const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
-  
+
   // State for mood data including type, intensity, factors, and notes
   const [moodData, setMoodData] = useState({
     type: selectedMood as MoodType,
@@ -77,7 +77,7 @@ export default function MoodLoggingScreen() {
     factors: [] as string[],
     notes: "",
   });
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("mood");
@@ -213,13 +213,13 @@ export default function MoodLoggingScreen() {
   // Handle form submission with mock success response
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    
+
     // Simulate API call delay
     setTimeout(() => {
       Alert.alert("Mood Logged!", "Your mood has been saved successfully.", [
-        { 
-          text: "OK", 
-          onPress: () => router.replace("../mood-tracking/mood-history") 
+        {
+          text: "OK",
+          onPress: () => router.replace("../mood-tracking/mood-history"),
         },
       ]);
       setIsSubmitting(false);
@@ -238,21 +238,18 @@ export default function MoodLoggingScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
-      
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#FFFFFF"
+        translucent={false}
+      />
+
       {/* Elegant curved background with gradient colors - positioned absolutely */}
       <View style={styles.backgroundContainer}>
         <CurvedBackground />
       </View>
-      
-      {/* Header with navigation controls */}
-      <View style={styles.tempHeader}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-        </TouchableOpacity>
-        <Text style={styles.tempHeaderTitle}>Mood Tracking</Text>
-        <View style={{ width: 24 }} />
-      </View>
+
+      <AppHeader title="Mood Tracker" showBack={true} />
 
       {/* Main Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>

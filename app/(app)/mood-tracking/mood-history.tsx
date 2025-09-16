@@ -112,7 +112,7 @@ export default function MoodHistoryScreen() {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -166,7 +166,7 @@ export default function MoodHistoryScreen() {
             mood_factors: [{ factor: "Social" }, { factor: "Leisure" }],
           },
         ];
-        
+
         setMoodHistory(mockData);
         setLoading(false);
       }, 1000); // Simulate network delay
@@ -229,97 +229,99 @@ export default function MoodHistoryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Elegant curved background with gradient colors */}
-      <CurvedBackground />
-      
-      {/* Header with navigation controls */}
-      <AppHeader title="Mood Tracking" showBack={true} />
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Mood Tracker" showBack={true} />
 
-      {/* Main Content */}
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {moodHistory.length > 0 ? (
-          <FlatList
-            data={moodHistory}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMoodEntry}
-            scrollEnabled={false}
-          />
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="sad-outline" size={48} color="#666" />
-            <Text style={styles.emptyText}>No mood entries yet</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => router.push("/(app)/mood")}
-            >
-              <Text style={styles.addButtonText}>Log Your First Mood</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Side Menu Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={() => {
-                    setSideMenuVisible(false);
-                    item.onPress();
-                  }}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={styles.navButton}
-            onPress={() => handleTabPress(tab.id)}
-          >
-            <Ionicons
-              name={tab.icon as any}
-              size={24}
-              color={activeTab === tab.id ? "#4CAF50" : "#666"}
+        {/* Main Content */}
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {moodHistory.length > 0 ? (
+            <FlatList
+              data={moodHistory}
+              keyExtractor={(item) => item.id}
+              renderItem={renderMoodEntry}
+              scrollEnabled={false}
             />
-            <Text
-              style={[
-                styles.navButtonText,
-                { color: activeTab === tab.id ? "#4CAF50" : "#666" },
-              ]}
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="sad-outline" size={48} color="#666" />
+              <Text style={styles.emptyText}>No mood entries yet</Text>
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => router.push("/(app)/mood")}
+              >
+                <Text style={styles.addButtonText}>Log Your First Mood</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Side Menu Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={() => {
+                      setSideMenuVisible(false);
+                      item.onPress();
+                    }}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Bottom Navigation */}
+        <View style={styles.bottomNav}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={styles.navButton}
+              onPress={() => handleTabPress(tab.id)}
             >
-              {tab.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </SafeAreaView>
+              <Ionicons
+                name={tab.icon as any}
+                size={24}
+                color={activeTab === tab.id ? "#4CAF50" : "#666"}
+              />
+              <Text
+                style={[
+                  styles.navButtonText,
+                  { color: activeTab === tab.id ? "#4CAF50" : "#666" },
+                ]}
+              >
+                {tab.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
