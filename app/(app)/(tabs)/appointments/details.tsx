@@ -13,23 +13,34 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { useAuth } from "../../../../context/AuthContext";
-import { useLocalSearchParams } from "expo-router";
-import { AppHeader } from "../../../../components/AppHeader";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
+/**
+ * BookAppointment Component
+ *
+ * Screen for booking appointments with support workers. Allows users to:
+ * - Select session type (Video Call, Phone Call, In Person)
+ * - Choose available dates and times
+ * - View support worker details
+ * - Navigate to confirmation screen
+ * Features a multi-step process with visual indicators and elegant curved background.
+ */
 export default function BookAppointment() {
-  const { user, profile, logout } = useAuth();
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState("Video Call");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
+  // Get support worker ID from navigation params
   const { supportWorkerId } = useLocalSearchParams();
 
-  // Mock data for support workers
+  // Mock data for support workers (replaces backend data)
   const supportWorkers = [
     {
       id: 1,
@@ -52,14 +63,29 @@ export default function BookAppointment() {
     (sw) => sw.id === Number(supportWorkerId)
   );
 
-  const [selectedType, setSelectedType] = useState("Video Call");
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
 
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
+  // Show error if support worker not found
   if (!supportWorker) {
-    return <Text>Support worker not found</Text>;
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <Text style={styles.errorText}>Support worker not found</Text>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
   }
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -68,6 +94,10 @@ export default function BookAppointment() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -76,6 +106,8 @@ export default function BookAppointment() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -114,7 +146,7 @@ export default function BookAppointment() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -170,18 +202,24 @@ export default function BookAppointment() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Show loading indicator if data is being fetched
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
@@ -190,8 +228,10 @@ export default function BookAppointment() {
     );
   }
 
+  // Available session types
   const SESSION_TYPES = ["Video Call", "Phone Call", "In Person"];
 
+  // Mock available dates and times
   const AVAILABLE_DATES = [
     "Monday, October 7, 2025",
     "Wednesday, October 9, 2025",
@@ -207,8 +247,10 @@ export default function BookAppointment() {
     "5:00 PM",
   ];
 
+  /**
+   * Handles navigation to confirmation screen with selected appointment details
+   */
   const handleContinue = () => {
-    // Navigate to confirmation, passing all selected data as parameters
     router.push({
       pathname: "/appointments/confirm",
       params: {
@@ -221,260 +263,263 @@ export default function BookAppointment() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CurvedBackground>
-        <View style={styles.contentContainer}>
-          {/* Header */}
-          <AppHeader title="Appointments" showBack={true} />
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title=" Book Appointments" showBack={true} />
 
-          <ScrollView style={styles.container}>
-            <Text style={styles.title}>
-              Schedule a session with a support worker
-            </Text>
+        <ScrollView style={styles.container}>
+          <Text style={styles.title}>
+            Schedule a session with a support worker
+          </Text>
 
-            {/* Step Indicator */}
-            <View style={styles.stepsContainer}>
-              <View style={styles.stepRow}>
-                {/* Step 1 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>1</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 2 - Active */}
-                <View style={[styles.stepCircle, styles.stepCircleActive]}>
-                  <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                    2
-                  </Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 3 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>3</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 4 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>4</Text>
-                </View>
+          {/* Step Indicator - Shows progress through booking process */}
+          <View style={styles.stepsContainer}>
+            <View style={styles.stepRow}>
+              {/* Step 1 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>1</Text>
               </View>
-            </View>
+              <View style={styles.stepConnector} />
 
-            {/* Support Worker Card with Avatar and Name */}
-            <View style={styles.supportWorkerCard}>
-              <View style={styles.supportWorkerHeader}>
-                <Image
-                  source={{ uri: supportWorker.avatar }}
-                  style={styles.avatar}
-                />
-                <View style={styles.supportWorkerInfo}>
-                  <Text style={styles.supportWorkerName}>
-                    {supportWorker.name}
-                  </Text>
-                  <Text style={styles.supportWorkerTitle}>
-                    {supportWorker.title}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Session Type Selection */}
-            <Text style={styles.sectionTitle}>Select Session Type</Text>
-            <View style={styles.sessionTypeContainer}>
-              {SESSION_TYPES.map((type) => {
-                // Determine icon based on session type
-                let iconName;
-                switch (type) {
-                  case "Video Call":
-                    iconName = "videocam";
-                    break;
-                  case "Phone Call":
-                    iconName = "call";
-                    break;
-                  case "In Person":
-                    iconName = "person";
-                    break;
-                  default:
-                    iconName = "help";
-                }
-
-                return (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.sessionTypeButton,
-                      selectedType === type && styles.sessionTypeButtonSelected,
-                    ]}
-                    onPress={() => setSelectedType(type)}
-                  >
-                    <Ionicons
-                      name={iconName as keyof typeof Ionicons.glyphMap}
-                      size={24}
-                      color={selectedType === type ? "#4CAF50" : "#666"}
-                      style={styles.sessionTypeIcon}
-                    />
-                    <Text
-                      style={[
-                        styles.sessionTypeText,
-                        selectedType === type && styles.sessionTypeTextSelected,
-                      ]}
-                    >
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Date and Time Selection */}
-            <Text style={styles.sectionTitle}>Select Date and Time</Text>
-
-            {/* Available Dates Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Available Dates</Text>
-              <View style={styles.datesContainer}>
-                {AVAILABLE_DATES.map((date) => (
-                  <TouchableOpacity
-                    key={date}
-                    style={[
-                      styles.dateItem,
-                      selectedDate === date && styles.dateItemSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedDate(date);
-                      setSelectedTime(null); // Reset time when date changes
-                    }}
-                  >
-                    <Ionicons
-                      name="calendar"
-                      size={20}
-                      color={selectedDate === date ? "#4CAF50" : "#666"}
-                      style={styles.dateIcon}
-                    />
-                    <Text
-                      style={[
-                        styles.dateText,
-                        selectedDate === date && styles.dateTextSelected,
-                      ]}
-                    >
-                      {date}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {selectedDate ? (
-              <>
-                {/* Available Times Card */}
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>Available Times</Text>
-                  <View style={styles.timesContainer}>
-                    {AVAILABLE_TIMES.map((time) => (
-                      <TouchableOpacity
-                        key={time}
-                        style={[
-                          styles.timeItem,
-                          selectedTime === time && styles.timeItemSelected,
-                        ]}
-                        onPress={() => setSelectedTime(time)}
-                      >
-                        <Ionicons
-                          name="time"
-                          size={16}
-                          color={selectedTime === time ? "#4CAF50" : "#666"}
-                          style={styles.timeIcon}
-                        />
-                        <Text
-                          style={[
-                            styles.timeText,
-                            selectedTime === time && styles.timeTextSelected,
-                          ]}
-                        >
-                          {time}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </>
-            ) : (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Available Times</Text>
-                <View style={styles.timesContainer}></View>
-                <Text style={styles.placeholderText}>
-                  Please select available date first
+              {/* Step 2 - Active */}
+              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                  2
                 </Text>
               </View>
-            )}
+              <View style={styles.stepConnector} />
 
-            <TouchableOpacity
-              style={[
-                styles.continueButton,
-                (!selectedDate || !selectedTime) &&
-                  styles.continueButtonDisabled,
-              ]}
-              onPress={handleContinue}
-              disabled={!selectedDate || !selectedTime}
-            >
-              <Text style={styles.continueButtonText}>Continue</Text>
-            </TouchableOpacity>
-          </ScrollView>
+              {/* Step 3 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>3</Text>
+              </View>
+              <View style={styles.stepConnector} />
 
-          {/* Side Menu */}
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={sideMenuVisible}
-            onRequestClose={() => setSideMenuVisible(false)}
-          >
-            <View style={styles.modalContainer}>
-              <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setSideMenuVisible(false)}
-              />
-              <View style={styles.sideMenu}>
-                <View style={styles.sideMenuHeader}>
-                  <Text style={styles.profileName}>{getDisplayName()}</Text>
-                  <Text style={styles.profileEmail}>{user?.email}</Text>
-                </View>
-                <ScrollView style={styles.sideMenuContent}>
-                  {sideMenuItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.sideMenuItem}
-                      onPress={item.onPress}
-                    >
-                      <Ionicons
-                        name={item.icon as any}
-                        size={20}
-                        color="#4CAF50"
-                      />
-                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              {/* Step 4 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>4</Text>
               </View>
             </View>
-          </Modal>
+          </View>
 
-          <BottomNavigation
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabPress={handleTabPress}
-          />
-        </View>
-      </CurvedBackground>
-    </SafeAreaView>
+          {/* Support Worker Card with Avatar and Name */}
+          <View style={styles.supportWorkerCard}>
+            <View style={styles.supportWorkerHeader}>
+              <Image
+                source={{ uri: supportWorker.avatar }}
+                style={styles.avatar}
+              />
+              <View style={styles.supportWorkerInfo}>
+                <Text style={styles.supportWorkerName}>
+                  {supportWorker.name}
+                </Text>
+                <Text style={styles.supportWorkerTitle}>
+                  {supportWorker.title}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Session Type Selection */}
+          <Text style={styles.sectionTitle}>Select Session Type</Text>
+          <View style={styles.sessionTypeContainer}>
+            {SESSION_TYPES.map((type) => {
+              // Determine icon based on session type
+              let iconName;
+              switch (type) {
+                case "Video Call":
+                  iconName = "videocam";
+                  break;
+                case "Phone Call":
+                  iconName = "call";
+                  break;
+                case "In Person":
+                  iconName = "person";
+                  break;
+                default:
+                  iconName = "help";
+              }
+
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.sessionTypeButton,
+                    selectedType === type && styles.sessionTypeButtonSelected,
+                  ]}
+                  onPress={() => setSelectedType(type)}
+                >
+                  <Ionicons
+                    name={iconName as keyof typeof Ionicons.glyphMap}
+                    size={24}
+                    color={selectedType === type ? "#4CAF50" : "#666"}
+                    style={styles.sessionTypeIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.sessionTypeText,
+                      selectedType === type && styles.sessionTypeTextSelected,
+                    ]}
+                  >
+                    {type}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Date and Time Selection */}
+          <Text style={styles.sectionTitle}>Select Date and Time</Text>
+
+          {/* Available Dates Card */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Available Dates</Text>
+            <View style={styles.datesContainer}>
+              {AVAILABLE_DATES.map((date) => (
+                <TouchableOpacity
+                  key={date}
+                  style={[
+                    styles.dateItem,
+                    selectedDate === date && styles.dateItemSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedDate(date);
+                    setSelectedTime(null); // Reset time when date changes
+                  }}
+                >
+                  <Ionicons
+                    name="calendar"
+                    size={20}
+                    color={selectedDate === date ? "#4CAF50" : "#666"}
+                    style={styles.dateIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.dateText,
+                      selectedDate === date && styles.dateTextSelected,
+                    ]}
+                  >
+                    {date}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Available Times Card (only shown when date is selected) */}
+          {selectedDate ? (
+            <>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Available Times</Text>
+                <View style={styles.timesContainer}>
+                  {AVAILABLE_TIMES.map((time) => (
+                    <TouchableOpacity
+                      key={time}
+                      style={[
+                        styles.timeItem,
+                        selectedTime === time && styles.timeItemSelected,
+                      ]}
+                      onPress={() => setSelectedTime(time)}
+                    >
+                      <Ionicons
+                        name="time"
+                        size={16}
+                        color={selectedTime === time ? "#4CAF50" : "#666"}
+                        style={styles.timeIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.timeText,
+                          selectedTime === time && styles.timeTextSelected,
+                        ]}
+                      >
+                        {time}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Available Times</Text>
+              <View style={styles.timesContainer}></View>
+              <Text style={styles.placeholderText}>
+                Please select available date first
+              </Text>
+            </View>
+          )}
+
+          {/* Continue Button (disabled until both date and time are selected) */}
+          <TouchableOpacity
+            style={[
+              styles.continueButton,
+              (!selectedDate || !selectedTime) && styles.continueButtonDisabled,
+            ]}
+            onPress={handleContinue}
+            disabled={!selectedDate || !selectedTime}
+          >
+            <Text style={styles.continueButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Side Menu Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  errorText: {
+    fontSize: 18,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 50,
   },
   loadingContainer: {
     flex: 1,

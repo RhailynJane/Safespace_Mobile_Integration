@@ -4,28 +4,31 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   SafeAreaView,
   Modal,
   Pressable,
   ActivityIndicator,
-  Image,
-  Linking,
   Alert,
-  ImageBackground,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
-import { useAuth } from "../../../../../context/AuthContext";
-import { useLocalSearchParams } from "expo-router";
-import { BlurView } from "expo-blur";
-import { AppHeader } from "../../../../../components/AppHeader";
 import CurvedBackground from "../../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../../components/AppHeader";
 
+/**
+ * AppointmentDetail Component
+ * 
+ * Detailed view of a single appointment that allows users to:
+ * - View appointment details (date, time, support worker, type, status)
+ * - Join video sessions
+ * - Reschedule appointments
+ * - Cancel appointments
+ * Features modals for confirmation actions and elegant curved background.
+ */
 export default function AppointmentList() {
-  const { user, profile, logout } = useAuth();
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
@@ -33,6 +36,17 @@ export default function AppointmentList() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [rescheduleModalVisible, setRescheduleModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
+
+  // Mock user data 
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
 
   // Mock data for appointments
   const appointments = [
@@ -50,36 +64,52 @@ export default function AppointmentList() {
   // Find the appointment based on the ID from the URL
   const appointment = appointments.find((appt) => appt.id === Number(id));
 
+  // Show error if appointment not found
   if (!appointment) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={28} color="#4CAF50" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Appointment Details</Text>
-          <View style={{ width: 28 }} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="warning" size={48} color="#FF6B6B" />
-          <Text style={styles.errorText}>Appointment not found</Text>
-        </View>
-      </SafeAreaView>
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={28} color="#4CAF50" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Appointment Details</Text>
+            <View style={{ width: 28 }} />
+          </View>
+          <View style={styles.errorContainer}>
+            <Ionicons name="warning" size={48} color="#FF6B6B" />
+            <Text style={styles.errorText}>Appointment not found</Text>
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
     );
   }
 
+  /**
+   * Handles navigation to video consultation screen
+   */
   const handleJoinSession = () => {
     router.push("/video-consultations");
   };
 
+  /**
+   * Opens reschedule modal
+   */
   const handleReschedule = () => {
     setRescheduleModalVisible(true);
   };
 
+  /**
+   * Opens cancellation confirmation modal
+   */
   const handleCancel = () => {
     setCancelModalVisible(true);
   };
 
+  /**
+   * Confirms appointment cancellation
+   * Simulates API call with timeout
+   */
   const confirmCancel = () => {
     setLoading(true);
     setTimeout(() => {
@@ -90,6 +120,10 @@ export default function AppointmentList() {
     }, 1500);
   };
 
+  /**
+   * Confirms appointment rescheduling
+   * Validates time slot selection and simulates API call
+   */
   const confirmReschedule = () => {
     if (!selectedTimeSlot) {
       Alert.alert(
@@ -110,6 +144,7 @@ export default function AppointmentList() {
     }, 1500);
   };
 
+  // Show loading indicator during operations
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
@@ -118,6 +153,7 @@ export default function AppointmentList() {
     );
   }
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -126,6 +162,10 @@ export default function AppointmentList() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -134,6 +174,8 @@ export default function AppointmentList() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -172,7 +214,7 @@ export default function AppointmentList() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -228,23 +270,27 @@ export default function AppointmentList() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
   return (
-    <CurvedBackground>
+  <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <AppHeader title="Appointments" showBack={true} />
+          <AppHeader title="Appointment Details" showBack={true} />
 
         <ScrollView style={styles.content}>
           {/* Appointment Card */}
@@ -253,6 +299,7 @@ export default function AppointmentList() {
               {appointment.supportWorker}
             </Text>
 
+            {/* Appointment Details */}
             <View style={styles.detailRow}>
               <Ionicons name="calendar-outline" size={20} color="#666" />
               <Text style={styles.detailText}>{appointment.date}</Text>
@@ -265,7 +312,6 @@ export default function AppointmentList() {
               <Ionicons name="videocam-outline" size={20} color="#666" />
               <Text style={styles.detailText}>{appointment.type} Session</Text>
             </View>
-
             <View style={styles.detailRow}>
               <Ionicons
                 name="information-circle-outline"
@@ -280,6 +326,7 @@ export default function AppointmentList() {
 
           {/* Action Buttons */}
           <View style={styles.actions}>
+            {/* Join Session Button */}
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleJoinSession}
@@ -288,6 +335,7 @@ export default function AppointmentList() {
               <Text style={styles.primaryButtonText}>Join Session</Text>
             </TouchableOpacity>
 
+            {/* Reschedule Button */}
             <TouchableOpacity
               style={styles.secondaryButton}
               onPress={handleReschedule}
@@ -296,6 +344,7 @@ export default function AppointmentList() {
               <Text style={styles.secondaryButtonText}>Reschedule</Text>
             </TouchableOpacity>
 
+            {/* Cancel Appointment Button */}
             <TouchableOpacity
               style={styles.tertiaryButton}
               onPress={handleCancel}
@@ -316,7 +365,7 @@ export default function AppointmentList() {
               style={styles.modalOverlay}
               onPress={() => setCancelModalVisible(false)}
             >
-              <BlurView intensity={20} style={styles.blurContainer}>
+              <View style={styles.blurContainer}>
                 <View style={styles.confirmationModalContent}>
                   <View style={styles.modalIconContainer}>
                     <Ionicons name="close-circle" size={48} color="#F44336" />
@@ -345,7 +394,7 @@ export default function AppointmentList() {
                     </TouchableOpacity>
                   </View>
                 </View>
-              </BlurView>
+              </View>
             </Pressable>
           </Modal>
 
@@ -360,7 +409,7 @@ export default function AppointmentList() {
               style={styles.modalOverlay}
               onPress={() => setRescheduleModalVisible(false)}
             >
-              <BlurView intensity={20} style={styles.blurContainer}>
+              <View style={styles.blurContainer}>
                 <View style={styles.confirmationModalContent}>
                   <View style={styles.modalIconContainer}>
                     <Ionicons name="calendar" size={48} color="#4CAF50" />
@@ -371,6 +420,7 @@ export default function AppointmentList() {
                     {appointment.supportWorker}.
                   </Text>
 
+                  {/* Available Time Slots */}
                   <View style={styles.rescheduleOptions}>
                     <Text style={styles.rescheduleHint}>
                       Available time slots:
@@ -445,12 +495,12 @@ export default function AppointmentList() {
                     </TouchableOpacity>
                   </View>
                 </View>
-              </BlurView>
+              </View>
             </Pressable>
           </Modal>
         </ScrollView>
 
-        {/* Side Menu */}
+        {/* Side Menu Modal */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -465,7 +515,7 @@ export default function AppointmentList() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -487,6 +537,7 @@ export default function AppointmentList() {
           </View>
         </Modal>
 
+        {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}

@@ -14,20 +14,38 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../../context/AuthContext";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-import CurvedBackground from "../../../../components/CurvedBackground"; 
 
 const { width } = Dimensions.get("window");
 
+/**
+ * AppointmentsScreen Component
+ * 
+ * Main appointments screen that allows users to book new appointments
+ * or view their scheduled appointments. Features an intuitive interface
+ * with clear navigation options and an elegant curved background.
+ */
 export default function AppointmentsScreen() {
-  const { user, profile, logout } = useAuth();
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [activeView, setActiveView] = useState("main"); // 'main', 'book', 'details', 'confirmation', 'scheduled'
+  const [activeView, setActiveView] = useState("main");
 
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -36,6 +54,10 @@ export default function AppointmentsScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -44,6 +66,8 @@ export default function AppointmentsScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -82,7 +106,7 @@ export default function AppointmentsScreen() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -138,18 +162,24 @@ export default function AppointmentsScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Show loading indicator if data is being fetched
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
@@ -158,25 +188,39 @@ export default function AppointmentsScreen() {
     );
   }
 
+  /**
+   * Handles navigation to book appointment screen
+   */
   const handleBookAppointment = () => {
     router.push("../appointments/book");
   };
 
+  /**
+   * Handles navigation to view scheduled appointments
+   */
   const handleViewScheduled = () => {
     router.push("../appointments/appointment-list");
   }
 
+  /**
+   * Renders the main content of the appointments screen
+   * @returns JSX element with appointment options
+   */
   const renderContent = () => (
     <View style={styles.content}>
       <View style={styles.buttonContainer}>
+        {/* Primary action button - Book Appointment */}
         <TouchableOpacity style={styles.primaryButton} onPress={handleBookAppointment}>
           <Text style={styles.buttonText}>Book Appointment</Text>
         </TouchableOpacity>
+        
+        {/* Secondary action button - View Scheduled Appointments */}
         <TouchableOpacity style={styles.secondaryButton} onPress={handleViewScheduled}>
           <Text style={styles.secondaryButtonText}>Check Scheduled Appointments</Text>
         </TouchableOpacity>
       </View>
-      {/* Show the list of appointments below the buttons */}
+      
+      {/* Placeholder for scheduled appointments list */}
       {activeView === "scheduled"}
     </View>
   );
@@ -184,7 +228,9 @@ export default function AppointmentsScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <AppHeader title="Appointments" showBack={true} />
+          <AppHeader title="Appointments" showBack={true} />
+        
+        {/* Appointment Illustration */}
         <View style={styles.imageContainer}>
           <Image 
             source={require('../../../../assets/images/appointment.png')} 
@@ -196,7 +242,7 @@ export default function AppointmentsScreen() {
         {/* Main Content */}
         {renderContent()}
 
-        {/* Side Menu */}
+        {/* Side Menu Modal */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -211,7 +257,7 @@ export default function AppointmentsScreen() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -229,6 +275,7 @@ export default function AppointmentsScreen() {
           </View>
         </Modal>
 
+        {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}

@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   SafeAreaView,
   Modal,
@@ -15,50 +14,39 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { useAuth } from "../../../../context/AuthContext";
-import { useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
-import { AppHeader } from "../../../../components/AppHeader";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
+/**
+ * AppointmentList Component
+ * 
+ * Screen that displays a list of user's appointments, categorized as:
+ * - Upcoming appointments (future scheduled sessions)
+ * - Past appointments (completed sessions)
+ * Allows users to view appointment details and schedule new appointments.
+ * Features an elegant curved background and intuitive interface.
+ */
 export default function AppointmentList() {
-  const { user, profile, logout } = useAuth();
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const { supportWorkerId } = useLocalSearchParams();
-
-  // Add state for selectedType, selectedDate, selectedTime
-  const [selectedType, setSelectedType] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedTime, setSelectedTime] = useState<string>("");
-  const [appointmentNotes, setAppointmentNotes] = useState<string>("");
-  const [activeView, setActiveView] = useState<string>("confirmation");
-  const [bookingStep, setBookingStep] = useState<number>(1);
   const [activeAppointmentsTab, setActiveAppointmentsTab] = useState<
     "upcoming" | "past"
   >("upcoming");
 
-  // Mock data for support workers
-  const supportWorkers = [
-    {
-      id: 1,
-      name: "Eric Young",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-  ];
+  // Mock user data 
+ const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -67,6 +55,10 @@ export default function AppointmentList() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -75,6 +67,8 @@ export default function AppointmentList() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -113,7 +107,7 @@ export default function AppointmentList() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -169,15 +163,20 @@ export default function AppointmentList() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
@@ -191,8 +190,17 @@ export default function AppointmentList() {
       type: "Video",
       status: "upcoming",
     },
+    {
+      id: 2,
+      supportWorker: "Michael Chen",
+      date: "September 15, 2025",
+      time: "2:00 PM",
+      type: "Phone",
+      status: "past",
+    },
   ];
 
+  // Show loading indicator if data is being fetched
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
@@ -201,24 +209,22 @@ export default function AppointmentList() {
     );
   }
 
-  const appointment = appointments.length > 0 ? appointments[0] : null;
-
+  /**
+   * Handles navigation to appointment details screen
+   * @param appointmentId - ID of the selected appointment
+   */
   const handleAppointmentPress = (appointmentId: number) => {
-    // Navigate to appointment details or show details modal
-    if (appointment) {
-      router.push(
-        `/(app)/(tabs)/appointments/${appointment.id}/appointment-detail`
-      );
-    }
+    router.push(
+      `/(app)/(tabs)/appointments/${appointmentId}/appointment-detail`
+    );
   };
 
   return (
-    <CurvedBackground>
+ <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <AppHeader title="Appointments" showBack={true} />
+          <AppHeader title="My Appointments" showBack={true} />
 
-        {/* Appointments Tabs */}
+        {/* Appointments Tabs - Switch between Upcoming and Past appointments */}
         <View style={styles.appointmentsTabs}>
           <TouchableOpacity
             style={[
@@ -359,7 +365,7 @@ export default function AppointmentList() {
           </TouchableOpacity>
         </View>
 
-        {/* Side Menu */}
+        {/* Side Menu Modal */}
         <Modal
           animationType="fade"
           transparent={true}
@@ -374,7 +380,7 @@ export default function AppointmentList() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -396,6 +402,7 @@ export default function AppointmentList() {
           </View>
         </Modal>
 
+        {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}

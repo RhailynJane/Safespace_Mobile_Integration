@@ -15,113 +15,70 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
-import { useAuth } from "../../context/AuthContext";
 
-/**
- * ForgotPasswordScreen Component
- *
- * A clean, user-friendly password reset screen that allows users to request
- * a password reset email. Features comprehensive validation, loading states,
- * and clear user feedback for both success and error scenarios.
- *
- * Features:
- * - Email validation with regex pattern matching
- * - Loading states during API calls
- * - Error and success message handling
- * - Keyboard-aware interface
- * - Native alert confirmation
- * - Accessible back navigation
- * - Consistent SafeSpace branding
- */
+// Forgot password screen with email validation and reset flow
 export default function ForgotPasswordScreen() {
-  // FORM STATE MANAGEMENT
+  // State management for form data and UI status
   const [email, setEmail] = useState(""); // User's email input
-  const [loading, setLoading] = useState(false); // Loading state during API call
-  const [emailError, setEmailError] = useState(""); // Email validation error message
+  const [loading, setLoading] = useState(false); // Loading state during mock API call
+  const [emailError, setEmailError] = useState(""); // Email validation errors
   const [successMessage, setSuccessMessage] = useState(""); // Success feedback message
 
-  // AUTH CONTEXT
-  // Access the resetPassword function from authentication context
-  const { resetPassword } = useAuth();
+  // Mock password reset function - simulates API call for frontend demo
+  const resetPassword = async (email: string) => {
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
+    return { error: null }; // Always return success for demo purposes
+  };
 
-  /**
-   * Handles the password reset process
-   * - Validates email input and format
-   * - Calls authentication service
-   * - Manages loading states and user feedback
-   * - Shows success alert and navigates back on completion
-   */
+  // Handle password reset request with validation
   const handleResetPassword = async () => {
-    // Clear any previous messages
+    // Clear previous messages before validation
     setEmailError("");
     setSuccessMessage("");
 
-    // VALIDATION: Check for missing email
+    // Validate email presence
     if (!email.trim()) {
       setEmailError("Email is required");
       return;
     }
 
-    // VALIDATION: Basic email format validation using regex
-    // Matches: username@domain.extension format
+    // Validate email format using regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       setEmailError("Please enter a valid email address");
       return;
     }
 
-    // API CALL: Send password reset request
-    setLoading(true); // Show loading state
+    // Simulate API call with loading state
+    setLoading(true);
     const result = await resetPassword(email.trim());
-    setLoading(false); // Hide loading state
+    setLoading(false);
 
-    // HANDLE API RESPONSE
+    // Handle API response
     if (result.error) {
-      // Show error message from API
-      setEmailError(result.error);
+      setEmailError(result.error); // Show error message
     } else {
-      // Show success message
+      // Show success state and confirmation alert
       setSuccessMessage("Password reset email sent! Check your inbox.");
-
-      // Show native alert with detailed instructions
       Alert.alert(
-        "Reset Email Sent", // Alert title
-        "We've sent a password reset link to your email address. Please check your inbox and follow the instructions.", // Alert message
-        [
-          {
-            text: "OK",
-            onPress: () => router.back(), // Navigate back to login screen
-          },
-        ]
+        "Reset Email Sent",
+        "We've sent a password reset link to your email address.",
+        [{ text: "OK", onPress: () => router.back() }] // Navigate back on confirmation
       );
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Status bar configuration for consistent appearance */}
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
-      {/* 
-        KEYBOARD AVOIDING VIEW
-        Ensures form remains visible when keyboard is open
-        Different behavior for iOS (padding) vs Android (height)
-      */}
+      {/* Keyboard handling to ensure form remains visible */}
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* 
-          SCROLLABLE CONTAINER
-          Allows scrolling if content exceeds screen height
-          Centers content vertically when space allows
-        */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* 
-            BACK NAVIGATION BUTTON
-            Positioned absolutely in top-left corner
-            Allows users to return to previous screen
-          */}
+          {/* Back navigation button - top left corner */}
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -129,39 +86,23 @@ export default function ForgotPasswordScreen() {
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
 
-          {/* 
-            LOGO SECTION
-            Displays SafeSpace branding at top of form
-            Provides visual continuity with other auth screens
-          */}
+          {/* Logo and header section */}
           <View style={styles.logoContainer}>
             <SafeSpaceLogo size={218} />
           </View>
 
-          {/* 
-            HEADER TEXT SECTION
-            Clear title and instructional subtitle
-            Explains the password reset process to users
-          */}
+          {/* Page title and instructions */}
           <Text style={styles.title}>Reset Your Password</Text>
           <Text style={styles.subtitle}>
-            Enter your email address and we'll send you a link to reset your
-            password.
+            Enter your email address and we'll send you a link to reset your password.
           </Text>
 
-          {/* 
-            MAIN FORM CONTAINER
-            Contains all form inputs, validation messages, and action buttons
-          */}
+          {/* Main form container */}
           <View style={styles.formContainer}>
-            {/* EMAIL INPUT SECTION */}
+            {/* Email input label */}
             <Text style={styles.inputLabel}>Email Address</Text>
-
-            {/* 
-              EMAIL INPUT WITH ICON
-              Styled input wrapper with mail icon for visual clarity
-              Includes validation and real-time error clearing
-            */}
+            
+            {/* Email input field with icon */}
             <View style={styles.inputWrapper}>
               <Ionicons
                 name="mail-outline"
@@ -175,33 +116,20 @@ export default function ForgotPasswordScreen() {
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
-                  // Clear errors when user starts typing
-                  setEmailError("");
-                  setSuccessMessage("");
+                  setEmailError(""); // Clear error when typing
+                  setSuccessMessage(""); // Clear success when editing
                 }}
-                autoCapitalize="none" // Prevent auto-capitalization for emails
-                keyboardType="email-address" // Show email-optimized keyboard
-                editable={!loading} // Disable input during loading
+                autoCapitalize="none" // Important for email fields
+                keyboardType="email-address" // Optimize keyboard for email
+                editable={!loading} // Disable during loading
               />
             </View>
 
-            {/* 
-              VALIDATION MESSAGES
-              Conditionally rendered error and success messages
-              Provide immediate feedback to user
-            */}
-            {emailError ? (
-              <Text style={styles.errorText}>{emailError}</Text>
-            ) : null}
-            {successMessage ? (
-              <Text style={styles.successText}>{successMessage}</Text>
-            ) : null}
+            {/* Validation messages - conditionally rendered */}
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+            {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
 
-            {/* 
-              RESET PASSWORD BUTTON
-              Primary action button with loading state
-              Disabled during API call to prevent multiple submissions
-            */}
+            {/* Primary action button */}
             <TouchableOpacity
               style={[styles.resetButton, loading && styles.disabledButton]}
               onPress={handleResetPassword}
@@ -212,11 +140,7 @@ export default function ForgotPasswordScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* 
-              FOOTER NAVIGATION
-              Link back to sign-in screen for users who remember their password
-              Disabled during loading to prevent navigation conflicts
-            */}
+            {/* Footer navigation link */}
             <View style={styles.footerContainer}>
               <TouchableOpacity
                 onPress={() => router.back()}
@@ -236,168 +160,116 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  // MAIN CONTAINER
-  // Light gray background consistent with app theme
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5", // Light gray background
+    backgroundColor: "#F5F5F5",
   },
-
-  // KEYBOARD AVOIDING CONTAINER
-  // Full height container for keyboard avoidance behavior
   keyboardContainer: {
     flex: 1,
   },
-
-  // SCROLLABLE CONTENT CONTAINER
-  // Centers content vertically when space allows, enables scrolling when needed
   scrollContainer: {
-    flexGrow: 1, // Allow growth beyond screen height
-    paddingHorizontal: 24, // Side padding for content
-    paddingVertical: 20, // Top/bottom padding
-    justifyContent: "center", // Center content vertically when possible
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    justifyContent: "center",
   },
-
-  // NAVIGATION ELEMENTS
-  // Back button positioned absolutely in top-left corner
   backButton: {
     position: "absolute",
-    top: 50, // Distance from top of safe area
-    left: 24, // Distance from left edge
-    zIndex: 1, // Ensure button stays above other content
-    padding: 8, // Touch target padding
+    top: 50,
+    left: 24,
+    zIndex: 1,
+    padding: 8,
   },
-
-  // BRANDING SECTION
-  // Logo container with appropriate spacing
   logoContainer: {
-    alignItems: "center", // Center logo horizontally
+    alignItems: "center",
   },
-
-  // HEADER TEXT STYLES
-  // Main title for the screen
   title: {
     fontSize: 20,
     fontWeight: "700", 
-    color: "#333", // Dark gray for good contrast
+    color: "#333",
     textAlign: "center",
-    marginBottom: 30, // Space before toggle
+    marginBottom: 30,
   },
-
-  // Instructional subtitle text
   subtitle: {
     fontSize: 16,
-    color: "#666", // Medium gray for secondary text
+    color: "#666",
     textAlign: "center",
-    marginBottom: 40, // Large bottom margin before form
-    lineHeight: 22, // Better readability
-    paddingHorizontal: 20, // Extra side padding for subtitle
+    marginBottom: 40,
+    lineHeight: 22,
+    paddingHorizontal: 20,
   },
-
-  // FORM LAYOUT
-  // Container for all form elements
   formContainer: {
-    width: "100%", // Full width within padding
+    width: "100%",
   },
-
-  // Input field label
   inputLabel: {
     fontSize: 13,
     fontWeight: "400",
     color: "#333",
-    marginBottom: 20, // Small space before input
-    marginTop: 2, // Space above label (except first)
+    marginBottom: 20,
+    marginTop: 2,
   },
-
-  // INPUT FIELD STYLING
-  // Wrapper for input with icon
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF", // White background for contrast
-    borderRadius: 12, // Rounded corners
-    paddingHorizontal: 16, // Internal padding
-    height: 50, // Fixed height for consistency
-    // Subtle shadow for depth
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 50,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1, // Android shadow
-    marginBottom: 8, // Space for error messages
+    elevation: 1,
+    marginBottom: 8,
   },
-
-  // Icon styling within input
   inputIcon: {
-    marginRight: 12, // Space between icon and text input
+    marginRight: 12,
   },
-
-  // Text input field
   input: {
-    flex: 1, // Take remaining space after icons
+    flex: 1,
     fontSize: 12,
     color: "#",
   },
-
-  // BUTTON STYLES
-  // Primary reset button
   resetButton: {
-    backgroundColor: "#7BB8A8", // Teal color matching app theme
-    borderRadius: 25, // Fully rounded corners
-    paddingVertical: 16, // Vertical padding for touch target
-    alignItems: "center", // Center text horizontally
-    marginTop: 20, // Space above button
-    marginBottom: 30, // Space below button
+    backgroundColor: "#7BB8A8", // Brand primary color
+    borderRadius: 25,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginTop: 20,
+    marginBottom: 30,
   },
-
-  // Disabled button state
   disabledButton: {
-    opacity: 0.6, // Reduce opacity when disabled
+    opacity: 0.6, // Visual indicator for disabled state
   },
-
-  // Button text styling
   resetButtonText: {
-    color: "#FFFFFF", // White text for contrast
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600", // Semi-bold for emphasis
+    fontWeight: "600",
   },
-
-  // FOOTER SECTION
-  // Container for footer links
   footerContainer: {
-    alignItems: "center", // Center footer content
-    marginTop: 20, // Space above footer
+    alignItems: "center",
+    marginTop: 20,
   },
-
-  // Footer text styling
   footerText: {
     fontSize: 14,
-    color: "#666", // Medium gray for secondary text
+    color: "#666",
     textAlign: "center",
   },
-
-  // Highlighted link text within footer
   linkText: {
     fontWeight: "400",
-    color: "#E43232",
+    color: "#E43232", // Error/attention color for links
     textDecorationLine: 'underline',
-
   },
-
-  // MESSAGE STYLES
-  // Error message styling
   errorText: {
     color: "#FF6B6B", // Red color for errors
-    marginTop: 4, // Small space above error
-    marginLeft: 8, // Align with input content
-    fontSize: 13, // Slightly smaller than main text
+    marginTop: 4,
+    marginLeft: 8,
+    fontSize: 13,
   },
-
-  // Success message styling
   successText: {
     color: "#4CAF50", // Green color for success
-    marginTop: 4, // Small space above message
-    marginLeft: 8, // Align with input content
-    fontSize: 13, // Slightly smaller than main text
+    marginTop: 4,
+    marginLeft: 8,
+    fontSize: 13,
   },
 });

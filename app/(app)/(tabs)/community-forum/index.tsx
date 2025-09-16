@@ -1,7 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
-
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -11,26 +8,43 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  ActivityIndicator,
   Dimensions,
   Image,
   Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../../context/AuthContext";
+import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 
+/**
+ * CommunityScreen Component
+ * 
+ * Main community forum entry screen that provides an introduction to the community features.
+ * Features a welcoming interface with a curved background and navigation options.
+ * This is a standalone UI component with no backend dependencies.
+ */
 export default function CommunityScreen() {
-  const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("community");
-  const [profileImage, setProfileImage] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Mock user data for UI demonstration
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+    uid: "demo-uid"
+  };
+
+  // Mock profile data for UI demonstration
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User"
+  };
+
+  // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -39,6 +53,9 @@ export default function CommunityScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Shows the side menu with animation
+   */
   const showSideMenu = () => {
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
@@ -48,6 +65,9 @@ export default function CommunityScreen() {
     }).start();
   };
 
+  /**
+   * Hides the side menu with animation
+   */
   const hideSideMenu = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -58,33 +78,28 @@ export default function CommunityScreen() {
     });
   };
 
-  const loadProfileImage = async () => {
-    try {
-      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
-      if (savedImage) {
-        setProfileImage(savedImage);
-      }
-    } catch (error) {
-      console.log('Error loading profile image:', error);
-    }
-  };
-
+  /**
+   * Generates initials from user's name for profile placeholder
+   */
   const getInitials = () => {
-    const firstName = profile?.firstName || "";
-    const lastName = profile?.lastName || "";
+    const firstName = mockProfile?.firstName || "";
+    const lastName = mockProfile?.lastName || "";
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
   };
 
+  /**
+   * Gets the user's name for greeting purposes
+   */
   const getGreetingName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
     return "User";
   };
 
-  useEffect(() => {
-    loadProfileImage();
-  }, [user?.uid]);
-
+  /**
+   * Handles tab navigation
+   * @param tabId - The ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -94,10 +109,22 @@ export default function CommunityScreen() {
     }
   };
 
+  /**
+   * Navigates to the main community forum
+   */
   const handleStartPress = () => {
     router.push("../community-forum/main");
   };
 
+  /**
+   * Mock logout function for demonstration
+   */
+  const mockLogout = () => {
+    console.log("User logged out");
+    hideSideMenu();
+  };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -136,7 +163,7 @@ export default function CommunityScreen() {
       title: "Journaling",
       onPress: () => {
         hideSideMenu();
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -190,39 +217,18 @@ export default function CommunityScreen() {
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
-        hideSideMenu();
-        await logout();
-      },
+      onPress: mockLogout,
     },
   ];
 
-  if (loading) {
-    return (
-      <LinearGradient
-        colors={['#E8E4F0', '#E2DDF2', '#DDD7F1', '#D8D2EF']}
-        style={styles.loadingContainer}
-      >
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </LinearGradient>
-    );
-  }
-
   return (
-    <LinearGradient
-      colors={['#E8E4F0', '#E2DDF2', '#DDD7F1', '#D8D2EF']}
-      style={styles.container}
-    >
+    <CurvedBackground style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
+        {/* Header with profile and navigation icons */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
             <View style={styles.profileImageContainer}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profileImage} />
-              ) : (
-                <Text style={styles.initialsText}>{getInitials()}</Text>
-              )} 
+              <Text style={styles.initialsText}>{getInitials()}</Text>
             </View>
           </TouchableOpacity>
           <View style={styles.headerIcons}>
@@ -243,7 +249,7 @@ export default function CommunityScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Add the image above the main content */}
+          {/* Community illustration */}
           <View style={styles.imageContainer}>
             <Image 
               source={require('../../../../assets/images/community-forum.png')} 
@@ -252,7 +258,7 @@ export default function CommunityScreen() {
             />
           </View>
 
-          {/* Main Content */}
+          {/* Main content with welcome message */}
           <View style={styles.content}>
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeTitle}>Welcome to Our</Text>
@@ -273,7 +279,7 @@ export default function CommunityScreen() {
           </View>
         </ScrollView>
 
-        {/* Side Menu */}
+        {/* Side Menu Modal */}
         <Modal
           animationType="none" 
           transparent={true}
@@ -288,7 +294,7 @@ export default function CommunityScreen() {
             <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getGreetingName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -310,13 +316,14 @@ export default function CommunityScreen() {
           </Animated.View>
         </Modal>
 
+        {/* Bottom navigation bar */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
       </SafeAreaView>
-    </LinearGradient>
+    </CurvedBackground>
   );
 }
 
@@ -337,11 +344,6 @@ const styles = StyleSheet.create({
     width: width * 0.9,
     height: 350,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -357,11 +359,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F5E9",
     justifyContent: "center",
     alignItems: "center",
-  },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    marginTop: 5,
   },
   initialsText: {
     fontSize: 16,
@@ -388,6 +386,7 @@ const styles = StyleSheet.create({
   welcomeContainer: {
     alignItems: "center",
     padding: 20,
+    marginTop: 30
   },
   welcomeTitle: {
     fontSize: 32,
@@ -412,12 +411,11 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderColor: "#FFF",
     borderWidth: 3,
-    marginTop: 20,
+    marginTop: 70,
     marginBottom: 10,
     paddingBottom: 15,
   },
   startButtonText: {
-    fontFamily: "Epilogue",
     color: "#412100ff",
     fontSize: 18,
     fontWeight: "700",

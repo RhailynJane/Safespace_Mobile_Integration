@@ -15,19 +15,42 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { useAuth } from "../../../../context/AuthContext";
-import { AppHeader } from "../../../../components/AppHeader";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
+/**
+ * BookAppointment Component
+ *
+ * Initial screen for booking appointments that allows users to:
+ * - Browse available support workers
+ * - Search for specific support workers
+ * - View support worker specialties and profiles
+ * - Select a support worker to proceed with booking
+ * Features an elegant curved background and intuitive interface.
+ */
 export default function BookAppointment() {
-  const { user, profile, logout } = useAuth();
+  // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "Demo User",
+    email: "demo@gmail.com",
+  };
+
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User",
+  };
+
+  /**
+   * Handles navigation to support worker details screen
+   * @param supportWorkerId - ID of the selected support worker
+   */
   const handleSelectSupportWorker = (supportWorkerId: number) => {
-    // Navigate to the details screen, passing the ID as a parameter
     router.push(`/appointments/details?supportWorkerId=${supportWorkerId}`);
   };
 
@@ -49,10 +72,12 @@ export default function BookAppointment() {
     },
   ];
 
+  // Filter support workers based on search query
   const filteredSupportWorkers = supportWorkers.filter((sw) =>
     sw.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -61,6 +86,10 @@ export default function BookAppointment() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -69,6 +98,8 @@ export default function BookAppointment() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -107,7 +138,7 @@ export default function BookAppointment() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -163,18 +194,24 @@ export default function BookAppointment() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Mock logout functionality
+        console.log("User signed out");
       },
     },
   ];
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  // Show loading indicator if data is being fetched
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
@@ -183,155 +220,146 @@ export default function BookAppointment() {
     );
   }
 
-  // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 06, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "upcoming",
-    },
-  ];
-
   return (
-    <SafeAreaView style={styles.container}>
     <CurvedBackground>
-        <View style={styles.contentContainer}>
-          {/* Header */}
-          <AppHeader title="Appointments" showBack={true} />
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Book Appointment" showBack={true} />
 
-          <ScrollView style={styles.container}>
-            <Text style={styles.title}>
-              Schedule a session with a support worker
-            </Text>
+        <ScrollView style={styles.container}>
+          <Text style={styles.title}>
+            Schedule a session with a support worker
+          </Text>
 
-            {/* Step Indicator */}
-            <View style={styles.stepsContainer}>
-              <View style={styles.stepRow}>
-                {/* Step 1 - Active */}
-                <View style={[styles.stepCircle, styles.stepCircleActive]}>
-                  <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                    1
+          {/* Step Indicator - Shows progress through booking process */}
+          <View style={styles.stepsContainer}>
+            <View style={styles.stepRow}>
+              {/* Step 1 - Active (Current Step) */}
+              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                  1
+                </Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 2 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>2</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 3 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>3</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 4 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>4</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons
+              name="search"
+              size={20}
+              color="#666"
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search support worker..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          {/* Support Workers List */}
+          {filteredSupportWorkers.map((supportWorker) => (
+            <TouchableOpacity
+              key={supportWorker.id}
+              style={styles.supportWorkerCard}
+              onPress={() => handleSelectSupportWorker(supportWorker.id)}
+            >
+              {/* Support Worker Avatar and Info */}
+              <View style={styles.avatarContainer}>
+                <Image
+                  source={{ uri: supportWorker.avatar }}
+                  style={styles.avatar}
+                />
+                <View style={styles.supportWorkerInfo}>
+                  <Text style={styles.supportWorkerName}>
+                    {supportWorker.name}
+                  </Text>
+                  <Text style={styles.supportWorkerTitle}>
+                    {supportWorker.title}
                   </Text>
                 </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 2 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>2</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 3 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>3</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 4 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>4</Text>
-                </View>
               </View>
-            </View>
 
-            <View style={styles.searchContainer}>
-              <Ionicons
-                name="search"
-                size={20}
-                color="#666"
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search support worker..."
-                placeholderTextColor="#999"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-
-            {filteredSupportWorkers.map((supportWorker) => (
-              <TouchableOpacity
-                key={supportWorker.id}
-                style={styles.supportWorkerCard}
-                onPress={() => handleSelectSupportWorker(supportWorker.id)}
-              >
-                {/* Add avatar image here */}
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: supportWorker.avatar }}
-                    style={styles.avatar}
-                  />
-                  <View style={styles.supportWorkerInfo}>
-                    <Text style={styles.supportWorkerName}>
-                      {supportWorker.name}
-                    </Text>
-                    <Text style={styles.supportWorkerTitle}>
-                      {supportWorker.title}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.specialtiesContainer}>
-                  {supportWorker.specialties.map((specialty, index) => (
-                    <Text key={index} style={styles.specialtyText}>
-                      {specialty}
-                    </Text>
-                  ))}
-                </View>
-                <Text style={styles.selectText}>Select Support Worker</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Side Menu */}
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={sideMenuVisible}
-            onRequestClose={() => setSideMenuVisible(false)}
-          >
-            <View style={styles.modalContainer}>
-              <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setSideMenuVisible(false)}
-              />
-              <View style={styles.sideMenu}>
-                <View style={styles.sideMenuHeader}>
-                  <Text style={styles.profileName}>{getDisplayName()}</Text>
-                  <Text style={styles.profileEmail}>{user?.email}</Text>
-                </View>
-                <ScrollView style={styles.sideMenuContent}>
-                  {sideMenuItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.sideMenuItem}
-                      onPress={item.onPress}
-                    >
-                      <Ionicons
-                        name={item.icon as any}
-                        size={20}
-                        color="#4CAF50"
-                      />
-                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              {/* Support Worker Specialties */}
+              <View style={styles.specialtiesContainer}>
+                {supportWorker.specialties.map((specialty, index) => (
+                  <Text key={index} style={styles.specialtyText}>
+                    {specialty}
+                  </Text>
+                ))}
               </View>
-            </View>
-          </Modal>
 
-          <BottomNavigation
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabPress={handleTabPress}
-          />
-        </View>
-      </CurvedBackground>
-    </SafeAreaView>
+              {/* Selection Prompt */}
+              <Text style={styles.selectText}>Select Support Worker</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Side Menu Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 

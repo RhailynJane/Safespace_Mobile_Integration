@@ -14,139 +14,94 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
-import { useAuth } from "../../context/AuthContext";
 
-/**
- * LoginScreen Component
- *
- * A comprehensive authentication screen featuring both email/password login
- * and social authentication options. Includes form validation, error handling,
- * loading states, and smooth navigation between auth screens.
- *
- * Features:
- * - Email and password input with validation
- * - Password visibility toggle
- * - Sign In/Sign Up toggle navigation
- * - Social login buttons (Facebook, Google, Instagram)
- * - Comprehensive error handling with specific field validation
- * - Loading states and disabled interactions during authentication
- * - Keyboard-aware interface with scroll support
- * - Links to forgot password and signup screens
- */
 export default function LoginScreen() {
-  // FORM INPUT STATE
-  const [email, setEmail] = useState(""); // User's email input
-  const [password, setPassword] = useState(""); // User's password input
-  const [showPassword, setShowPassword] = useState(false); // Password visibility toggle
-  const [loading, setLoading] = useState(false); // Loading state during authentication
+  // Form state management
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // ERROR STATE MANAGEMENT
-  // Separate error states for specific field validation and user feedback
-  const [emailError, setEmailError] = useState(""); // Email-specific error messages
-  const [passwordError, setPasswordError] = useState(""); // Password-specific error messages
-  const [generalError, setGeneralError] = useState(""); // General authentication errors
-
-  // AUTH CONTEXT
-  // Access the signIn function from authentication context
-  const { signIn } = useAuth();
+  // Error state management for form validation
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [generalError, setGeneralError] = useState("");
 
   /**
-   * Handles the sign-in process
-   * - Validates required fields (email and password)
-   * - Calls authentication service
-   * - Manages error states with specific field targeting
-   * - Navigates to app on successful authentication
+   * Mock authentication function for demo purposes
+   * In a real application, this would connect to a backend API
+   * to validate user credentials and return authentication tokens
+   */
+  const signIn = async (email: string, password: string) => {
+    // Simulate API call delay (1.5 seconds)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Demo simulation - always return success
+    // In production, this would validate credentials against a database
+    return { error: null };
+  };
+
+  /**
+   * Handles the sign-in process with validation and authentication
+   * Validates input fields, calls authentication function, and handles errors
    */
   const handleSignIn = async () => {
-    // Clear all previous error messages
+    // Clear previous error messages before validation
     setEmailError("");
     setPasswordError("");
     setGeneralError("");
 
-    // VALIDATION: Check for missing required fields
+    // Basic client-side validation
     if (!email.trim()) {
-      setEmailError("Email is missing, please input to login");
+      setEmailError("Email is required");
       return;
     }
     if (!password.trim()) {
-      setPasswordError("Password is missing, please input to login");
+      setPasswordError("Password is required");
       return;
     }
 
-    // API CALL: Authenticate user
-    setLoading(true); // Show loading state
+    // Set loading state to show progress and disable inputs
+    setLoading(true);
     const result = await signIn(email.trim(), password);
-    setLoading(false); // Hide loading state
+    setLoading(false);
 
-    // HANDLE AUTHENTICATION RESULT
+    // Handle authentication errors
     if (result.error) {
-      // Route specific errors to appropriate fields for better UX
-      if (result.error === "Invalid email address.") {
-        setEmailError(result.error);
-      } else if (result.error === "Email or password is incorrect.") {
-        // Show as general error since Firebase doesn't distinguish for security
-        setGeneralError(result.error);
-      } else {
-        // Catch-all for other authentication errors
-        setGeneralError(result.error);
-      }
-      return; // Stop here, no navigation on error
+      setGeneralError("Login failed. Please try again.");
+      return;
     }
 
-    // SUCCESSFUL LOGIN: Navigate to main app
+    // Navigate to the main app screen on successful authentication
     router.replace("/(app)/(tabs)/home");
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Status bar configuration for consistent appearance */}
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
-      {/* 
-        KEYBOARD AVOIDING VIEW
-        Ensures form remains accessible when keyboard is open
-        Different behavior for iOS (padding) vs Android (height)
-      */}
+      {/* Keyboard handling for iOS/Android to ensure inputs remain visible */}
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* 
-          SCROLLABLE CONTAINER
-          Allows scrolling when content exceeds screen height
-          Centers content vertically when space allows
-        */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          
-        {/* ELLIPSE  
-            At the top of the screen 
-        */}
-                          <View style={styles.topEllipse}></View> 
-          
+          {/* Decorative background element */}
+          <View style={styles.topEllipse}></View> 
 
-          {/* 
-            LOGO SECTION
-            SafeSpace branding at top of login form
-            Provides visual identity and professional appearance
-          */}
+          {/* Application logo display */}
           <View style={styles.logoContainer}>
             <SafeSpaceLogo size={218} />
           </View>
 
-          {/* SCREEN TITLE */}
+          {/* Page title */}
           <Text style={styles.title}>Sign In To SafeSpace</Text>
 
-          {/* 
-            SIGN IN / SIGN UP TOGGLE
-            Visual toggle showing current screen (Sign In active)
-            Allows easy navigation between login and registration
-          */}
+          {/* Toggle between Sign In and Sign Up modes */}
           <View style={styles.toggleContainer}>
-            {/* Active Sign In button - highlighted */}
             <View style={[styles.toggleButton, styles.activeToggle]}>
               <Text style={styles.activeToggleText}>Sign In</Text>
             </View>
-            {/* Inactive Sign Up button - navigates to signup */}
             <TouchableOpacity
               style={styles.toggleButton}
               onPress={() => router.push("/(auth)/signup")}
@@ -155,18 +110,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* 
-            MAIN FORM CONTAINER
-            Contains all form inputs, validation messages, and action buttons
-          */}
+          {/* Main form container */}
           <View style={styles.formContainer}>
-            {/* EMAIL INPUT SECTION */}
+            {/* Email input field with icon and validation */}
             <Text style={styles.inputLabel}>Email Address</Text>
-
-            {/* 
-              EMAIL INPUT WITH ICON
-              Styled input wrapper with mail icon and real-time validation
-            */}
             <View style={styles.inputWrapper}>
               <Ionicons
                 name="mail-outline"
@@ -180,25 +127,17 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
-                  setEmailError(""); // Clear email error when user types
+                  setEmailError(""); // Clear error when user starts typing
                 }}
-                autoCapitalize="none" // Prevent auto-capitalization for emails
-                keyboardType="email-address" // Show email-optimized keyboard
-                editable={!loading} // Disable input during authentication
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
               />
             </View>
-            {/* Email validation error message */}
-            {emailError ? (
-              <Text style={styles.errorText}>{emailError}</Text>
-            ) : null}
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-            {/* PASSWORD INPUT SECTION */}
+            {/* Password input field with toggle visibility and validation */}
             <Text style={styles.inputLabel}>Password</Text>
-
-            {/* 
-              PASSWORD INPUT WITH ICONS
-              Lock icon on left, eye toggle on right for password visibility
-            */}
             <View style={styles.inputWrapper}>
               <Ionicons
                 name="lock-closed-outline"
@@ -212,16 +151,12 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  setPasswordError(""); // Clear password error when user types
+                  setPasswordError(""); // Clear error when user starts typing
                 }}
-                secureTextEntry={!showPassword} // Hide/show password based on state
-                editable={!loading} // Disable input during authentication
+                secureTextEntry={!showPassword}
+                editable={!loading}
               />
-              {/* 
-                PASSWORD VISIBILITY TOGGLE
-                Eye icon that toggles password visibility
-                Changes icon based on current visibility state
-              */}
+              {/* Toggle password visibility button */}
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeIcon}
@@ -233,25 +168,12 @@ export default function LoginScreen() {
                 />
               </TouchableOpacity>
             </View>
-            {/* Password validation error message */}
-            {passwordError ? (
-              <Text style={styles.errorText}>{passwordError}</Text>
-            ) : null}
+            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
-            {/* 
-              GENERAL ERROR MESSAGE
-              Displays authentication errors that don't belong to specific fields
-              Such as "Email or password is incorrect" for security reasons
-            */}
-            {generalError ? (
-              <Text style={styles.errorText}>{generalError}</Text>
-            ) : null}
+            {/* General authentication error message */}
+            {generalError ? <Text style={styles.errorText}>{generalError}</Text> : null}
 
-            {/* 
-              SIGN IN BUTTON
-              Primary action button with loading state
-              Disabled during authentication to prevent multiple submissions
-            */}
+            {/* Sign in button with loading state */}
             <TouchableOpacity
               style={[styles.signInButton, loading && styles.disabledButton]}
               onPress={handleSignIn}
@@ -262,31 +184,8 @@ export default function LoginScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/*
-  SOCIAL LOGIN SECTION
-  Alternative authentication methods via social platforms
-  Currently displays UI buttons (functionality would be implemented separately)
-  
-<View style={styles.socialContainer}>
-  <TouchableOpacity style={styles.socialButton}>
-    <Ionicons name="logo-facebook" size={24} color="#1877F2" />
-  </TouchableOpacity>
-  <TouchableOpacity style={styles.socialButton}>
-    <Ionicons name="logo-google" size={24} color="#DB4437" />
-  </TouchableOpacity>
-  <TouchableOpacity style={styles.socialButton}>
-    <Ionicons name="logo-instagram" size={24} color="#E4405F" />
-  </TouchableOpacity>
-</View>
-*/}
-
-            {/* 
-              FOOTER NAVIGATION LINKS
-              Links to other authentication screens
-              Disabled during loading to prevent navigation conflicts
-            */}
+            {/* Footer navigation links */}
             <View style={styles.footerContainer}>
-              {/* Link to signup screen for new users */}
               <TouchableOpacity
                 onPress={() => router.push("/(auth)/signup")}
                 disabled={loading}
@@ -297,7 +196,7 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Link to forgot password screen */}
+              {/* Forgot password navigation */}
               <TouchableOpacity
                 style={styles.forgotPassword}
                 onPress={() => router.push("/(auth)/forgot-password")}
@@ -313,229 +212,149 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  // MAIN CONTAINER
-  // Light gray background consistent with app theme
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5", // Light gray background
+    backgroundColor: "#F5F5F5",
   },
-
-  // KEYBOARD AVOIDING CONTAINER
-  // Full height container for keyboard avoidance behavior
   keyboardContainer: {
     flex: 1,
   },
-
-  //ELLIPSE 
+  // Decorative ellipse at the top of the screen
   topEllipse: {
-  position: 'absolute',
-  top: 0,
-  left: -50,
-  right: -50,
-  height: 200,
-  backgroundColor: '#B87B7B',
-  opacity: 0.10, // 50% opacity
-  borderBottomLeftRadius: 200,
-  borderBottomRightRadius: 200,
-  zIndex: -1, // Place behind other content
-},
-
-  // SCROLLABLE CONTENT CONTAINER
-  // Centers content vertically when space allows, enables scrolling when needed
+    position: 'absolute',
+    top: 0,
+    left: -50,
+    right: -50,
+    height: 200,
+    backgroundColor: '#B87B7B',
+    opacity: 0.10,
+    borderBottomLeftRadius: 200,
+    borderBottomRightRadius: 200,
+    zIndex: -1,
+  },
   scrollContainer: {
-    flexGrow: 1, // Allow growth beyond screen height
-    paddingHorizontal: 24, // Side padding for content
-    paddingVertical: 2, // Top/bottom padding
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 2,
   },
-
-  // BRANDING SECTION
-  // Logo container with appropriate spacing
   logoContainer: {
-    alignItems: "center", // Center logo horizontally
+    alignItems: "center",
   },
-
-  // Screen title styling
   title: {
     fontSize: 20,
     fontWeight: "700", 
-    color: "#333", // Dark gray for good contrast
+    color: "#333",
     textAlign: "center",
-    marginBottom: 30, // Space before toggle
+    marginBottom: 30,
   },
-
-  // SIGN IN/SIGN UP TOGGLE
-  // Container for the toggle switch between login and signup
+  // Container for Sign In/Sign Up toggle buttons
   toggleContainer: {
     flexDirection: "row",
-    backgroundColor: "#FFF", // White background
-    borderRadius: 25, // Fully rounded corners
-    padding: 4, // Internal padding around buttons
-    marginBottom: 30, // Space below toggle
-    // Subtle shadow for depth
+    backgroundColor: "#FFF",
+    borderRadius: 25,
+    padding: 4,
+    marginBottom: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3, // Android shadow
+    elevation: 3,
   },
-
-  // Individual toggle button styling
   toggleButton: {
-    flex: 1, // Equal width for both buttons
-    paddingVertical: 12, // Vertical padding
-    alignItems: "center", // Center text horizontally
-    borderRadius: 20, // Rounded corners for active state
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderRadius: 20,
   },
-
-  // Active toggle button (Sign In)
   activeToggle: {
-    backgroundColor: "#7BB8A8", // Teal background for active state
+    backgroundColor: "#7BB8A8", // Brand color for active state
   },
-
-  // Active toggle text styling
   activeToggleText: {
-    color: "#FFF", // White text on teal background
-    fontWeight: "600", // Semi-bold
+    color: "#FFF",
+    fontWeight: "600",
     fontSize: 16,
   },
-
-  // Inactive toggle text styling
   inactiveToggleText: {
-    color: "#666", // Gray text for inactive state
-    fontWeight: "500", // Medium weight
+    color: "#666",
+    fontWeight: "500",
     fontSize: 16,
   },
-
-  // FORM LAYOUT
-  // Container for all form elements
   formContainer: {
-    width: "100%", // Full width within padding
+    width: "100%",
   },
-
-  // Input field labels
   inputLabel: {
     fontSize: 13,
     fontWeight: "400",
     color: "#333",
-    marginBottom: 20, // Small space before input
-    marginTop: 2, // Space above label (except first)
+    marginBottom: 20,
+    marginTop: 2,
   },
-
-  // INPUT FIELD STYLING
-  // Wrapper for input with icons
+  // Wrapper for input fields with icon and styling
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF", // White background for contrast
-    borderRadius: 12, // Rounded corners
-    paddingHorizontal: 16, // Internal padding
-    height: 50, // Fixed height for consistency
-    // Subtle shadow for depth
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 50,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1, // Android shadow
-    marginBottom: 8, // Space for error messages
+    elevation: 1,
+    marginBottom: 8,
   },
-
-  // Left icon styling within inputs
   inputIcon: {
-    marginRight: 12, // Space between icon and text input
+    marginRight: 12,
   },
-
-  // Text input field
   input: {
-    flex: 1, // Take remaining space after icons
+    flex: 1,
     fontSize: 12,
     color: "#",
   },
-
-  // Password visibility toggle button
   eyeIcon: {
-    padding: 4, // Touch target padding
+    padding: 4,
   },
-
-  // BUTTON STYLES
-  // Primary sign in button
+  // Primary action button
   signInButton: {
-    backgroundColor: "#7BB8A8", // Teal color matching app theme
-    borderRadius: 25, // Fully rounded corners
-    paddingVertical: 16, // Vertical padding for touch target
-    alignItems: "center", // Center text horizontally
-    marginTop: 30, // Space above button
-    marginBottom: 30, // Space below button
-  },
-
-  // Disabled button state
-  disabledButton: {
-    opacity: 0.6, // Reduce opacity when disabled
-  },
-
-  // Sign in button text styling
-  signInButtonText: {
-    color: "#FFFFFF", // White text for contrast
-    fontSize: 16,
-    fontWeight: "600", // Semi-bold for emphasis
-  },
-
-  // SOCIAL LOGIN SECTION
-  // Container for social media login buttons
-  socialContainer: {
-    flexDirection: "row", // Horizontal layout
-    justifyContent: "center", // Center buttons
-    gap: 20, // Space between buttons
-    marginBottom: 30, // Space below social buttons
-  },
-
-  // Individual social login button
-  socialButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25, // Circular buttons
-    backgroundColor: "#FFF", // White background
+    backgroundColor: "#7BB8A8", // Brand color
+    borderRadius: 25,
+    paddingVertical: 16,
     alignItems: "center",
-    justifyContent: "center",
-    // Shadow for depth
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3, // Android shadow
+    marginTop: 30,
+    marginBottom: 30,
   },
-
-  // FOOTER SECTION
-  // Container for footer links
+  disabledButton: {
+    opacity: 0.6, // Visual indicator for disabled state
+  },
+  signInButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   footerContainer: {
-    alignItems: "center", // Center footer content
-    gap: 10, // Space between footer elements
+    alignItems: "center",
+    gap: 10,
   },
-
-  // Footer text styling
   footerText: {
     fontSize: 14,
-    color: "#666", // Medium gray for secondary text
+    color: "#666",
     textAlign: "center",
   },
-
-  // Highlighted link text within footer and buttons
+  // Style for clickable text links
   linkText: {
     fontWeight: "400",
-    color: "#E43232", // Red accent color for links
+    color: "#E43232", // Error/attention color for links
     textDecorationLine: 'underline',
   },
-
-  // Forgot password link spacing
   forgotPassword: {
-    marginTop: 5, // Small additional space above forgot password
+    marginTop: 5,
   },
-
-  // ERROR MESSAGE STYLING
-  // Error text for validation messages
+  // Error message styling
   errorText: {
-    color: "#E43232", // Red color for errors
-    marginTop: 4, // Small space above error
-    marginLeft: 8, // Align with input content
-    fontSize: 13, // Slightly smaller than main text
+    color: "#E43232",
+    marginTop: 4,
+    marginLeft: 8,
+    fontSize: 13,
   },
 });

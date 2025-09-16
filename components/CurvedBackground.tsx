@@ -9,6 +9,11 @@ interface CurvedBackgroundProps {
   style?: object;
 }
 
+/**LLM Prompt: 
+ * I need a React Native component that creates an elegant background with flowing curves and gradient colors using SVG. 
+ * It should use responsive SVG paths with customizable gradients, accept children elements, and have TypeScript props.
+ */
+
 /**
  * CurvedBackground Component
  * 
@@ -105,6 +110,3 @@ const styles = StyleSheet.create({
 
 export default CurvedBackground;
 
-/**LLM Prompt: 
- * I need a React Native component that creates an elegant background with flowing curves and gradient colors using SVG. 
- * It should use responsive SVG paths with customizable gradients, accept children elements, and have TypeScript props.*/
