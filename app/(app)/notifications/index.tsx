@@ -6,13 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  SafeAreaView,
 } from "react-native";
 import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";
 
-
- // Type definition for a Notification object.
+// Type definition for a Notification object.
 interface Notification {
   id: string;
   title: string;
@@ -43,7 +43,7 @@ export default function NotificationsScreen() {
         message: "You have a new message from Dr. Smith",
         time: "10 minutes ago",
         isRead: false,
-        type: "message"
+        type: "message",
       },
       {
         id: "2",
@@ -51,7 +51,7 @@ export default function NotificationsScreen() {
         message: "Your appointment is scheduled for tomorrow at 2:00 PM",
         time: "1 hour ago",
         isRead: true,
-        type: "appointment"
+        type: "appointment",
       },
       {
         id: "3",
@@ -59,7 +59,7 @@ export default function NotificationsScreen() {
         message: "Don't forget to complete your daily journal entry",
         time: "3 hours ago",
         isRead: false,
-        type: "reminder"
+        type: "reminder",
       },
       {
         id: "4",
@@ -67,7 +67,7 @@ export default function NotificationsScreen() {
         message: "New features are available in the latest update",
         time: "1 day ago",
         isRead: true,
-        type: "system"
+        type: "system",
       },
       {
         id: "5",
@@ -75,10 +75,10 @@ export default function NotificationsScreen() {
         message: "How are you feeling today? Track your mood",
         time: "2 days ago",
         isRead: true,
-        type: "reminder"
+        type: "reminder",
       },
     ];
-    
+
     setNotifications(mockNotifications);
   };
 
@@ -89,7 +89,7 @@ export default function NotificationsScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadNotifications();
-    setTimeout(() => setRefreshing(false), 1000); 
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   /**
@@ -98,9 +98,13 @@ export default function NotificationsScreen() {
    * Useful for when user taps on an unread notification.
    */
   const markAsRead = (id: string) => {
-    setNotifications(notifications.map(notification => 
-      notification.id === id ? {...notification, isRead: true} : notification
-    ));
+    setNotifications(
+      notifications.map((notification) =>
+        notification.id === id
+          ? { ...notification, isRead: true }
+          : notification
+      )
+    );
   };
 
   /**
@@ -109,10 +113,12 @@ export default function NotificationsScreen() {
    * Triggered when user presses the "Mark all as read" button.
    */
   const markAllAsRead = () => {
-    setNotifications(notifications.map(notification => ({
-      ...notification,
-      isRead: true
-    })));
+    setNotifications(
+      notifications.map((notification) => ({
+        ...notification,
+        isRead: true,
+      }))
+    );
   };
 
   /**
@@ -121,7 +127,7 @@ export default function NotificationsScreen() {
    * Ensures consistent visual language for each category.
    */
   const getNotificationIcon = (type: string) => {
-    switch(type) {
+    switch (type) {
       case "message":
         return "chatbubble-outline";
       case "appointment":
@@ -140,7 +146,7 @@ export default function NotificationsScreen() {
    * Returns a color code for each notification type.
    */
   const getNotificationColor = (type: string) => {
-    switch(type) {
+    switch (type) {
       case "message":
         return "#4FC3F7";
       case "appointment":
@@ -155,83 +161,89 @@ export default function NotificationsScreen() {
   };
 
   // Calculate the number of unread notifications
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
-    <View style={styles.container}>
-      <CurvedBackground />
-      <AppHeader title="Notifications" showBack={true} />
-      
-      {/* Top bar showing unread count & "Mark all as read" action */}
-      <View style={styles.headerActions}>
-        <Text style={styles.unreadText}>
-          {unreadCount} unread {unreadCount === 1 ? 'notification' : 'notifications'}
-        </Text>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={markAllAsRead}>
-            <Text style={styles.markAllText}>Mark all as read</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Notifications" showBack={true} />
 
-      {/* Main notifications list (scrollable with pull-to-refresh) */}
-      <ScrollView
-        style={styles.notificationsList}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {/* Empty state when no notifications are available */}
-        {notifications.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="notifications-off-outline" size={64} color="#E0E0E0" />
-            <Text style={styles.emptyStateText}>No notifications yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              You'll see important updates here
-            </Text>
-          </View>
-        ) : (
-          // Render a list of notifications
-          notifications.map((notification) => (
-            <TouchableOpacity
-              key={notification.id}
-              style={[
-                styles.notificationItem,
-                !notification.isRead && styles.unreadNotification 
-              ]}
-              onPress={() => markAsRead(notification.id)} 
-            >
-              {/* Left: Notification Icon */}
-              <View style={styles.notificationIconContainer}>
-                <Ionicons
-                  name={getNotificationIcon(notification.type)}
-                  size={20}
-                  color={getNotificationColor(notification.type)}
-                />
-              </View>
-              
-              {/* Middle: Notification details (title, message, time) */}
-              <View style={styles.notificationContent}>
-                <Text style={styles.notificationTitle}>
-                  {notification.title}
-                </Text>
-                <Text style={styles.notificationMessage}>
-                  {notification.message}
-                </Text>
-                <Text style={styles.notificationTime}>
-                  {notification.time}
-                </Text>
-              </View>
-              
-              {/* Right: Green dot indicator for unread notifications */}
-              {!notification.isRead && (
-                <View style={styles.unreadIndicator} />
-              )}
+        {/* Top bar showing unread count & "Mark all as read" action */}
+        <View style={styles.headerActions}>
+          <Text style={styles.unreadText}>
+            {unreadCount} unread{" "}
+            {unreadCount === 1 ? "notification" : "notifications"}
+          </Text>
+          {unreadCount > 0 && (
+            <TouchableOpacity onPress={markAllAsRead}>
+              <Text style={styles.markAllText}>Mark all as read</Text>
             </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-    </View>
+          )}
+        </View>
+
+        {/* Main notifications list (scrollable with pull-to-refresh) */}
+        <ScrollView
+          style={styles.notificationsList}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {/* Empty state when no notifications are available */}
+          {notifications.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="notifications-off-outline"
+                size={64}
+                color="#E0E0E0"
+              />
+              <Text style={styles.emptyStateText}>No notifications yet</Text>
+              <Text style={styles.emptyStateSubtext}>
+                You'll see important updates here
+              </Text>
+            </View>
+          ) : (
+            // Render a list of notifications
+            notifications.map((notification) => (
+              <TouchableOpacity
+                key={notification.id}
+                style={[
+                  styles.notificationItem,
+                  !notification.isRead && styles.unreadNotification,
+                ]}
+                onPress={() => markAsRead(notification.id)}
+              >
+                {/* Left: Notification Icon */}
+                <View style={styles.notificationIconContainer}>
+                  <Ionicons
+                    name={getNotificationIcon(notification.type)}
+                    size={20}
+                    color={getNotificationColor(notification.type)}
+                  />
+                </View>
+
+                {/* Middle: Notification details (title, message, time) */}
+                <View style={styles.notificationContent}>
+                  <Text style={styles.notificationTitle}>
+                    {notification.title}
+                  </Text>
+                  <Text style={styles.notificationMessage}>
+                    {notification.message}
+                  </Text>
+                  <Text style={styles.notificationTime}>
+                    {notification.time}
+                  </Text>
+                </View>
+
+                {/* Right: Green dot indicator for unread notifications */}
+                {!notification.isRead && (
+                  <View style={styles.unreadIndicator} />
+                )}
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
@@ -245,7 +257,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   headerActions: {
-    flexDirection: "row", 
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
@@ -292,7 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   unreadNotification: {
-    backgroundColor: "#F8F9FF", 
+    backgroundColor: "#F8F9FF",
   },
   notificationIconContainer: {
     width: 40,
