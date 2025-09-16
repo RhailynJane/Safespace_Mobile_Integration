@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../../components/AppHeader";
 
 /**
  * AppointmentDetail Component
@@ -287,18 +288,9 @@ export default function AppointmentList() {
   };
 
   return (
-    <CurvedBackground>
+  <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Custom Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={28} color="#4CAF50" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Appointment Details</Text>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="menu" size={28} color="#4CAF50" />
-          </TouchableOpacity>
-        </View>
+          <AppHeader title="Appointment Details" showBack={true} />
 
         <ScrollView style={styles.content}>
           {/* Appointment Card */}

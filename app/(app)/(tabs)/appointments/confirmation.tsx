@@ -15,10 +15,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 /**
  * ConfirmAppointment Component
- * 
+ *
  * Final confirmation screen that shows after successfully booking an appointment.
  * Displays appointment details, confirmation message, and navigation options
  * to view appointments or book another. Features an elegant curved background.
@@ -57,11 +58,11 @@ export default function ConfirmAppointment() {
   );
 
   // Mock user data (replaces backend auth context)
-    const mockUser = {
+  const mockUser = {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -238,18 +239,7 @@ export default function ConfirmAppointment() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Custom Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>Appointment Confirmation</Text>
-          
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="menu" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-        </View>
+        <AppHeader title="Appointment Confirmation" showBack={true} />
 
         <ScrollView style={styles.scrollContainer}>
           <Text style={styles.title}>
@@ -301,7 +291,7 @@ export default function ConfirmAppointment() {
                   {appointment ? appointment.supportWorker : ""}
                 </Text>
               </View>
-              
+
               {/* Appointment Date */}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Date:</Text>
@@ -309,7 +299,7 @@ export default function ConfirmAppointment() {
                   {appointment ? `${appointment.date}` : ""}
                 </Text>
               </View>
-              
+
               {/* Appointment Time */}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Time:</Text>
@@ -317,7 +307,7 @@ export default function ConfirmAppointment() {
                   {appointment ? `${appointment.time}` : ""}
                 </Text>
               </View>
-              
+
               {/* Session Type */}
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Session Type:</Text>

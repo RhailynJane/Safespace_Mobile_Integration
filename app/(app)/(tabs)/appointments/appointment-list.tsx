@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 /**
  * AppointmentList Component
@@ -219,20 +220,9 @@ export default function AppointmentList() {
   };
 
   return (
-    <CurvedBackground>
+ <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Custom Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>My Appointments</Text>
-          
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="menu" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-        </View>
+          <AppHeader title="My Appointments" showBack={true} />
 
         {/* Appointments Tabs - Switch between Upcoming and Past appointments */}
         <View style={styles.appointmentsTabs}>

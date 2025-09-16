@@ -16,10 +16,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 /**
  * ConfirmAppointment Component
- * 
+ *
  * Appointment confirmation screen that allows users to review booking details,
  * add optional notes for the support worker, and confirm their appointment.
  * Features a multi-step progress indicator and elegant curved background.
@@ -58,11 +59,11 @@ export default function ConfirmAppointment() {
   );
 
   // Mock user data (replaces backend auth context)
-    const mockUser = {
+  const mockUser = {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -258,178 +259,164 @@ export default function ConfirmAppointment() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <View style={styles.contentContainer}>
-          {/* Custom Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-            </TouchableOpacity>
-            
-            <Text style={styles.headerTitle}>Confirm Appointment</Text>
-            
-            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-              <Ionicons name="menu" size={24} color="#2E7D32" />
-            </TouchableOpacity>
+        <AppHeader title="Confirm Appointment" showBack={true} />
+
+        <ScrollView style={styles.scrollContainer}>
+          <Text style={styles.title}>
+            Schedule a session with a support worker
+          </Text>
+
+          {/* Step Indicator - Shows progress through booking process */}
+          <View style={styles.stepsContainer}>
+            <View style={styles.stepRow}>
+              {/* Step 1 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>1</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 2 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>2</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 3 - Active (Current Step) */}
+              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                  3
+                </Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 4 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>4</Text>
+              </View>
+            </View>
           </View>
 
-          <ScrollView style={styles.scrollContainer}>
-            <Text style={styles.title}>
-              Schedule a session with a support worker
-            </Text>
+          {/* Booking Details Card */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Booking Details</Text>
+            <Text style={styles.subSectionTitle}>Appointment Summary</Text>
 
-            {/* Step Indicator - Shows progress through booking process */}
-            <View style={styles.stepsContainer}>
-              <View style={styles.stepRow}>
-                {/* Step 1 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>1</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 2 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>2</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 3 - Active (Current Step) */}
-                <View style={[styles.stepCircle, styles.stepCircleActive]}>
-                  <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                    3
+            {appointment ? (
+              <View style={styles.summaryContainer}>
+                {/* Support Worker Details */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Support Worker:</Text>
+                  <Text style={styles.summaryValue}>
+                    {appointment.supportWorker}
                   </Text>
                 </View>
-                <View style={styles.stepConnector} />
 
-                {/* Step 4 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>4</Text>
+                {/* Appointment Date */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Date:</Text>
+                  <Text style={styles.summaryValue}>{appointment.date}</Text>
+                </View>
+
+                {/* Appointment Time */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Time:</Text>
+                  <Text style={styles.summaryValue}>{appointment.time}</Text>
+                </View>
+
+                {/* Session Type */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Session Type:</Text>
+                  <Text style={styles.summaryValue}>{appointment.type}</Text>
                 </View>
               </View>
+            ) : (
+              <Text>No appointment data available</Text>
+            )}
+
+            <View style={styles.divider} />
+
+            {/* Optional Notes Section */}
+            <Text style={styles.subSectionTitle}>
+              Notes for Support Worker (Optional)
+            </Text>
+            <TextInput
+              style={styles.notesInput}
+              multiline
+              numberOfLines={4}
+              placeholder="Share any specific concerns or topics you'd like to discuss..."
+              placeholderTextColor="#999"
+              value={appointmentNotes}
+              onChangeText={setAppointmentNotes}
+            />
+
+            {/* Action Buttons */}
+            <View style={styles.buttonRow}>
+              {/* Back Button */}
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.backButtonText}>Back</Text>
+              </TouchableOpacity>
+
+              {/* Confirm Booking Button */}
+              <TouchableOpacity
+                style={styles.bookButton}
+                onPress={handleConfirmBooking}
+              >
+                <Text style={styles.bookButtonText}>Book Appointment</Text>
+              </TouchableOpacity>
             </View>
+          </View>
+        </ScrollView>
 
-            {/* Booking Details Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Booking Details</Text>
-              <Text style={styles.subSectionTitle}>Appointment Summary</Text>
-
-              {appointment ? (
-                <View style={styles.summaryContainer}>
-                  {/* Support Worker Details */}
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Support Worker:</Text>
-                    <Text style={styles.summaryValue}>
-                      {appointment.supportWorker}
-                    </Text>
-                  </View>
-                  
-                  {/* Appointment Date */}
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Date:</Text>
-                    <Text style={styles.summaryValue}>{appointment.date}</Text>
-                  </View>
-                  
-                  {/* Appointment Time */}
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Time:</Text>
-                    <Text style={styles.summaryValue}>{appointment.time}</Text>
-                  </View>
-                  
-                  {/* Session Type */}
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Session Type:</Text>
-                    <Text style={styles.summaryValue}>{appointment.type}</Text>
-                  </View>
-                </View>
-              ) : (
-                <Text>No appointment data available</Text>
-              )}
-
-              <View style={styles.divider} />
-
-              {/* Optional Notes Section */}
-              <Text style={styles.subSectionTitle}>
-                Notes for Support Worker (Optional)
-              </Text>
-              <TextInput
-                style={styles.notesInput}
-                multiline
-                numberOfLines={4}
-                placeholder="Share any specific concerns or topics you'd like to discuss..."
-                placeholderTextColor="#999"
-                value={appointmentNotes}
-                onChangeText={setAppointmentNotes}
-              />
-
-              {/* Action Buttons */}
-              <View style={styles.buttonRow}>
-                {/* Back Button */}
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => router.back()}
-                >
-                  <Text style={styles.backButtonText}>Back</Text>
-                </TouchableOpacity>
-                
-                {/* Confirm Booking Button */}
-                <TouchableOpacity
-                  style={styles.bookButton}
-                  onPress={handleConfirmBooking}
-                >
-                  <Text style={styles.bookButtonText}>Book Appointment</Text>
-                </TouchableOpacity>
+        {/* Side Menu Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
               </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-          </ScrollView>
+          </View>
+        </Modal>
 
-          {/* Side Menu Modal */}
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={sideMenuVisible}
-            onRequestClose={() => setSideMenuVisible(false)}
-          >
-            <View style={styles.modalContainer}>
-              <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setSideMenuVisible(false)}
-              />
-              <View style={styles.sideMenu}>
-                <View style={styles.sideMenuHeader}>
-                  <Text style={styles.profileName}>{getDisplayName()}</Text>
-                  <Text style={styles.profileEmail}>{mockUser?.email}</Text>
-                </View>
-                <ScrollView style={styles.sideMenuContent}>
-                  {sideMenuItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.sideMenuItem}
-                      onPress={item.onPress}
-                    >
-                      <Ionicons
-                        name={item.icon as any}
-                        size={20}
-                        color="#4CAF50"
-                      />
-                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Bottom Navigation */}
-          <BottomNavigation
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabPress={handleTabPress}
-          />
-        </View>
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
