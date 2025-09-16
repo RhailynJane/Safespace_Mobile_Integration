@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -54,134 +55,134 @@ export default function GeneralMentalHealthAssessmentScreen() {
       id: 0,
       text: "Over the past 2 weeks, how would you rate your overall mental health?",
       shortText: "Overall mental health rating",
-      domain: "Overall Well-being"
+      domain: "Overall Well-being",
     },
     {
       id: 1,
       text: "Over the past 2 weeks, how often have you felt cheerful and in good spirits?",
       shortText: "Feeling cheerful and in good spirits",
-      domain: "Overall Well-being"
+      domain: "Overall Well-being",
     },
     {
       id: 2,
       text: "Over the past 2 weeks, how often have you felt calm and relaxed?",
       shortText: "Feeling calm and relaxed",
-      domain: "Overall Well-being"
+      domain: "Overall Well-being",
     },
-    
+
     // Mood & Emotions
     {
       id: 3,
       text: "Over the past 2 weeks, how often have you felt sad or down?",
       shortText: "Feeling sad or down",
-      domain: "Mood & Emotions"
+      domain: "Mood & Emotions",
     },
     {
       id: 4,
       text: "Over the past 2 weeks, how often have you felt hopeless about the future?",
       shortText: "Feeling hopeless about the future",
-      domain: "Mood & Emotions"
+      domain: "Mood & Emotions",
     },
     {
       id: 5,
       text: "Over the past 2 weeks, how often have you experienced mood swings?",
       shortText: "Experiencing mood swings",
-      domain: "Mood & Emotions"
+      domain: "Mood & Emotions",
     },
     {
       id: 6,
       text: "Over the past 2 weeks, how often have you felt emotionally overwhelmed?",
       shortText: "Feeling emotionally overwhelmed",
-      domain: "Mood & Emotions"
+      domain: "Mood & Emotions",
     },
-    
+
     // Anxiety & Stress
     {
       id: 7,
       text: "Over the past 2 weeks, how often have you felt nervous, anxious, or on edge?",
       shortText: "Feeling nervous, anxious, or on edge",
-      domain: "Anxiety & Stress"
+      domain: "Anxiety & Stress",
     },
     {
       id: 8,
       text: "Over the past 2 weeks, how often have you felt stressed or under pressure?",
       shortText: "Feeling stressed or under pressure",
-      domain: "Anxiety & Stress"
+      domain: "Anxiety & Stress",
     },
     {
       id: 9,
       text: "Over the past 2 weeks, how often have you had trouble relaxing?",
       shortText: "Having trouble relaxing",
-      domain: "Anxiety & Stress"
+      domain: "Anxiety & Stress",
     },
-    
+
     // Sleep & Energy
     {
       id: 10,
       text: "Over the past 2 weeks, how often have you had trouble falling or staying asleep?",
       shortText: "Having trouble with sleep",
-      domain: "Sleep & Energy"
+      domain: "Sleep & Energy",
     },
     {
       id: 11,
       text: "Over the past 2 weeks, how often have you felt tired or had little energy?",
       shortText: "Feeling tired or lacking energy",
-      domain: "Sleep & Energy"
+      domain: "Sleep & Energy",
     },
     {
       id: 12,
       text: "Over the past 2 weeks, how often has your sleep been restful and refreshing?",
       shortText: "Sleep being restful and refreshing",
-      domain: "Sleep & Energy"
+      domain: "Sleep & Energy",
     },
-    
+
     // Concentration & Daily Functioning
     {
       id: 13,
       text: "Over the past 2 weeks, how often have you had trouble concentrating on things?",
       shortText: "Having trouble concentrating",
-      domain: "Concentration & Daily Functioning"
+      domain: "Concentration & Daily Functioning",
     },
     {
       id: 14,
       text: "Over the past 2 weeks, how often have you felt productive and accomplished tasks well?",
       shortText: "Feeling productive and accomplishing tasks",
-      domain: "Concentration & Daily Functioning"
+      domain: "Concentration & Daily Functioning",
     },
     {
       id: 15,
       text: "Over the past 2 weeks, how often have daily activities felt overwhelming?",
       shortText: "Daily activities feeling overwhelming",
-      domain: "Concentration & Daily Functioning"
+      domain: "Concentration & Daily Functioning",
     },
-    
+
     // Social & Relationships
     {
       id: 16,
       text: "Over the past 2 weeks, how often have you felt connected to friends and family?",
       shortText: "Feeling connected to friends and family",
-      domain: "Social & Relationships"
+      domain: "Social & Relationships",
     },
     {
       id: 17,
       text: "Over the past 2 weeks, how often have you withdrawn from social activities?",
       shortText: "Withdrawing from social activities",
-      domain: "Social & Relationships"
+      domain: "Social & Relationships",
     },
-    
+
     // Coping & Self-care
     {
       id: 18,
       text: "Over the past 2 weeks, how often have you been taking good care of yourself?",
       shortText: "Taking good care of yourself",
-      domain: "Coping & Self-care"
+      domain: "Coping & Self-care",
     },
     {
       id: 19,
       text: "Over the past 2 weeks, how often have you been able to cope with daily challenges?",
       shortText: "Coping with daily challenges",
-      domain: "Coping & Self-care"
-    }
+      domain: "Coping & Self-care",
+    },
   ];
 
   // Answer options with numerical values for scoring
@@ -190,7 +191,7 @@ export default function GeneralMentalHealthAssessmentScreen() {
     { value: 1, label: "Rarely" },
     { value: 2, label: "Sometimes" },
     { value: 3, label: "Often" },
-    { value: 4, label: "Always" }
+    { value: 4, label: "Always" },
   ];
 
   // Handle navigation between tabs
@@ -358,51 +359,198 @@ export default function GeneralMentalHealthAssessmentScreen() {
   // Render completion screen when assessment is finished
   if (isCompleted) {
     return (
-      <SafeAreaView style={styles.container}>
-        {/* Curved background for visual appeal */}
-        <CurvedBackground />
-        
-        {/* Header with navigation and notification icons */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Self Assessment</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-              <Ionicons name="notifications-outline" size={24} color="#333" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>1</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-              <Ionicons name="grid-outline" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-        </View>
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <AppHeader title="General-Assessment" showBack={true} />
 
-        {/* Completion Content */}
-        <View style={styles.completionContainer}>
-          <Text style={styles.completionTitle}>Mental Health Assessment Completed!</Text>
-          
-          <View style={styles.completionIconContainer}>
-            <View style={styles.completionIcon}>
-              <Ionicons name="checkmark-circle" size={40} color="#4CAF50" />
-              <View style={styles.checkmarkBadge}>
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          {/* Completion Content */}
+          <View style={styles.completionContainer}>
+            <Text style={styles.completionTitle}>
+              Mental Health Assessment Completed!
+            </Text>
+
+            <View style={styles.completionIconContainer}>
+              <View style={styles.completionIcon}>
+                <Ionicons name="checkmark-circle" size={40} color="#4CAF50" />
               </View>
             </View>
+
+            <Text style={styles.completionMessage}>
+              Your comprehensive mental health assessment has been completed.
+              Your therapist will review the results before your appointment.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.anotherAssessmentButton}
+              onPress={handleTakeAnotherAssessment}
+            >
+              <Text style={styles.anotherAssessmentText}>
+                Take another assessment
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.completionMessage}>
-            Your comprehensive mental health assessment has been completed. Your therapist will review the results before your appointment.
-          </Text>
-
-          <TouchableOpacity 
-            style={styles.anotherAssessmentButton}
-            onPress={handleTakeAnotherAssessment}
+          {/* Side Menu Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={sideMenuVisible}
+            onRequestClose={() => setSideMenuVisible(false)}
           >
-            <Text style={styles.anotherAssessmentText}>Take another assessment</Text>
+            <View style={styles.modalContainer}>
+              <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setSideMenuVisible(false)}
+              />
+              <View style={styles.sideMenu}>
+                <View style={styles.sideMenuHeader}>
+                  <Text style={styles.profileName}>{getDisplayName()}</Text>
+                  <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+                </View>
+                <ScrollView style={styles.sideMenuContent}>
+                  {sideMenuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.sideMenuItem}
+                      onPress={item.onPress}
+                    >
+                      <Ionicons
+                        name={item.icon as keyof typeof Ionicons.glyphMap}
+                        size={20}
+                        color="#4CAF50"
+                      />
+                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Bottom navigation bar */}
+          <BottomNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
+  // Main assessment screen with questions and navigation
+  return (
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="General-Assessment" showBack={true} />
+
+        {/* Scrollable content area for questions */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Progress Bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${
+                      ((currentQuestion + 1) / questions.length) * 100
+                    }%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {currentQuestion + 1} of {questions.length}
+            </Text>
+          </View>
+
+          {/* Question Header */}
+          <View style={styles.questionHeader}>
+            <View style={styles.questionNumberContainer}>
+              <Text style={styles.questionNumber}>
+                Question {currentQuestion + 1}
+              </Text>
+              <Text style={styles.domainText}>
+                {questions[currentQuestion]?.domain}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.startOverButton}
+              onPress={handleStartOver}
+            >
+              <Text style={styles.startOverText}>Start Over</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Question Content */}
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionText}>
+              {questions[currentQuestion]?.text}
+            </Text>
+          </View>
+
+          {/* Answer Options */}
+          <View style={styles.optionsContainer}>
+            {answerOptions.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.optionButton,
+                  answers[currentQuestion] === option.value &&
+                    styles.selectedOption,
+                ]}
+                onPress={() => handleAnswerSelect(option.value)}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    answers[currentQuestion] === option.value &&
+                      styles.selectedOptionText,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Navigation Buttons */}
+        <View style={styles.navigationContainer}>
+          <TouchableOpacity
+            style={[styles.navButton, styles.backButton]}
+            onPress={handleBack}
+            disabled={currentQuestion === 0}
+          >
+            <Text
+              style={[
+                styles.navButtonText,
+                currentQuestion === 0 && styles.disabledText,
+              ]}
+            >
+              Back
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.navButton,
+              styles.nextButton,
+              answers[currentQuestion] === undefined && styles.disabledButton,
+            ]}
+            onPress={handleNext}
+            disabled={answers[currentQuestion] === undefined}
+          >
+            <Text
+              style={[
+                styles.navButtonText,
+                styles.nextButtonText,
+                answers[currentQuestion] === undefined && styles.disabledText,
+              ]}
+            >
+              {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -430,7 +578,11 @@ export default function GeneralMentalHealthAssessmentScreen() {
                     style={styles.sideMenuItem}
                     onPress={item.onPress}
                   >
-                    <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
+                    <Ionicons
+                      name={item.icon as keyof typeof Ionicons.glyphMap}
+                      size={20}
+                      color="#4CAF50"
+                    />
                     <Text style={styles.sideMenuItemText}>{item.title}</Text>
                   </TouchableOpacity>
                 ))}
@@ -446,160 +598,7 @@ export default function GeneralMentalHealthAssessmentScreen() {
           onTabPress={handleTabPress}
         />
       </SafeAreaView>
-    );
-  }
-
-  // Main assessment screen with questions and navigation
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Curved background for visual appeal */}
-      <CurvedBackground />
-      
-      {/* Header with navigation and notification icons */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>General Mental Health</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#333" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>1</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="grid-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Scrollable content area for questions */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { width: `${((currentQuestion + 1) / questions.length) * 100}%` }
-              ]} 
-            />
-          </View>
-          <Text style={styles.progressText}>
-            {currentQuestion + 1} of {questions.length}
-          </Text>
-        </View>
-
-        {/* Question Header */}
-        <View style={styles.questionHeader}>
-          <View style={styles.questionNumberContainer}>
-            <Text style={styles.questionNumber}>Question {currentQuestion + 1}</Text>
-            <Text style={styles.domainText}>{questions[currentQuestion]?.domain}</Text>
-          </View>
-          <TouchableOpacity style={styles.startOverButton} onPress={handleStartOver}>
-            <Text style={styles.startOverText}>Start Over</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Question Content */}
-        <View style={styles.questionContainer}>
-          <Text style={styles.questionText}>{questions[currentQuestion]?.text}</Text>
-        </View>
-
-        {/* Answer Options */}
-        <View style={styles.optionsContainer}>
-          {answerOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.optionButton,
-                answers[currentQuestion] === option.value && styles.selectedOption
-              ]}
-              onPress={() => handleAnswerSelect(option.value)}
-            >
-              <Text style={[
-                styles.optionText,
-                answers[currentQuestion] === option.value && styles.selectedOptionText
-              ]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Navigation Buttons */}
-      <View style={styles.navigationContainer}>
-        <TouchableOpacity
-          style={[styles.navButton, styles.backButton]}
-          onPress={handleBack}
-          disabled={currentQuestion === 0}
-        >
-          <Text style={[styles.navButtonText, currentQuestion === 0 && styles.disabledText]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            styles.nextButton,
-            answers[currentQuestion] === undefined && styles.disabledButton
-          ]}
-          onPress={handleNext}
-          disabled={answers[currentQuestion] === undefined}
-        >
-          <Text style={[
-            styles.navButtonText,
-            styles.nextButtonText,
-            answers[currentQuestion] === undefined && styles.disabledText
-          ]}>
-            {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Side Menu Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Bottom navigation bar */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
@@ -607,66 +606,27 @@ export default function GeneralMentalHealthAssessmentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  notificationButton: {
-    position: "relative",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF5722",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "600",
-  },
   content: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   progressContainer: {
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "transparent",
   },
   progressBar: {
     height: 8,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: "#545353ff",
     borderRadius: 4,
     marginBottom: 8,
   },
@@ -686,9 +646,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "transparent",
   },
   questionNumberContainer: {
     flex: 1,
@@ -718,7 +678,9 @@ const styles = StyleSheet.create({
   questionContainer: {
     paddingHorizontal: 20,
     paddingVertical: 30,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
+    marginTop: 1,
+    marginBottom: 1,
   },
   questionText: {
     fontSize: 18,
@@ -729,7 +691,8 @@ const styles = StyleSheet.create({
   optionsContainer: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    gap: 15,
+    gap: 5,
+    marginTop: 1
   },
   optionButton: {
     backgroundColor: "#FFFFFF",
@@ -766,9 +729,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: "transparent",
+    marginBottom: 120,
   },
   navButton: {
     paddingHorizontal: 30,
@@ -789,7 +753,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
-    color: "#FFFFFF",
+    color: "#000000 ",
   },
   nextButtonText: {
     color: "#FFFFFF",
@@ -802,7 +766,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   completionTitle: {
     fontSize: 24,
