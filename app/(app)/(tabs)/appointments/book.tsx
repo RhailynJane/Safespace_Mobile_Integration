@@ -16,10 +16,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 /**
  * BookAppointment Component
- * 
+ *
  * Initial screen for booking appointments that allows users to:
  * - Browse available support workers
  * - Search for specific support workers
@@ -35,11 +36,11 @@ export default function BookAppointment() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Mock user data (replaces backend auth context)
-   const mockUser = {
+  const mockUser = {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -220,158 +221,145 @@ export default function BookAppointment() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CurvedBackground>
-        <View style={styles.contentContainer}>
-          {/* Custom Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-            </TouchableOpacity>
-            
-            <Text style={styles.headerTitle}>Book Appointment</Text>
-            
-            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-              <Ionicons name="menu" size={24} color="#2E7D32" />
-            </TouchableOpacity>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Book Appointment" showBack={true} />
+
+        <ScrollView style={styles.container}>
+          <Text style={styles.title}>
+            Schedule a session with a support worker
+          </Text>
+
+          {/* Step Indicator - Shows progress through booking process */}
+          <View style={styles.stepsContainer}>
+            <View style={styles.stepRow}>
+              {/* Step 1 - Active (Current Step) */}
+              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+                  1
+                </Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 2 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>2</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 3 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>3</Text>
+              </View>
+              <View style={styles.stepConnector} />
+
+              {/* Step 4 - Inactive */}
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>4</Text>
+              </View>
+            </View>
           </View>
 
-          <ScrollView style={styles.container}>
-            <Text style={styles.title}>
-              Schedule a session with a support worker
-            </Text>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons
+              name="search"
+              size={20}
+              color="#666"
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search support worker..."
+              placeholderTextColor="#999"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
 
-            {/* Step Indicator - Shows progress through booking process */}
-            <View style={styles.stepsContainer}>
-              <View style={styles.stepRow}>
-                {/* Step 1 - Active (Current Step) */}
-                <View style={[styles.stepCircle, styles.stepCircleActive]}>
-                  <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                    1
+          {/* Support Workers List */}
+          {filteredSupportWorkers.map((supportWorker) => (
+            <TouchableOpacity
+              key={supportWorker.id}
+              style={styles.supportWorkerCard}
+              onPress={() => handleSelectSupportWorker(supportWorker.id)}
+            >
+              {/* Support Worker Avatar and Info */}
+              <View style={styles.avatarContainer}>
+                <Image
+                  source={{ uri: supportWorker.avatar }}
+                  style={styles.avatar}
+                />
+                <View style={styles.supportWorkerInfo}>
+                  <Text style={styles.supportWorkerName}>
+                    {supportWorker.name}
+                  </Text>
+                  <Text style={styles.supportWorkerTitle}>
+                    {supportWorker.title}
                   </Text>
                 </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 2 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>2</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 3 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>3</Text>
-                </View>
-                <View style={styles.stepConnector} />
-
-                {/* Step 4 - Inactive */}
-                <View style={styles.stepCircle}>
-                  <Text style={styles.stepNumber}>4</Text>
-                </View>
               </View>
-            </View>
 
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-              <Ionicons
-                name="search"
-                size={20}
-                color="#666"
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search support worker..."
-                placeholderTextColor="#999"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-
-            {/* Support Workers List */}
-            {filteredSupportWorkers.map((supportWorker) => (
-              <TouchableOpacity
-                key={supportWorker.id}
-                style={styles.supportWorkerCard}
-                onPress={() => handleSelectSupportWorker(supportWorker.id)}
-              >
-                {/* Support Worker Avatar and Info */}
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: supportWorker.avatar }}
-                    style={styles.avatar}
-                  />
-                  <View style={styles.supportWorkerInfo}>
-                    <Text style={styles.supportWorkerName}>
-                      {supportWorker.name}
-                    </Text>
-                    <Text style={styles.supportWorkerTitle}>
-                      {supportWorker.title}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Support Worker Specialties */}
-                <View style={styles.specialtiesContainer}>
-                  {supportWorker.specialties.map((specialty, index) => (
-                    <Text key={index} style={styles.specialtyText}>
-                      {specialty}
-                    </Text>
-                  ))}
-                </View>
-                
-                {/* Selection Prompt */}
-                <Text style={styles.selectText}>Select Support Worker</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Side Menu Modal */}
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={sideMenuVisible}
-            onRequestClose={() => setSideMenuVisible(false)}
-          >
-            <View style={styles.modalContainer}>
-              <Pressable
-                style={styles.modalOverlay}
-                onPress={() => setSideMenuVisible(false)}
-              />
-              <View style={styles.sideMenu}>
-                <View style={styles.sideMenuHeader}>
-                  <Text style={styles.profileName}>{getDisplayName()}</Text>
-                  <Text style={styles.profileEmail}>{mockUser?.email}</Text>
-                </View>
-                <ScrollView style={styles.sideMenuContent}>
-                  {sideMenuItems.map((item, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.sideMenuItem}
-                      onPress={item.onPress}
-                    >
-                      <Ionicons
-                        name={item.icon as any}
-                        size={20}
-                        color="#4CAF50"
-                      />
-                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              {/* Support Worker Specialties */}
+              <View style={styles.specialtiesContainer}>
+                {supportWorker.specialties.map((specialty, index) => (
+                  <Text key={index} style={styles.specialtyText}>
+                    {specialty}
+                  </Text>
+                ))}
               </View>
-            </View>
-          </Modal>
 
-          {/* Bottom Navigation */}
-          <BottomNavigation
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabPress={handleTabPress}
-          />
-        </View>
-      </CurvedBackground>
-    </SafeAreaView>
+              {/* Selection Prompt */}
+              <Text style={styles.selectText}>Select Support Worker</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Side Menu Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
