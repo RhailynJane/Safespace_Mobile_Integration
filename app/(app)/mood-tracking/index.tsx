@@ -350,12 +350,10 @@ const MoodTrackingScreen = () => {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Elegant curved background with gradient colors */}
-      <CurvedBackground />
-      
-      {/* Header with navigation controls */}
-      <AppHeader title="Mood Tracker" showBack={true} />
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        {/* Header with navigation controls */}
+        <AppHeader title="Mood Tracker" showBack={true} />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Mood selection section */}
@@ -473,9 +471,10 @@ const MoodTrackingScreen = () => {
         activeTab={activeTab}
         onTabPress={handleTabPress}
       />
-    </SafeAreaView>
+     </SafeAreaView>
+    </CurvedBackground>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
