@@ -359,6 +359,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F5E9",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 5,
   },
   initialsText: {
     fontSize: 16,
@@ -385,6 +386,7 @@ const styles = StyleSheet.create({
   welcomeContainer: {
     alignItems: "center",
     padding: 20,
+    marginTop: 30
   },
   welcomeTitle: {
     fontSize: 32,
@@ -409,7 +411,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderColor: "#FFF",
     borderWidth: 3,
-    marginTop: 20,
+    marginTop: 70,
     marginBottom: 10,
     paddingBottom: 15,
   },
