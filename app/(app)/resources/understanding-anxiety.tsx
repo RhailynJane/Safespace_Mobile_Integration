@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -47,25 +48,7 @@ export default function UnderstandingAnxietyScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Header section with back button, title, and action icons */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Support and Resources</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              onPress={() => router.push("/notifications")}
-              style={styles.notificationButton}
-            >
-              <Ionicons name="notifications-outline" size={24} color="#333" />
-              <View style={styles.notificationBadge} />
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Ionicons name="grid-outline" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <AppHeader title="Resources" showBack={true} />
 
         {/* Main scrollable content area */}
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

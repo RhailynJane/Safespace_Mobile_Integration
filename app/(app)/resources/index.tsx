@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -236,27 +237,7 @@ export default function ResourcesScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        {/* Header with navigation controls and notifications */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Support and Resources</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              onPress={() => router.push("/notifications")}
-              style={styles.notificationButton}
-            >
-              <Ionicons name="notifications-outline" size={24} color="#333" />
-              <View style={styles.notificationBadge} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-              <Ionicons name="grid-outline" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <AppHeader title="Resources" showBack={true} />
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Search bar for filtering resources */}
