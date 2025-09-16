@@ -1,3 +1,7 @@
+/**
+ * LLM Prompt: Add concise comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
 import React, { useState, useEffect } from "react";
 import {
   View,

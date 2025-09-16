@@ -1,3 +1,7 @@
+/**
+ * LLM Prompt: Add concise comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -15,7 +19,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 
-// Mock data for demonstration (replaces backend implementation)
+// Mock data for demonstration 
 const mockJournalEntries = [
   {
     id: "1",

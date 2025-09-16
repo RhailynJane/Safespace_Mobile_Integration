@@ -1,3 +1,8 @@
+/**
+ * LLM Prompt: Add concise inline comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
+
 import { router } from "expo-router";
 import { useEffect } from "react";
 import { Animated, StyleSheet, View } from "react-native";

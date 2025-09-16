@@ -1,3 +1,7 @@
+/**
+ * LLM Prompt: Add concise comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
 import { useState, useEffect, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -91,12 +95,13 @@ export default function HomeScreen() {
   };
 
   // Quick action buttons for main app features
+  
   const quickActions = [
     {
       id: "mood",
       title: "Track Mood",
       icon: "happy-outline",
-      image: require("../../../assets/images/track-mood.png"),
+      image: require("../../../assets/images/track-mood.png"), //Image Reference: https://share.google/images/srWgmup3g77BOhLVX
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/mood-tracking"),
@@ -105,7 +110,7 @@ export default function HomeScreen() {
       id: "journal",
       title: "Journal",
       icon: "journal-outline",
-      image: require("../../../assets/images/journal.png"),
+      image: require("../../../assets/images/journal.png"), //Image Reference: https://id.lovepik.com/image-380642209/notebook-with-flowers-and-another-clipart-vector-sticker.html
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/journal"),
@@ -114,7 +119,7 @@ export default function HomeScreen() {
       id: "resources",
       title: "Resources",
       icon: "library-outline",
-      image: require("../../../assets/images/resources.png"),
+      image: require("../../../assets/images/resources.png"), //Image Reference: <a href='https://pngtree.com/freepng/books-and-books_5411517.html'>png image from pngtree.com/</a>
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/resources"),
@@ -123,7 +128,7 @@ export default function HomeScreen() {
       id: "crisis",
       title: "Crisis Support",
       icon: "help-buoy-outline",
-      image: require("../../../assets/images/crisis-support.png"),
+      image: require("../../../assets/images/crisis-support.png"), //Image Reference: https://share.google/images/sL7sgY0f438Zl1auI
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),

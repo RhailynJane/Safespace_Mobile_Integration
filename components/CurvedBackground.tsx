@@ -12,6 +12,7 @@ interface CurvedBackgroundProps {
 /**LLM Prompt: 
  * I need a React Native component that creates an elegant background with flowing curves and gradient colors using SVG. 
  * It should use responsive SVG paths with customizable gradients, accept children elements, and have TypeScript props.
+ * Reference: chat.deepseek
  */
 
 /**
@@ -24,7 +25,6 @@ interface CurvedBackgroundProps {
  * Props:
  * - children: React nodes to render on top of the background
  * - style: Additional styles to apply to the container
- * 
  */
 const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
   children,

@@ -2,6 +2,10 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+/**
+ * LLM Prompt: Add concise inline comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
 
 /**
  * OnboardingFlow Component

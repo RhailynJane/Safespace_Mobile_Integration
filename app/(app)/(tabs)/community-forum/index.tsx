@@ -1,3 +1,7 @@
+/**
+ * LLM Prompt: Add concise comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
 import { useState, useRef } from "react";
 import {
   View,
@@ -250,6 +254,7 @@ export default function CommunityScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Community illustration */}
+          {/* Image Reference: https://share.google/images/81eVPYnbEonHp6pR8 */}
           <View style={styles.imageContainer}>
             <Image 
               source={require('../../../../assets/images/community-forum.png')} 
