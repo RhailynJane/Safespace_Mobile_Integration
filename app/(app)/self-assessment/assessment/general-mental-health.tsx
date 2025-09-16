@@ -234,7 +234,7 @@ export default function GeneralMentalHealthAssessmentScreen() {
 
   // Navigate to assessment selection screen
   const handleTakeAnotherAssessment = () => {
-    router.push("/assessment/selection");
+    router.replace("../assessment/selection");
   };
 
   // Side menu navigation options

@@ -140,7 +140,7 @@ export default function GAD7QuestionnaireScreen() {
 
   // Navigate to assessment selection screen
   const handleTakeAnotherAssessment = () => {
-    router.push("/assessment/selection");
+    router.push("../assessment/selection");
   };
 
   // Side menu navigation items
