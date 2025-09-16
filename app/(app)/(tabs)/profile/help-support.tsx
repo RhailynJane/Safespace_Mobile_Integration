@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 interface HelpSection {
   id: string;
@@ -28,9 +29,27 @@ interface HelpItem {
 }
 
 const HelpSupportScreen: React.FC = () => {
+  const [activeTab, setActiveTab] = useState("profile");
   const [expandedSections, setExpandedSections] = useState<string[]>([
     "crisis",
   ]);
+
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community-forum", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) =>
@@ -340,6 +359,12 @@ const HelpSupportScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -348,16 +373,14 @@ const HelpSupportScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "transparent",
+    marginTop: -30,
   },
   scrollView: {
-    flex: 1,
     paddingHorizontal: 16,
   },
   screenTitle: {
     fontSize: 22,
     fontWeight: "700",
-    marginTop: 20,
     marginBottom: 8,
     textAlign: "center",
     color: "#2E7D32",
@@ -384,7 +407,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
-    borderBottomWidth: 1,
     borderBottomColor: "#f1f3f4",
   },
   crisisSectionHeader: {
