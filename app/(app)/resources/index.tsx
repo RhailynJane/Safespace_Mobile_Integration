@@ -32,7 +32,7 @@ export default function ResourcesScreen() {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -216,8 +216,11 @@ export default function ResourcesScreen() {
 
   // Filter resources based on search query and selected category
   const filteredResources = resources.filter((resource) => {
-    const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "" || resource.category === selectedCategory;
+    const matchesSearch = resource.title
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesCategory =
+      selectedCategory === "" || resource.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
@@ -231,159 +234,181 @@ export default function ResourcesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Curved background component for visual appeal */}
-      <CurvedBackground />
-      
-      {/* Header with navigation controls and notifications */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Support and Resources</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#333" />
-            <View style={styles.notificationBadge} />
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        {/* Header with navigation controls and notifications */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="grid-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Search bar for filtering resources */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search resources"
-              placeholderTextColor="#999"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Support and Resources</Text>
           </View>
-        </View>
-
-        {/* Category selection section with horizontal scrolling */}
-        <View style={styles.categoriesSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Suggested Category</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllButton}>See All</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              onPress={() => router.push("/notifications")}
+              style={styles.notificationButton}
+            >
+              <Ionicons name="notifications-outline" size={24} color="#333" />
+              <View style={styles.notificationBadge} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
+              <Ionicons name="grid-outline" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-          
-          <ScrollView 
-            horizontal={true}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesScrollContainer}
-          >
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryButton,
-                  { backgroundColor: category.color },
-                  selectedCategory === category.id && styles.selectedCategory
-                ]}
-                onPress={() => setSelectedCategory(selectedCategory === category.id ? "" : category.id)}
-              >
-                <Text style={styles.categoryIcon}>{category.icon}</Text>
-                <Text style={styles.categoryName}>{category.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
 
-        {/* Main resources listing section */}
-        <View style={styles.resourcesSection}>
-          <Text style={styles.resourcesSectionTitle}>All Resources</Text>
-          
-          <View style={styles.resourcesList}>
-            {filteredResources.map((resource) => (
-              <TouchableOpacity
-                key={resource.id}
-                style={styles.resourceCard}
-                onPress={() => {
-                  // Handle resource selection based on the resource
-                  if (resource.title === "Understanding Anxiety") {
-                    router.push("/understanding-anxiety");
-                  } else {
-                    console.log("Selected resource:", resource.title);
-                    // Add navigation for other resources as needed
-                  }
-                }}
-              >
-                <View style={[styles.resourceImageContainer, { backgroundColor: resource.backgroundColor }]}>
-                  <Text style={styles.resourceEmoji}>{resource.image}</Text>
-                </View>
-                
-                <View style={styles.resourceContent}>
-                  <Text style={styles.resourceTitle}>{resource.title}</Text>
-                  <View style={styles.resourceMeta}>
-                    <Text style={styles.resourceType}>{resource.type}</Text>
-                    <View style={styles.resourceDot} />
-                    <Text style={styles.resourceDuration}>{resource.duration}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Side menu modal for additional navigation options */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Search bar for filtering resources */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons
+                name="search"
+                size={20}
+                color="#999"
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search resources"
+                placeholderTextColor="#999"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
             </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
+          </View>
+
+          {/* Category selection section with horizontal scrolling */}
+          <View style={styles.categoriesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Suggested Category</Text>
+              <TouchableOpacity>
+                <Text style={styles.seeAllButton}>See All</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal={true}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesScrollContainer}
+            >
+              {categories.map((category) => (
                 <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
+                  key={category.id}
+                  style={[
+                    styles.categoryButton,
+                    { backgroundColor: category.color },
+                    selectedCategory === category.id && styles.selectedCategory,
+                  ]}
+                  onPress={() =>
+                    setSelectedCategory(
+                      selectedCategory === category.id ? "" : category.id
+                    )
+                  }
                 >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  <Text style={styles.categoryIcon}>{category.icon}</Text>
+                  <Text style={styles.categoryName}>{category.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
-        </View>
-      </Modal>
 
-      {/* Bottom navigation component for main app navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+          {/* Main resources listing section */}
+          <View style={styles.resourcesSection}>
+            <Text style={styles.resourcesSectionTitle}>All Resources</Text>
+
+            <View style={styles.resourcesList}>
+              {filteredResources.map((resource) => (
+                <TouchableOpacity
+                  key={resource.id}
+                  style={styles.resourceCard}
+                  onPress={() => {
+                    // Handle resource selection based on the resource
+                    if (resource.title === "Understanding Anxiety") {
+                      router.push("../resources/understanding-anxiety");
+                    } else {
+                      console.log("Selected resource:", resource.title);
+                      // Add navigation for other resources as needed
+                    }
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.resourceImageContainer,
+                      { backgroundColor: resource.backgroundColor },
+                    ]}
+                  >
+                    <Text style={styles.resourceEmoji}>{resource.image}</Text>
+                  </View>
+
+                  <View style={styles.resourceContent}>
+                    <Text style={styles.resourceTitle}>{resource.title}</Text>
+                    <View style={styles.resourceMeta}>
+                      <Text style={styles.resourceType}>{resource.type}</Text>
+                      <View style={styles.resourceDot} />
+                      <Text style={styles.resourceDuration}>
+                        {resource.duration}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Side menu modal for additional navigation options */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Bottom navigation component for main app navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
