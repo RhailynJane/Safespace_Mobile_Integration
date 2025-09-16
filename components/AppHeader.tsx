@@ -448,6 +448,6 @@ const styles = StyleSheet.create({
     marginLeft: 15, // Space between icon and text
   },
   safeArea: {
-    backgroundColor: 'white', 
+    backgroundColor: 'transparent', 
   }
 });
