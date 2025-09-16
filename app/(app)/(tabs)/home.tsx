@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Image,
   Modal,
@@ -16,6 +15,7 @@ import {
   Platform,
   Animated,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -460,7 +460,7 @@ export default function HomeScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => router.push("/(app)/(tabs)/profile/edit")}

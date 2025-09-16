@@ -14,6 +14,8 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from 'react-native';
 
 const { width } = Dimensions.get("window");
 
@@ -217,119 +219,125 @@ export const AppHeader = ({
 
   return (
     <>
-      {/* Main Header Container */}
-      <View style={styles.header}>
-        {/* Left Section: Back Button or Profile Image */}
-        {showBack ? (
-          // Back button for navigation
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-undo-sharp" size={24} color="black" />
-          </TouchableOpacity>
-        ) : (
-          // Profile image/initials that navigate to profile edit
-          <TouchableOpacity
-            onPress={() => router.push("/(app)/(tabs)/profile/edit")}
-            accessibilityLabel="Edit profile"
-          >
-            <View style={styles.profileImageContainer}>
-              {profileImage ? (
-                <Image
-                  source={{ uri: profileImage }}
-                  style={styles.profileImage}
-                  accessibilityLabel="Profile photo"
-                />
-              ) : (
-                <Text style={styles.initialsText}>{getInitials()}</Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* Center Section: Title */}
-        <View style={styles.titleContainer}>
-          {title ? (
-            <Text style={styles.headerTitle} accessibilityRole="header">
-              {title}
-            </Text>
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
+        {/* Main Header Container */}
+        <View style={styles.header}>
+          {/* Left Section: Back Button or Profile Image */}
+          {showBack ? (
+            // Back button for navigation
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="arrow-undo-sharp" size={24} color="black" />
+            </TouchableOpacity>
           ) : (
-            <View style={styles.emptyTitle} /> // Empty view to maintain layout
-          )}
-        </View>
-
-        {/* Right Section: Icons and Actions */}
-        <View style={styles.headerIcons}>
-          {/* Custom right-side actions passed as props */}
-          {rightActions}
-
-          {/* Notifications Icon */}
-          {showNotifications && (
+            // Profile image/initials that navigate to profile edit
             <TouchableOpacity
-              onPress={() => router.push("/notifications")}
-              accessibilityLabel="View notifications"
+              onPress={() => router.push("/(app)/(tabs)/profile/edit")}
+              accessibilityLabel="Edit profile"
             >
-              <Ionicons name="notifications-outline" size={24} color="#666" />
+              <View style={styles.profileImageContainer}>
+                {profileImage ? (
+                  <Image
+                    source={{ uri: profileImage }}
+                    style={styles.profileImage}
+                    accessibilityLabel="Profile photo"
+                  />
+                ) : (
+                  <Text style={styles.initialsText}>{getInitials()}</Text>
+                )}
+              </View>
             </TouchableOpacity>
           )}
 
-          {/* Menu Icon - Opens side navigation drawer */}
-          {showMenu && (
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={showSideMenu}
-              accessibilityLabel="Open menu"
-            >
-              <Ionicons name="grid" size={24} color="#666" />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+          {/* Center Section: Title */}
+          <View style={styles.titleContainer}>
+            {title ? (
+              <Text style={styles.headerTitle} accessibilityRole="header">
+                {title}
+              </Text>
+            ) : (
+              <View style={styles.emptyTitle} /> // Empty view to maintain layout
+            )}
+          </View>
 
-      {/* Side Menu Modal - Navigation Drawer */}
-      <Modal
-        animationType="none"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={hideSideMenu} // Android back button support
-      >
-        {/* Overlay with press-to-close functionality */}
-        <Animated.View
-          style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
+          {/* Right Section: Icons and Actions */}
+          <View style={styles.headerIcons}>
+            {/* Custom right-side actions passed as props */}
+            {rightActions}
+
+            {/* Notifications Icon */}
+            {showNotifications && (
+              <TouchableOpacity
+                onPress={() => router.push("/notifications")}
+                accessibilityLabel="View notifications"
+              >
+                <Ionicons name="notifications-outline" size={24} color="#666" />
+              </TouchableOpacity>
+            )}
+
+            {/* Menu Icon - Opens side navigation drawer */}
+            {showMenu && (
+              <TouchableOpacity
+                style={styles.menuButton}
+                onPress={showSideMenu}
+                accessibilityLabel="Open menu"
+              >
+                <Ionicons name="grid" size={24} color="#666" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Side Menu Modal - Navigation Drawer */}
+        <Modal
+          animationType="none"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={hideSideMenu} // Android back button support
         >
-          <Pressable
-            style={StyleSheet.absoluteFillObject}
-            onPress={hideSideMenu}
-            accessibilityLabel="Close menu"
-          />
+          {/* Overlay with press-to-close functionality */}
+          <Animated.View
+            style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFillObject}
+              onPress={hideSideMenu}
+              accessibilityLabel="Close menu"
+            />
 
-          {/* Side Menu Content */}
-          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
-            {/* User Profile Section in Menu Header */}
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getGreetingName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
+            {/* Side Menu Content */}
+            <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+              {/* User Profile Section in Menu Header */}
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getGreetingName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
 
-            {/* Scrollable List of Menu Items */}
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                  accessibilityLabel={item.title}
-                >
-                  <Ionicons name={item.icon as any} size={20} color="#757575" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              {/* Scrollable List of Menu Items */}
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                    accessibilityLabel={item.title}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#757575"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
-      </Modal>
+        </Modal>
+      </SafeAreaView>
     </>
   );
 };
@@ -439,4 +447,7 @@ const styles = StyleSheet.create({
     color: "#333", // Dark text color
     marginLeft: 15, // Space between icon and text
   },
+  safeArea: {
+    backgroundColor: 'white', 
+  }
 });

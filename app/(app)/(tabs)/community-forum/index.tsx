@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Modal,
   Pressable,
@@ -12,6 +11,7 @@ import {
   Image,
   Animated,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
@@ -223,7 +223,7 @@ export default function CommunityScreen() {
 
   return (
     <CurvedBackground style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header with profile and navigation icons */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
