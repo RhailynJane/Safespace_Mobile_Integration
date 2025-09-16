@@ -11,10 +11,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../../components/AppHeader";
 
 /**
  * PostSuccessScreen Component
- * 
+ *
  * Success confirmation screen shown after a user successfully creates a post.
  * Features a success message, image, and navigation options to view the post
  * or continue browsing. Includes an elegant curved background.
@@ -52,68 +53,53 @@ export default function PostSuccessScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Curved background component */}
-      <CurvedBackground style={styles.curvedBackground} />
-      
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
-          
-          <View style={styles.communityPostButton}>
-            <Text style={styles.communityPostButtonText}>Community Post</Text>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Community Forum" showBack={true} />
+
+        <View style={styles.content}>
+          {/* Success Card */}
+          <View style={styles.successCard}>
+            <View>
+              <Image
+                source={require("../../../../../assets/images/successnew.png")}
+              />
+            </View>
+
+            <Text style={styles.title}>Post Successful!</Text>
+
+            <Text style={styles.message}>
+              You have successfully posted a post.
+              {"\n"}Let's see it now!
+            </Text>
+
+            <TouchableOpacity
+              style={styles.cardButton}
+              onPress={handleViewPost}
+            >
+              <Text style={styles.cardButtonText}>See my post</Text>
+            </TouchableOpacity>
           </View>
-          
-          <View style={styles.headerRight} />
         </View>
-      </View>  
 
-      <View style={styles.content}>
-        {/* Success Card */}
-        <View style={styles.successCard}>
-          <View style={styles.successImageBorder}>
-            <Image
-              source={require('../../../../../assets/images/success.png')}
-              style={styles.successImage}
-            />
-          </View>
-          
-          <Text style={styles.title}>Post Successful!</Text>
-          
-          <Text style={styles.message}>
-            You have successfully posted a post.
-            {"\n"}Let's see it now!
-          </Text>
-
-          <TouchableOpacity
-            style={styles.cardButton}
-            onPress={handleViewPost}
-          >
-            <Text style={styles.cardButtonText}>See my post</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
   },
   curvedBackground: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -121,7 +107,7 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   headerContainer: {
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   header: {
     flexDirection: "row",
@@ -131,7 +117,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   communityPostButton: {
-    backgroundColor: "#EDE7EC",
+    backgroundColor: "transparent",
     paddingHorizontal: 40,
     paddingVertical: 8,
     borderRadius: 20,
@@ -148,7 +134,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
     justifyContent: "flex-start",
     marginTop: 30,
     alignItems: "center",
@@ -156,40 +142,15 @@ const styles = StyleSheet.create({
   },
   successCard: {
     backgroundColor: "#FFFFFF",
-    borderColor: "#000",
     borderWidth: 0.5,
     borderRadius: 20,
     height: 418,
     padding: 30,
     marginHorizontal: 20,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-  },
-  successImage: {
-    width: 250,
-    height: 250,
-    borderWidth: 1,
-    borderRadius: 30,
-    borderColor: '#B87B7B',
-    marginTop: -18,
-  },
-  successImageBorder: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
-    borderRadius: 5,
-    borderColor: '#B87B7B',
   },
   title: {
     fontSize: 18,
@@ -197,12 +158,12 @@ const styles = StyleSheet.create({
     color: "#212121",
     marginBottom: 16,
     marginTop: 20,
-    textAlign: "left",
+    textAlign: "center",
   },
   message: {
     fontSize: 14,
     color: "#666",
-    textAlign: "left",
+    textAlign: "center",
     lineHeight: 12,
     marginBottom: 10,
     marginTop: -5,
