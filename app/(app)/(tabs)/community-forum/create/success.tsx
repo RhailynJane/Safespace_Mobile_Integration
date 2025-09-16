@@ -8,17 +8,29 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
-import { useAuth } from "../../../../../context/AuthContext";
+import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 
+/**
+ * PostSuccessScreen Component
+ *
+ * Success confirmation screen shown after a user successfully creates a post.
+ * Features a success message, image, and navigation options to view the post
+ * or continue browsing. Includes an elegant curved background.
+ */
 export default function PostSuccessScreen() {
   const [activeTab, setActiveTab] = useState("community-forum");
+
+  /**
+   * Handles navigation to view the newly created post
+   */
   const handleViewPost = () => {
     router.replace("/(app)/(tabs)/community-forum/main");
   };
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -27,6 +39,10 @@ export default function PostSuccessScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -37,64 +53,71 @@ export default function PostSuccessScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <AppHeader 
-        title=""
-        showBack={true} 
-        showMenu={false} 
-        showNotifications={false}
-        rightActions={
-          <View style={styles.communityPostButton}>
-            <Text style={styles.communityPostButtonText}>Community Post</Text>
-          </View>
-        }
-      />  
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Community Forum" showBack={true} />
 
-      <View style={styles.content}>
-        {/* Success Card */}
-        <View style={styles.successCard}>
-          <View style={styles.successImageBorder}>
-            <Image
-              source={require('../../../../../assets/images/success.png')}
-              style={styles.successImage}
-            />
-          </View>
-          
-          <Text style={styles.title}>Post Successful!</Text>
-          
-          <Text style={styles.message}>
-            You have successfully posted a post.
-            {"\n"}Let's see it now!
-          </Text>
+        <View style={styles.content}>
+          {/* Success Card */}
+          <View style={styles.successCard}>
+            <View>
+              <Image
+                source={require("../../../../../assets/images/successnew.png")}
+              />
+            </View>
 
-          <TouchableOpacity
-            style={styles.cardButton}
-            onPress={handleViewPost}
-          >
-            <Text style={styles.cardButtonText}>See my post</Text>
-          </TouchableOpacity>
-          
+            <Text style={styles.title}>Post Successful!</Text>
+
+            <Text style={styles.message}>
+              You have successfully posted a post.
+              {"\n"}Let's see it now!
+            </Text>
+
+            <TouchableOpacity
+              style={styles.cardButton}
+              onPress={handleViewPost}
+            >
+              <Text style={styles.cardButtonText}>See my post</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
+  },
+  curvedBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
+  },
+  headerContainer: {
+    backgroundColor: "transparent",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   communityPostButton: {
-    backgroundColor: "#EDE7EC",
+    backgroundColor: "transparent",
     paddingHorizontal: 40,
     paddingVertical: 8,
     borderRadius: 20,
@@ -106,9 +129,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
+  headerRight: {
+    width: 24, // Placeholder for balance
+  },
   content: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
     justifyContent: "flex-start",
     marginTop: 30,
     alignItems: "center",
@@ -116,43 +142,15 @@ const styles = StyleSheet.create({
   },
   successCard: {
     backgroundColor: "#FFFFFF",
-    borderColor: "#000",
     borderWidth: 0.5,
     borderRadius: 20,
-    height:418,
+    height: 418,
     padding: 30,
     marginHorizontal: 20,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
-  },
-  successIcon: {
-    marginBottom: 20,
-  },
-  successImage: {
-    width:250,
-    height: 250,
-    borderWidth: 1,
-    borderRadius: 30,
-    borderColor: '#B87B7B',
-    marginTop: -18,
-  },
-  successImageBorder:{
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
-    borderRadius: 5,
-    borderColor: '#B87B7B',
   },
   title: {
     fontSize: 18,
@@ -160,12 +158,12 @@ const styles = StyleSheet.create({
     color: "#212121",
     marginBottom: 16,
     marginTop: 20,
-    textAlign: "left",
+    textAlign: "center",
   },
   message: {
     fontSize: 14,
     color: "#666",
-    textAlign: "left",
+    textAlign: "center",
     lineHeight: 12,
     marginBottom: 10,
     marginTop: -5,

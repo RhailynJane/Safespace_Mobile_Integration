@@ -8,7 +8,11 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { SignupData } from "../app/(auth)/signup";
+
+// Local interface for signup data
+interface SignupData {
+  password: string;
+}
 
 // Props interface for the PasswordStep component
 interface PasswordStepProps {

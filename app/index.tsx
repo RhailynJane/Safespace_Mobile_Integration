@@ -4,84 +4,54 @@ import { Animated, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SafeSpaceLogo from "../components/SafeSpaceLogo";
 
-/**
- * SplashScreen Component
- *
- * The initial screen users see when opening the app. Features a clean,
- * minimalist design with the SafeSpace logo and app name that fade in
- * and scale up simultaneously for a polished entrance animation.
- *
- * Features:
- * - Simultaneous fade-in and scale-up animations (800ms duration)
- * - Clean light gray background
- * - Centered logo and app name
- * - Automatic navigation to loading screen after 2 seconds
- * - Uses parallel animations for smooth visual effect
- */
 export default function SplashScreen() {
   // Animation values for entrance effects
-  const fadeAnim = new Animated.Value(0); // Opacity: starts invisible (0), fades to visible (1)
-  const scaleAnim = new Animated.Value(0.8); // Scale: starts small (0.8x), grows to full size (1.0x)
+  const fadeAnim = new Animated.Value(0); // Controls opacity (0 = invisible, 1 = fully visible)
+  const scaleAnim = new Animated.Value(0.8); // Controls scale (0.8 = 80% size, 1 = full size)
 
   useEffect(() => {
-    // ENTRANCE ANIMATION
-    // Run fade-in and scale-up animations simultaneously for polished effect
+    // Run fade-in and scale-up animations simultaneously
     Animated.parallel([
-      // FADE-IN ANIMATION
-      // Logo and title gradually become visible over 800ms
+      // Fade animation: gradually becomes visible over 800ms
       Animated.timing(fadeAnim, {
-        toValue: 1, // Final opacity: fully visible
-        duration: 800, // Animation duration: 800 milliseconds
-        useNativeDriver: true, // Better performance for opacity animations
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
       }),
-
-      // SCALE-UP ANIMATION
-      // Logo and title grow from 80% to 100% size over 800ms
+      // Scale animation: grows from 80% to 100% size over 800ms
       Animated.timing(scaleAnim, {
-        toValue: 1, // Final scale: normal size (100%)
-        duration: 800, // Animation duration: 800 milliseconds (matches fade)
-        useNativeDriver: true, // Better performance for transform animations
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
       }),
-    ]).start(); // Start both animations immediately
+    ]).start();
 
-    // AUTO-NAVIGATION TIMER
-    // Navigate to loading screen after splash screen display time
+    // Navigate to loading screen after 2 seconds
     const timer = setTimeout(() => {
-      router.replace("/loading"); // Navigate to loading screen
-    }, 2000); // 2-second delay (800ms animation + 1200ms display time)
+      router.replace("/loading");
+    }, 2000);
 
-    // CLEANUP FUNCTION
-    // Clear timer if component unmounts before timeout completes
-    // Prevents navigation attempts on unmounted components
+    // Cleanup: clear timer if component unmounts
     return () => clearTimeout(timer);
-  }, []); // Empty dependency array: run once on component mount
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* 
-          ANIMATED LOGO CONTAINER
-          Applies both fade and scale animations to the logo
-          Logo grows from 80% to 100% size while fading in
-        */}
+        {/* Animated container for logo with fade and scale effects */}
         <Animated.View
           style={[
             styles.logoContainer,
             {
-              opacity: fadeAnim, // Apply fade-in animation
-              transform: [{ scale: scaleAnim }], // Apply scale-up animation
+              opacity: fadeAnim, // Apply fade animation
+              transform: [{ scale: scaleAnim }], // Apply scale animation
             },
           ]}
         >
-          {/* SafeSpace logo component with 80px size */}
           <SafeSpaceLogo size={100} />
         </Animated.View>
 
-        {/* 
-          ANIMATED APP TITLE
-          Large "SafeSpace" text that fades in with the logo
-          Only applies opacity animation (no scaling for text)
-        */}
+        {/* App title with fade animation only */}
         <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
           SafeSpace
         </Animated.Text>
@@ -91,33 +61,26 @@ export default function SplashScreen() {
 }
 
 const styles = StyleSheet.create({
-  // MAIN CONTAINER
-  // Light gray background for clean, professional appearance
+  // Main container with light background
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb", // Very light gray background
+    backgroundColor: "#f9fafb",
   },
-
-  // CONTENT WRAPPER
-  // Centers logo and title vertically and horizontally on screen
+  // Content area centered both vertically and horizontally
   content: {
     flex: 1,
-    justifyContent: "center", // Center content vertically
-    alignItems: "center", // Center content horizontally
-    paddingHorizontal: 32, // Side padding for smaller screens
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
   },
-
-  // LOGO CONTAINER
-  // Provides spacing between logo and title text
+  // Container for logo with spacing below
   logoContainer: {
-    marginBottom: 32, // Space below logo, above title text
+    marginBottom: 32,
   },
-
-  // APP TITLE TEXT
-  // Large, bold "SafeSpace" text in dark color
+  // App title styling
   title: {
-    fontSize: 32, // Large text for brand prominence
-    fontWeight: "bold", // Bold weight for strong brand presence
-    color: "#111827", // Very dark gray (almost black) for good contrast
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#111827",
   },
 });

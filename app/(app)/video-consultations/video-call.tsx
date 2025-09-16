@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,26 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
+
 import BottomNavigation from "../../../components/BottomNavigation";
+import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
+
+/* Mock user/profile data for frontend development and UI testing */
+const mockUser = {
+  displayName: "Demo User",
+  email: "demo@gmail.com",
+};
+
+const mockProfile = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+/* Sample appointment data (static/mock) */
 const appointments = [
   {
     id: 1,
@@ -26,10 +41,24 @@ const appointments = [
   },
 ];
 
+/**
+ * VideoCallScreen
+ * - Uses CurvedBackground for an elegant background.
+ * - No backend or auth dependencies — uses mock data.
+ * - Contains selectable audio options and actions to join/cancel the meeting.
+ */
 export default function VideoCallScreen() {
-  const [audioOption, setAudioOption] = useState("phone"); // 'phone', 'none'
-  const { user, profile, logout } = useAuth();
+  // Local UI state for audio selection
+  const [audioOption, setAudioOption] = useState<"phone" | "none">("phone");
 
+  // Active bottom navigation tab
+  const [activeTab, setActiveTab] = useState<string>("home");
+
+  // Use the mock data instead of auth/context
+  const user = mockUser;
+  const profile = mockProfile;
+
+  // Helper: produce a friendly display name from available mock data
   const getDisplayName = () => {
     if (profile?.firstName) return profile.firstName;
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -37,11 +66,15 @@ export default function VideoCallScreen() {
     return "User";
   };
 
+  // Handler: start meeting - navigates to the meeting route
   const handleStartMeeting = () => {
+    // Replace navigation with your meeting screen path as needed
     router.replace("../video-consultations/video-call-meeting");
   };
 
   const currentAppointment = appointments[0];
+
+  // Bottom navigation tabs configuration (UI only)
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -50,8 +83,7 @@ export default function VideoCallScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  const [activeTab, setActiveTab] = useState<string>("home");
-
+  // Handler for tab presses
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -62,108 +94,113 @@ export default function VideoCallScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.meetingContainer}>
-      <View style={styles.meetingHeader}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.meetingTitle}>Safespace Meeting</Text>
-        <View style={{ width: 24 }} />
-      </View>
+   <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+          <AppHeader title="Safespace Meeting" showBack={true} />
 
-      {/* Meeting Content */}
-      <View style={styles.meetingContent}>
-        <Text style={styles.meetingWith}>
-          Meeting with {currentAppointment?.supportWorker ?? ""}
-        </Text>
+        {/* Main meeting content */}
+        <View style={styles.meetingContent}>
+          <Text style={styles.meetingWith}>
+            Meeting with {currentAppointment?.supportWorker ?? ""}
+          </Text>
 
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={50} color="#FFFFFF" />
-          </View>
-          <View style={styles.profileTextContainer}>
-            <Text style={styles.avatarName}>{getDisplayName()}</Text>
+          {/* Avatar + user name */}
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              {/* Simple icon avatar — replace with Image component if you want to show actual avatar */}
+              <Ionicons name="person" size={50} color="#FFFFFF" />
+            </View>
+
+            <View style={styles.profileTextContainer}>
+              <Text style={styles.avatarName}>{getDisplayName()}</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/*Audio Options Content */}
-      <View style={styles.audioOptions}>
-        <Text style={styles.audioTitle}>Audio Options</Text>
+        {/* Audio Options (UI only) */}
+        <View style={styles.audioOptions}>
+          <Text style={styles.audioTitle}>Audio Options</Text>
 
-        <TouchableOpacity
-          style={[
-            styles.audioOption,
-            audioOption === "phone" && styles.audioOptionSelected,
-          ]}
-          onPress={() => setAudioOption("phone")}
-        >
-          <Ionicons
-            name={
-              audioOption === "phone" ? "radio-button-on" : "radio-button-off"
-            }
-            size={24}
-            color={audioOption === "phone" ? "#4CAF50" : "#757575"}
-          />
-          <View style={styles.audioOptionText}>
-            <Text style={styles.audioOptionTitle}>Phone Audio</Text>
-            <Text style={styles.audioOptionDesc}>Call in with your phone</Text>
-          </View>
-        </TouchableOpacity>
+          {/* Phone Audio Option */}
+          <TouchableOpacity
+            style={[
+              styles.audioOption,
+              audioOption === "phone" && styles.audioOptionSelected,
+            ]}
+            onPress={() => setAudioOption("phone")}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name={audioOption === "phone" ? "radio-button-on" : "radio-button-off"}
+              size={24}
+              color={audioOption === "phone" ? "#4CAF50" : "#757575"}
+            />
+            <View style={styles.audioOptionText}>
+              <Text style={styles.audioOptionTitle}>Phone Audio</Text>
+              <Text style={styles.audioOptionDesc}>Call in with your phone</Text>
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.audioOption,
-            audioOption === "none" && styles.audioOptionSelected,
-          ]}
-          onPress={() => setAudioOption("none")}
-        >
-          <Ionicons
-            name={
-              audioOption === "none" ? "radio-button-on" : "radio-button-off"
-            }
-            size={24}
-            color={audioOption === "none" ? "#4CAF50" : "#757575"}
-          />
-          <View style={styles.audioOptionText}>
-            <Text style={styles.audioOptionTitle}>Don't Use Audio</Text>
-            <Text style={styles.audioOptionDesc}>Join without audio</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          {/* Join Without Audio Option */}
+          <TouchableOpacity
+            style={[
+              styles.audioOption,
+              audioOption === "none" && styles.audioOptionSelected,
+            ]}
+            onPress={() => setAudioOption("none")}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name={audioOption === "none" ? "radio-button-on" : "radio-button-off"}
+              size={24}
+              color={audioOption === "none" ? "#4CAF50" : "#757575"}
+            />
+            <View style={styles.audioOptionText}>
+              <Text style={styles.audioOptionTitle}>Don't Use Audio</Text>
+              <Text style={styles.audioOptionDesc}>Join without audio</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.meetingActions}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
+        {/* Action buttons */}
+        <View style={styles.meetingActions}>
+          {/* Cancel simply navigates back */}
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.joinNowButton}
-          onPress={handleStartMeeting}
-        >
-          <Text style={styles.joinNowButtonText}>Join Now</Text>
-        </TouchableOpacity>
-      </View>
+          {/* Join Now triggers navigation to the meeting flow */}
+          <TouchableOpacity
+            style={styles.joinNowButton}
+            onPress={handleStartMeeting}
+            accessibilityRole="button"
+          >
+            <Text style={styles.joinNowButtonText}>Join Now</Text>
+          </TouchableOpacity>
+        </View>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+        {/* Bottom navigation (UI only) */}
+        <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
+/* Styles for the VideoCallScreen */
 const styles = StyleSheet.create({
+  // container added to match usage in JSX (SafeAreaView style={styles.container})
+  container: {
+    flex: 1,
+    backgroundColor: "transparent", 
+    justifyContent: "space-between",
+  },
   meetingContainer: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent", 
     justifyContent: "space-between",
   },
   meetingHeader: {
@@ -172,7 +209,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    borderBottomColor: "rgba(224,224,224,0.5)",
   },
   backButton: {
     padding: 4,
@@ -220,10 +257,12 @@ const styles = StyleSheet.create({
   },
   audioOptions: {
     width: "100%",
-    maxWidth: 300,
-    marginRight: 15,
-    marginLeft: 50,
+    maxWidth: 360,
     justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 40,
+    marginLeft: (width - Math.min(width, 360)) / 2,
   },
   audioTitle: {
     fontSize: 14,
@@ -239,6 +278,7 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
     borderRadius: 8,
     marginBottom: 15,
+    backgroundColor: "transparent",
   },
   audioOptionSelected: {
     borderColor: "#4CAF50",
@@ -263,7 +303,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 10,
     borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    borderTopColor: "rgba(224,224,224,0.5)",
+    marginBottom: 100,
+    paddingHorizontal: 20,
+    width: "100%",
+    maxWidth: 360,
+    marginLeft: (width - Math.min(width, 360)) / 2,
   },
   cancelButton: {
     flex: 1,
@@ -273,6 +318,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     marginRight: 10,
+    backgroundColor: "transparent",
   },
   cancelButtonText: {
     color: "#757575",

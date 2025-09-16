@@ -12,42 +12,50 @@ import {
   Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
-import { useAuth } from "../../../../../context/AuthContext";
+import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/**
+ * CreatePostScreen Component
+ * 
+ * Screen for creating new community posts with options for privacy settings,
+ * draft saving, and content creation. Features a curved background and
+ * intuitive post creation interface.
+ */
 export default function CreatePostScreen() {
+  // State management
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
   const [postContent, setPostContent] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const { user, profile, logout } = useAuth();
 
-  // Load profile image when component mounts
-  useEffect(() => {
-    loadProfileImage();
-  }, []);
-
-  const loadProfileImage = async () => {
-    try {
-      const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
-      if (savedImage) {
-        setProfileImage(savedImage);
-      }
-    } catch (error) {
-      console.log('Error loading profile image:', error);
-    }
+  // Mock user data (replaces backend auth context)
+  const mockUser = {
+    displayName: "Demo user",
+    email: "demo@gmail.com",
+  };
+  
+  const mockProfile = {
+    firstName: "Demo",
+    lastName: "User"
   };
 
+  /**
+   * Handles saving post as draft
+   * Shows alert confirmation and updates draft state
+   */
   const handleSaveDraft = () => {
     setIsDraft(true);
     Alert.alert("Draft Saved", "Your post has been saved as a draft.");
   };
 
+  /**
+   * Handles post publishing
+   * Logs post data and navigates to success screen
+   */
   const handlePublish = () => {
     console.log("Publishing post:", {
       category: selectedCategory,
@@ -59,6 +67,7 @@ export default function CreatePostScreen() {
     router.push("/community-forum/create/success");
   };
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -67,6 +76,10 @@ export default function CreatePostScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles bottom tab navigation
+   * @param tabId - ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -76,16 +89,24 @@ export default function CreatePostScreen() {
     }
   };
 
+  /**
+   * Gets display name from available user data
+   * @returns String with user's display name or fallback
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (mockProfile?.firstName) return mockProfile.firstName;
+    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (mockUser?.email) return mockUser.email.split("@")[0];
     return "User";
   };
 
+  /**
+   * Generates user initials from profile data
+   * @returns String containing user initials
+   */
   const getInitials = () => {
-    const firstName = profile?.firstName || "";
-    const lastName = profile?.lastName || "";
+    const firstName = mockProfile?.firstName || "";
+    const lastName = mockProfile?.lastName || "";
     if (firstName && lastName) {
       return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     }
@@ -94,45 +115,31 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
-      {/* Header */}
-      <AppHeader 
-        title=""
-        showBack={true} 
-        showMenu={false} 
-        showNotifications={false}
-        rightActions={
-          <View style={styles.communityPostButton}>
-           <Text style={styles.communityPostButtonText}>Community Post</Text>
-          </View>
-      }
-      />
-      {/* Title Section */}
-      <View style={styles.titleSection}>
-        <Text style={styles.mainTitle}>Post Content</Text>
-      </View>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+          <AppHeader title="Community Forum" showBack={true} />
+          <ScrollView style={styles.content}>
+
+        {/* Title Section */}
+        <View style={styles.titleSection}>
+          <Text style={styles.mainTitle}>Post Content</Text>
+        </View>
+
         {/* User Profile Summary with Post Card Inside */}
         <View style={styles.profileCard}>
           <View style={styles.profileSection}>
             <View style={styles.profileContainer}>
               <View style={styles.profileImageContainer}>
-                {profileImage ? (
-                  <Image
-                    source={{ uri: profileImage }}
-                    style={styles.profileImage}
-                  />
-                ) : (
-                  <View style={styles.profileImageFallback}>
-                    <Text style={styles.initialsText}>{getInitials()}</Text>
-                  </View>
-                )}
+                <View style={styles.profileImageFallback}>
+                  <Text style={styles.initialsText}>{getInitials()}</Text>
+                </View>
               </View>
               <View style={styles.profileTextContainer}>
                 <Text style={styles.userName}>{getDisplayName()}</Text>
               </View>
             </View>
           </View>
+          
           {/* Post Content Card (inside user card) */}
           <View style={styles.postCard}>
             <TextInput
@@ -142,29 +149,31 @@ export default function CreatePostScreen() {
               value={postContent}
               onChangeText={setPostContent}
               textAlignVertical="top"
+              maxLength={300}
             />
 
-          {/* Icons and Character Count Row */}
-          <View style={styles.postActions}>
-            <View style={styles.actionIcons}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="mic-outline" size={20} color="#666" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="camera-outline" size={20} color="#666" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="images-outline" size={20} color="#666" />
-              </TouchableOpacity>
+            {/* Icons and Character Count Row */}
+            <View style={styles.postActions}>
+              <View style={styles.actionIcons}>
+                <TouchableOpacity style={styles.iconButton}>
+                  <Ionicons name="mic-outline" size={20} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton}>
+                  <Ionicons name="camera-outline" size={20} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton}>
+                  <Ionicons name="images-outline" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+              
+              <Text style={styles.charCount}>{postContent.length}/300</Text>
             </View>
-            
-            <Text style={styles.charCount}>{postContent.length}/300</Text>
           </View>
+
+          <View style={styles.divider} />
         </View>
 
-        <View style={styles.divider} />
-        </View>
-                {/* Privacy Settings */}
+        {/* Privacy Settings */}
         <View style={styles.privacyContainer}>
           <View style={styles.privacyRow}>
             <Text style={styles.privacyText}>Hide from Community?</Text>
@@ -180,26 +189,26 @@ export default function CreatePostScreen() {
           )}
         </View>
 
-              {/* Action Buttons */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.draftButton}
-          onPress={handleSaveDraft}
-        >
-          <Text style={styles.draftButtonText}>Save as Draft</Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.draftButton}
+            onPress={handleSaveDraft}
+          >
+            <Text style={styles.draftButtonText}>Save as Draft</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.publishButton,
-            !postContent.trim() && styles.publishButtonDisabled
-          ]}
-          onPress={handlePublish}
-          disabled={!postContent.trim()}
-        >
-          <Text style={styles.publishButtonText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[
+              styles.publishButton,
+              !postContent.trim() && styles.publishButtonDisabled
+            ]}
+            onPress={handlePublish}
+            disabled={!postContent.trim()}
+          >
+            <Text style={styles.publishButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -208,46 +217,66 @@ export default function CreatePostScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
       />
-    </SafeAreaView>
+ </SafeAreaView>
+
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
+  },
+  curvedBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
   },
   headerContainer: {
-  backgroundColor: "#F8F9FA",
+    backgroundColor: "#transparent",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   communityPostButton: {
-  backgroundColor: "#EDE7EC",
-  paddingHorizontal: 40,
-  paddingVertical: 8,
-  borderRadius: 20,
-  borderWidth: 0.5,
-  borderColor: "#000",
+    backgroundColor: "#EDE7EC",
+    paddingHorizontal: 40,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 0.5,
+    borderColor: "#000",
   },
   communityPostButtonText: {
     color: "#000",
     fontSize: 11,
     fontWeight: "600",
   },
+  headerRight: {
+    width: 24, // Placeholder for balance
+  },
   titleSection: {
     paddingHorizontal: 15,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
+    paddingVertical: 16,
   },
   mainTitle: {
     fontSize: 19,
     fontWeight: "800",
     color: "#000",
-    textAlign: "left",
+    textAlign: "center",
   },
   content: {
     flex: 1,
     padding: 16,
-    backgroundColor: "#F2F2F7",
-
+    backgroundColor: "transparent",
   },
   profileCard: {
     backgroundColor: "#EDE7EC",
@@ -323,10 +352,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   postActions: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
   },
   actionIcons: {
     flexDirection: "row",
@@ -337,11 +366,10 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#F2F2F7",
     marginVertical: 16,
   },
   privacyContainer: {
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
     borderRadius: 12,
     marginTop: 10,
     padding: 16,
@@ -365,9 +393,9 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: "column",
     padding: 20,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: "transparent",
     borderTopWidth: 1,
-    borderTopColor: "#F2F2F7",
+    borderTopColor: "transparent",
     gap: 12,
     marginBottom: 40,
   },
@@ -376,7 +404,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor:"white",
+    borderColor: "white",
     alignItems: "center",
     marginRight: 30,
     marginLeft: 30,
@@ -399,7 +427,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor:"white",
+    borderColor: "white",
     alignItems: "center",
     marginRight: 30,
     marginLeft: 30,

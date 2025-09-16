@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -18,11 +18,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../context/AuthContext";
-import { supabase } from "../../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
-import { BorderRadius } from "../../../constants/theme";
 import { LinearGradient } from "expo-linear-gradient";
+import CurvedBackground from "../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
 
@@ -38,17 +36,37 @@ type Resource = {
   id: string;
   title: string;
   duration: string;
+  onPress?: () => void;
 };
 
+// Mock user data for frontend-only implementation
+const MOCK_USER = {
+  uid: "demo-user-id",
+  email: "demo@gmail.com",
+  displayName: "Demo User",
+};
+
+const MOCK_PROFILE = {
+  firstName: "Demo",
+  lastName: "User",
+};
+
+/**
+ * HomeScreen Component
+ *
+ * Main dashboard screen featuring user greeting, quick actions, mood tracking,
+ * and resource recommendations. Designed with a clean, modern UI and smooth animations.
+ *
+ * This is a frontend-only implementation.
+ */
 export default function HomeScreen() {
-  const { user, profile, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);4
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -58,22 +76,27 @@ export default function HomeScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-
+  /**
+   * Mock logout function for frontend-only implementation
+   */
   const handleLogout = async () => {
     try {
-      await logout();
+      // Clear any stored data
+      await AsyncStorage.clear();
+      // Navigate to login screen
       router.replace("/(auth)/login");
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
+  // Quick action buttons for main app features
   const quickActions = [
     {
       id: "mood",
       title: "Track Mood",
       icon: "happy-outline",
-      image: require("../../../assets/images/track-mood.png"), 
+      image: require("../../../assets/images/track-mood.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/mood-tracking"),
@@ -82,16 +105,16 @@ export default function HomeScreen() {
       id: "journal",
       title: "Journal",
       icon: "journal-outline",
-      image: require("../../../assets/images/journal.png"), 
+      image: require("../../../assets/images/journal.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
-      onPress: () => router.push("/journaling"),
+      onPress: () => router.push("/journal"),
     },
     {
       id: "resources",
       title: "Resources",
       icon: "library-outline",
-      image: require("../../../assets/images/resources.png"), 
+      image: require("../../../assets/images/resources.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/resources"),
@@ -100,33 +123,39 @@ export default function HomeScreen() {
       id: "crisis",
       title: "Crisis Support",
       icon: "help-buoy-outline",
-      image: require("../../../assets/images/crisis-support.png"), 
+      image: require("../../../assets/images/crisis-support.png"),
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
-
       onPress: () => router.push("/crisis-support"),
     },
   ];
 
+  /**
+   * Shows the side menu with smooth fade animation
+   */
   const showSideMenu = () => {
-  setSideMenuVisible(true);
-  Animated.timing(fadeAnim, {
-    toValue: 1,
-    duration: 800, // 300ms fade in
-    useNativeDriver: true,
-  }).start();
-};
+    setSideMenuVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
 
-const hideSideMenu = () => {
-  Animated.timing(fadeAnim, {
-    toValue: 0,
-    duration: 800, // 300ms fade out
-    useNativeDriver: true,
-  }).start(() => {
-    setSideMenuVisible(false);
-  });
-};
+  /**
+   * Hides the side menu with fade out animation
+   */
+  const hideSideMenu = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setSideMenuVisible(false);
+    });
+  };
 
+  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -165,7 +194,7 @@ const hideSideMenu = () => {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -222,7 +251,7 @@ const hideSideMenu = () => {
       onPress: async () => {
         try {
           setSideMenuVisible(false);
-          await logout();
+          await handleLogout();
         } catch (error) {
           console.error("Sign out error:", error);
         }
@@ -230,6 +259,9 @@ const hideSideMenu = () => {
     },
   ];
 
+  /**
+   * Returns emoji representation for mood type
+   */
   const getEmojiForMood = (moodType: string) => {
     switch (moodType) {
       case "very-happy":
@@ -247,6 +279,9 @@ const hideSideMenu = () => {
     }
   };
 
+  /**
+   * Returns label text for mood type
+   */
   const getLabelForMood = (moodType: string) => {
     switch (moodType) {
       case "very-happy":
@@ -264,6 +299,9 @@ const hideSideMenu = () => {
     }
   };
 
+  /**
+   * Returns appropriate greeting based on time of day
+   */
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good Morning";
@@ -271,111 +309,81 @@ const hideSideMenu = () => {
     return "Good Evening";
   };
 
+  /**
+   * Loads mock mood data for demonstration
+   */
   const fetchRecentMoods = async () => {
     try {
-      if (!user?.uid) return;
+      // Try to load moods from local storage first
+      const storedMoods = await AsyncStorage.getItem("recentMoods");
 
-      // First get client ID
-      const { data: clientData, error: clientError } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("firebase_uid", user.uid)
-        .single();
+      if (storedMoods) {
+        setRecentMoods(JSON.parse(storedMoods));
+      } else {
+        // Create mock data if none exists
+        const mockMoods: MoodEntry[] = [
+          {
+            id: "1",
+            mood_type: "happy",
+            created_at: new Date().toISOString(),
+            mood_emoji: getEmojiForMood("happy"),
+            mood_label: getLabelForMood("happy"),
+          },
+          {
+            id: "2",
+            mood_type: "neutral",
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+            mood_emoji: getEmojiForMood("neutral"),
+            mood_label: getLabelForMood("neutral"),
+          },
+          {
+            id: "3",
+            mood_type: "sad",
+            created_at: new Date(Date.now() - 172800000).toISOString(),
+            mood_emoji: getEmojiForMood("sad"),
+            mood_label: getLabelForMood("sad"),
+          },
+        ];
 
-      if (clientError || !clientData) return;
-
-      // Then fetch mood entries
-      const { data, error } = await supabase
-        .from("mood_entries")
-        .select("*")
-        .eq("client_id", clientData.id)
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (error) return;
-
-      const transformedEntries = (data || []).map((entry) => ({
-        ...entry,
-        mood_emoji: getEmojiForMood(entry.mood_type),
-        mood_label: getLabelForMood(entry.mood_type),
-      }));
-
-      setRecentMoods(transformedEntries);
+        setRecentMoods(mockMoods);
+        await AsyncStorage.setItem("recentMoods", JSON.stringify(mockMoods));
+      }
     } catch (error) {
-      console.log("Mood entries not available");
+      console.log("Error loading mood data");
       setRecentMoods([]);
     }
   };
 
+  /**
+   * Loads mock resource data for demonstration
+   */
   const fetchResources = async () => {
     try {
-      // Check if resources table exists
-      const { data: tableExists } = await supabase.rpc("table_exists", {
-        table_name: "resources",
-      });
+      // Mock data for demonstration
+      const mockResources: Resource[] = [
+        {
+          id: "1",
+          title: "Understanding Anxiety",
+          duration: "10 min",
+        },
+      ];
 
-      if (!tableExists) {
-        setResources([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("resources")
-        .select("id, title, duration")
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (error) throw error;
-      setResources(data || []);
+      setResources(mockResources);
     } catch (error) {
       setResources([]);
     }
   };
 
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-
   useFocusEffect(
-  useCallback(() => {
-    fetchData();
-    loadProfileImage(); // Add this line
-  }, [user?.uid])
-);
+    useCallback(() => {
+      fetchData();
+      loadProfileImage();
+    }, [])
+  );
 
-  // Set up realtime subscription for mood updates
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    // First get client ID for the filter
-    supabase
-      .from("clients")
-      .select("id")
-      .eq("firebase_uid", user.uid)
-      .single()
-      .then(({ data: clientData, error: clientError }) => {
-        if (clientError || !clientData) return;
-
-        const subscription = supabase
-          .channel("mood_entries")
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "mood_entries",
-              filter: `client_id=eq.${clientData.id}`,
-            },
-            () => {
-              fetchRecentMoods(); // Refresh when mood entries change
-            }
-          )
-          .subscribe();
-
-        return () => {
-          supabase.removeChannel(subscription);
-        };
-      });
-  }, [user?.uid]);
-
+  /**
+   * Fetches all required data for the dashboard
+   */
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -388,9 +396,12 @@ const hideSideMenu = () => {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-    }, [user?.uid])
+    }, [])
   );
 
+  /**
+   * Formats date into relative or short format
+   */
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -409,237 +420,250 @@ const hideSideMenu = () => {
     }
   };
 
+  /**
+   * Loads profile image from local storage
+   */
   const loadProfileImage = async () => {
-  try {
-    const savedImage = await AsyncStorage.getItem(`profileImage_${user?.uid}`);
-    if (savedImage) {
-      setProfileImage(savedImage);
+    try {
+      const savedImage = await AsyncStorage.getItem("profileImage");
+      if (savedImage) {
+        setProfileImage(savedImage);
+      }
+    } catch (error) {
+      console.log("Error loading profile image:", error);
     }
-  } catch (error) {
-    console.log('Error loading profile image:', error);
+  };
+
+  /**
+   * Generates initials from user's name for fallback avatar
+   */
+  const getInitials = () => {
+    return `${MOCK_PROFILE.firstName.charAt(0)}${MOCK_PROFILE.lastName.charAt(
+      0
+    )}`.toUpperCase();
+  };
+
+  /**
+   * Returns the user's first name for personalized greeting
+   */
+  const getGreetingName = () => {
+    return MOCK_PROFILE.firstName;
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+      </View>
+    );
   }
-};
-
-const getInitials = () => {
-  const firstName = profile?.firstName || "";
-  const lastName = profile?.lastName || "";
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
-};
-
-const getGreetingName = () => {
-  if (profile?.firstName) return profile.firstName;
-  if (user?.displayName) return user.displayName.split(" ")[0];
-  return "User";
-};
-
-if (loading) {
-  return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#4CAF50" />
-    </View>
-  );
-}
-
-  
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <LinearGradient
-      colors={['#FFFFFF', '#F8F8FC', '#F2F2F7', '#EEEEEF', '#F5F5F0']}
-      style={styles.container}
-      >
+    <CurvedBackground>
       <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-       <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
-      <View style={styles.profileImageContainer}>
-        {profileImage ? (
-          <Image source={{ uri: profileImage }} style={styles.profileImage} />
-        ) : (
-          <Text style={styles.initialsText}>{getInitials()}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => router.push("/notifications")}>
-            <Ionicons name="notifications-outline" size={24} color="#000" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.menuButton}
-            onPress={showSideMenu}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/(tabs)/profile/edit")}
           >
-            <Ionicons name="grid" size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-        <ScrollView
-          style={styles.content}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          
-          {/* Greeting Section */}
-          <View style={styles.greetingSection}>
-            <Text style={styles.greetingText}>
-              {getGreeting()}, <Text style={styles.nameText}>{getGreetingName()}!</Text>
-            </Text>
-            <Text style={styles.subGreetingText}>How are you feeling today?</Text>
-          </View>
-
-          {/* Emergency Help Section */}
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.helpButton}
-              onPress={() => router.push("/crisis-support")}
-            >
-              <View style={styles.helpButtonContent}>
-                <Text style={styles.helpButtonText}>Get Help Now</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-
-          {/* Quick Actions */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.actionsGrid}>
-              {quickActions.map((action) => (
-                <TouchableOpacity
-                  key={action.id}
-                  style={[
-                    styles.actionCard,
-                    { 
-                      backgroundColor: action.color,
-                      borderColor: action.borderColor 
-                    }
-                  ]}
-                  onPress={action.onPress}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: action.borderColor }]}>
-                    {action.image ? (
-                      <Image 
-                        source={action.image} 
-                        style={[
-                          styles.actionImage,
-                          action.id === "crisis" && styles.crisisSupportImage
-
-                        ]}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <Ionicons
-                        name={action.icon as any}
-                        size={28}
-                        color="white"
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.actionTitle}>{action.title}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.profileImageContainer}>
+              {profileImage ? (
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <Text style={styles.initialsText}>{getInitials()}</Text>
+              )}
             </View>
-          </View>
-
-        {/* Recent Mood History Section */}
-          <View style={styles.section}>
-            <TouchableOpacity 
-              onPress={() => router.push("/mood-history")}
-              style={styles.sectionTitleContainer}
-            >
-              <Text style={styles.sectionTitle}>Recent Moods</Text>
+          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity onPress={() => router.push("/notifications")}>
+              <Ionicons name="notifications-outline" size={24} color="#000" />
             </TouchableOpacity>
-            {recentMoods.length > 0 ? (
-              <View style={styles.recentMoods}>
-                {recentMoods.map((mood) => (
-                  <View key={mood.id} style={styles.moodItem}>
-                    <Text style={styles.moodEmoji}>{mood.mood_emoji}</Text>
-                    <View style={styles.moodDetails}>
-                      <Text style={styles.moodDate}>
-                        {formatDate(mood.created_at)}
-                      </Text>
-                      <Text style={styles.moodText}>{mood.mood_label}</Text>
+            <TouchableOpacity style={styles.menuButton} onPress={showSideMenu}>
+              <Ionicons name="grid" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <KeyboardAvoidingView
+          style={styles.contentContainer}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Greeting Section */}
+            <View style={styles.greetingSection}>
+              <Text style={styles.greetingText}>
+                {getGreeting()},{" "}
+                <Text style={styles.nameText}>{getGreetingName()}!</Text>
+              </Text>
+              <Text style={styles.subGreetingText}>
+                How are you feeling today?
+              </Text>
+            </View>
+
+            {/* Emergency Help Section */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={styles.helpButton}
+                onPress={() => router.push("/crisis-support")}
+              >
+                <View style={styles.helpButtonContent}>
+                  <Text style={styles.helpButtonText}>Get Help Now</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Actions Grid */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <View style={styles.actionsGrid}>
+                {quickActions.map((action) => (
+                  <TouchableOpacity
+                    key={action.id}
+                    style={[
+                      styles.actionCard,
+                      {
+                        backgroundColor: action.color,
+                        borderColor: action.borderColor,
+                      },
+                    ]}
+                    onPress={action.onPress}
+                  >
+                    <View
+                      style={[
+                        styles.iconContainer,
+                        { backgroundColor: action.borderColor },
+                      ]}
+                    >
+                      {action.image ? (
+                        <Image
+                          source={action.image}
+                          style={[
+                            styles.actionImage,
+                            action.id === "crisis" && styles.crisisSupportImage,
+                          ]}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Ionicons
+                          name={action.icon as any}
+                          size={28}
+                          color="white"
+                        />
+                      )}
                     </View>
-                  </View>
-                  
+                    <Text style={styles.actionTitle}>{action.title}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
-            ) : (
-              <View style={styles.noDataContainer}>
-                <Text style={styles.noDataText}>No mood entries yet</Text>
-                <Text style={styles.noDataSubtext}>
-                  Start tracking your mood to see insights here
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Resources Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recommended Resources</Text>
-            {resources.length > 0 ? (
-              resources.map((resource) => (
-                <TouchableOpacity
-                  key={resource.id}
-                  style={styles.resourceCard}
-                  onPress={() => router.push(`/resources/${resource.id}`)}
-                >
-                  <View style={styles.resourceInfo}>
-                    <Text style={styles.resourceTitle}>{resource.title}</Text>
-                    <Text style={styles.resourceDuration}>
-                      {resource.duration}
-                    </Text>
-                  </View>
-                  <Ionicons name="play-circle" size={32} color="#4CAF50" />
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.noDataContainer}>
-                <Text style={styles.noDataText}>No resources available</Text>
-                <Text style={styles.noDataSubtext}>
-                  Check back later for new content
-                </Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
-        
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={styles.navItem}
-            onPress={() => {
-              setActiveTab(tab.id);
-              if (tab.id !== "home") router.push(`/${tab.id}`);
-            }}
-          >
-            <View style={[
-              styles.navIconContainer,
-              activeTab === tab.id && styles.activeIconContainer
-            ]}>
-              <Ionicons
-                name={tab.icon as any}
-                size={24}
-                color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
-              />
             </View>
-          </TouchableOpacity>
-        ))}
-      </View>
-        {/* Side Menu */}
+
+            {/* Recent Mood History Section */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                onPress={() => router.push("/mood-history")}
+                style={styles.sectionTitleContainer}
+              >
+                <Text style={styles.sectionTitle}>Recent Moods</Text>
+              </TouchableOpacity>
+              {recentMoods.length > 0 ? (
+                <View style={styles.recentMoods}>
+                  {recentMoods.map((mood) => (
+                    <View key={mood.id} style={styles.moodItem}>
+                      <Text style={styles.moodEmoji}>{mood.mood_emoji}</Text>
+                      <View style={styles.moodDetails}>
+                        <Text style={styles.moodDate}>
+                          {formatDate(mood.created_at)}
+                        </Text>
+                        <Text style={styles.moodText}>{mood.mood_label}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.noDataContainer}>
+                  <Text style={styles.noDataText}>No mood entries yet</Text>
+                  <Text style={styles.noDataSubtext}>
+                    Start tracking your mood to see insights here
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Resources Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recommended Resources</Text>
+              {resources.length > 0 ? (
+                resources.map((resource) => (
+                  <TouchableOpacity
+                    key={resource.id}
+                    style={styles.resourceCard}
+                    onPress={() => router.push(`../resources/understanding-anxiety`)}
+                  >
+                    <View style={styles.resourceInfo}>
+                      <Text style={styles.resourceTitle}>{resource.title}</Text>
+                      <Text style={styles.resourceDuration}>
+                        {resource.duration}
+                      </Text>
+                    </View>
+                    <Ionicons name="play-circle" size={32} color="#4CAF50" />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.noDataContainer}>
+                  <Text style={styles.noDataText}>No resources available</Text>
+                  <Text style={styles.noDataSubtext}>
+                    Check back later for new content
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.bottomSpacing} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+        {/* Bottom Navigation */}
+        <View style={styles.bottomNav}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={styles.navItem}
+              onPress={() => {
+                setActiveTab(tab.id);
+                if (tab.id !== "home") router.push(`/${tab.id}`);
+              }}
+            >
+              <View
+                style={[
+                  styles.navIconContainer,
+                  activeTab === tab.id && styles.activeIconContainer,
+                ]}
+              >
+                <Ionicons
+                  name={tab.icon as any}
+                  size={24}
+                  color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
+                />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Side Menu Modal */}
         <Modal
-          animationType="none" 
+          animationType="none"
           transparent={true}
           visible={sideMenuVisible}
           onRequestClose={hideSideMenu}
         >
-          <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
+          <Animated.View
+            style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
+          >
             <Pressable
               style={StyleSheet.absoluteFillObject}
               onPress={hideSideMenu}
@@ -647,7 +671,7 @@ if (loading) {
             <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getGreetingName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <Text style={styles.profileEmail}>{MOCK_USER.email}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -655,7 +679,7 @@ if (loading) {
                     key={index}
                     style={styles.sideMenuItem}
                     onPress={() => {
-                      hideSideMenu(); // Use hideSideMenu instead
+                      hideSideMenu();
                       item.onPress();
                     }}
                   >
@@ -671,21 +695,15 @@ if (loading) {
             </Animated.View>
           </Animated.View>
         </Modal>
-                
       </SafeAreaView>
-          </LinearGradient>
-
-    </KeyboardAvoidingView>
+    </CurvedBackground>
   );
 }
 
-
-
-
 const styles = StyleSheet.create({
-  
   container: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
@@ -726,13 +744,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     paddingVertical: 20,
     paddingHorizontal: 32,
-    borderTopLeftRadius: 0,     
-    borderTopRightRadius: 0,     
-    borderBottomLeftRadius: 50,  
-    borderBottomRightRadius: 50, 
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 50,
+    borderBottomRightRadius: 50,
     marginBottom: 20,
   },
-
   greetingText: {
     fontSize: 24,
     fontWeight: "300",
@@ -746,8 +763,7 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 24,
-    
+    marginBottom: 30,
   },
   sectionTitle: {
     fontSize: 14,
@@ -755,7 +771,7 @@ const styles = StyleSheet.create({
     color: "#000",
     marginBottom: 20,
   },
-    sectionHeader: {
+  sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -773,16 +789,15 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginRight: 4,
   },
-
   profileImage: {
-  width: 40,
-  height: 40,
-  borderRadius: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   initialsText: {
-  fontSize: 16,
-  fontWeight: "bold",
-  color: "#4CAF50",
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#4CAF50",
   },
   helpButton: {
     backgroundColor: "#E4585A",
@@ -810,7 +825,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   actionCard: {
-    width: 141 ,
+    width: 141,
     height: 159,
     borderRadius: 16,
     padding: 20,
@@ -835,18 +850,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-
   actionImage: {
     width: 85,
     height: 120,
-    // tintColor: "white", 
   },
   trackMoodImage: {
-  width: 130, 
-  height: 140, 
+    width: 130,
+    height: 140,
   },
   crisisSupportImage: {
-  opacity: 0.6,
+    opacity: 0.6,
   },
   actionTitle: {
     fontSize: 14,
@@ -869,8 +882,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitleContainer: {
-  alignSelf: 'flex-start', 
-},
+    alignSelf: "flex-start",
+  },
   moodItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -960,8 +973,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 40,    
-    borderTopRightRadius: 40, 
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -976,43 +989,26 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   activeIconContainer: {
-  backgroundColor: '#B6D5CF61', // Your ellipse color when tapped
+    backgroundColor: "#B6D5CF61",
   },
-
   navIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 20, // Makes it elliptical/circular
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    width: '100%',  
-    height: '100%', 
-    
-    
-  },
-  // Remove modalContainer and modalOverlay, replace with:
   fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end', // This positions the sidebar on the right
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
   },
   sideMenu: {
- 
     paddingTop: 40,
     width: width * 0.75,
     backgroundColor: "#FFFFFF",
-    height: "100%", // Full height
-    // Remove marginTop
+    height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
@@ -1027,11 +1023,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   nameText: {
-  fontWeight: "700", // Bold for the name
-  color: "#000",
-
-
-},
+    fontWeight: "700",
+    color: "#000",
+  },
   profileEmail: {
     fontSize: 14,
     color: "#757575",
@@ -1046,11 +1040,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
-    
   },
   sideMenuItemText: {
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  contentContainer: {
+    flex: 1,
+      marginBottom: 80, // Space for bottom navigation
+    },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 30, 
+  },
+  bottomSpacing: {
+    height: 30, // Additional spacing at the bottom
   },
 });

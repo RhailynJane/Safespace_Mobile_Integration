@@ -15,18 +15,37 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "../../../../context/AuthContext";
-import BottomNavigation from "../../../../components/BottomNavigation";
-import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
+
+/**
+ * MessagesScreen Component
+ *
+ * Screen for viewing and managing messages with contacts. Features a search bar,
+ * contact list with online status indicators, and navigation to individual chat screens.
+ *
+ * This is a frontend-only implementation with mock data for demonstration.
+ */
 export default function MessagesScreen() {
-  const { user, profile, logout } = useAuth();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
   const [newMessageModalVisible, setNewMessageModalVisible] = useState(false);
+
+  // Mock user data for frontend-only implementation
+  const MOCK_USER = {
+    email: "demo@gmail.com",
+    displayName: "Demo User",
+  };
+
+  const MOCK_PROFILE = {
+    firstName: "Demo",
+    lastName: "User",
+  };
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -36,6 +55,9 @@ export default function MessagesScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handles tab navigation between different app sections
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -44,6 +66,10 @@ export default function MessagesScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  /**
+   * Side menu navigation items for app navigation
+   */
   const sideMenuItems = [
     {
       icon: "home",
@@ -82,7 +108,7 @@ export default function MessagesScreen() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -138,15 +164,20 @@ export default function MessagesScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        await logout();
+        // Clear local storage and navigate to login
+        await AsyncStorage.clear();
+        router.replace("/(auth)/login");
       },
     },
   ];
 
+  /**
+   * Returns the user's display name for personalization
+   */
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (MOCK_PROFILE.firstName) return MOCK_PROFILE.firstName;
+    if (MOCK_USER.displayName) return MOCK_USER.displayName.split(" ")[0];
+    if (MOCK_USER.email) return MOCK_USER.email.split("@")[0];
     return "User";
   };
 
@@ -158,86 +189,155 @@ export default function MessagesScreen() {
     );
   }
 
+  /**
+   * Mock contact data for demonstration
+   */
   const contacts = [
     {
       id: 1,
       name: "Eric Young",
       avatar: "https://randomuser.me/api/portraits/men/1.jpg",
       online: true,
+      lastMessage: "Thanks for checking in!",
+      timestamp: "2:30 PM",
     },
     {
       id: 2,
       name: "Support Group",
       avatar: "https://randomuser.me/api/portraits/women/4.jpg",
       online: false,
+      lastMessage: "Weekly meeting reminder",
+      timestamp: "Yesterday",
     },
     {
       id: 3,
       name: "Sophia Lee",
       avatar: "https://randomuser.me/api/portraits/women/3.jpg",
       online: true,
+      lastMessage: "How are you feeling today?",
+      timestamp: "10:45 AM",
+    },
+    {
+      id: 4,
+      name: "Dr. Martinez",
+      avatar: "https://randomuser.me/api/portraits/men/5.jpg",
+      online: false,
+      lastMessage: "Appointment confirmation",
+      timestamp: "Monday",
+    },
+    {
+      id: 5,
+      name: "Wellness Coach",
+      avatar: "https://randomuser.me/api/portraits/women/6.jpg",
+      online: true,
+      lastMessage: "Exercise routine update",
+      timestamp: "Just now",
     },
   ];
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Message</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons
-          name="search"
-          size={20}
-          color="#9E9E9E"
-          style={styles.searchIcon}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search contacts..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor="#9E9E9E"
-          autoFocus={true}
-        />
-      </View>
-
-      {/* Contact List */}
-      <ScrollView style={styles.contactList}>
-        <Text style={styles.sectionTitle}>Recent Contacts</Text>
-        {contacts.map((contact) => (
-          <TouchableOpacity
-            key={contact.id}
-            style={styles.contactItem}
-            onPress={() =>
-              router.push(`../messages/message-chat-screen?id=${contact.id}`)
-            }
+  /**
+   * Custom BottomNavigation component for tab navigation
+   */
+  const BottomNavigation = ({
+    tabs,
+    activeTab,
+    onTabPress,
+  }: {
+    tabs: Array<{ id: string; name: string; icon: string }>;
+    activeTab: string;
+    onTabPress: (tabId: string) => void;
+  }) => (
+    <View style={bottomNavStyles.container}>
+      {tabs.map((tab) => (
+        <TouchableOpacity
+          key={tab.id}
+          style={bottomNavStyles.tab}
+          onPress={() => onTabPress(tab.id)}
+        >
+          <Ionicons
+            name={tab.icon as any}
+            size={24}
+            color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
+          />
+          <Text
+            style={[
+              bottomNavStyles.tabText,
+              { color: activeTab === tab.id ? "#2EA78F" : "#9E9E9E" },
+            ]}
           >
-            <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: contact.avatar }}
-                style={styles.contactAvatar}
-              />
-              {contact.online && <View style={styles.onlineIndicator} />}
-            </View>
-            <Text style={styles.contactName}>{contact.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+            {tab.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
+  return (
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="New Message" showBack={true} />
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons
+            name="search"
+            size={20}
+            color="#9E9E9E"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search contacts..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#9E9E9E"
+            autoFocus={true}
+          />
+        </View>
+
+        {/* Contact List */}
+        <ScrollView style={styles.contactList}>
+          <Text style={styles.sectionTitle}>Recent Contacts</Text>
+          {contacts.map((contact) => (
+            <TouchableOpacity
+              key={contact.id}
+              style={styles.contactItem}
+              onPress={() =>
+                router.push(`../messages/message-chat-screen?id=${contact.id}`)
+              }
+            >
+              <View style={styles.avatarContainer}>
+                <Image
+                  source={{ uri: contact.avatar }}
+                  style={styles.contactAvatar}
+                />
+                {contact.online && <View style={styles.onlineIndicator} />}
+              </View>
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactName}>{contact.name}</Text>
+                <Text style={styles.contactMessage}>{contact.lastMessage}</Text>
+              </View>
+              <View style={styles.timestampContainer}>
+                <Text style={styles.timestamp}>{contact.timestamp}</Text>
+                {contact.online && <View style={styles.unreadIndicator} />}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
   loadingContainer: {
     flex: 1,
@@ -289,6 +389,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
   },
   avatarContainer: {
     position: "relative",
@@ -310,9 +412,63 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFF",
   },
+  contactInfo: {
+    flex: 1,
+  },
   contactName: {
     fontSize: 16,
     color: "#333",
     fontWeight: "500",
+    marginBottom: 4,
+  },
+  contactMessage: {
+    fontSize: 14,
+    color: "#666",
+  },
+  timestampContainer: {
+    alignItems: "flex-end",
+  },
+  timestamp: {
+    fontSize: 12,
+    color: "#9E9E9E",
+    marginBottom: 4,
+  },
+  unreadIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#4CAF50",
+  },
+});
+
+const bottomNavStyles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 16,
+    backgroundColor: "#FFFFFF",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  tab: {
+    alignItems: "center",
+    padding: 8,
+  },
+  tabText: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });

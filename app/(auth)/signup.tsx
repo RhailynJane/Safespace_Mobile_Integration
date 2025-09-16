@@ -17,10 +17,8 @@ import PersonalInfoStep from "../../components/PersonalInfoStep";
 import PasswordStep from "../../components/PasswordStep";
 import EmailVerificationStep from "../../components/EmailVerificationStep";
 import SuccessStep from "../../components/SuccessStep";
-import { useAuth } from "../../context/AuthContext";
-import { supabase } from "../../lib/supabase";
-import { getAuth } from "firebase/auth";
 
+// Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
 
 export interface SignupData {
@@ -31,11 +29,10 @@ export interface SignupData {
   phoneNumber: string;
   password: string;
   verificationCode: string;
-  therapyType: "adult" | "minor" | "guardian";
 }
 
 export default function SignupScreen() {
-  const { signUp } = useAuth();
+  // State management for signup process
   const [currentStep, setCurrentStep] = useState<SignupStep>("personal");
   const [loading, setLoading] = useState(false);
   const [signupData, setSignupData] = useState<SignupData>({
@@ -46,20 +43,22 @@ export default function SignupScreen() {
     phoneNumber: "",
     password: "",
     verificationCode: "",
-    therapyType: "adult", // Default to adult therapy type
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Update signup data with partial updates
   const updateSignupData = (data: Partial<SignupData>) => {
     setSignupData((prev) => ({ ...prev, ...data }));
   };
 
+  // Progress to the next step in the signup process
   const nextStep = async () => {
     const steps: SignupStep[] = ["personal", "password", "verification", "success"];
     const currentIndex = steps.indexOf(currentStep);
 
     setErrorMessage(null);
 
+    // Handle password step validation
     if (currentStep === "password") {
       // Validate required fields
       if (!signupData.firstName || !signupData.lastName) {
@@ -74,21 +73,13 @@ export default function SignupScreen() {
       setLoading(true);
 
       try {
-        const firebaseResult = await signUp(
-          signupData.email,
-          signupData.password,
-          signupData.firstName,
-          signupData.lastName,
-          signupData.therapyType,
-          signupData.phoneNumber
-        );
-
-        if (firebaseResult?.error) {
-          setErrorMessage(firebaseResult.error);
-          setLoading(false);
-          return;
-        }
-
+        // In a real implementation, this would call signup API
+        // For now, we'll simulate a successful signup
+        console.log("Signup data:", signupData);
+        
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         setCurrentStep("verification");
       } catch (error) {
         setErrorMessage(
@@ -103,6 +94,7 @@ export default function SignupScreen() {
       return;
     }
 
+    // Progress to next step if not on password step
     if (currentIndex < steps.length - 1) {
       const nextStep = steps[currentIndex + 1];
       if (nextStep) {
@@ -111,6 +103,7 @@ export default function SignupScreen() {
     }
   };
 
+  // Return to the previous step
   const prevStep = () => {
     const steps: SignupStep[] = ["personal", "password", "verification", "success"];
     const currentIndex = steps.indexOf(currentStep);
@@ -119,10 +112,12 @@ export default function SignupScreen() {
     }
   };
 
+  // Get the current step number for display purposes
   const getStepNumber = (): number => {
     return ["personal", "password", "verification", "success"].indexOf(currentStep) + 1;
   };
 
+  // Render the appropriate step component based on current step
   const renderCurrentStep = () => {
     switch (currentStep) {
       case "personal":
@@ -203,15 +198,17 @@ export default function SignupScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {/* Decorative ellipse at the top */}
+          <View style={styles.topEllipse}></View> 
 
-                <View style={styles.topEllipse}></View> 
-
-
+          {/* Logo display (hidden on success screen) */}
           {currentStep !== "success" && (
             <View style={styles.logoContainer}>
               <SafeSpaceLogo size={218} />
             </View>
           )}
+          
+          {/* Render the current step component */}
           {renderCurrentStep()}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -264,20 +261,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 20,
   },
-
   topEllipse: {
-  position: 'absolute',
-  top: 0,
-  left: -50,
-  right: -50,
-  height: 200,
-  backgroundColor: '#B87B7B',
-  opacity: 0.10, // 50% opacity
-  borderBottomLeftRadius: 200,
-  borderBottomRightRadius: 200,
-  zIndex: -1, // Place behind other content
-},
-
+    position: 'absolute',
+    top: 0,
+    left: -50,
+    right: -50,
+    height: 200,
+    backgroundColor: '#B87B7B',
+    opacity: 0.10,
+    borderBottomLeftRadius: 200,
+    borderBottomRightRadius: 200,
+    zIndex: -1,
+  },
   activeToggle: {
     backgroundColor: "#7BB8A8",
   },

@@ -7,7 +7,15 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { SignupData } from "../app/(auth)/signup";
+
+// Local interface for signup data
+interface SignupData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  age: string;
+  phoneNumber: string;
+}
 
 // Props interface for the PersonalInfoStep component
 interface PersonalInfoStepProps {
