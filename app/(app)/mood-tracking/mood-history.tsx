@@ -326,7 +326,7 @@ export default function MoodHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "Transparent",
   },
   loadingContainer: {
     flex: 1,
@@ -338,8 +338,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: 20,
-    paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#Transparent",
   },
   headerTitle: {
     fontSize: 20,

@@ -12,6 +12,7 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  StatusBar,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import Slider from "@react-native-community/slider";
@@ -218,7 +219,7 @@ export default function MoodLoggingScreen() {
       Alert.alert("Mood Logged!", "Your mood has been saved successfully.", [
         { 
           text: "OK", 
-          onPress: () => router.replace("../mood-tracking/mood-history.tsx") 
+          onPress: () => router.replace("../mood-tracking/mood-history") 
         },
       ]);
       setIsSubmitting(false);
@@ -236,12 +237,22 @@ export default function MoodLoggingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Elegant curved background with gradient colors */}
-      <CurvedBackground />
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      
+      {/* Elegant curved background with gradient colors - positioned absolutely */}
+      <View style={styles.backgroundContainer}>
+        <CurvedBackground />
+      </View>
       
       {/* Header with navigation controls */}
-      <AppHeader title="Mood Tracking" showBack={true} />
+      <View style={styles.tempHeader}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+        </TouchableOpacity>
+        <Text style={styles.tempHeaderTitle}>Mood Tracking</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
       {/* Main Content */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -389,7 +400,7 @@ export default function MoodLoggingScreen() {
           </TouchableOpacity>
         ))}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -397,6 +408,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+    marginTop: -50,
+    paddingTop: 50,
+  },
+  headerContainer: {
+    marginTop: 0,
+    paddingTop: 0,
+  },
+  tempHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    paddingTop: 10,
+    backgroundColor: "#FFFFFF",
+  },
+  tempHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#2E7D32",
+  },
+  backgroundContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
   },
   header: {
     flexDirection: "row",

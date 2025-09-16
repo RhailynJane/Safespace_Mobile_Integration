@@ -15,12 +15,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
 /**
  * CrisisScreen Component
- * 
+ *
  * Emergency support screen providing immediate crisis resources including:
  * - Emergency contact numbers (911, crisis hotlines)
  * - Immediate coping strategies
@@ -39,7 +40,7 @@ export default function CrisisScreen() {
     displayName: "Demo User",
     email: "demo@gmail.com",
   };
-  
+
   const mockProfile = {
     firstName: "Demo",
     lastName: "User",
@@ -66,7 +67,7 @@ export default function CrisisScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
-  
+
   // Side menu navigation items
   const sideMenuItems = [
     {
@@ -213,18 +214,10 @@ export default function CrisisScreen() {
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="menu" size={28} color="#4CAF50" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Crisis Support</Text>
-          <TouchableOpacity onPress={() => console.log("Notifications pressed")}>
-            <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-          </TouchableOpacity>
-        </View>
+        <AppHeader title="Crisis Support" showBack={true} />
 
         {/* Main Content */}
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.contentContainer}
         >
@@ -233,34 +226,38 @@ export default function CrisisScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionMainTitle}>Need Immediate Help?</Text>
               <Text style={styles.sectionText}>
-                If you or someone you know is in crisis, please call 911 or contact a 24/7 crisis line in your area.
+                If you or someone you know is in crisis, please call 911 or
+                contact a 24/7 crisis line in your area.
               </Text>
               <Text style={styles.sectionText}>
-                For urgent mental health support, reach out to the Distress Centre at 403-266-4357 or visit distresscentre.com.
+                For urgent mental health support, reach out to the Distress
+                Centre at 403-266-4357 or visit distresscentre.com.
               </Text>
             </View>
           </View>
 
           {/* Emergency Action Buttons */}
           <View style={styles.emergencyButtons}>
-            <TouchableOpacity 
-              style={[styles.emergencyButton, { backgroundColor: '#E53935' }]}
-              onPress={() => handleEmergencyCall('911')}
+            <TouchableOpacity
+              style={[styles.emergencyButton, { backgroundColor: "#E53935" }]}
+              onPress={() => handleEmergencyCall("911")}
             >
               <Ionicons name="call" size={20} color="#FFFFFF" />
               <Text style={styles.emergencyButtonText}>Call 911</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.emergencyButton, { backgroundColor: '#4CAF50' }]}
-              onPress={() => handleEmergencyCall('988')}
+            <TouchableOpacity
+              style={[styles.emergencyButton, { backgroundColor: "#4CAF50" }]}
+              onPress={() => handleEmergencyCall("988")}
             >
               <Ionicons name="call" size={20} color="#FFFFFF" />
-              <Text style={styles.emergencyButtonText}>Crisis Hotline: 988</Text>
+              <Text style={styles.emergencyButtonText}>
+                Crisis Hotline: 988
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.emergencyButton, { backgroundColor: '#2196F3' }]}
+            <TouchableOpacity
+              style={[styles.emergencyButton, { backgroundColor: "#2196F3" }]}
               onPress={handleDistressCenter}
             >
               <Ionicons name="globe" size={20} color="#FFFFFF" />
@@ -278,53 +275,79 @@ export default function CrisisScreen() {
                 </View>
                 <Text style={styles.strategyText}>Take slow breaths.</Text>
               </View>
-              
+
               <View style={styles.strategyItem}>
                 <View style={styles.strategyNumber}>
                   <Text style={styles.strategyNumberText}>2</Text>
                 </View>
-                <Text style={styles.strategyText}>Go to a safe public place.</Text>
+                <Text style={styles.strategyText}>
+                  Go to a safe public place.
+                </Text>
               </View>
-              
+
               <View style={styles.strategyItem}>
                 <View style={styles.strategyNumber}>
                   <Text style={styles.strategyNumberText}>3</Text>
                 </View>
-                <Text style={styles.strategyText}>Focus on getting through the next hour.</Text>
+                <Text style={styles.strategyText}>
+                  Focus on getting through the next hour.
+                </Text>
               </View>
-              
+
               <View style={styles.strategyItem}>
                 <View style={styles.strategyNumber}>
                   <Text style={styles.strategyNumberText}>4</Text>
                 </View>
-                <Text style={styles.strategyText}>Reach out to someone you trust.</Text>
+                <Text style={styles.strategyText}>
+                  Reach out to someone you trust.
+                </Text>
               </View>
-              
+
               <View style={styles.strategyItem}>
                 <View style={styles.strategyNumber}>
                   <Text style={styles.strategyNumberText}>5</Text>
                 </View>
-                <Text style={styles.strategyText}>Remove means of self harm.</Text>
+                <Text style={styles.strategyText}>
+                  Remove means of self harm.
+                </Text>
               </View>
-              
+
               <View style={styles.strategyItem}>
                 <View style={styles.strategyNumber}>
                   <Text style={styles.strategyNumberText}>6</Text>
                 </View>
-                <Text style={styles.strategyText}>Use grounding techniques (5-4-3-2-1)</Text>
+                <Text style={styles.strategyText}>
+                  Use grounding techniques (5-4-3-2-1)
+                </Text>
               </View>
             </View>
           </View>
 
           {/* Grounding Technique Section */}
           <View style={styles.groundingSection}>
-            <Text style={styles.groundingTitle}>5-4-3-2-1 Grounding Technique</Text>
+            <Text style={styles.groundingTitle}>
+              5-4-3-2-1 Grounding Technique
+            </Text>
             <View style={styles.groundingSteps}>
-              <Text style={styles.groundingStep}><Text style={styles.groundingNumber}>5</Text> things you can see</Text>
-              <Text style={styles.groundingStep}><Text style={styles.groundingNumber}>4</Text> things you can touch</Text>
-              <Text style={styles.groundingStep}><Text style={styles.groundingNumber}>3</Text> things you can hear</Text>
-              <Text style={styles.groundingStep}><Text style={styles.groundingNumber}>2</Text> things you can smell</Text>
-              <Text style={styles.groundingStep}><Text style={styles.groundingNumber}>1</Text> thing you can taste</Text>
+              <Text style={styles.groundingStep}>
+                <Text style={styles.groundingNumber}>5</Text> things you can see
+              </Text>
+              <Text style={styles.groundingStep}>
+                <Text style={styles.groundingNumber}>4</Text> things you can
+                touch
+              </Text>
+              <Text style={styles.groundingStep}>
+                <Text style={styles.groundingNumber}>3</Text> things you can
+                hear
+              </Text>
+              <Text style={styles.groundingStep}>
+                <Text style={styles.groundingNumber}>2</Text> things you can
+                smell
+              </Text>
+              <Text style={styles.groundingStep}>
+                <Text style={styles.groundingNumber}>1</Text> thing you can
+                taste
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -353,7 +376,11 @@ export default function CrisisScreen() {
                     style={styles.sideMenuItem}
                     onPress={item.onPress}
                   >
-                    <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
                     <Text style={styles.sideMenuItemText}>{item.title}</Text>
                   </TouchableOpacity>
                 ))}
