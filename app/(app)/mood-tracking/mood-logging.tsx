@@ -121,7 +121,7 @@ export default function MoodLoggingScreen() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {

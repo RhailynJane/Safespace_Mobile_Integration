@@ -106,7 +106,7 @@ export default function AppointmentsScreen() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {

@@ -417,7 +417,7 @@ export default function PHQ9QuestionnaireScreen() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {

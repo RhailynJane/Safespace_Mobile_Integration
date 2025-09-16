@@ -214,7 +214,7 @@ export default function AppointmentList() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {

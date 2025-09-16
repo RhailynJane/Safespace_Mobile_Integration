@@ -67,7 +67,7 @@ const sideMenuItems = [
   {
     icon: "journal",
     title: "Journaling",
-    onPress: () => router.push("/journaling"),
+    onPress: () => router.push("/journal"),
   },
   {
     icon: "library",

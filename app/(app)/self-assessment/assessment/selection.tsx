@@ -155,7 +155,7 @@ export default function AssessmentSelectionScreen() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {

@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -33,7 +34,7 @@ export default function StressQuestionnaireScreen() {
   // Using mock data instead of auth context
   const user = mockUser;
   const profile = mockProfile;
-  
+
   // State management for UI components
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,53 +57,53 @@ export default function StressQuestionnaireScreen() {
     {
       id: 0,
       text: "In the last month, how often have you been upset because of something that happened unexpectedly?",
-      shortText: "Upset because of something unexpected"
+      shortText: "Upset because of something unexpected",
     },
     {
       id: 1,
       text: "In the last month, how often have you felt that you were unable to control the important things in your life?",
-      shortText: "Unable to control important things"
+      shortText: "Unable to control important things",
     },
     {
       id: 2,
       text: "In the last month, how often have you felt nervous and stressed?",
-      shortText: "Felt nervous and stressed"
+      shortText: "Felt nervous and stressed",
     },
     {
       id: 3,
       text: "In the last month, how often have you felt confident about your ability to handle your personal problems?",
-      shortText: "Confident about handling personal problems"
+      shortText: "Confident about handling personal problems",
     },
     {
       id: 4,
       text: "In the last month, how often have you felt that things were going your way?",
-      shortText: "Things were going your way"
+      shortText: "Things were going your way",
     },
     {
       id: 5,
       text: "In the last month, how often have you found that you could not cope with all the things that you had to do?",
-      shortText: "Could not cope with all the things to do"
+      shortText: "Could not cope with all the things to do",
     },
     {
       id: 6,
       text: "In the last month, how often have you been able to control irritations in your life?",
-      shortText: "Able to control irritations"
+      shortText: "Able to control irritations",
     },
     {
       id: 7,
       text: "In the last month, how often have you felt that you were on top of things?",
-      shortText: "Felt on top of things"
+      shortText: "Felt on top of things",
     },
     {
       id: 8,
       text: "In the last month, how often have you been angered because of things that were outside of your control?",
-      shortText: "Angered by things outside your control"
+      shortText: "Angered by things outside your control",
     },
     {
       id: 9,
       text: "In the last month, how often have you felt difficulties were piling up so high that you could not overcome them?",
-      shortText: "Difficulties piling up too high to overcome"
-    }
+      shortText: "Difficulties piling up too high to overcome",
+    },
   ];
 
   // Response options for the stress assessment
@@ -111,7 +112,7 @@ export default function StressQuestionnaireScreen() {
     { value: 1, label: "Almost Never" },
     { value: 2, label: "Sometimes" },
     { value: 3, label: "Fairly Often" },
-    { value: 4, label: "Very Often" }
+    { value: 4, label: "Very Often" },
   ];
 
   // Handle tab navigation in the bottom navigation bar
@@ -155,7 +156,7 @@ export default function StressQuestionnaireScreen() {
 
   // Navigate to assessment selection screen
   const handleTakeAnotherAssessment = () => {
-    router.push("/assessment/selection");
+    router.push("../assessment/selection");
   };
 
   // Side menu navigation options
@@ -197,7 +198,7 @@ export default function StressQuestionnaireScreen() {
       title: "Journaling",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
@@ -279,51 +280,173 @@ export default function StressQuestionnaireScreen() {
   // Show completion screen when assessment is finished
   if (isCompleted) {
     return (
-      <SafeAreaView style={styles.container}>
-        {/* Curved background for visual appeal */}
-        <CurvedBackground />
-        
-        {/* Header with navigation and notification icons */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Self Assessment</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-              <Ionicons name="notifications-outline" size={24} color="#333" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>1</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-              <Ionicons name="grid-outline" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-        </View>
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <AppHeader title="Stress-Assessment" showBack={true} />
 
-        {/* Completion Content */}
-        <View style={styles.completionContainer}>
-          <Text style={styles.completionTitle}>Self Assessment Completed!</Text>
-          
-          <View style={styles.completionIconContainer}>
-            <View style={styles.completionIcon}>
-              <Ionicons name="person" size={40} color="#F44336" />
-              <View style={styles.checkmarkBadge}>
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          {/* Completion Content */}
+          <View style={styles.completionContainer}>
+            <Text style={styles.completionTitle}>
+              Self Assessment Completed!
+            </Text>
+
+            <View style={styles.completionIconContainer}>
+              <View style={styles.completionIcon}>
+                <Ionicons name="checkmark-circle" size={40} color="#4CAF50" />
               </View>
             </View>
+
+            <Text style={styles.completionMessage}>
+              Your therapist will review the result of your assessment!
+            </Text>
+
+            <TouchableOpacity
+              style={styles.anotherAssessmentButton}
+              onPress={handleTakeAnotherAssessment}
+            >
+              <Text style={styles.anotherAssessmentText}>
+                Take another assessment
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.completionMessage}>
-            Your therapist will review the result of your assessment!
-          </Text>
-
-          <TouchableOpacity 
-            style={styles.anotherAssessmentButton}
-            onPress={handleTakeAnotherAssessment}
+          {/* Side Menu Modal */}
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={sideMenuVisible}
+            onRequestClose={() => setSideMenuVisible(false)}
           >
-            <Text style={styles.anotherAssessmentText}>Take another assessment</Text>
+            <View style={styles.modalContainer}>
+              <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setSideMenuVisible(false)}
+              />
+              <View style={styles.sideMenu}>
+                <View style={styles.sideMenuHeader}>
+                  <Text style={styles.profileName}>{getDisplayName()}</Text>
+                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                </View>
+                <ScrollView style={styles.sideMenuContent}>
+                  {sideMenuItems.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.sideMenuItem}
+                      onPress={item.onPress}
+                    >
+                      <Ionicons
+                        name={item.icon as keyof typeof Ionicons.glyphMap}
+                        size={20}
+                        color="#4CAF50"
+                      />
+                      <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Bottom Navigation Bar */}
+          <BottomNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
+  // Main assessment screen with questions and answer options
+  return (
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Stress-Assessment" showBack={true} />
+
+        {/* Scrollable content area for questions */}
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Question progress indicator and reset button */}
+          <View style={styles.questionHeader}>
+            <Text style={styles.questionNumber}>
+              Question {currentQuestion + 1} of {questions.length}
+            </Text>
+            <TouchableOpacity
+              style={styles.startOverButton}
+              onPress={handleStartOver}
+            >
+              <Text style={styles.startOverText}>Start Over</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Current question display */}
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionText}>
+              {questions[currentQuestion]?.text}
+            </Text>
+          </View>
+
+          {/* Answer options for the current question */}
+          <View style={styles.optionsContainer}>
+            {answerOptions.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.optionButton,
+                  answers[currentQuestion] === option.value &&
+                    styles.selectedOption,
+                ]}
+                onPress={() => handleAnswerSelect(option.value)}
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    answers[currentQuestion] === option.value &&
+                      styles.selectedOptionText,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Navigation buttons for moving between questions */}
+        <View style={styles.navigationContainer}>
+          <TouchableOpacity
+            style={[styles.navButton, styles.backButton]}
+            onPress={handleBack}
+            disabled={currentQuestion === 0}
+          >
+            <Text
+              style={[
+                styles.navButtonText,
+                currentQuestion === 0 && styles.disabledText,
+              ]}
+            >
+              Back
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.navButton,
+              styles.nextButton,
+              answers[currentQuestion] === undefined && styles.disabledButton,
+            ]}
+            onPress={handleNext}
+            disabled={answers[currentQuestion] === undefined}
+          >
+            <Text
+              style={[
+                styles.navButtonText,
+                styles.nextButtonText,
+                answers[currentQuestion] === undefined && styles.disabledText,
+              ]}
+            >
+              {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -351,7 +474,11 @@ export default function StressQuestionnaireScreen() {
                     style={styles.sideMenuItem}
                     onPress={item.onPress}
                   >
-                    <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
+                    <Ionicons
+                      name={item.icon as keyof typeof Ionicons.glyphMap}
+                      size={20}
+                      color="#4CAF50"
+                    />
                     <Text style={styles.sideMenuItemText}>{item.title}</Text>
                   </TouchableOpacity>
                 ))}
@@ -367,198 +494,23 @@ export default function StressQuestionnaireScreen() {
           onTabPress={handleTabPress}
         />
       </SafeAreaView>
-    );
-  }
-
-  // Main assessment screen with questions and answer options
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Curved background for visual appeal */}
-      <CurvedBackground />
-      
-      {/* Header with navigation and notification icons */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Self Assessment</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#333" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>1</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="grid-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Scrollable content area for questions */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Question progress indicator and reset button */}
-        <View style={styles.questionHeader}>
-          <Text style={styles.questionNumber}>Question {currentQuestion + 1} of {questions.length}</Text>
-          <TouchableOpacity style={styles.startOverButton} onPress={handleStartOver}>
-            <Text style={styles.startOverText}>Start Over</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Current question display */}
-        <View style={styles.questionContainer}>
-          <Text style={styles.questionText}>{questions[currentQuestion]?.text}</Text>
-        </View>
-
-        {/* Answer options for the current question */}
-        <View style={styles.optionsContainer}>
-          {answerOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.optionButton,
-                answers[currentQuestion] === option.value && styles.selectedOption
-              ]}
-              onPress={() => handleAnswerSelect(option.value)}
-            >
-              <Text style={[
-                styles.optionText,
-                answers[currentQuestion] === option.value && styles.selectedOptionText
-              ]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Navigation buttons for moving between questions */}
-      <View style={styles.navigationContainer}>
-        <TouchableOpacity
-          style={[styles.navButton, styles.backButton]}
-          onPress={handleBack}
-          disabled={currentQuestion === 0}
-        >
-          <Text style={[styles.navButtonText, currentQuestion === 0 && styles.disabledText]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.navButton,
-            styles.nextButton,
-            answers[currentQuestion] === undefined && styles.disabledButton
-          ]}
-          onPress={handleNext}
-          disabled={answers[currentQuestion] === undefined}
-        >
-          <Text style={[
-            styles.navButtonText,
-            styles.nextButtonText,
-            answers[currentQuestion] === undefined && styles.disabledText
-          ]}>
-            {currentQuestion === questions.length - 1 ? "Complete" : "Next"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Side Menu Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-          </View>
-        </Modal>
-
-        {/* Bottom Navigation Bar */}
-        <BottomNavigation
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabPress={handleTabPress}
-        />
-      </SafeAreaView>
-    );
-  }
-
+    </CurvedBackground>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  notificationButton: {
-    position: "relative",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF5722",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "600",
-  },
   content: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   questionHeader: {
     flexDirection: "row",
@@ -566,9 +518,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "transparent",
   },
   questionNumber: {
     fontSize: 16,
@@ -589,7 +541,7 @@ const styles = StyleSheet.create({
   questionContainer: {
     paddingHorizontal: 20,
     paddingVertical: 30,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   questionText: {
     fontSize: 18,
@@ -600,7 +552,7 @@ const styles = StyleSheet.create({
   optionsContainer: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    gap: 15,
+    gap: 5,
   },
   optionButton: {
     backgroundColor: "#FFFFFF",
@@ -637,9 +589,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 20,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: "transparent",
+    marginBottom: 120,
   },
   navButton: {
     paddingHorizontal: 30,
@@ -660,20 +613,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
-    color: "#FFFFFF",
+    color: "#000000",
   },
   nextButtonText: {
     color: "#FFFFFF",
   },
   disabledText: {
-    color: "#9E9E9E",
+    color: "#000000",
   },
   completionContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 40,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   completionTitle: {
     fontSize: 24,

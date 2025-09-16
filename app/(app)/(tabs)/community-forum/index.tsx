@@ -163,7 +163,7 @@ export default function CommunityScreen() {
       title: "Journaling",
       onPress: () => {
         hideSideMenu();
-        router.push("/journaling");
+        router.push("/journal");
       },
     },
     {
