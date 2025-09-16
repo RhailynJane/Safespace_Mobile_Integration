@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8F5E9",
     padding: 16,
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 80,
   },
   groundingTitle: {
     fontSize: 18,
