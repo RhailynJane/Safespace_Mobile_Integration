@@ -16,10 +16,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
-// Mock user data 
+// Mock user data
 const mockUser = {
   displayName: "Demo User",
   email: "demo@gmail.com",
@@ -32,7 +33,7 @@ const mockProfile = {
 
 /**
  * VideoScreen Component
- * 
+ *
  * A screen that displays video consultation details and technical requirements.
  * Users can view their upcoming appointments and join video meetings.
  * Features a beautiful curved background and comprehensive navigation.
@@ -211,157 +212,154 @@ export default function VideoScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <CurvedBackground />
-      
-      {/* Header with menu button and title */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-          <Ionicons name="menu" size={28} color="#4CAF50" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Video Consultation</Text>
-        <TouchableOpacity onPress={() => router.push("/notifications")}>
-          <Ionicons name="notifications-outline" size={24} color="#4CAF50" />
-        </TouchableOpacity>
-      </View>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Video Session" showBack={true} />
 
-      {/* Main Content */}
-      <ScrollView style={styles.scrollContent}>
-        <View style={styles.content}>
-          <View style={styles.appointmentCard}>
-            {/* Support Worker Profile */}
-            <View style={styles.profileContainer}>
-              <Image
-                source={{ uri: appointments[0]?.avatar }}
-                style={styles.avatar}
-              />
-              <View style={styles.nameContainer}>
-                <Text style={styles.name}>
-                  {appointments[0]?.supportWorker ?? ""}
-                </Text>
-                <Text style={styles.date}>{appointments[0]?.date ?? ""}</Text>
-                <Text style={styles.time}>{appointments[0]?.time ?? ""}</Text>
-              </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  appointments[0]?.status === "Upcoming"
-                    ? styles.upcomingBadge
-                    : appointments[0]?.status === "Completed"
-                    ? styles.completedBadge
-                    : styles.canceledBadge,
-                ]}
-              >
-                <Text style={styles.statusText}>
-                  {appointments[0]?.status ?? ""}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Technical Requirements Section */}
-            <Text style={styles.sectionTitle}>Technical Requirements</Text>
-
-            <Text style={styles.subsectionTitle}>System Requirements</Text>
-            <View style={styles.requirementItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>
-                Stable internet connection (min 1 Mbps)
-              </Text>
-            </View>
-            <View style={styles.requirementItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>Speakers or headphones</Text>
-            </View>
-
-            <Text style={styles.subsectionTitle}>Privacy & Security</Text>
-            <View style={styles.requirementItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>
-                End to end encrypted video calls
-              </Text>
-            </View>
-            <View style={styles.requirementItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>
-                HIPAA/PIPEDA compliant platform
-              </Text>
-            </View>
-            <View style={styles.requirementItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>
-                No recordings without consent
-              </Text>
-            </View>
-            <View style={styles.requirementItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.requirementText}>
-                Secure data transmission
-              </Text>
-            </View>
-
-            {/* Join Meeting Button (only for upcoming appointments) */}
-            {appointments[0] && appointments[0].status === "Upcoming" && (
-              <TouchableOpacity
-                style={styles.joinButton}
-                onPress={handleJoinMeeting}
-              >
-                <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                <Text style={styles.joinButtonText}>Join Meeting</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Side Menu Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
+        {/* Main Content */}
+        <ScrollView style={styles.scrollContent}>
+          <View style={styles.content}>
+            <View style={styles.appointmentCard}>
+              {/* Support Worker Profile */}
+              <View style={styles.profileContainer}>
+                <Image
+                  source={{ uri: appointments[0]?.avatar }}
+                  style={styles.avatar}
+                />
+                <View style={styles.nameContainer}>
+                  <Text style={styles.name}>
+                    {appointments[0]?.supportWorker ?? ""}
+                  </Text>
+                  <Text style={styles.date}>{appointments[0]?.date ?? ""}</Text>
+                  <Text style={styles.time}>{appointments[0]?.time ?? ""}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    appointments[0]?.status === "Upcoming"
+                      ? styles.upcomingBadge
+                      : appointments[0]?.status === "Completed"
+                      ? styles.completedBadge
+                      : styles.canceledBadge,
+                  ]}
                 >
-                  <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+                  <Text style={styles.statusText}>
+                    {appointments[0]?.status ?? ""}
+                  </Text>
+                </View>
+              </View>
 
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+              <View style={styles.divider} />
+
+              {/* Technical Requirements Section */}
+              <Text style={styles.sectionTitle}>Technical Requirements</Text>
+
+              <Text style={styles.subsectionTitle}>System Requirements</Text>
+              <View style={styles.requirementItem}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.requirementText}>
+                  Stable internet connection (min 1 Mbps)
+                </Text>
+              </View>
+              <View style={styles.requirementItem}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.requirementText}>
+                  Speakers or headphones
+                </Text>
+              </View>
+
+              <Text style={styles.subsectionTitle}>Privacy & Security</Text>
+              <View style={styles.requirementItem}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.requirementText}>
+                  End to end encrypted video calls
+                </Text>
+              </View>
+              <View style={styles.requirementItem}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.requirementText}>
+                  HIPAA/PIPEDA compliant platform
+                </Text>
+              </View>
+              <View style={styles.requirementItem}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.requirementText}>
+                  No recordings without consent
+                </Text>
+              </View>
+              <View style={styles.requirementItem}>
+                <View style={styles.bulletPoint} />
+                <Text style={styles.requirementText}>
+                  Secure data transmission
+                </Text>
+              </View>
+
+              {/* Join Meeting Button (only for upcoming appointments) */}
+              {appointments[0] && appointments[0].status === "Upcoming" && (
+                <TouchableOpacity
+                  style={styles.joinButton}
+                  onPress={handleJoinMeeting}
+                >
+                  <Ionicons name="videocam" size={20} color="#FFFFFF" />
+                  <Text style={styles.joinButtonText}>Join Meeting</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Side Menu Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   avatar: {
     width: 60,
