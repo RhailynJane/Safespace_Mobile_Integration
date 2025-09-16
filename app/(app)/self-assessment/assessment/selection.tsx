@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { AppHeader } from "../../../../components/AppHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -33,7 +34,7 @@ export default function AssessmentSelectionScreen() {
   // Using mock data instead of AuthContext
   const user = mockUser;
   const profile = mockProfile;
-  
+
   // State management for UI components
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -102,16 +103,16 @@ export default function AssessmentSelectionScreen() {
   const handleAssessmentType = (assessmentId: string) => {
     // Navigate to the specific assessment questionnaire
     if (assessmentId === "depression-phq9") {
-      router.push("/assessment/phq9");
+      router.push("../assessment/phq9");
     } else if (assessmentId === "anxiety-gad7") {
-      router.push("/assessment/gad7");
+      router.push("../assessment/gad7");
     } else if (assessmentId === "general-mental-health") {
-    router.push("/assessment/general-mental-health");
+      router.push("../assessment/general-mental-health");
     } else if (assessmentId === "stress-assessment") {
-    router.push("/assessment/stress-test");
+      router.push("../assessment/stress-test");
     } else {
       // For other assessments, navigate to a generic placeholder for now
-      router.push(`/assessment/questionnaire/${assessmentId}`);
+      router.push(`../assessment/questionnaire/${assessmentId}`);
     }
   };
 
@@ -234,163 +235,125 @@ export default function AssessmentSelectionScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Add CurvedBackground to the assessment selection screen */}
-      <CurvedBackground />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Self Assessment</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push("/notifications")} style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#333" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>1</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSideMenuVisible(true)}>
-            <Ionicons name="grid-outline" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <AppHeader title="Self-Assessment" showBack={true} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Purpose Section */}
-        <View style={styles.purposeSection}>
-          <Text style={styles.purposeTitle}>Purpose: Pre-Appointment Assessment</Text>
-          <Text style={styles.purposeDescription}>
-            This assessment will help your provider better understand your current state before your appointment
-          </Text>
-        </View>
-
-        {/* Instructions */}
-        <View style={styles.instructionsSection}>
-          <Text style={styles.instructionsText}>
-            Please select an assessment to help evaluate your current mental health status
-          </Text>
-        </View>
-
-        {/* Assessment Types */}
-        <View style={styles.assessmentTypesContainer}>
-          {assessmentTypes.map((assessment) => (
-            <TouchableOpacity
-              key={assessment.id}
-              style={[styles.assessmentCard, { backgroundColor: assessment.backgroundColor }]}
-              onPress={() => handleAssessmentType(assessment.id)}
-            >
-              <View style={styles.assessmentIconContainer}>
-                <Ionicons name={assessment.icon as any} size={24} color={assessment.iconColor} />
-              </View>
-              <View style={styles.assessmentContent}>
-                <Text style={styles.assessmentTitle}>{assessment.title}</Text>
-                <Text style={styles.assessmentDescription}>{assessment.description}</Text>
-                <Text style={styles.assessmentDuration}>{assessment.duration}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-
-      {/* Side Menu */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setSideMenuVisible(false)}
-          />
-          <View style={styles.sideMenu}>
-            <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
-            </View>
-            <ScrollView style={styles.sideMenuContent}>
-              {sideMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.sideMenuItem}
-                  onPress={item.onPress}
-                >
-                  <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={20} color="#4CAF50" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Purpose Section */}
+          <View style={styles.purposeSection}>
+            <Text style={styles.purposeTitle}>
+              Purpose: Pre-Appointment Assessment
+            </Text>
+            <Text style={styles.purposeDescription}>
+              This assessment will help your provider better understand your
+              current state before your appointment
+            </Text>
           </View>
-        </View>
-      </Modal>
 
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-    </SafeAreaView>
+          {/* Instructions */}
+          <View style={styles.instructionsSection}>
+            <Text style={styles.instructionsText}>
+              Please select an assessment to help evaluate your current mental
+              health status
+            </Text>
+          </View>
+
+          {/* Assessment Types */}
+          <View style={styles.assessmentTypesContainer}>
+            {assessmentTypes.map((assessment) => (
+              <TouchableOpacity
+                key={assessment.id}
+                style={[
+                  styles.assessmentCard,
+                  { backgroundColor: assessment.backgroundColor },
+                ]}
+                onPress={() => handleAssessmentType(assessment.id)}
+              >
+                <View style={styles.assessmentIconContainer}>
+                  <Ionicons
+                    name={assessment.icon as any}
+                    size={24}
+                    color={assessment.iconColor}
+                  />
+                </View>
+                <View style={styles.assessmentContent}>
+                  <Text style={styles.assessmentTitle}>{assessment.title}</Text>
+                  <Text style={styles.assessmentDescription}>
+                    {assessment.description}
+                  </Text>
+                  <Text style={styles.assessmentDuration}>
+                    {assessment.duration}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Side Menu */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={sideMenuVisible}
+          onRequestClose={() => setSideMenuVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Pressable
+              style={styles.modalOverlay}
+              onPress={() => setSideMenuVisible(false)}
+            />
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+              </View>
+              <ScrollView style={styles.sideMenuContent}>
+                {sideMenuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sideMenuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons
+                      name={item.icon as keyof typeof Ionicons.glyphMap}
+                      size={20}
+                      color="#4CAF50"
+                    />
+                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  notificationButton: {
-    position: "relative",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF5722",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "600",
-  },
   content: {
     flex: 1,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "transparent",
   },
   purposeSection: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
@@ -407,11 +370,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   instructionsSection: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: "transparent",
   },
   instructionsText: {
     fontSize: 14,
