@@ -46,7 +46,7 @@ export default function ProfileScreen() {
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
-    { id: "community", name: "Community", icon: "people" },
+    { id: "community-forum", name: "Community", icon: "people" },
     { id: "appointments", name: "Appointments", icon: "calendar" },
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
@@ -270,6 +270,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginTop: 50,
   },
   profileImage: {
     width: 80,
