@@ -186,23 +186,21 @@ export default function CrisisScreen() {
 
   /**
    * Handles emergency call actions
-   * Note: In a real app, this would use Linking.openURL('tel:911')
    * @param number - The emergency number to call
    */
   const handleEmergencyCall = (number: string) => {
     console.log(`Calling emergency number: ${number}`);
-    // In a real app: Linking.openURL(`tel:${number}`);
-    alert(`This would call ${number} in a real application`);
+    // Linking.openURL(`tel:${number}`);
+    alert(`This would call ${number} `);
   };
 
   /**
    * Handles distress center website navigation
-   * Note: In a real app, this would use Linking.openURL
    */
   const handleDistressCenter = () => {
     console.log("Opening Distress Center website");
-    // In a real app: Linking.openURL('https://distresscentre.com');
-    alert("This would open the Distress Center website in a real application");
+    // Linking.openURL('https://distresscentre.com');
+    alert("This would open the Distress Center website");
   };
 
   // Show loading indicator during operations
