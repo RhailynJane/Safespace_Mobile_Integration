@@ -190,7 +190,6 @@ export default function CrisisScreen() {
    */
   const handleEmergencyCall = (number: string) => {
     console.log(`Calling emergency number: ${number}`);
-    // Linking.openURL(`tel:${number}`);
     alert(`This would call ${number} `);
   };
 
@@ -199,7 +198,6 @@ export default function CrisisScreen() {
    */
   const handleDistressCenter = () => {
     console.log("Opening Distress Center website");
-    // Linking.openURL('https://distresscentre.com');
     alert("This would open the Distress Center website");
   };
 
