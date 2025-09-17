@@ -39,7 +39,7 @@ export default function CrisisScreen() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("crisis");
 
-  // Mock user data (replaces backend auth context)
+  // Mock user data 
   const mockUser = {
     displayName: "Demo User",
     email: "demo@gmail.com",
