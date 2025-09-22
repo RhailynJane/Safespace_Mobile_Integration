@@ -1,4 +1,4 @@
-# SafeSpace Mental Health App - Combined Documentation
+# SafeSpace Mental Health App - Components
 
 ## 📱 Frontend Documentation
 
