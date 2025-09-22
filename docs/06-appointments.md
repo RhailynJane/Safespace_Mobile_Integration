@@ -1,3 +1,8 @@
+/**
+* LLM Prompt: Create comprehensive React Native component documentation covering frontend implementation details and backend integration specs including PostgreSQL schema design and REST API endpoints. 
+* Reference: chat.deepseek.com
+*/
+
 # SafeSpace Appointments System - Appointment Documentation
 
 ## 📱 Frontend Appointments Components
