@@ -1,4 +1,4 @@
-# SafeSpace Authentication Flow - Combined Documentation
+# SafeSpace Authentication Flow - Authentication Documentation
 
 ## 📱 Frontend Authentication Components
 
