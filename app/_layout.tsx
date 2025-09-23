@@ -25,7 +25,7 @@ function UserSyncHandler() {
       // Use the full user object from useUser hook
       syncUserWithDatabase(user);
     }
-  }, [isLoaded, isSignedIn, user]); // Depend on user object instead of userId
+  }, [isLoaded, isSignedIn, user]);
 
   return null;
 }
@@ -45,25 +45,7 @@ function AuthLoading() {
   return null;
 }
 
-export default function RootLayout() {
-  return (
-    <ClerkProvider 
-      publishableKey={publishableKey} 
-      tokenCache={tokenCache}
-      afterSignInUrl="/(app)/(tabs)/home"
-      afterSignUpUrl="/(app)/(tabs)/home"
-    >
-      <SafeAreaProvider>
-        <AuthLoading />
-        <UserSyncHandler />
-        <MainStack />
-      </SafeAreaProvider>
-    </ClerkProvider>
-  );
-}
-
-// Separate stack component to use hooks
-function MainStack() {
+function RootLayoutNav() {
   const { isLoaded, isSignedIn } = useAuth();
 
   if (!isLoaded) {
@@ -77,6 +59,7 @@ function MainStack() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       {!isSignedIn ? (
+        // Public routes - user is NOT signed in
         <>
           <Stack.Screen name="index" />
           <Stack.Screen name="loading" />
@@ -85,8 +68,25 @@ function MainStack() {
           <Stack.Screen name="(auth)" />
         </>
       ) : (
+        // Protected routes - user IS signed in
         <Stack.Screen name="(app)" />
       )}
     </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ClerkProvider 
+      publishableKey={publishableKey} 
+      tokenCache={tokenCache}
+      afterSignInUrl="/(app)/(tabs)/home"
+    >
+      <SafeAreaProvider>
+        <AuthLoading />
+        <UserSyncHandler />
+        <RootLayoutNav />
+      </SafeAreaProvider>
+    </ClerkProvider>
   );
 }

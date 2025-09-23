@@ -1,121 +1,156 @@
-/**
- * LLM Prompt: Add concise inline comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import SafeSpaceLogo from "./SafeSpaceLogo";
+// components/SuccessStep.tsx
+import { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 
-// Props interface for the SuccessStep component
 interface SuccessStepProps {
   onContinue: () => void;
-  onSignIn?: () => void;
+  onSignIn: () => void;
 }
 
-/**
- * SuccessStep - Email verification success screen component
- * Displays confirmation that email verification was successful and provides
- * a call-to-action to sign in to the app
- */
-export default function SuccessStep({ onSignIn }: SuccessStepProps) {
+export default function SuccessStep({ onContinue, onSignIn }: SuccessStepProps) {
+  const [syncing, setSyncing] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Sync user with your database
+  const syncUserWithDatabase = async () => {
+    try {
+      // You'll need to get the current user's info
+      // This is a simplified example - you'll need to adapt it
+      const response = await fetch('YOUR_BACKEND_URL/api/sync-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // You'll need to pass user data here
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to sync user');
+      }
+
+      setSyncing(false);
+    } catch (error) {
+      console.error('Sync error:', error);
+      setSyncError('Failed to sync user data');
+      setSyncing(false);
+    }
+  };
+
+  // Call sync when component mounts
+  useEffect(() => {
+    syncUserWithDatabase();
+  }, []);
+
   return (
     <View style={styles.container}>
-      {/* App logo at the top */}
-      <SafeSpaceLogo size={80} />
+      <Text style={styles.title}>Account Created Successfully! 🎉</Text>
+      
+      {syncing ? (
+        <View style={styles.syncContainer}>
+          <ActivityIndicator size="large" color="#7BB8A8" />
+          <Text style={styles.syncText}>Setting up your account...</Text>
+        </View>
+      ) : syncError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{syncError}</Text>
+          <Text style={styles.errorHelp}>
+            Your account was created, but there was an issue syncing data.
+            You can continue to the app.
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.successText}>
+          Your account has been set up successfully! You can now access all features of SafeSpace.
+        </Text>
+      )}
 
-      {/* Success checkmark icon */}
-      <View style={styles.iconContainer}>
-        <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-      </View>
-
-      {/* Main success message */}
-      <Text style={styles.title}>Your email was successfully verified!</Text>
-
-      {/* Encouraging subtitle to proceed */}
-      <Text style={styles.subtitle}>Only one click to explore SafeSpace</Text>
-
-      {/* Primary call-to-action button */}
-      <TouchableOpacity style={styles.signInButton} onPress={onSignIn}>
-        <Text style={styles.signInButtonText}>Sign in</Text>
+      <TouchableOpacity
+        style={[styles.button, syncing && styles.disabledButton]}
+        onPress={onContinue}
+        disabled={syncing}
+      >
+        <Text style={styles.buttonText}>
+          {syncing ? 'Setting Up...' : 'Continue to App'}
+        </Text>
       </TouchableOpacity>
 
-      {/* Terms and privacy policy disclaimer */}
-      <View style={styles.termsContainer}>
-        <Text style={styles.termsText}>
-          By using this platform, you agree to the{" "}
-          <Text style={styles.termsLink}>Terms</Text> and{" "}
-          <Text style={styles.termsLink}>Privacy Policy</Text>.
-        </Text>
-      </View>
+      <TouchableOpacity style={styles.signInButton} onPress={onSignIn}>
+        <Text style={styles.signInButtonText}>Sign In to Another Account</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Main container - centers all content vertically and horizontally
   container: {
     flex: 1,
-    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24, // Side padding for mobile screens
+    alignItems: "center",
+    padding: 24,
   },
-
-  // Container for the success checkmark icon
-  iconContainer: {
-    marginTop: 32, // Space between logo and icon
-    marginBottom: 24, // Space between icon and title
-  },
-
-  // Main success title styling
   title: {
     fontSize: 24,
-    fontWeight: "600", // Semi-bold weight
-    color: "#333", // Dark gray for good readability
+    fontWeight: "600",
+    marginBottom: 16,
     textAlign: "center",
-    marginBottom: 8, // Small gap between title and subtitle
+    color: "#333",
   },
-
-  // Subtitle text styling
-  subtitle: {
-    fontSize: 16,
-    color: "#666", // Medium gray for secondary text
-    textAlign: "center",
-    marginBottom: 40, // Larger gap before the button
-  },
-
-  // Primary sign-in button styling
-  signInButton: {
-    width: "100%", // Full width button
-    backgroundColor: "#7FDBDA", // Teal brand color
-    borderRadius: 25, // Rounded corners for modern look
-    paddingVertical: 16, // Comfortable touch target height
+  syncContainer: {
     alignItems: "center",
-    marginBottom: 32, // Space before terms text
+    marginVertical: 20,
   },
-
-  // Sign-in button text styling
-  signInButtonText: {
-    color: "#FFFFFF", // White text on teal background
-    fontSize: 18,
-    fontWeight: "600", // Semi-bold for emphasis
+  syncText: {
+    marginTop: 10,
+    color: "#666",
   },
-
-  // Container for terms and privacy text
-  termsContainer: {
-    paddingHorizontal: 20, // Additional padding for text wrapping
+  errorContainer: {
+    backgroundColor: "#FFE6E6",
+    padding: 16,
+    borderRadius: 8,
+    marginVertical: 20,
   },
-
-  // Terms and privacy policy text styling
-  termsText: {
-    fontSize: 14, // Smaller font for legal text
-    color: "#666", // Medium gray
+  errorText: {
+    color: "#D00",
+    fontWeight: "600",
+  },
+  errorHelp: {
+    color: "#666",
+    marginTop: 8,
+    fontSize: 12,
+  },
+  successText: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 32,
     textAlign: "center",
-    lineHeight: 20, // Better readability for multi-line text
+    lineHeight: 22,
   },
-
-  // Styling for clickable terms links within the text
-  termsLink: {
-    color: "#333", // Darker color to indicate clickability
-    fontWeight: "600", // Bold to distinguish from regular text
+  button: {
+    backgroundColor: "#7BB8A8",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 16,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  signInButton: {
+    padding: 16,
+    alignItems: "center",
+    width: "100%",
+  },
+  signInButtonText: {
+    color: "#7BB8A8",
+    fontWeight: "600",
+    fontSize: 16,
   },
 });

@@ -1,17 +1,30 @@
-import { Stack } from "expo-router";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+// app/(app)/_layout.tsx
+import { Stack, Redirect } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
+import { ActivityIndicator, View } from "react-native";
 
-export default function RootLayout() {
+export default function AppLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  // Show loading indicator while checking auth state
+  if (!isLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#7BB8A8" />
+      </View>
+    );
+  }
+
+  // Redirect to auth if not signed in
+  if (!isSignedIn) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  // Render the protected app routes
   return (
-    <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="loading" />
-          <Stack.Screen name="quote" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(app)" />
-        </Stack>
-      </SafeAreaProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      {/* Add other app screens here if needed */}
+    </Stack>
   );
 }
