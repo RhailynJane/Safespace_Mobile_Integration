@@ -15,13 +15,18 @@ import {
 
 interface EmailVerificationStepProps {
   email: string;
+  verificationCode: string;
+  onUpdate: (data: { verificationCode: string }) => void;
   onNext: () => void;
-  onBack?: () => void;
+  onBack: () => void;
   stepNumber: number;
+  loading?: boolean;
 }
 
 export default function EmailVerificationStep({
   email,
+  verificationCode,
+  onUpdate,
   onNext,
   onBack,
   stepNumber,

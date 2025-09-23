@@ -8,7 +8,8 @@ import SafeSpaceLogo from "./SafeSpaceLogo";
 
 // Props interface for the SuccessStep component
 interface SuccessStepProps {
-  onSignIn: () => void; // Callback function when user taps the sign-in button
+  onContinue: () => void;
+  onSignIn?: () => void;
 }
 
 /**
