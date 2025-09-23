@@ -21,6 +21,7 @@ import PasswordStep from "../../components/PasswordStep";
 import EmailVerificationStep from "../../components/EmailVerificationStep";
 import SuccessStep from "../../components/SuccessStep";
 import { CaptchaHandler } from "../../utils/captcha-handler";
+import { apiService } from '../../utils/api';
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -169,55 +170,94 @@ export default function SignupScreen() {
   };
 
   // Handle email verification
-  const handleVerification = async () => {
-    if (!isLoaded || !signUp) {
-      setErrorMessage("Authentication service not ready");
-      return;
-    }
+  // Update the handleVerification function in your signup component
+const handleVerification = async () => {
+  if (!isLoaded || !signUp) {
+    setErrorMessage("Authentication service not ready");
+    return;
+  }
 
-    setErrorMessage(null);
+  setErrorMessage(null);
 
-    if (
-      !signupData.verificationCode ||
-      signupData.verificationCode.length !== 6
-    ) {
-      setErrorMessage("Please enter the 6-digit verification code");
-      return;
-    }
+  if (
+    !signupData.verificationCode ||
+    signupData.verificationCode.length !== 6
+  ) {
+    setErrorMessage("Please enter the 6-digit verification code");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      // Attempt email verification with Clerk
-      const signUpAttempt = await signUp.attemptEmailAddressVerification({
-        code: signupData.verificationCode,
-      });
+  try {
+    // Attempt email verification with Clerk
+    const signUpAttempt = await signUp.attemptEmailAddressVerification({
+      code: signupData.verificationCode,
+    });
 
-      if (signUpAttempt.status === "complete") {
-        // User successfully verified - set active session
-        await setActive({ session: signUpAttempt.createdSessionId });
+    if (signUpAttempt.status === "complete") {
+      // User successfully verified - set active session
+      await setActive({ session: signUpAttempt.createdSessionId });
+
+      // Sync user data with your database
+      try {
+        console.log('Syncing user with database...');
+        const syncResult = await apiService.syncUser({
+          clerkUserId: signUpAttempt.createdUserId!,
+          email: signupData.email,
+          firstName: signupData.firstName,
+          lastName: signupData.lastName,
+          phoneNumber: signupData.phoneNumber,
+        });
+
+        console.log('User synced successfully:', syncResult);
+
+        // Create client record
+        if (syncResult.user?.id) {
+          try {
+            await apiService.createClient({
+              userId: syncResult.user.id,
+              // Add any additional client data if you have it in signupData
+              // emergencyContactName: signupData.emergencyContactName,
+              // emergencyContactPhone: signupData.emergencyContactPhone,
+              // emergencyContactRelationship: signupData.emergencyContactRelationship,
+            });
+            console.log('Client record created successfully');
+          } catch (clientError) {
+            console.error('Failed to create client record:', clientError);
+            // Don't fail the signup process if client creation fails
+          }
+        }
+
         setCurrentStep("success");
-      } else {
-        // Handle incomplete verification
-        setErrorMessage("Verification incomplete. Please try again.");
-        console.log("Verification status:", signUpAttempt.status);
+      } catch (syncError) {
+        console.error('Failed to sync user with database:', syncError);
+        // Still proceed to success since Clerk authentication worked
+        setCurrentStep("success");
+        // Optionally show a warning to the user
+        // setErrorMessage("Account created successfully, but some data may need to be updated later.");
       }
-    } catch (err: any) {
-      console.error("Verification error:", err);
-
-      // Handle specific Clerk errors
-      if (err.errors) {
-        const clerkError = err.errors[0];
-        setErrorMessage(
-          clerkError?.message || "Invalid verification code. Please try again."
-        );
-      } else {
-        setErrorMessage("Invalid verification code. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+    } else {
+      // Handle incomplete verification
+      setErrorMessage("Verification incomplete. Please try again.");
+      console.log("Verification status:", signUpAttempt.status);
     }
-  };
+  } catch (err: any) {
+    console.error("Verification error:", err);
+
+    // Handle specific Clerk errors
+    if (err.errors) {
+      const clerkError = err.errors[0];
+      setErrorMessage(
+        clerkError?.message || "Invalid verification code. Please try again."
+      );
+    } else {
+      setErrorMessage("Invalid verification code. Please try again.");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Add a resend function
   const handleResendCode = async () => {

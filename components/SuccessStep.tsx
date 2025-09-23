@@ -1,6 +1,8 @@
 // components/SuccessStep.tsx
-import { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { useUser } from "@clerk/clerk-expo";
+import { syncUserToDatabase } from "../lib/api";
 
 interface SuccessStepProps {
   onContinue: () => void;
@@ -8,40 +10,50 @@ interface SuccessStepProps {
 }
 
 export default function SuccessStep({ onContinue, onSignIn }: SuccessStepProps) {
+  const { user } = useUser();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // Sync user with your database
   const syncUserWithDatabase = async () => {
+    if (!user) {
+      setSyncError("User information not available");
+      setSyncing(false);
+      return;
+    }
+
     try {
-      // You'll need to get the current user's info
-      // This is a simplified example - you'll need to adapt it
-      const response = await fetch('YOUR_BACKEND_URL/api/sync-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          // You'll need to pass user data here
-        }),
+      await syncUserToDatabase({
+        clerkUserId: user.id,
+        email: user.primaryEmailAddress?.emailAddress || '',
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        phoneNumber: user.primaryPhoneNumber?.phoneNumber,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to sync user');
-      }
-
+      console.log('User synced successfully to PostgreSQL');
       setSyncing(false);
     } catch (error) {
       console.error('Sync error:', error);
-      setSyncError('Failed to sync user data');
+      setSyncError(error instanceof Error ? error.message : 'Failed to sync user data');
       setSyncing(false);
     }
   };
 
-  // Call sync when component mounts
   useEffect(() => {
     syncUserWithDatabase();
-  }, []);
+  }, [user]);
+
+  const handleContinue = () => {
+    if (syncError) {
+      Alert.alert(
+        "Sync Warning",
+        "Your account was created, but there was an issue syncing with the database. You can continue anyway.",
+        [{ text: "Continue", onPress: onContinue }]
+      );
+    } else {
+      onContinue();
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -50,38 +62,32 @@ export default function SuccessStep({ onContinue, onSignIn }: SuccessStepProps) 
       {syncing ? (
         <View style={styles.syncContainer}>
           <ActivityIndicator size="large" color="#7BB8A8" />
-          <Text style={styles.syncText}>Setting up your account...</Text>
+          <Text style={styles.syncText}>Syncing with database...</Text>
         </View>
       ) : syncError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{syncError}</Text>
-          <Text style={styles.errorHelp}>
-            Your account was created, but there was an issue syncing data.
-            You can continue to the app.
-          </Text>
+          <Text style={styles.errorText}>Database Sync Issue</Text>
+          <Text style={styles.errorHelp}>{syncError}</Text>
         </View>
       ) : (
         <Text style={styles.successText}>
-          Your account has been set up successfully! You can now access all features of SafeSpace.
+          Your account has been synced with the database successfully!
         </Text>
       )}
 
       <TouchableOpacity
         style={[styles.button, syncing && styles.disabledButton]}
-        onPress={onContinue}
+        onPress={handleContinue}
         disabled={syncing}
       >
         <Text style={styles.buttonText}>
-          {syncing ? 'Setting Up...' : 'Continue to App'}
+          {syncing ? 'Syncing...' : 'Continue to App'}
         </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.signInButton} onPress={onSignIn}>
-        <Text style={styles.signInButtonText}>Sign In to Another Account</Text>
       </TouchableOpacity>
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -110,15 +116,23 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     marginVertical: 20,
+    alignItems: "center",
   },
   errorText: {
     color: "#D00",
     fontWeight: "600",
+    marginBottom: 8,
   },
   errorHelp: {
     color: "#666",
-    marginTop: 8,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  noteText: {
+    color: "#666",
     fontSize: 12,
+    textAlign: "center",
+    fontStyle: "italic",
   },
   successText: {
     fontSize: 16,
