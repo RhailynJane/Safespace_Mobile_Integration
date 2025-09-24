@@ -72,7 +72,7 @@ export const AppHeader = ({
     });
   };
 
-  // Fixed Clerk logout function - using relative paths like your working appointments screen
+  // Fixed Clerk logout function
   const handleSignOut = async () => {
     console.log('SIGN OUT BUTTON PRESSED!');
     
@@ -92,38 +92,29 @@ export const AppHeader = ({
       console.log('Clearing AsyncStorage...');
       await AsyncStorage.clear();
       
-      // Also try Clerk signOut
-      try {
-        console.log('Calling Clerk signOut...');
-        await signOut();
-        console.log('Clerk signOut completed');
-      } catch (clerkError) {
-        console.log('Clerk signOut failed, but continuing:', clerkError);
-      }
+      // Sign out from Clerk
+      console.log('Calling Clerk signOut...');
+      await signOut();
+      console.log('Clerk signOut completed');
       
-      // Use relative path navigation like your working appointments screen
+      // Use absolute path for navigation (more reliable)
       console.log('Navigating to login...');
-      router.replace("../../../(auth)/login");
-      
-      // Reset the signing out state
-      console.log('Resetting isSigningOut to false...');
-      setIsSigningOut(false);
+      router.replace("/(auth)/login");
       
     } catch (error) {
       console.error('Sign out error:', error);
-      setIsSigningOut(false);
       
       // Show error alert with fallback navigation
       Alert.alert(
         "Sign Out Error",
-        `There was an issue signing out: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        "There was an issue signing out. Please try again.",
         [
           { 
             text: "Try Again", 
             onPress: () => {
               // Try different navigation approaches
               try {
-                router.replace("../../../(auth)/login");
+                router.replace("/(auth)/login");
               } catch (navError) {
                 console.log('Fallback navigation failed:', navError);
                 // Last resort - try going back to root
@@ -131,10 +122,35 @@ export const AppHeader = ({
               }
             }
           },
-          { text: "Cancel" }
+          { 
+            text: "Cancel",
+            onPress: () => setIsSigningOut(false)
+          }
         ]
       );
+    } finally {
+      setIsSigningOut(false);
     }
+  };
+
+  // Confirmation dialog for sign out
+  const confirmSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => console.log('Sign out cancelled')
+        },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: handleSignOut
+        }
+      ]
+    );
   };
 
   // Load profile image from AsyncStorage
@@ -298,11 +314,8 @@ export const AppHeader = ({
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
-        setSideMenuVisible(false);
-        console.log("User signed out");
-      },
-      disabled: false,
+      onPress: confirmSignOut, // Use the confirmation dialog
+      disabled: isSigningOut,
     },
   ];
 
@@ -435,9 +448,11 @@ export const AppHeader = ({
                     style={[
                       styles.sideMenuItemText,
                       item.disabled && styles.sideMenuItemTextDisabled,
+                      item.title === "Sign Out" && styles.signOutText,
                     ]}
                   >
                     {item.title}
+                    {item.title === "Sign Out" && isSigningOut && "..."}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -449,7 +464,7 @@ export const AppHeader = ({
   );
 };
 
-// Styles remain the same
+// Updated styles with sign out text color
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
@@ -559,6 +574,10 @@ const styles = StyleSheet.create({
   },
   sideMenuItemTextDisabled: {
     color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B", // Red color for sign out
+    fontWeight: "600",
   },
   safeArea: {
     backgroundColor: "transparent",

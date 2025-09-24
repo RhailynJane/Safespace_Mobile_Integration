@@ -18,12 +18,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAuth, useUser } from "@clerk/clerk-expo"; // Import Clerk hooks
 import CurvedBackground from "../../../components/CurvedBackground";
 
 const { width } = Dimensions.get("window");
@@ -43,25 +45,13 @@ type Resource = {
   onPress?: () => void;
 };
 
-// Mock user data for frontend-only implementation
-const MOCK_USER = {
-  uid: "demo-user-id",
-  email: "demo@gmail.com",
-  displayName: "Demo User",
-};
-
-const MOCK_PROFILE = {
-  firstName: "Demo",
-  lastName: "User",
-};
-
 /**
  * HomeScreen Component
  *
  * Main dashboard screen featuring user greeting, quick actions, mood tracking,
  * and resource recommendations. Designed with a clean, modern UI and smooth animations.
  *
- * This is a frontend-only implementation.
+ * Integrated with Clerk for authentication and user management.
  */
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
@@ -70,7 +60,12 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState("home");
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Clerk authentication hooks
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -81,27 +76,73 @@ export default function HomeScreen() {
   ];
 
   /**
-   * Mock logout function for frontend-only implementation
+   * Enhanced logout function with Clerk integration
    */
   const handleLogout = async () => {
+    console.log('HomeScreen logout initiated...');
+    
+    if (isSigningOut) {
+      console.log('Already signing out, returning...');
+      return;
+    }
+    
     try {
-      // Clear any stored data
+      setIsSigningOut(true);
+      
+      // Close the side menu first
+      hideSideMenu();
+      
+      // Clear local storage
       await AsyncStorage.clear();
+      console.log('AsyncStorage cleared');
+      
+      // Sign out from Clerk
+      if (signOut) {
+        await signOut();
+        console.log('Clerk signOut completed');
+      }
+      
       // Navigate to login screen
       router.replace("/(auth)/login");
+      console.log('Navigation to login completed');
+      
     } catch (error) {
       console.error("Logout error:", error);
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
+  /**
+   * Confirmation dialog for sign out
+   */
+  const confirmSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => console.log('Sign out cancelled')
+        },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: handleLogout
+        }
+      ]
+    );
+  };
+
   // Quick action buttons for main app features
-  
   const quickActions = [
     {
       id: "mood",
       title: "Track Mood",
       icon: "happy-outline",
-      image: require("../../../assets/images/track-mood.png"), //Image Reference: https://share.google/images/srWgmup3g77BOhLVX
+      image: require("../../../assets/images/track-mood.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/mood-tracking"),
@@ -110,7 +151,7 @@ export default function HomeScreen() {
       id: "journal",
       title: "Journal",
       icon: "journal-outline",
-      image: require("../../../assets/images/journal.png"), //Image Reference: https://id.lovepik.com/image-380642209/notebook-with-flowers-and-another-clipart-vector-sticker.html
+      image: require("../../../assets/images/journal.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/journal"),
@@ -119,7 +160,7 @@ export default function HomeScreen() {
       id: "resources",
       title: "Resources",
       icon: "library-outline",
-      image: require("../../../assets/images/resources.png"), //Image Reference: <a href='https://pngtree.com/freepng/books-and-books_5411517.html'>png image from pngtree.com/</a>
+      image: require("../../../assets/images/resources.png"),
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/resources"),
@@ -128,7 +169,7 @@ export default function HomeScreen() {
       id: "crisis",
       title: "Crisis Support",
       icon: "help-buoy-outline",
-      image: require("../../../assets/images/crisis-support.png"), //Image Reference: https://share.google/images/sL7sgY0f438Zl1auI
+      image: require("../../../assets/images/crisis-support.png"),
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),
@@ -166,23 +207,23 @@ export default function HomeScreen() {
       icon: "home",
       title: "Dashboard",
       onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/home");
+        hideSideMenu();
+        router.push("/(tabs)/home");
       },
     },
     {
       icon: "person",
       title: "Profile",
       onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/profile");
+        hideSideMenu();
+        router.push("/(tabs)/profile");
       },
     },
     {
       icon: "bar-chart",
       title: "Self-Assessment",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/self-assessment");
       },
     },
@@ -190,7 +231,7 @@ export default function HomeScreen() {
       icon: "happy",
       title: "Mood Tracking",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/mood-tracking");
       },
     },
@@ -198,7 +239,7 @@ export default function HomeScreen() {
       icon: "journal",
       title: "Journaling",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/journal");
       },
     },
@@ -206,7 +247,7 @@ export default function HomeScreen() {
       icon: "library",
       title: "Resources",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/resources");
       },
     },
@@ -214,7 +255,7 @@ export default function HomeScreen() {
       icon: "help-circle",
       title: "Crisis Support",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/crisis-support");
       },
     },
@@ -222,23 +263,23 @@ export default function HomeScreen() {
       icon: "chatbubble",
       title: "Messages",
       onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/messages");
+        hideSideMenu();
+        router.push("/(tabs)/messages");
       },
     },
     {
       icon: "calendar",
       title: "Appointments",
       onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/appointments");
+        hideSideMenu();
+        router.push("/(tabs)/appointments");
       },
     },
     {
       icon: "people",
       title: "Community Forum",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/community-forum");
       },
     },
@@ -246,21 +287,15 @@ export default function HomeScreen() {
       icon: "videocam",
       title: "Video Consultations",
       onPress: () => {
-        setSideMenuVisible(false);
+        hideSideMenu();
         router.push("/video-consultations");
       },
     },
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
-        try {
-          setSideMenuVisible(false);
-          await handleLogout();
-        } catch (error) {
-          console.error("Sign out error:", error);
-        }
-      },
+      onPress: confirmSignOut, // Use confirmation dialog
+      disabled: isSigningOut,
     },
   ];
 
@@ -379,13 +414,6 @@ export default function HomeScreen() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-      loadProfileImage();
-    }, [])
-  );
-
   /**
    * Fetches all required data for the dashboard
    */
@@ -401,6 +429,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
+      loadProfileImage();
     }, [])
   );
 
@@ -443,16 +472,36 @@ export default function HomeScreen() {
    * Generates initials from user's name for fallback avatar
    */
   const getInitials = () => {
-    return `${MOCK_PROFILE.firstName.charAt(0)}${MOCK_PROFILE.lastName.charAt(
-      0
-    )}`.toUpperCase();
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+    }
+    if (user?.fullName) {
+      const names = user.fullName.split(" ");
+      return names.length > 1 
+        ? `${names[0]?.charAt(0) ?? ""}${names[names.length - 1]?.charAt(0) ?? ""}`.toUpperCase()
+        : (names[0]?.charAt(0) ?? "").toUpperCase();
+    }
+    return "U";
   };
 
   /**
    * Returns the user's first name for personalized greeting
    */
   const getGreetingName = () => {
-    return MOCK_PROFILE.firstName;
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    return "User";
+  };
+
+  /**
+   * Returns the user's email for display
+   */
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email"
+    );
   };
 
   if (loading) {
@@ -468,12 +517,17 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => router.push("/(app)/(tabs)/profile/edit")}
+            onPress={() => router.push("/(tabs)/profile/edit")}
           >
             <View style={styles.profileImageContainer}>
               {profileImage ? (
                 <Image
                   source={{ uri: profileImage }}
+                  style={styles.profileImage}
+                />
+              ) : user?.imageUrl ? (
+                <Image
+                  source={{ uri: user.imageUrl }}
                   style={styles.profileImage}
                 />
               ) : (
@@ -632,6 +686,7 @@ export default function HomeScreen() {
             <View style={styles.bottomSpacing} />
           </ScrollView>
         </KeyboardAvoidingView>
+        
         {/* Bottom Navigation */}
         <View style={styles.bottomNav}>
           {tabs.map((tab) => (
@@ -640,7 +695,7 @@ export default function HomeScreen() {
               style={styles.navItem}
               onPress={() => {
                 setActiveTab(tab.id);
-                if (tab.id !== "home") router.push(`/${tab.id}`);
+                if (tab.id !== "home") router.push(`/(tabs)/${tab.id}`);
               }}
             >
               <View
@@ -676,24 +731,32 @@ export default function HomeScreen() {
             <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getGreetingName()}</Text>
-                <Text style={styles.profileEmail}>{MOCK_USER.email}</Text>
+                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.sideMenuItem}
-                    onPress={() => {
-                      hideSideMenu();
-                      item.onPress();
-                    }}
+                    style={[
+                      styles.sideMenuItem,
+                      item.disabled && styles.sideMenuItemDisabled,
+                    ]}
+                    onPress={item.onPress}
+                    disabled={item.disabled}
                   >
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color="#757575"
+                      color={item.disabled ? "#CCCCCC" : "#757575"}
                     />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    <Text style={[
+                      styles.sideMenuItemText,
+                      item.disabled && styles.sideMenuItemTextDisabled,
+                      item.title === "Sign Out" && styles.signOutText,
+                    ]}>
+                      {item.title}
+                      {item.title === "Sign Out" && isSigningOut && "..."}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -1063,5 +1126,15 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 30, // Additional spacing at the bottom
+  },
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B",
+    fontWeight: "600",
   },
 });
