@@ -19,6 +19,7 @@ import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 /**
  * SettingsScreen Component
@@ -256,37 +257,6 @@ export default function SettingsScreen() {
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textSecondary}
       />
-    </View>
-  );
-
-  /**
-   * Custom BottomNavigation component
-   */
-  const BottomNavigation = ({ tabs, activeTab, onTabPress }: {
-    tabs: Array<{ id: string; name: string; icon: string }>;
-    activeTab: string;
-    onTabPress: (tabId: string) => void;
-  }) => (
-    <View style={[bottomNavStyles.container, { backgroundColor: theme.colors.surface }]}>
-      {tabs.map((tab) => (
-        <TouchableOpacity
-          key={tab.id}
-          style={bottomNavStyles.tab}
-          onPress={() => onTabPress(tab.id)}
-        >
-          <Ionicons
-            name={tab.icon as any}
-            size={24}
-            color={activeTab === tab.id ? theme.colors.primary : theme.colors.icon}
-          />
-          <Text style={[
-            bottomNavStyles.tabText,
-            { color: activeTab === tab.id ? theme.colors.primary : theme.colors.textSecondary }
-          ]}>
-            {tab.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
     </View>
   );
 

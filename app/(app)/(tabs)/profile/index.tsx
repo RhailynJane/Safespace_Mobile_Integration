@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "@clerk/clerk-expo"; // Import Clerk auth hook
 import CurvedBackground from "../../../../components/CurvedBackground";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState("profile");
@@ -128,34 +129,6 @@ export default function ProfileScreen() {
     
     return "U";
   };
-
-  const BottomNavigation = ({ tabs, activeTab, onTabPress }: {
-    tabs: Array<{ id: string; name: string; icon: string }>;
-    activeTab: string;
-    onTabPress: (tabId: string) => void;
-  }) => (
-    <View style={bottomNavStyles.container}>
-      {tabs.map((tab) => (
-        <TouchableOpacity
-          key={tab.id}
-          style={bottomNavStyles.tab}
-          onPress={() => onTabPress(tab.id)}
-        >
-          <Ionicons
-            name={tab.icon as any}
-            size={24}
-            color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
-          />
-          <Text style={[
-            bottomNavStyles.tabText,
-            { color: activeTab === tab.id ? "#2EA78F" : "#9E9E9E" }
-          ]}>
-            {tab.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
 
   return (
     <CurvedBackground>
