@@ -46,69 +46,6 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
-// Side menu navigation options
-const sideMenuItems = [
-  {
-    icon: "home",
-    title: "Dashboard",
-    onPress: () => router.replace("/(app)/(tabs)/home"),
-  },
-  {
-    icon: "person",
-    title: "Profile",
-    onPress: () => router.push("/(app)/(tabs)/profile"),
-  },
-  {
-    icon: "bar-chart",
-    title: "Self-Assessment",
-    onPress: () => router.push("/self-assessment"),
-  },
-  {
-    icon: "happy",
-    title: "Mood Tracking",
-    onPress: () => router.push("/mood-tracking"),
-  },
-  {
-    icon: "journal",
-    title: "Journaling",
-    onPress: () => router.push("/journal"),
-  },
-  {
-    icon: "library",
-    title: "Resources",
-    onPress: () => router.push("/resources"),
-  },
-  {
-    icon: "help-circle",
-    title: "Crisis Support",
-    onPress: () => router.push("/crisis-support"),
-  },
-  {
-    icon: "chatbubble",
-    title: "Messages",
-    onPress: () => router.push("/(app)/(tabs)/messages"),
-  },
-  {
-    icon: "calendar",
-    title: "Appointments",
-    onPress: () => router.push("/(app)/(tabs)/appointments"),
-  },
-  {
-    icon: "people",
-    title: "Community Forum",
-    onPress: () => router.push("/community-forum"),
-  },
-  {
-    icon: "videocam",
-    title: "Video Consultations",
-    onPress: () => router.push("/video-consultations"),
-  },
-  {
-    icon: "log-out",
-    title: "Sign Out",
-    onPress: () => console.log("Sign Out pressed"),
-  },
-];
 
 export default function MoodHistoryScreen() {
   // Mock user data for frontend demonstration
@@ -259,47 +196,6 @@ export default function MoodHistoryScreen() {
             </View>
           )}
         </ScrollView>
-
-        {/* Side Menu Modal */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={sideMenuVisible}
-          onRequestClose={() => setSideMenuVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <Pressable
-              style={styles.modalOverlay}
-              onPress={() => setSideMenuVisible(false)}
-            />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
-              </View>
-              <ScrollView style={styles.sideMenuContent}>
-                {sideMenuItems.map((item, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.sideMenuItem}
-                    onPress={() => {
-                      setSideMenuVisible(false);
-                      item.onPress();
-                    }}
-                  >
-                    <Ionicons
-                      name={item.icon as any}
-                      size={20}
-                      color="#4CAF50"
-                    />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
         {/* Bottom Navigation */}
         <View style={styles.bottomNav}>
           {tabs.map((tab) => (
