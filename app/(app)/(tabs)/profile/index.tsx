@@ -1,7 +1,3 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -16,17 +12,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from "@clerk/clerk-expo"; // Import Clerk auth hook
 import CurvedBackground from "../../../../components/CurvedBackground";
 
-/**
- * ProfileScreen Component
- * 
- * User profile screen displaying personal information, settings options,
- * and account management features. Features a clean UI with curved background
- * and smooth navigation.
- * 
- * This is a frontend-only implementation with mock data for demonstration.
- */
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -40,7 +28,9 @@ export default function ProfileScreen() {
     location: "Calgary, AB",
   });
 
-  // Mock user data for frontend-only implementation
+  // Use Clerk's useAuth hook to get signOut function
+  const { signOut, isSignedIn } = useAuth();
+
   const MOCK_USER = {
     email: "demo@gmail.com",
     displayName: "Demo User"
@@ -54,23 +44,17 @@ export default function ProfileScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Load profile data when screen loads
   useEffect(() => {
     loadProfileData();
   }, []);
 
-  /**
-   * Loads profile data from local storage
-   */
   const loadProfileData = async () => {
     try {
-      // Load profile image
       const savedImage = await AsyncStorage.getItem('profileImage');
       if (savedImage) {
         setProfileImage(savedImage);
       }
 
-      // Load profile data (name, location)
       const savedProfileData = await AsyncStorage.getItem('profileData');
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
@@ -81,9 +65,6 @@ export default function ProfileScreen() {
     }
   };
 
-  /**
-   * Handles tab navigation
-   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -94,34 +75,36 @@ export default function ProfileScreen() {
   };
 
   /**
-   * Mock logout function for frontend-only implementation
+   * Fixed signout function with Clerk integration
    */
   const handleLogout = async () => {
-  try {
-    console.log('Profile screen logout started...');
-    // Clear any stored data
-    await AsyncStorage.clear();
-    console.log('AsyncStorage cleared');
-    
-    // Use relative path navigation
-    router.replace("../../../(auth)/login");
-    console.log('Navigation completed');
-  } catch (error) {
-    console.error("Logout error:", error);
-    Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
-  }
-};
+    try {
+      console.log('Signout initiated...');
+      
+      // Sign out from Clerk
+      if (signOut) {
+        await signOut();
+        console.log('Clerk signout successful');
+      }
+      
+      // Clear local storage
+      await AsyncStorage.clear();
+      console.log('AsyncStorage cleared');
+      
+      // Navigate to auth screen - use absolute path
+      router.replace("/(auth)/login");
+      console.log('Navigation to login completed');
+      
+    } catch (error) {
+      console.error("Signout error:", error);
+      Alert.alert("Sign Out Failed", "Unable to sign out. Please try again.");
+    }
+  };
 
-  /**
-   * Returns the user's first name for display
-   */
   const getGreetingName = () => {
     return profileData.firstName || "User";
   };
 
-  /**
-   * Returns the user's full name for display
-   */
   const getFullName = () => {
     if (profileData.firstName && profileData.lastName) {
       return `${profileData.firstName} ${profileData.lastName}`.trim();
@@ -129,16 +112,10 @@ export default function ProfileScreen() {
     return getGreetingName();
   };
 
-  /**
-   * Returns the user's location for display
-   */
   const getLocation = () => {
     return profileData.location || "";
   };
 
-  /**
-   * Generates initials for the avatar fallback
-   */
   const getInitials = () => {
     const firstName = profileData.firstName || "";
     const lastName = profileData.lastName || "";
@@ -152,9 +129,6 @@ export default function ProfileScreen() {
     return "U";
   };
 
-  /**
-   * Custom BottomNavigation component for frontend-only implementation
-   */
   const BottomNavigation = ({ tabs, activeTab, onTabPress }: {
     tabs: Array<{ id: string; name: string; icon: string }>;
     activeTab: string;
@@ -256,6 +230,7 @@ export default function ProfileScreen() {
     </CurvedBackground>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
