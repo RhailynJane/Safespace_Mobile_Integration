@@ -34,7 +34,6 @@ const { width } = Dimensions.get("window");
  * This is a frontend-only implementation with mock data for demonstration.
  */
 export default function MessagesScreen() {
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
@@ -70,110 +69,6 @@ export default function MessagesScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
-
-  /**
-   * Side menu navigation items for app navigation
-   */
-  const sideMenuItems = [
-    {
-      icon: "home",
-      title: "Dashboard",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.replace("/(app)/(tabs)/home");
-      },
-    },
-    {
-      icon: "person",
-      title: "Profile",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/profile");
-      },
-    },
-    {
-      icon: "bar-chart",
-      title: "Self-Assessment",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/self-assessment");
-      },
-    },
-    {
-      icon: "happy",
-      title: "Mood Tracking",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/mood-tracking");
-      },
-    },
-    {
-      icon: "journal",
-      title: "Journaling",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/journal");
-      },
-    },
-    {
-      icon: "library",
-      title: "Resources",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/resources");
-      },
-    },
-    {
-      icon: "help-circle",
-      title: "Crisis Support",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/crisis-support");
-      },
-    },
-    {
-      icon: "chatbubble",
-      title: "Messages",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/messages");
-      },
-    },
-    {
-      icon: "calendar",
-      title: "Appointments",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/appointments");
-      },
-    },
-    {
-      icon: "people",
-      title: "Community Forum",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/community-forum");
-      },
-    },
-    {
-      icon: "videocam",
-      title: "Video Consultations",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/video-consultations");
-      },
-    },
-    {
-      icon: "log-out",
-      title: "Sign Out",
-      onPress: async () => {
-        setSideMenuVisible(false);
-        // Clear local storage and navigate to login
-        await AsyncStorage.clear();
-        router.replace("/(auth)/login");
-      },
-    },
-  ];
 
   /**
    * Returns the user's display name for personalization
