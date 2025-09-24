@@ -5,7 +5,7 @@ import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "../utils/cache";
 import { useEffect } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, LogBox } from "react-native";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -67,6 +67,19 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Suppress the useInsertionEffect warning from Clerk/Emotion libraries
+    LogBox.ignoreLogs([
+      'useInsertionEffect must not schedule updates',
+    ]);
+    
+    // Optional: Suppress other common third-party warnings
+    LogBox.ignoreLogs([
+      'useInsertionEffect must not schedule updates',
+      'Non-serializable values were found in the navigation state',
+    ]);
+  }, []);
+
   return (
     <ClerkProvider 
       publishableKey={publishableKey} 
