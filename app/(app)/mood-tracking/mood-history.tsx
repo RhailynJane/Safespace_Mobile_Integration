@@ -1,5 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
+ * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
 import React, { useState, useEffect } from "react";
@@ -20,6 +20,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
+import BottomNavigation from "../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 
@@ -45,7 +46,6 @@ const tabs = [
   { id: "messages", name: "Messages", icon: "chatbubbles" },
   { id: "profile", name: "Profile", icon: "person" },
 ];
-
 
 export default function MoodHistoryScreen() {
   // Mock user data for frontend demonstration
@@ -196,30 +196,13 @@ export default function MoodHistoryScreen() {
             </View>
           )}
         </ScrollView>
-        {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.navButton}
-              onPress={() => handleTabPress(tab.id)}
-            >
-              <Ionicons
-                name={tab.icon as any}
-                size={24}
-                color={activeTab === tab.id ? "#4CAF50" : "#666"}
-              />
-              <Text
-                style={[
-                  styles.navButtonText,
-                  { color: activeTab === tab.id ? "#4CAF50" : "#666" },
-                ]}
-              >
-                {tab.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+
+        {/* Bottom navigation bar */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </SafeAreaView>
     </CurvedBackground>
   );

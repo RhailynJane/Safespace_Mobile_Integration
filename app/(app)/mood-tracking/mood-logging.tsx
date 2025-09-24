@@ -1,5 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
+ * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
 import React, { useState } from "react";
@@ -23,6 +23,7 @@ import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
+import BottomNavigation from "../../../components/BottomNavigation";
 
 const { width } = Dimensions.get("window");
 
@@ -141,141 +142,127 @@ export default function MoodLoggingScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor="#FFFFFF"
-        translucent={false}
-      />
-
-      {/* Elegant curved background with gradient colors - positioned absolutely */}
-      <View style={styles.backgroundContainer}>
-        <CurvedBackground />
-      </View>
-
-      <AppHeader title="Mood Tracker" showBack={true} />
-
-      {/* Main Content */}
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Mood display section showing selected mood */}
-        <View style={styles.moodDisplay}>
-          <Text style={styles.moodEmoji}>
-            {moodConfig[moodData.type].emoji}
-          </Text>
-          <Text style={styles.moodLabel}>
-            {moodConfig[moodData.type].label}
-          </Text>
-        </View>
-
-        {/* Intensity selection section with slider */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Intensity (1-5)</Text>
-          <View style={styles.sliderContainer}>
-            <Text>1</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={1}
-              maximumValue={5}
-              step={1}
-              value={moodData.intensity}
-              onValueChange={handleIntensityChange}
-              minimumTrackTintColor="#4CAF50"
-              maximumTrackTintColor="#E0E0E0"
-              thumbTintColor="#4CAF50"
-            />
-            <Text>5</Text>
-          </View>
-          <Text style={styles.intensityValue}>
-            Current: {moodData.intensity}
-          </Text>
-        </View>
-
-        {/* Mood factors selection section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Factors</Text>
-          <View style={styles.factorsContainer}>
-            {moodFactors.map((factor) => (
-              <TouchableOpacity
-                key={factor}
-                style={[
-                  styles.factorButton,
-                  moodData.factors.includes(factor) &&
-                    styles.selectedFactorButton,
-                ]}
-                onPress={() => handleFactorToggle(factor)}
-              >
-                <Text
-                  style={[
-                    styles.factorText,
-                    moodData.factors.includes(factor) &&
-                      styles.selectedFactorText,
-                  ]}
-                >
-                  {factor}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Notes input section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notes</Text>
-          <TextInput
-            style={styles.notesInput}
-            placeholder="Add any notes about your mood..."
-            value={moodData.notes}
-            onChangeText={handleNotesChange}
-            multiline
+    <CurvedBackground>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
+          <StatusBar
+            barStyle="dark-content"
+            backgroundColor="#FFFFFF"
+            translucent={false}
           />
         </View>
 
-        {/* Submit button */}
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={styles.submitButtonText}>Save Mood Entry</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+        {/* Elegant curved background with gradient colors - positioned absolutely */}
+        <View style={styles.backgroundContainer}>
+          <CurvedBackground />
+        </View>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={styles.navButton}
-            onPress={() => handleTabPress(tab.id)}
-          >
-            <Ionicons
-              name={tab.icon as any}
-              size={24}
-              color={activeTab === tab.id ? "#4CAF50" : "#666"}
-            />
-            <Text
-              style={[
-                styles.navButtonText,
-                { color: activeTab === tab.id ? "#4CAF50" : "#666" },
-              ]}
-            >
-              {tab.name}
+        <AppHeader title="Mood Tracker" showBack={true} />
+
+        {/* Main Content */}
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {/* Mood display section showing selected mood */}
+          <View style={styles.moodDisplay}>
+            <Text style={styles.moodEmoji}>
+              {moodConfig[moodData.type].emoji}
             </Text>
+            <Text style={styles.moodLabel}>
+              {moodConfig[moodData.type].label}
+            </Text>
+          </View>
+
+          {/* Intensity selection section with slider */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Intensity (1-5)</Text>
+            <View style={styles.sliderContainer}>
+              <Text>1</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={1}
+                maximumValue={5}
+                step={1}
+                value={moodData.intensity}
+                onValueChange={handleIntensityChange}
+                minimumTrackTintColor="#4CAF50"
+                maximumTrackTintColor="#E0E0E0"
+                thumbTintColor="#4CAF50"
+              />
+              <Text>5</Text>
+            </View>
+            <Text style={styles.intensityValue}>
+              Current: {moodData.intensity}
+            </Text>
+          </View>
+
+          {/* Mood factors selection section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Factors</Text>
+            <View style={styles.factorsContainer}>
+              {moodFactors.map((factor) => (
+                <TouchableOpacity
+                  key={factor}
+                  style={[
+                    styles.factorButton,
+                    moodData.factors.includes(factor) &&
+                      styles.selectedFactorButton,
+                  ]}
+                  onPress={() => handleFactorToggle(factor)}
+                >
+                  <Text
+                    style={[
+                      styles.factorText,
+                      moodData.factors.includes(factor) &&
+                        styles.selectedFactorText,
+                    ]}
+                  >
+                    {factor}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Notes input section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notes</Text>
+            <TextInput
+              style={styles.notesInput}
+              placeholder="Add any notes about your mood..."
+              value={moodData.notes}
+              onChangeText={handleNotesChange}
+              multiline
+            />
+          </View>
+
+          {/* Submit button */}
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.submitButtonText}>Save Mood Entry</Text>
+            )}
           </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+        </ScrollView>
+
+        {/* Bottom navigation bar */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "transparent",
     marginTop: -50,
     paddingTop: 50,
   },
@@ -403,6 +390,7 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: "center",
     marginTop: 16,
+    marginBottom: 32,
   },
   submitButtonText: {
     color: "#FFF",
