@@ -168,27 +168,30 @@ export default function ChatScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
+        {/* Fixed Header with proper safe area padding */}
+        <View style={styles.headerWrapper}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+            </TouchableOpacity>
 
-          <View style={styles.contactInfo}>
-            <Image
-              source={{ uri: contact.avatar }}
-              style={styles.headerAvatar}
-            />
-            <View>
-              <Text style={styles.contactName}>{contact.name}</Text>
-              <Text style={styles.contactStatus}>
-                {contact.online ? "Online" : "Offline"}
-              </Text>
+            <View style={styles.contactInfo}>
+              <Image
+                source={{ uri: contact.avatar }}
+                style={styles.headerAvatar}
+              />
+              <View>
+                <Text style={styles.contactName}>{contact.name}</Text>
+                <Text style={styles.contactStatus}>
+                  {contact.online ? "Online" : "Offline"}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <TouchableOpacity onPress={() => router.push("../appointments/book")}>
-            <Ionicons name="call-outline" size={24} color="#2E7D32" />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("../appointments/book")}>
+              <Ionicons name="call-outline" size={24} color="#2E7D32" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Chat Messages */}
@@ -290,18 +293,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "transparent",
   },
-  headerGradient: {
-    paddingTop: 10,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-    overflow: "hidden",
+  // Wrapper to handle safe area properly
+  headerWrapper: {
+    backgroundColor: "transparent",
+    paddingTop: Platform.OS === 'ios' ? 0 : 25, // Adjust for Android status bar
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 15,
-    paddingTop: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    backgroundColor: "transparent",
   },
   contactInfo: {
     flexDirection: "row",
@@ -322,11 +325,10 @@ const styles = StyleSheet.create({
   },
   contactStatus: {
     fontSize: 12,
-    color: "##000000",
+    color: "#000000",
     flexDirection: "row",
     alignItems: "center",
   },
-
   messagesContainer: {
     flex: 1,
     backgroundColor: "transparent",
