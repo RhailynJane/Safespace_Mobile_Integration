@@ -1,12 +1,8 @@
-/**
- * LLM Prompt: Add concise inline comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-
 import { useState, useEffect } from "react";
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Alert,
@@ -15,142 +11,146 @@ import {
 
 interface EmailVerificationStepProps {
   email: string;
+  verificationCode: string;
+  onUpdate: (data: { verificationCode: string }) => void;
   onNext: () => void;
-  onBack?: () => void;
+  onBack: () => void;
   stepNumber: number;
+  loading?: boolean;
+  onResendCode?: () => Promise<void>;
 }
 
 export default function EmailVerificationStep({
   email,
+  verificationCode,
+  onUpdate,
   onNext,
   onBack,
   stepNumber,
+  loading = false,
+  onResendCode,
 }: EmailVerificationStepProps) {
-  const [loading, setLoading] = useState(false); // Loading state for resend operation
-  const [checking, setChecking] = useState(false); // Loading state for verification check
-  const [error, setError] = useState(""); // Error message display
-  const [cooldown, setCooldown] = useState(0); // Cooldown timer for resend button
-  const [isVerified, setIsVerified] = useState(false); // Track verification status
+  const [resendLoading, setResendLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [error, setError] = useState("");
 
   // Handle cooldown timer for resend button
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let timer: NodeJS.Timeout | null = null;
+
     if (cooldown > 0) {
-      timer = setTimeout(() => setCooldown(cooldown - 1), 1000); // Decrement cooldown every second
+      timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
     }
+
     return () => {
-      if (timer !== null) {
-        clearTimeout(timer as any); // Cleanup timer on unmount
-      }
+      if (timer) clearTimeout(timer);
     };
   }, [cooldown]);
 
-  const handleResend = async () => {
-    if (cooldown > 0) return; // Prevent resend during cooldown
-
-    try {
-      setLoading(true);
-      // Simulate sending verification email (replace with actual API call)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setCooldown(30); // 30-second cooldown before allowing resend
-      Alert.alert(
-        "Verification Email Sent",
-        `A new verification link has been sent to ${email}`
-      );
-    } catch (err) {
-      setError("Failed to resend verification email");
-      console.error("Resend error:", err);
-    } finally {
-      setLoading(false);
-    }
+  const handleCodeChange = (code: string) => {
+    const numericCode = code.replace(/[^0-9]/g, "").substring(0, 6);
+    onUpdate({ verificationCode: numericCode });
+    setError("");
   };
 
-  const checkVerificationStatus = async () => {
+  const handleResend = async () => {
+    if (cooldown > 0 || resendLoading) return;
+
     try {
-      setChecking(true);
-      setError(""); // Clear previous errors
-      
-      // Simulate checking verification status (replace with actual API call)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For demo purposes, simulate successful verification
-      const verified = true; 
-      
-      if (verified) {
-        setIsVerified(true);
-        onNext(); // Proceed to next step after verification
+      setResendLoading(true);
+      setError("");
+
+      if (onResendCode) {
+        await onResendCode();
       } else {
-        setError("Email not verified yet. Please check your inbox.");
+        // Fallback - this should ideally be provided via props
+        console.warn("No resend function provided");
       }
+
+      setCooldown(30);
+      Alert.alert("Verification Code Sent", `A new 6-digit code has been sent to ${email}`);
     } catch (err) {
-      setError("Failed to check verification status");
-      console.error("Verification check error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to resend code";
+      setError(errorMessage);
     } finally {
-      setChecking(false);
+      setResendLoading(false);
     }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Verify Your Email</Text>
-      <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
+      <Text style={styles.subtitle}>Step {stepNumber} of 4</Text>
 
       <Text style={styles.description}>
-        We've sent a verification link to{" "}
-        <Text style={styles.email}>{email}</Text>. Please:
+        We've sent a 6-digit verification code to{" "}
+        <Text style={styles.email}>{email}</Text>
       </Text>
 
-      <View style={styles.instructions}>
-        <Text style={styles.instruction}>1. Check your inbox</Text>
-        <Text style={styles.instruction}>2. Click the verification link</Text>
-        <Text style={styles.instruction}>3. Return to this app</Text>
+      {/* Code Input */}
+      <View style={styles.codeInputContainer}>
+        <TextInput
+          style={[styles.codeInput, error && styles.errorInput]}
+          value={verificationCode}
+          onChangeText={handleCodeChange}
+          placeholder="000000"
+          placeholderTextColor="#999"
+          keyboardType="number-pad"
+          maxLength={6}
+          autoFocus={true}
+          editable={!loading}
+        />
+        <Text style={styles.codeHint}>Enter the 6-digit code</Text>
       </View>
-
-      <TouchableOpacity
-        style={[
-          styles.button,
-          (checking || isVerified) && styles.disabledButton, // Disable when checking or verified
-        ]}
-        onPress={checkVerificationStatus}
-        disabled={checking || isVerified}
-      >
-        {checking ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>
-            {isVerified ? "Verified! Continue" : "I've Verified My Email"}
-          </Text>
-        )}
-      </TouchableOpacity>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+      {/* Verify Button */}
+      <TouchableOpacity
+        style={[
+          styles.button,
+          (loading || verificationCode.length !== 6) && styles.disabledButton,
+        ]}
+        onPress={onNext}
+        disabled={loading || verificationCode.length !== 6}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Verify Email</Text>
+        )}
+      </TouchableOpacity>
+
+      {/* Resend Code Section */}
       <View style={styles.resendContainer}>
+        <Text style={styles.resendPrompt}>Didn't receive the code?</Text>
         <TouchableOpacity
           onPress={handleResend}
-          disabled={loading || cooldown > 0} // Disable during loading or cooldown
+          disabled={resendLoading || cooldown > 0}
         >
           <Text
             style={[
               styles.resendLink,
-              (loading || cooldown > 0) && styles.disabledLink, // Visual disabled state
+              (resendLoading || cooldown > 0) && styles.disabledLink,
             ]}
           >
-            {loading
+            {resendLoading
               ? "Sending..."
               : cooldown > 0
-              ? `Resend in ${cooldown}s` // Show cooldown timer
-              : "Resend Email"}
+              ? `Resend in ${cooldown}s`
+              : "Resend Code"}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {onBack && ( // Only show back button if onBack prop provided
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
-      )}
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={onBack}
+        disabled={loading}
+      >
+        <Text style={styles.backButtonText}>Back</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 8,
     textAlign: "center",
+    color: "#333",
   },
   subtitle: {
     fontSize: 16,
@@ -176,31 +177,53 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 16,
     color: "#666",
-    marginBottom: 16,
+    marginBottom: 32,
     textAlign: "center",
+    lineHeight: 22,
   },
   email: {
     fontWeight: "600",
+    color: "#7BB8A8",
+  },
+  codeInputContainer: {
+    marginBottom: 24,
+    alignItems: "center",
+  },
+  codeInput: {
+    width: 200,
+    height: 50,
+    borderWidth: 2,
+    borderColor: "#7BB8A8",
+    borderRadius: 8,
+    fontSize: 20,
+    fontWeight: "600",
+    textAlign: "center",
     color: "#333",
+    backgroundColor: "#FFF",
+    letterSpacing: 8, // Better visual spacing for codes
   },
-  instructions: {
-    marginBottom: 32,
-    paddingHorizontal: 20,
+  codeHint: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 8,
   },
-  instruction: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 8,
+  errorInput: {
+    borderColor: "#FF6B6B",
   },
   button: {
-    backgroundColor: "#7BB8A8", // Primary brand color
+    backgroundColor: "#7BB8A8",
     padding: 16,
     borderRadius: 8,
     alignItems: "center",
     marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   disabledButton: {
-    opacity: 0.6, // Visual indicator for disabled state
+    opacity: 0.6,
   },
   buttonText: {
     color: "#fff",
@@ -208,29 +231,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   resendContainer: {
-    marginTop: 16,
+    alignItems: "center",
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+  },
+  resendPrompt: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 8,
   },
   resendLink: {
-    color: "#FF6B6B", // Attention-grabbing color for resend
+    color: "#7BB8A8",
     fontWeight: "600",
-    textAlign: "center",
+    fontSize: 14,
   },
   disabledLink: {
     opacity: 0.6,
-    color: "#999", // Muted color when disabled
+    color: "#999",
   },
   errorText: {
-    color: "#FF6B6B", // Error color
-    marginTop: 8,
+    color: "#FF6B6B",
+    marginBottom: 16,
     textAlign: "center",
+    fontSize: 14,
   },
   backButton: {
     marginTop: 24,
     padding: 12,
+    alignItems: "center",
   },
   backButtonText: {
     color: "#666",
-    textAlign: "center",
     fontWeight: "500",
+    fontSize: 16,
   },
 });

@@ -1,4 +1,5 @@
-import { useState } from "react";
+// app/(auth)/signup.tsx
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,13 +11,17 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
+import { useSignUp } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 import PersonalInfoStep from "../../components/PersonalInfoStep";
 import PasswordStep from "../../components/PasswordStep";
 import EmailVerificationStep from "../../components/EmailVerificationStep";
 import SuccessStep from "../../components/SuccessStep";
+import { CaptchaHandler } from "../../utils/captcha-handler";
+import { apiService } from '../../utils/api';
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -32,6 +37,10 @@ export interface SignupData {
 }
 
 export default function SignupScreen() {
+  // Clerk signup hook
+  const { isLoaded, signUp, setActive } = useSignUp();
+  const [captchaReady, setCaptchaReady] = useState(false);
+
   // State management for signup process
   const [currentStep, setCurrentStep] = useState<SignupStep>("personal");
   const [loading, setLoading] = useState(false);
@@ -46,75 +55,272 @@ export default function SignupScreen() {
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Wait for CAPTCHA to be ready (shorter timeout for mobile)
+  useEffect(() => {
+    const timer = setTimeout(
+      () => {
+        setCaptchaReady(true);
+      },
+      Platform.OS === "web" ? 1000 : 500
+    );
+
+    return () => clearTimeout(timer);
+  }, []);
+
   // Update signup data with partial updates
   const updateSignupData = (data: Partial<SignupData>) => {
     setSignupData((prev) => ({ ...prev, ...data }));
   };
 
-  // Progress to the next step in the signup process
-  const nextStep = async () => {
-    const steps: SignupStep[] = ["personal", "password", "verification", "success"];
-    const currentIndex = steps.indexOf(currentStep);
-
+  // Handle personal info step
+  const handlePersonalInfoNext = () => {
     setErrorMessage(null);
 
-    // Handle password step validation
-    if (currentStep === "password") {
-      // Validate required fields
-      if (!signupData.firstName || !signupData.lastName) {
-        setErrorMessage("Please provide your full name");
-        return;
-      }
-      if (!signupData.email || !signupData.password) {
-        setErrorMessage("Email and password are required");
-        return;
-      }
-
-      setLoading(true);
-
-      try {
-        // In a real implementation, this would call signup API
-        // For now, we'll simulate a successful signup
-        console.log("Signup data:", signupData);
-        
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setCurrentStep("verification");
-      } catch (error) {
-        setErrorMessage(
-          typeof error === "string"
-            ? error
-            : "Failed to complete registration. Please try again."
-        );
-        console.error("Signup error:", error);
-      } finally {
-        setLoading(false);
-      }
+    // Validate personal info
+    if (!signupData.firstName || !signupData.lastName) {
+      setErrorMessage("Please provide your full name");
+      return;
+    }
+    if (!signupData.email) {
+      setErrorMessage("Email is required");
       return;
     }
 
-    // Progress to next step if not on password step
-    if (currentIndex < steps.length - 1) {
-      const nextStep = steps[currentIndex + 1];
-      if (nextStep) {
-        setCurrentStep(nextStep);
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(signupData.email)) {
+      setErrorMessage("Please enter a valid email address");
+      return;
+    }
+
+    setCurrentStep("password");
+  };
+
+  // Handle password step with improved CAPTCHA handling
+  const handlePasswordNext = async () => {
+    if (!isLoaded) {
+      setErrorMessage("Authentication service not ready");
+      return;
+    }
+
+    setErrorMessage(null);
+
+    // Validate password
+    if (!signupData.password) {
+      setErrorMessage("Password is required");
+      return;
+    }
+    if (signupData.password.length < 8) {
+      setErrorMessage("Password must be at least 8 characters long");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Prepare signup data with CAPTCHA considerations
+      const signupPayload: any = {
+        emailAddress: signupData.email,
+        password: signupData.password,
+        firstName: signupData.firstName,
+        lastName: signupData.lastName,
+      };
+
+      // Add CAPTCHA configuration for web environment
+      if (Platform.OS === "web" && !__DEV__) {
+        signupPayload.captcha = {
+          invisible: true,
+        };
       }
+
+      // Start sign-up process
+      await signUp.create(signupPayload);
+
+      // Send email verification code
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+
+      // Move to verification step
+      setCurrentStep("verification");
+    } catch (err: any) {
+      console.error("Sign up error:", err);
+
+      // Use the improved CAPTCHA error handler
+      const errorMessage = CaptchaHandler.handleCaptchaError(err);
+      setErrorMessage(errorMessage);
+
+      // Log detailed error for debugging
+      if (err.errors) {
+        console.error("Clerk error details:", err.errors);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Improved retry mechanism
+  const retrySignup = async () => {
+    setErrorMessage(null);
+    setCaptchaReady(false);
+
+    // Longer delay for retry to ensure clean state
+    setTimeout(() => {
+      setCaptchaReady(true);
+      handlePasswordNext();
+    }, 3000);
+  };
+
+  // Handle email verification
+  // Update the handleVerification function in your signup component
+const handleVerification = async () => {
+  if (!isLoaded || !signUp) {
+    setErrorMessage("Authentication service not ready");
+    return;
+  }
+
+  setErrorMessage(null);
+
+  if (
+    !signupData.verificationCode ||
+    signupData.verificationCode.length !== 6
+  ) {
+    setErrorMessage("Please enter the 6-digit verification code");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    // Attempt email verification with Clerk
+    const signUpAttempt = await signUp.attemptEmailAddressVerification({
+      code: signupData.verificationCode,
+    });
+
+    if (signUpAttempt.status === "complete") {
+      // User successfully verified - set active session
+      await setActive({ session: signUpAttempt.createdSessionId });
+
+      // Sync user data with your database
+      try {
+        console.log('Syncing user with database...');
+        const syncResult = await apiService.syncUser({
+          clerkUserId: signUpAttempt.createdUserId!,
+          email: signupData.email,
+          firstName: signupData.firstName,
+          lastName: signupData.lastName,
+          phoneNumber: signupData.phoneNumber,
+        });
+
+        console.log('User synced successfully:', syncResult);
+
+        // Create client record
+        if (syncResult.user?.id) {
+          try {
+            await apiService.createClient({
+              userId: syncResult.user.id,
+              // Add any additional client data if you have it in signupData
+              // emergencyContactName: signupData.emergencyContactName,
+              // emergencyContactPhone: signupData.emergencyContactPhone,
+              // emergencyContactRelationship: signupData.emergencyContactRelationship,
+            });
+            console.log('Client record created successfully');
+          } catch (clientError) {
+            console.error('Failed to create client record:', clientError);
+            // Don't fail the signup process if client creation fails
+          }
+        }
+
+        setCurrentStep("success");
+      } catch (syncError) {
+        console.error('Failed to sync user with database:', syncError);
+        // Still proceed to success since Clerk authentication worked
+        setCurrentStep("success");
+        // Optionally show a warning to the user
+        // setErrorMessage("Account created successfully, but some data may need to be updated later.");
+      }
+    } else {
+      // Handle incomplete verification
+      setErrorMessage("Verification incomplete. Please try again.");
+      console.log("Verification status:", signUpAttempt.status);
+    }
+  } catch (err: any) {
+    console.error("Verification error:", err);
+
+    // Handle specific Clerk errors
+    if (err.errors) {
+      const clerkError = err.errors[0];
+      setErrorMessage(
+        clerkError?.message || "Invalid verification code. Please try again."
+      );
+    } else {
+      setErrorMessage("Invalid verification code. Please try again.");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Add a resend function
+  const handleResendCode = async () => {
+    if (!isLoaded || !signUp) return;
+
+    try {
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      Alert.alert(
+        "Code Sent",
+        "A new verification code has been sent to your email."
+      );
+    } catch (err: any) {
+      setErrorMessage("Failed to resend code. Please try again.");
+    }
+  };
+
+  // Progress to the next step
+  const nextStep = async () => {
+    switch (currentStep) {
+      case "personal":
+        handlePersonalInfoNext();
+        break;
+      case "password":
+        await handlePasswordNext();
+        break;
+      case "verification":
+        await handleVerification();
+        break;
+      default:
+        const steps: SignupStep[] = [
+          "personal",
+          "password",
+          "verification",
+          "success",
+        ];
+        const currentIndex = steps.indexOf(currentStep);
+        if (currentIndex < steps.length - 1) {
+          setCurrentStep(steps[currentIndex + 1]!);
+        }
+        break;
     }
   };
 
   // Return to the previous step
   const prevStep = () => {
-    const steps: SignupStep[] = ["personal", "password", "verification", "success"];
+    const steps: SignupStep[] = [
+      "personal",
+      "password",
+      "verification",
+      "success",
+    ];
     const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex > 0 && steps[currentIndex - 1]) {
+    if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]!);
     }
   };
 
   // Get the current step number for display purposes
   const getStepNumber = (): number => {
-    return ["personal", "password", "verification", "success"].indexOf(currentStep) + 1;
+    return (
+      ["personal", "password", "verification", "success"].indexOf(currentStep) +
+      1
+    );
   };
 
   // Render the appropriate step component based on current step
@@ -143,7 +349,7 @@ export default function SignupScreen() {
               onNext={nextStep}
               stepNumber={getStepNumber()}
             />
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.footerContainer}
               onPress={() => router.push("/(auth)/login")}
             >
@@ -166,7 +372,19 @@ export default function SignupScreen() {
               loading={loading}
             />
             {errorMessage && (
-              <Text style={styles.errorText}>{errorMessage}</Text>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{errorMessage}</Text>
+                {(errorMessage.includes("CAPTCHA") ||
+                  errorMessage.includes("Security verification") ||
+                  errorMessage.includes("verification")) && (
+                  <TouchableOpacity
+                    onPress={retrySignup}
+                    style={styles.retryButton}
+                  >
+                    <Text style={styles.retryText}>Retry Security Check</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </View>
         );
@@ -175,14 +393,23 @@ export default function SignupScreen() {
         return (
           <EmailVerificationStep
             email={signupData.email}
+            verificationCode={signupData.verificationCode}
+            onUpdate={updateSignupData}
             onNext={nextStep}
             onBack={prevStep}
             stepNumber={getStepNumber()}
+            loading={loading}
+            onResendCode={handleResendCode} // Add this line
           />
         );
 
       case "success":
-        return <SuccessStep onSignIn={() => router.push("/(auth)/login")} />;
+        return (
+          <SuccessStep
+            onContinue={() => router.replace("/(app)/(tabs)/home")}
+            onSignIn={() => router.replace("/(auth)/login")}
+          />
+        );
 
       default:
         return null;
@@ -199,7 +426,7 @@ export default function SignupScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Decorative ellipse at the top */}
-          <View style={styles.topEllipse}></View> 
+          <View style={styles.topEllipse}></View>
 
           {/* Logo display (hidden on success screen) */}
           {currentStep !== "success" && (
@@ -207,7 +434,7 @@ export default function SignupScreen() {
               <SafeSpaceLogo size={218} />
             </View>
           )}
-          
+
           {/* Render the current step component */}
           {renderCurrentStep()}
         </ScrollView>
@@ -262,13 +489,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   topEllipse: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: -50,
     right: -50,
     height: 200,
-    backgroundColor: '#B87B7B',
-    opacity: 0.10,
+    backgroundColor: "#B87B7B",
+    opacity: 0.1,
     borderBottomLeftRadius: 200,
     borderBottomRightRadius: 200,
     zIndex: -1,
@@ -297,7 +524,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontWeight: "400",
     color: "#E43232",
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   errorText: {
     color: "#E43232",
@@ -305,5 +532,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 10,
     textAlign: "center",
+  },
+  errorContainer: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  retryButton: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: "#7BB8A8",
+    borderRadius: 5,
+  },
+  retryText: {
+    color: "#FFF",
+    fontWeight: "600",
   },
 });

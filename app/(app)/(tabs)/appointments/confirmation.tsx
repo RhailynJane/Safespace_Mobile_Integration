@@ -1,5 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
+ * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
 import { useState } from "react";
@@ -20,6 +20,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { Alert } from "react-native";
 
 /**
  * ConfirmAppointment Component
@@ -61,15 +64,59 @@ export default function ConfirmAppointment() {
     (sw) => sw.id === Number(supportWorkerId)
   );
 
-  // Mock user data (replaces backend auth context)
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  // Clerk authentication hooks
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
+
+  const getDisplayName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    if (user?.primaryEmailAddress?.emailAddress) {
+      return user.primaryEmailAddress.emailAddress.split("@")[0];
+    }
+    return "User";
   };
 
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email available"
+    );
+  };
+
+  /**
+   * Enhanced logout function with Clerk integration
+   */
+  const handleLogout = async () => {
+    if (isSigningOut) return;
+
+    try {
+      setIsSigningOut(true);
+      setSideMenuVisible(false);
+
+      await AsyncStorage.clear();
+      if (signOut) {
+        await signOut();
+      }
+
+      router.replace("/(auth)/login");
+    } catch (error) {
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  /**
+   * Confirmation dialog for sign out
+   */
+  const confirmSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+    ]);
   };
 
   // Show error if support worker not found
@@ -198,24 +245,10 @@ export default function ConfirmAppointment() {
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
-        setSideMenuVisible(false);
-        // Mock logout functionality
-        console.log("User signed out");
-      },
+      onPress: confirmSignOut,
+      disabled: isSigningOut,
     },
   ];
-
-  /**
-   * Gets display name from available user data
-   * @returns String with user's display name or fallback
-   */
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
-  };
 
   // Show loading indicator if data is being fetched
   if (loading) {
@@ -356,21 +389,34 @@ export default function ConfirmAppointment() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.sideMenuItem}
+                    style={[
+                      styles.sideMenuItem,
+                      item.disabled && styles.sideMenuItemDisabled,
+                    ]}
                     onPress={item.onPress}
+                    disabled={item.disabled}
                   >
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color="#4CAF50"
+                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
                     />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    <Text
+                      style={[
+                        styles.sideMenuItemText,
+                        item.disabled && styles.sideMenuItemTextDisabled,
+                        item.title === "Sign Out" && styles.signOutText,
+                      ]}
+                    >
+                      {item.title}
+                      {item.title === "Sign Out" && isSigningOut && "..."}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -407,6 +453,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B",
+    fontWeight: "600",
   },
   header: {
     flexDirection: "row",

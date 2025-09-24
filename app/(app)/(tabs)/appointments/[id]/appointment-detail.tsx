@@ -17,9 +17,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 
 /**
  * AppointmentDetail Component
@@ -40,17 +42,11 @@ export default function AppointmentList() {
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [rescheduleModalVisible, setRescheduleModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // Mock user data 
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-  };
-  
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
-  };
+  // Clerk authentication hooks
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
 
   // Mock data for appointments
   const appointments = [
@@ -67,6 +63,67 @@ export default function AppointmentList() {
 
   // Find the appointment based on the ID from the URL
   const appointment = appointments.find((appt) => appt.id === Number(id));
+
+  /**
+   * Enhanced logout function with Clerk integration
+   */
+  const handleLogout = async () => {
+    console.log('AppointmentDetail logout initiated...');
+    
+    if (isSigningOut) {
+      console.log('Already signing out, returning...');
+      return;
+    }
+    
+    try {
+      setIsSigningOut(true);
+      
+      // Close the side menu first
+      setSideMenuVisible(false);
+      
+      // Clear local storage
+      await AsyncStorage.clear();
+      console.log('AsyncStorage cleared');
+      
+      // Sign out from Clerk
+      if (signOut) {
+        await signOut();
+        console.log('Clerk signOut completed');
+      }
+      
+      // Navigate to login screen
+      router.replace("/(auth)/login");
+      console.log('Navigation to login completed');
+      
+    } catch (error) {
+      console.error("Logout error:", error);
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  /**
+   * Confirmation dialog for sign out
+   */
+  const confirmSignOut = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => console.log('Sign out cancelled')
+        },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: handleLogout
+        }
+      ]
+    );
+  };
 
   // Show error if appointment not found
   if (!appointment) {
@@ -173,10 +230,35 @@ export default function AppointmentList() {
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
-      router.replace("/(app)/(tabs)/home");
+      router.replace("/(tabs)/home");
     } else {
-      router.push(`/(app)/(tabs)/${tabId}`);
+      router.push(`/(tabs)/${tabId}`);
     }
+  };
+
+  /**
+   * Gets display name from Clerk user data
+   * @returns String with user's display name or fallback
+   */
+  const getDisplayName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    if (user?.primaryEmailAddress?.emailAddress) {
+      return user.primaryEmailAddress.emailAddress.split("@")[0];
+    }
+    return "User";
+  };
+
+  /**
+   * Gets user email from Clerk
+   * @returns User's email address or fallback text
+   */
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email available"
+    );
   };
 
   // Side menu navigation items
@@ -186,7 +268,7 @@ export default function AppointmentList() {
       title: "Dashboard",
       onPress: () => {
         setSideMenuVisible(false);
-        router.replace("/(app)/(tabs)/home");
+        router.replace("/(tabs)/home");
       },
     },
     {
@@ -194,7 +276,7 @@ export default function AppointmentList() {
       title: "Profile",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/profile");
+        router.push("/(tabs)/profile");
       },
     },
     {
@@ -242,7 +324,7 @@ export default function AppointmentList() {
       title: "Messages",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/messages");
+        router.push("/(tabs)/messages");
       },
     },
     {
@@ -250,7 +332,7 @@ export default function AppointmentList() {
       title: "Appointments",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/appointments");
+        router.push("/(tabs)/appointments");
       },
     },
     {
@@ -272,29 +354,15 @@ export default function AppointmentList() {
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
-        setSideMenuVisible(false);
-        // Mock logout functionality
-        console.log("User signed out");
-      },
+      onPress: confirmSignOut,
+      disabled: isSigningOut,
     },
   ];
 
-  /**
-   * Gets display name from available user data
-   * @returns String with user's display name or fallback
-   */
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
-  };
-
   return (
-  <CurvedBackground>
+    <CurvedBackground>
       <SafeAreaView style={styles.container}>
-          <AppHeader title="Appointment Details" showBack={true} />
+        <AppHeader title="Appointment Details" showBack={true} />
 
         <ScrollView style={styles.content}>
           {/* Appointment Card */}
@@ -519,21 +587,32 @@ export default function AppointmentList() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.sideMenuItem}
+                    style={[
+                      styles.sideMenuItem,
+                      item.disabled && styles.sideMenuItemDisabled,
+                    ]}
                     onPress={item.onPress}
+                    disabled={item.disabled}
                   >
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color="#4CAF50"
+                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
                     />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    <Text style={[
+                      styles.sideMenuItemText,
+                      item.disabled && styles.sideMenuItemTextDisabled,
+                      item.title === "Sign Out" && styles.signOutText,
+                    ]}>
+                      {item.title}
+                      {item.title === "Sign Out" && isSigningOut && "..."}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -596,7 +675,7 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "transparent",
+    backgroundColor: "white",
     height: "100%",
   },
   sideMenuHeader: {
@@ -626,10 +705,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
   sideMenuItemText: {
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B",
+    fontWeight: "600",
   },
   footer: {
     padding: 16,

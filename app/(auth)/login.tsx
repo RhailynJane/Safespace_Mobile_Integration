@@ -1,3 +1,4 @@
+// app/(auth)/login.tsx
 import { useState } from "react";
 import {
   View,
@@ -13,91 +14,79 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSignIn } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 
 export default function LoginScreen() {
+  const { signIn, setActive, isLoaded } = useSignIn();
+
   // Form state management
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Error state management for form validation
-  const [emailError, setEmailError] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [generalError, setGeneralError] = useState("");
-
-  /**
-   * Mock authentication function for demo purposes
-   * In a real application, this would connect to a backend API
-   * to validate user credentials and return authentication tokens
-   */
-  const signIn = async (email: string, password: string) => {
-    // Simulate API call delay (1.5 seconds)
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Demo simulation - always return success
-    // In production, this would validate credentials against a database
-    return { error: null };
-  };
-
-  /**
-   * Handles the sign-in process with validation and authentication
-   * Validates input fields, calls authentication function, and handles errors
-   */
   const handleSignIn = async () => {
-    // Clear previous error messages before validation
-    setEmailError("");
-    setPasswordError("");
-    setGeneralError("");
-
-    // Basic client-side validation
-    if (!email.trim()) {
-      setEmailError("Email is required");
-      return;
-    }
-    if (!password.trim()) {
-      setPasswordError("Password is required");
+    if (!isLoaded) {
+      setError("Authentication service not ready");
       return;
     }
 
-    // Set loading state to show progress and disable inputs
+    setError("");
     setLoading(true);
-    const result = await signIn(email.trim(), password);
-    setLoading(false);
 
-    // Handle authentication errors
-    if (result.error) {
-      setGeneralError("Login failed. Please try again.");
-      return;
+    try {
+      const signInAttempt = await signIn.create({
+        identifier: email,
+        password,
+      });
+
+      if (signInAttempt.status === "complete") {
+        await setActive({ session: signInAttempt.createdSessionId });
+        router.replace("/(app)/(tabs)/home");
+      } else {
+        setError("Sign in process incomplete. Please try again.");
+        console.log(JSON.stringify(signInAttempt, null, 2));
+      }
+    } catch (err: any) {
+      console.error("Sign in error:", err);
+
+      if (err.errors) {
+        const clerkError = err.errors[0];
+        if (
+          clerkError.code === "form_identifier_not_found" ||
+          clerkError.code === "form_password_incorrect"
+        ) {
+          setError("Invalid email or password");
+        } else {
+          setError(clerkError.message || "Sign in failed");
+        }
+      } else {
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    // Navigate to the main app screen on successful authentication
-    router.replace("/(app)/(tabs)/home");
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
-      {/* Keyboard handling for iOS/Android to ensure inputs remain visible */}
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Decorative background element */}
-          <View style={styles.topEllipse}></View> 
+          <View style={styles.topEllipse}></View>
 
-          {/* Application logo display */}
           <View style={styles.logoContainer}>
             <SafeSpaceLogo size={218} />
           </View>
 
-          {/* Page title */}
           <Text style={styles.title}>Sign In To SafeSpace</Text>
 
-          {/* Toggle between Sign In and Sign Up modes */}
           <View style={styles.toggleContainer}>
             <View style={[styles.toggleButton, styles.activeToggle]}>
               <Text style={styles.activeToggleText}>Sign In</Text>
@@ -110,9 +99,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Main form container */}
           <View style={styles.formContainer}>
-            {/* Email input field with icon and validation */}
             <Text style={styles.inputLabel}>Email Address</Text>
             <View style={styles.inputWrapper}>
               <Ionicons
@@ -127,16 +114,14 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
-                  setEmailError(""); // Clear error when user starts typing
+                  setError("");
                 }}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!loading}
               />
             </View>
-            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-            {/* Password input field with toggle visibility and validation */}
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.inputWrapper}>
               <Ionicons
@@ -151,12 +136,11 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  setPasswordError(""); // Clear error when user starts typing
+                  setError("");
                 }}
                 secureTextEntry={!showPassword}
                 editable={!loading}
               />
-              {/* Toggle password visibility button */}
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeIcon}
@@ -168,23 +152,19 @@ export default function LoginScreen() {
                 />
               </TouchableOpacity>
             </View>
-            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
-            {/* General authentication error message */}
-            {generalError ? <Text style={styles.errorText}>{generalError}</Text> : null}
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            {/* Sign in button with loading state */}
             <TouchableOpacity
               style={[styles.signInButton, loading && styles.disabledButton]}
               onPress={handleSignIn}
-              disabled={loading}
+              disabled={loading || !isLoaded}
             >
               <Text style={styles.signInButtonText}>
                 {loading ? "Signing In..." : "Sign In"}
               </Text>
             </TouchableOpacity>
 
-            {/* Footer navigation links */}
             <View style={styles.footerContainer}>
               <TouchableOpacity
                 onPress={() => router.push("/(auth)/signup")}
@@ -196,7 +176,6 @@ export default function LoginScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Forgot password navigation */}
               <TouchableOpacity
                 style={styles.forgotPassword}
                 onPress={() => router.push("/(auth)/forgot-password")}
@@ -212,42 +191,29 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
-  keyboardContainer: {
-    flex: 1,
-  },
-  // Decorative ellipse at the top of the screen
+  container: { flex: 1, backgroundColor: "#F5F5F5" },
+  keyboardContainer: { flex: 1 },
   topEllipse: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: -50,
     right: -50,
     height: 200,
-    backgroundColor: '#B87B7B',
-    opacity: 0.10,
+    backgroundColor: "#B87B7B",
+    opacity: 0.1,
     borderBottomLeftRadius: 200,
     borderBottomRightRadius: 200,
     zIndex: -1,
   },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 2,
-  },
-  logoContainer: {
-    alignItems: "center",
-  },
+  scrollContainer: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 2 },
+  logoContainer: { alignItems: "center" },
   title: {
     fontSize: 20,
-    fontWeight: "700", 
+    fontWeight: "700",
     color: "#333",
     textAlign: "center",
     marginBottom: 30,
   },
-  // Container for Sign In/Sign Up toggle buttons
   toggleContainer: {
     flexDirection: "row",
     backgroundColor: "#FFF",
@@ -266,22 +232,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 20,
   },
-  activeToggle: {
-    backgroundColor: "#7BB8A8", // Brand color for active state
-  },
-  activeToggleText: {
-    color: "#FFF",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  inactiveToggleText: {
-    color: "#666",
-    fontWeight: "500",
-    fontSize: 16,
-  },
-  formContainer: {
-    width: "100%",
-  },
+  activeToggle: { backgroundColor: "#7BB8A8" },
+  activeToggleText: { color: "#FFF", fontWeight: "600", fontSize: 16 },
+  inactiveToggleText: { color: "#666", fontWeight: "500", fontSize: 16 },
+  formContainer: { width: "100%" },
   inputLabel: {
     fontSize: 13,
     fontWeight: "400",
@@ -289,7 +243,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 2,
   },
-  // Wrapper for input fields with icon and styling
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -304,57 +257,26 @@ const styles = StyleSheet.create({
     elevation: 1,
     marginBottom: 8,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 12,
-    color: "#",
-  },
-  eyeIcon: {
-    padding: 4,
-  },
-  // Primary action button
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 12, color: "#333" },
+  eyeIcon: { padding: 4 },
   signInButton: {
-    backgroundColor: "#7BB8A8", // Brand color
+    backgroundColor: "#7BB8A8",
     borderRadius: 25,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 30,
     marginBottom: 30,
   },
-  disabledButton: {
-    opacity: 0.6, // Visual indicator for disabled state
-  },
-  signInButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  footerContainer: {
-    alignItems: "center",
-    gap: 10,
-  },
-  footerText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-  },
-  // Style for clickable text links
+  disabledButton: { opacity: 0.6 },
+  signInButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
+  footerContainer: { alignItems: "center", gap: 10 },
+  footerText: { fontSize: 14, color: "#666", textAlign: "center" },
   linkText: {
     fontWeight: "400",
-    color: "#E43232", // Error/attention color for links
-    textDecorationLine: 'underline',
-  },
-  forgotPassword: {
-    marginTop: 5,
-  },
-  // Error message styling
-  errorText: {
     color: "#E43232",
-    marginTop: 4,
-    marginLeft: 8,
-    fontSize: 13,
+    textDecorationLine: "underline",
   },
+  forgotPassword: { marginTop: 5 },
+  errorText: { color: "#E43232", marginTop: 4, marginLeft: 8, fontSize: 13 },
 });

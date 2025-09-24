@@ -1,5 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
+ * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
 import { useState, useRef } from "react";
@@ -20,12 +20,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { Alert } from "react-native";
 const { width } = Dimensions.get("window");
 
 /**
  * CommunityScreen Component
- * 
+ *
  * Main community forum entry screen that provides an introduction to the community features.
  * Features a welcoming interface with a curved background and navigation options.
  * This is a standalone UI component with no backend dependencies.
@@ -35,19 +37,60 @@ export default function CommunityScreen() {
   const [activeTab, setActiveTab] = useState("community");
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Mock user data for UI demonstration
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-    uid: "demo-uid"
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  // Clerk authentication hooks
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
+
+  const getDisplayName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    if (user?.primaryEmailAddress?.emailAddress) {
+      return user.primaryEmailAddress.emailAddress.split("@")[0];
+    }
+    return "User";
   };
 
-  // Mock profile data for UI demonstration
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User"
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email available"
+    );
   };
 
+  /**
+   * Enhanced logout function with Clerk integration
+   */
+  const handleLogout = async () => {
+    if (isSigningOut) return;
+
+    try {
+      setIsSigningOut(true);
+      setSideMenuVisible(false);
+
+      await AsyncStorage.clear();
+      if (signOut) {
+        await signOut();
+      }
+
+      router.replace("/(auth)/login");
+    } catch (error) {
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  /**
+   * Confirmation dialog for sign out
+   */
+  const confirmSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+    ]);
+  };
   // Navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -86,8 +129,8 @@ export default function CommunityScreen() {
    * Generates initials from user's name for profile placeholder
    */
   const getInitials = () => {
-    const firstName = mockProfile?.firstName || "";
-    const lastName = mockProfile?.lastName || "";
+    const firstName = user?.firstName || "";
+    const lastName = user?.lastName || "";
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
   };
 
@@ -95,8 +138,7 @@ export default function CommunityScreen() {
    * Gets the user's name for greeting purposes
    */
   const getGreetingName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
+    if (user?.firstName) return user.firstName;
     return "User";
   };
 
@@ -221,16 +263,19 @@ export default function CommunityScreen() {
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: mockLogout,
+      onPress: confirmSignOut,
+      disabled: isSigningOut,
     },
   ];
 
   return (
     <CurvedBackground style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         {/* Header with profile and navigation icons */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/(app)/(tabs)/profile/edit")}>
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/(tabs)/profile/edit")}
+          >
             <View style={styles.profileImageContainer}>
               <Text style={styles.initialsText}>{getInitials()}</Text>
             </View>
@@ -239,10 +284,7 @@ export default function CommunityScreen() {
             <TouchableOpacity onPress={() => router.push("/notifications")}>
               <Ionicons name="notifications-outline" size={24} color="#666" />
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.menuButton}
-              onPress={showSideMenu}
-            >
+            <TouchableOpacity style={styles.menuButton} onPress={showSideMenu}>
               <Ionicons name="grid" size={24} color="#666" />
             </TouchableOpacity>
           </View>
@@ -256,8 +298,8 @@ export default function CommunityScreen() {
           {/* Community illustration */}
           {/* Image Reference: https://share.google/images/81eVPYnbEonHp6pR8 */}
           <View style={styles.imageContainer}>
-            <Image 
-              source={require('../../../../assets/images/community-forum.png')} 
+            <Image
+              source={require("../../../../assets/images/community-forum.png")}
               style={styles.appointmentImage}
               resizeMode="contain"
             />
@@ -270,8 +312,8 @@ export default function CommunityScreen() {
               <Text style={styles.welcomeTitle}>Community!</Text>
 
               <Text style={styles.welcomeSubtitle}>
-                Our community is a place of warmth and acceptance, where everyone's
-                voice is valued and respected.
+                Our community is a place of warmth and acceptance, where
+                everyone's voice is valued and respected.
               </Text>
 
               <TouchableOpacity
@@ -286,34 +328,49 @@ export default function CommunityScreen() {
 
         {/* Side Menu Modal */}
         <Modal
-          animationType="none" 
+          animationType="none"
           transparent={true}
           visible={sideMenuVisible}
           onRequestClose={hideSideMenu}
         >
-          <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
+          <Animated.View
+            style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
+          >
             <Pressable
               style={StyleSheet.absoluteFillObject}
               onPress={hideSideMenu}
             />
             <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
               <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getGreetingName()}</Text>
-                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.sideMenuItem}
+                    style={[
+                      styles.sideMenuItem,
+                      item.disabled && styles.sideMenuItemDisabled,
+                    ]}
                     onPress={item.onPress}
+                    disabled={item.disabled}
                   >
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color="#757575"
+                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
                     />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    <Text
+                      style={[
+                        styles.sideMenuItemText,
+                        item.disabled && styles.sideMenuItemTextDisabled,
+                        item.title === "Sign Out" && styles.signOutText,
+                      ]}
+                    >
+                      {item.title}
+                      {item.title === "Sign Out" && isSigningOut && "..."}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -391,7 +448,7 @@ const styles = StyleSheet.create({
   welcomeContainer: {
     alignItems: "center",
     padding: 20,
-    marginTop: 30
+    marginTop: 30,
   },
   welcomeTitle: {
     fontSize: 32,
@@ -428,8 +485,8 @@ const styles = StyleSheet.create({
   fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
   },
   sideMenu: {
     paddingTop: 40,
@@ -468,5 +525,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B",
+    fontWeight: "600",
   },
 });

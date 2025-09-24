@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import BottomNavigation from "../../../../components/BottomNavigation";
 
 /**
  * EditProfileScreen Component
@@ -282,37 +283,6 @@ export default function EditProfileScreen() {
   const getFullName = () => {
     return `${formData.firstName} ${formData.lastName}`.trim() || "User";
   };
-
-  /**
-   * Custom BottomNavigation component
-   */
-  const BottomNavigation = ({ tabs, activeTab, onTabPress }: {
-    tabs: Array<{ id: string; name: string; icon: string }>;
-    activeTab: string;
-    onTabPress: (tabId: string) => void;
-  }) => (
-    <View style={bottomNavStyles.container}>
-      {tabs.map((tab) => (
-        <TouchableOpacity
-          key={tab.id}
-          style={bottomNavStyles.tab}
-          onPress={() => onTabPress(tab.id)}
-        >
-          <Ionicons
-            name={tab.icon as any}
-            size={24}
-            color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
-          />
-          <Text style={[
-            bottomNavStyles.tabText,
-            { color: activeTab === tab.id ? "#2EA78F" : "#9E9E9E" }
-          ]}>
-            {tab.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
 
   return (
   <CurvedBackground>
