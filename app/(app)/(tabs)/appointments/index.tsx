@@ -1,5 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
+ * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
 import { useState } from "react";
@@ -21,12 +21,15 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { Alert } from "react-native";
 
 const { width } = Dimensions.get("window");
 
 /**
  * AppointmentsScreen Component
- * 
+ *
  * Main appointments screen that allows users to book new appointments
  * or view their scheduled appointments. Features an intuitive interface
  * with clear navigation options and an elegant curved background.
@@ -37,16 +40,59 @@ export default function AppointmentsScreen() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [activeView, setActiveView] = useState("main");
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  // Clerk authentication hooks
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
 
-  // Mock user data (replaces backend auth context)
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
+  const getDisplayName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    if (user?.primaryEmailAddress?.emailAddress) {
+      return user.primaryEmailAddress.emailAddress.split("@")[0];
+    }
+    return "User";
   };
-  
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
+
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email available"
+    );
+  };
+
+  /**
+   * Enhanced logout function with Clerk integration
+   */
+  const handleLogout = async () => {
+    if (isSigningOut) return;
+
+    try {
+      setIsSigningOut(true);
+      setSideMenuVisible(false);
+
+      await AsyncStorage.clear();
+      if (signOut) {
+        await signOut();
+      }
+
+      router.replace("/(auth)/login");
+    } catch (error) {
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  /**
+   * Confirmation dialog for sign out
+   */
+  const confirmSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+    ]);
   };
 
   // Bottom navigation tabs configuration
@@ -164,23 +210,10 @@ export default function AppointmentsScreen() {
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
-        setSideMenuVisible(false);
-        console.log("User signed out");
-      },
+      onPress: confirmSignOut,
+      disabled: isSigningOut,
     },
   ];
-
-  /**
-   * Gets display name from available user data
-   * @returns String with user's display name or fallback
-   */
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
-  };
 
   // Show loading indicator if data is being fetched
   if (loading) {
@@ -203,7 +236,7 @@ export default function AppointmentsScreen() {
    */
   const handleViewScheduled = () => {
     router.push("../appointments/appointment-list");
-  }
+  };
 
   /**
    * Renders the main content of the appointments screen
@@ -213,16 +246,24 @@ export default function AppointmentsScreen() {
     <View style={styles.content}>
       <View style={styles.buttonContainer}>
         {/* Primary action button - Book Appointment */}
-        <TouchableOpacity style={styles.primaryButton} onPress={handleBookAppointment}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleBookAppointment}
+        >
           <Text style={styles.buttonText}>Book Appointment</Text>
         </TouchableOpacity>
-        
+
         {/* Secondary action button - View Scheduled Appointments */}
-        <TouchableOpacity style={styles.secondaryButton} onPress={handleViewScheduled}>
-          <Text style={styles.secondaryButtonText}>Check Scheduled Appointments</Text>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={handleViewScheduled}
+        >
+          <Text style={styles.secondaryButtonText}>
+            Check Scheduled Appointments
+          </Text>
         </TouchableOpacity>
       </View>
-      
+
       {/* Placeholder for scheduled appointments list */}
       {activeView === "scheduled"}
     </View>
@@ -231,13 +272,13 @@ export default function AppointmentsScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-          <AppHeader title="Appointments" showBack={true} />
-        
+        <AppHeader title="Appointments" showBack={true} />
+
         {/* Appointment Illustration */}
         {/* Image Reference: https://iconscout.com/free-illustration/free-task-appointment-management-illustration_3485590*/}
         <View style={styles.imageContainer}>
-          <Image 
-            source={require('../../../../assets/images/appointment.png')} 
+          <Image
+            source={require("../../../../assets/images/appointment.png")}
             style={styles.appointmentImage}
             resizeMode="contain"
           />
@@ -261,17 +302,34 @@ export default function AppointmentsScreen() {
             <View style={styles.sideMenu}>
               <View style={styles.sideMenuHeader}>
                 <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.sideMenuItem}
+                    style={[
+                      styles.sideMenuItem,
+                      item.disabled && styles.sideMenuItemDisabled,
+                    ]}
                     onPress={item.onPress}
+                    disabled={item.disabled}
                   >
-                    <Ionicons name={item.icon as any} size={20} color="#4CAF50" />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                    />
+                    <Text
+                      style={[
+                        styles.sideMenuItemText,
+                        item.disabled && styles.sideMenuItemTextDisabled,
+                        item.title === "Sign Out" && styles.signOutText,
+                      ]}
+                    >
+                      {item.title}
+                      {item.title === "Sign Out" && isSigningOut && "..."}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -424,6 +482,16 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: "#4CAF50",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B",
     fontWeight: "600",
   },
 });
