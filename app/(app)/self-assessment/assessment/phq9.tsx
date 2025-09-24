@@ -382,73 +382,6 @@ export default function PHQ9QuestionnaireScreen() {
     router.push("../assessment/selection");
   };
 
-  // Side menu navigation items
-  const sideMenuItems = [
-    {
-      icon: "home",
-      title: "Dashboard",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.replace("/(app)/(tabs)/home");
-      },
-    },
-    {
-      icon: "person",
-      title: "Profile",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/profile");
-      },
-    },
-    {
-      icon: "bar-chart",
-      title: "Self-Assessment",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/self-assessment");
-      },
-    },
-    {
-      icon: "happy",
-      title: "Mood Tracking",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/mood-tracking");
-      },
-    },
-    {
-      icon: "journal",
-      title: "Journaling",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/journal");
-      },
-    },
-    {
-      icon: "library",
-      title: "Resources",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/resources");
-      },
-    },
-    {
-      icon: "help-circle",
-      title: "Crisis Support",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/crisis-support");
-      },
-    },
-    {
-      icon: "chatbubble",
-      title: "Messages",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/messages");
-      },
-    },
-  ];
 
   return (
     <CurvedBackground>
@@ -558,34 +491,6 @@ export default function PHQ9QuestionnaireScreen() {
           onTabPress={handleTabPress}
         />
 
-        <Modal visible={sideMenuVisible} animationType="slide" transparent>
-          <View style={styles.modalContainer}>
-            <Pressable
-              style={styles.modalOverlay}
-              onPress={() => setSideMenuVisible(false)}
-            />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>
-                  {profile.firstName} {profile.lastName}
-                </Text>
-                <Text style={styles.profileEmail}>{user.email}</Text>
-              </View>
-              <ScrollView style={styles.sideMenuContent}>
-                {sideMenuItems.map((item, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={styles.sideMenuItem}
-                    onPress={item.onPress}
-                  >
-                    <Ionicons name={item.icon as any} size={20} color="#333" />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
