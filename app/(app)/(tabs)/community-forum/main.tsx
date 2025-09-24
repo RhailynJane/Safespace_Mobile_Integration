@@ -1,5 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
+ * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
 import { useState, useEffect, useRef } from "react";
@@ -21,7 +21,9 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth, useUser } from "@clerk/clerk-expo";
+import { Alert } from "react-native";
 const { width, height } = Dimensions.get("window");
 
 // Mock data for posts
@@ -94,17 +96,59 @@ export default function CommunityMainScreen() {
   );
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  // Clerk authentication hooks
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
 
-  // Mock user data (replaces backend auth context)
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-    uid: "demo-user-id",
+  const getDisplayName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    if (user?.primaryEmailAddress?.emailAddress) {
+      return user.primaryEmailAddress.emailAddress.split("@")[0];
+    }
+    return "User";
   };
 
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email available"
+    );
+  };
+
+  /**
+   * Enhanced logout function with Clerk integration
+   */
+  const handleLogout = async () => {
+    if (isSigningOut) return;
+
+    try {
+      setIsSigningOut(true);
+      setSideMenuVisible(false);
+
+      await AsyncStorage.clear();
+      if (signOut) {
+        await signOut();
+      }
+
+      router.replace("/(auth)/login");
+    } catch (error) {
+      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  /**
+   * Confirmation dialog for sign out
+   */
+  const confirmSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+    ]);
   };
 
   /**
@@ -112,19 +156,9 @@ export default function CommunityMainScreen() {
    * @returns String containing user initials
    */
   const getInitials = () => {
-    const firstName = mockProfile?.firstName || "";
-    const lastName = mockProfile?.lastName || "";
+    const firstName = getDisplayName()?.split(" ")[0] || "";
+    const lastName = user?.lastName || "";
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
-  };
-
-  /**
-   * Gets greeting name from available user data
-   * @returns String with user's first name or fallback
-   */
-  const getGreetingName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    return "User";
   };
 
   /**
@@ -245,11 +279,8 @@ export default function CommunityMainScreen() {
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: async () => {
-        hideSideMenu();
-        // Mock logout functionality
-        console.log("User signed out");
-      },
+      onPress: confirmSignOut,
+      disabled: isSigningOut,
     },
   ];
 
@@ -312,18 +343,6 @@ export default function CommunityMainScreen() {
     } else {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
-  };
-
-  /**
-   * Gets display name from available user data
-   * @returns String with user's display name or fallback
-   */
-  const getDisplayName = () => {
-    if (mockProfile?.firstName)
-      return mockProfile.firstName + " " + (mockProfile.lastName || "");
-    if (mockUser?.displayName) return mockUser.displayName;
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "John Doe";
   };
 
   return (
@@ -481,18 +500,35 @@ export default function CommunityMainScreen() {
           />
           <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
             <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getGreetingName()}</Text>
-              <Text style={styles.profileEmail}>{mockUser?.email}</Text>
+              <Text style={styles.profileName}>{getDisplayName()}</Text>
+              <Text style={styles.profileEmail}>{getUserEmail()}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
                 <TouchableOpacity
                   key={index}
-                  style={styles.sideMenuItem}
+                  style={[
+                    styles.sideMenuItem,
+                    item.disabled && styles.sideMenuItemDisabled,
+                  ]}
                   onPress={item.onPress}
+                  disabled={item.disabled}
                 >
-                  <Ionicons name={item.icon as any} size={20} color="#757575" />
-                  <Text style={styles.sideMenuItemText}>{item.title}</Text>
+                  <Ionicons
+                    name={item.icon as any}
+                    size={20}
+                    color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                  />
+                  <Text
+                    style={[
+                      styles.sideMenuItemText,
+                      item.disabled && styles.sideMenuItemTextDisabled,
+                      item.title === "Sign Out" && styles.signOutText,
+                    ]}
+                  >
+                    {item.title}
+                    {item.title === "Sign Out" && isSigningOut && "..."}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -526,6 +562,16 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
     marginBottom: 80, // Space for bottom navigation
+  },
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B",
+    fontWeight: "600",
   },
   scrollView: {
     flex: 1,
