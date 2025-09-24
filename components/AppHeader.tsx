@@ -1,8 +1,3 @@
-/**
- * LLM Prompt: Add concise inline comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -15,23 +10,26 @@ import {
   Image,
   Animated,
   Dimensions,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from 'react-native';
+import { StatusBar } from "react-native";
+// Import Clerk hooks
+import { useAuth, useUser } from "@clerk/clerk-expo";
 
 const { width } = Dimensions.get("window");
 
 // Props interface for the AppHeader component
 export interface AppHeaderProps {
-  title?: string; // Optional header title
-  showBack?: boolean; // Whether to show back button instead of profile
-  showMenu?: boolean; // Whether to show menu button
-  showNotifications?: boolean; // Whether to show notifications button
-  rightActions?: React.ReactNode; // Custom right-side actions/components
-  onMenuPress?: () => void; // Optional custom menu press handler
+  title?: string;
+  showBack?: boolean;
+  showMenu?: boolean;
+  showNotifications?: boolean;
+  rightActions?: React.ReactNode;
+  onMenuPress?: () => void;
 }
 
 export const AppHeader = ({
@@ -44,18 +42,11 @@ export const AppHeader = ({
   // State for managing side menu visibility and profile image
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // Mock user data for frontend-only version
-  const [user] = useState({
-    uid: "demo-user-id",
-    email: "demo@gmail.com",
-    displayName: "Demo User",
-  });
-
-  const [profile] = useState({
-    firstName: "Demo",
-    lastName: "User",
-  });
+  // Clerk hooks for authentication
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
 
   // Animation value for fade effects
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -65,7 +56,7 @@ export const AppHeader = ({
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 800,
+      duration: 300,
       useNativeDriver: true,
     }).start();
   };
@@ -74,67 +65,154 @@ export const AppHeader = ({
   const hideSideMenu = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
-      duration: 800,
+      duration: 300,
       useNativeDriver: true,
     }).start(() => {
       setSideMenuVisible(false);
     });
   };
 
-  // Mock logout function for frontend-only version
-  const logout = async () => {
-    console.log("User logged out (frontend simulation)");
-    router.replace("/login");
+  // Fixed Clerk logout function - using relative paths like your working appointments screen
+  const handleSignOut = async () => {
+    console.log('SIGN OUT BUTTON PRESSED!');
+    
+    if (isSigningOut) {
+      console.log('Already signing out, returning...');
+      return;
+    }
+    
+    try {
+      console.log('Setting isSigningOut to true...');
+      setIsSigningOut(true);
+      
+      console.log('Hiding side menu...');
+      hideSideMenu(); // Close the menu first
+      
+      // Clear ALL stored data
+      console.log('Clearing AsyncStorage...');
+      await AsyncStorage.clear();
+      
+      // Also try Clerk signOut
+      try {
+        console.log('Calling Clerk signOut...');
+        await signOut();
+        console.log('Clerk signOut completed');
+      } catch (clerkError) {
+        console.log('Clerk signOut failed, but continuing:', clerkError);
+      }
+      
+      // Use relative path navigation like your working appointments screen
+      console.log('Navigating to login...');
+      router.replace("../../../(auth)/login");
+      
+      // Reset the signing out state
+      console.log('Resetting isSigningOut to false...');
+      setIsSigningOut(false);
+      
+    } catch (error) {
+      console.error('Sign out error:', error);
+      setIsSigningOut(false);
+      
+      // Show error alert with fallback navigation
+      Alert.alert(
+        "Sign Out Error",
+        `There was an issue signing out: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        [
+          { 
+            text: "Try Again", 
+            onPress: () => {
+              // Try different navigation approaches
+              try {
+                router.replace("../../../(auth)/login");
+              } catch (navError) {
+                console.log('Fallback navigation failed:', navError);
+                // Last resort - try going back to root
+                router.replace("/");
+              }
+            }
+          },
+          { text: "Cancel" }
+        ]
+      );
+    }
   };
 
   // Load profile image from AsyncStorage
   const loadProfileImage = async () => {
     try {
-      const savedImage = await AsyncStorage.getItem(`profileImage_${user.uid}`);
-      if (savedImage) {
-        setProfileImage(savedImage);
+      if (user?.id) {
+        const savedImage = await AsyncStorage.getItem(
+          `profileImage_${user.id}`
+        );
+        if (savedImage) {
+          setProfileImage(savedImage);
+        }
       }
     } catch (error) {
       console.log("Error loading profile image:", error);
     }
   };
 
-  // Load profile image when component mounts
+  // Load profile image when component mounts or user changes
   useEffect(() => {
-    loadProfileImage();
-  }, []);
+    if (user?.id) {
+      loadProfileImage();
+    }
+  }, [user?.id]);
 
   // Generate initials from user's name for profile placeholder
   const getInitials = () => {
-    const firstName = profile?.firstName || "";
-    const lastName = profile?.lastName || "";
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName.charAt(0)}${user.lastName.charAt(
+        0
+      )}`.toUpperCase();
+    }
+    if (user?.fullName) {
+      const names = user.fullName.split(" ");
+      return names.length > 1
+        ? `${names[0]?.charAt(0) ?? ""}${
+            names[names.length - 1]?.charAt(0) ?? ""
+          }`.toUpperCase()
+        : (names[0]?.charAt(0) ?? "").toUpperCase();
+    }
+    return "U";
   };
 
-  // Get greeting name from profile or user data
+  // Get greeting name from user data
   const getGreetingName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
     return "User";
   };
 
-  // Menu items for the side navigation drawer
+  // Get user email
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email"
+    );
+  };
+
+  // Menu items with corrected navigation paths
   const sideMenuItems = [
     {
       icon: "home",
       title: "Dashboard",
       onPress: () => {
         hideSideMenu();
-        router.push("/(app)/(tabs)/home");
+        router.push("/(tabs)/home");
       },
+      disabled: false,
     },
     {
       icon: "person",
       title: "Profile",
       onPress: () => {
         hideSideMenu();
-        router.push("/(app)/(tabs)/profile");
+        router.push("/(tabs)/profile");
       },
+      disabled: false,
     },
     {
       icon: "bar-chart",
@@ -143,6 +221,7 @@ export const AppHeader = ({
         hideSideMenu();
         router.push("/self-assessment");
       },
+      disabled: false,
     },
     {
       icon: "happy",
@@ -151,6 +230,7 @@ export const AppHeader = ({
         hideSideMenu();
         router.push("/mood-tracking");
       },
+      disabled: false,
     },
     {
       icon: "journal",
@@ -159,6 +239,7 @@ export const AppHeader = ({
         hideSideMenu();
         router.push("/journal");
       },
+      disabled: false,
     },
     {
       icon: "library",
@@ -167,6 +248,7 @@ export const AppHeader = ({
         hideSideMenu();
         router.push("/resources");
       },
+      disabled: false,
     },
     {
       icon: "help-circle",
@@ -175,22 +257,25 @@ export const AppHeader = ({
         hideSideMenu();
         router.push("/crisis-support");
       },
+      disabled: false,
     },
     {
       icon: "chatbubble",
       title: "Messages",
       onPress: () => {
         hideSideMenu();
-        router.push("/(app)/(tabs)/messages");
+        router.push("/(tabs)/messages");
       },
+      disabled: false,
     },
     {
       icon: "calendar",
       title: "Appointments",
       onPress: () => {
         hideSideMenu();
-        router.push("/(app)/(tabs)/appointments");
+        router.push("/(tabs)/appointments");
       },
+      disabled: false,
     },
     {
       icon: "people",
@@ -199,6 +284,7 @@ export const AppHeader = ({
         hideSideMenu();
         router.push("/community-forum");
       },
+      disabled: false,
     },
     {
       icon: "videocam",
@@ -207,147 +293,163 @@ export const AppHeader = ({
         hideSideMenu();
         router.push("/video-consultations");
       },
+      disabled: false,
     },
     {
       icon: "log-out",
       title: "Sign Out",
       onPress: async () => {
-        try {
-          hideSideMenu();
-          await logout();
-        } catch (error) {
-          console.error("Sign out error:", error);
-        }
+        setSideMenuVisible(false);
+        console.log("User signed out");
       },
+      disabled: false,
     },
   ];
 
-  return (
-    <>
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
-        {/* Main Header Container */}
+  // Don't render if user is not available (still loading)
+  if (!user && isSignedIn) {
+    return (
+      <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <View style={styles.header}>
-          {/* Left Section: Back Button or Profile Image */}
-          {showBack ? (
-            // Back button for navigation
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.backButton}
-              accessibilityLabel="Go back"
-            >
-              <Ionicons name="arrow-undo-sharp" size={24} color="black" />
-            </TouchableOpacity>
+          <Text>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView edges={["top"]} style={styles.safeArea}>
+      {/* Main Header Container */}
+      <View style={styles.header}>
+        {/* Left Section: Back Button or Profile Image */}
+        {showBack ? (
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-undo-sharp" size={24} color="black" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => router.push("/(tabs)/profile/edit")}
+            accessibilityLabel="Edit profile"
+          >
+            <View style={styles.profileImageContainer}>
+              {profileImage ? (
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.profileImage}
+                  accessibilityLabel="Profile photo"
+                />
+              ) : user?.imageUrl ? (
+                <Image
+                  source={{ uri: user.imageUrl }}
+                  style={styles.profileImage}
+                  accessibilityLabel="Profile photo"
+                />
+              ) : (
+                <Text style={styles.initialsText}>{getInitials()}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Center Section: Title */}
+        <View style={styles.titleContainer}>
+          {title ? (
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              {title}
+            </Text>
           ) : (
-            // Profile image/initials that navigate to profile edit
+            <View style={styles.emptyTitle} />
+          )}
+        </View>
+
+        {/* Right Section: Icons and Actions */}
+        <View style={styles.headerIcons}>
+          {rightActions}
+
+          {showNotifications && (
             <TouchableOpacity
-              onPress={() => router.push("/(app)/(tabs)/profile/edit")}
-              accessibilityLabel="Edit profile"
+              onPress={() => router.push("/notifications")}
+              accessibilityLabel="View notifications"
             >
-              <View style={styles.profileImageContainer}>
-                {profileImage ? (
-                  <Image
-                    source={{ uri: profileImage }}
-                    style={styles.profileImage}
-                    accessibilityLabel="Profile photo"
-                  />
-                ) : (
-                  <Text style={styles.initialsText}>{getInitials()}</Text>
-                )}
-              </View>
+              <Ionicons name="notifications-outline" size={24} color="#666" />
             </TouchableOpacity>
           )}
 
-          {/* Center Section: Title */}
-          <View style={styles.titleContainer}>
-            {title ? (
-              <Text style={styles.headerTitle} accessibilityRole="header">
-                {title}
-              </Text>
-            ) : (
-              <View style={styles.emptyTitle} /> // Empty view to maintain layout
-            )}
-          </View>
-
-          {/* Right Section: Icons and Actions */}
-          <View style={styles.headerIcons}>
-            {/* Custom right-side actions passed as props */}
-            {rightActions}
-
-            {/* Notifications Icon */}
-            {showNotifications && (
-              <TouchableOpacity
-                onPress={() => router.push("/notifications")}
-                accessibilityLabel="View notifications"
-              >
-                <Ionicons name="notifications-outline" size={24} color="#666" />
-              </TouchableOpacity>
-            )}
-
-            {/* Menu Icon - Opens side navigation drawer */}
-            {showMenu && (
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={showSideMenu}
-                accessibilityLabel="Open menu"
-              >
-                <Ionicons name="grid" size={24} color="#666" />
-              </TouchableOpacity>
-            )}
-          </View>
+          {showMenu && (
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={showSideMenu}
+              accessibilityLabel="Open menu"
+            >
+              <Ionicons name="grid" size={24} color="#666" />
+            </TouchableOpacity>
+          )}
         </View>
+      </View>
 
-        {/* Side Menu Modal - Navigation Drawer */}
-        <Modal
-          animationType="none"
-          transparent={true}
-          visible={sideMenuVisible}
-          onRequestClose={hideSideMenu} // Android back button support
+      {/* Side Menu Modal */}
+      <Modal
+        animationType="none"
+        transparent={true}
+        visible={sideMenuVisible}
+        onRequestClose={hideSideMenu}
+        statusBarTranslucent={true}
+      >
+        <Animated.View
+          style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
         >
-          {/* Overlay with press-to-close functionality */}
-          <Animated.View
-            style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
-          >
-            <Pressable
-              style={StyleSheet.absoluteFillObject}
-              onPress={hideSideMenu}
-              accessibilityLabel="Close menu"
-            />
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={hideSideMenu}
+            accessibilityLabel="Close menu"
+          />
 
-            {/* Side Menu Content */}
-            <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
-              {/* User Profile Section in Menu Header */}
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getGreetingName()}</Text>
-                <Text style={styles.profileEmail}>{user?.email}</Text>
-              </View>
+          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+            <View style={styles.sideMenuHeader}>
+              <Text style={styles.profileName}>{getGreetingName()}</Text>
+              <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            </View>
 
-              {/* Scrollable List of Menu Items */}
-              <ScrollView style={styles.sideMenuContent}>
-                {sideMenuItems.map((item, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.sideMenuItem}
-                    onPress={item.onPress}
-                    accessibilityLabel={item.title}
+            <ScrollView style={styles.sideMenuContent}>
+              {sideMenuItems.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.sideMenuItem,
+                    item.disabled && styles.sideMenuItemDisabled,
+                  ]}
+                  onPress={item.onPress}
+                  accessibilityLabel={item.title}
+                  disabled={item.disabled}
+                >
+                  <Ionicons
+                    name={item.icon as any}
+                    size={20}
+                    color={item.disabled ? "#CCCCCC" : "#757575"}
+                  />
+                  <Text
+                    style={[
+                      styles.sideMenuItemText,
+                      item.disabled && styles.sideMenuItemTextDisabled,
+                    ]}
                   >
-                    <Ionicons
-                      name={item.icon as any}
-                      size={20}
-                      color="#757575"
-                    />
-                    <Text style={styles.sideMenuItemText}>{item.title}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </Animated.View>
+                    {item.title}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </Animated.View>
-        </Modal>
-      </SafeAreaView>
-    </>
+        </Animated.View>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
-// Styles for the component
+// Styles remain the same
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
@@ -379,7 +481,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#E8F5E9", // Light green background for initials
+    backgroundColor: "#E8F5E9",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -391,7 +493,7 @@ const styles = StyleSheet.create({
   initialsText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#4CAF50", // Green color for initials
+    color: "#4CAF50",
   },
   titleContainer: {
     flex: 1,
@@ -403,38 +505,38 @@ const styles = StyleSheet.create({
   headerIcons: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12, // Space between icons
+    gap: 12,
   },
   menuButton: {
     padding: 4,
   },
   fullScreenOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent black overlay
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-start",
     alignItems: "flex-end",
   },
   sideMenu: {
-    paddingTop: 40, // Extra padding at top for status bar
-    width: width * 0.75, // 75% of screen width
+    paddingTop: 40,
+    width: width * 0.75,
     backgroundColor: "#FFFFFF",
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0", // Light gray border
+    borderBottomColor: "#E0E0E0",
     alignItems: "center",
   },
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121", // Dark gray
+    color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575", // Medium gray
+    color: "#757575",
   },
   sideMenuContent: {
     padding: 10,
@@ -445,14 +547,20 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0", // Very light gray border
+    borderBottomColor: "#F0F0F0",
+  },
+  sideMenuItemDisabled: {
+    opacity: 0.5,
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333", // Dark text color
-    marginLeft: 15, // Space between icon and text
+    color: "#333",
+    marginLeft: 15,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
   },
   safeArea: {
-    backgroundColor: 'transparent', 
-  }
+    backgroundColor: "transparent",
+  },
 });

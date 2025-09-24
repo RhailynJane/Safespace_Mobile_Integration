@@ -166,7 +166,6 @@ export default function AppointmentsScreen() {
       title: "Sign Out",
       onPress: async () => {
         setSideMenuVisible(false);
-        // Mock logout functionality
         console.log("User signed out");
       },
     },

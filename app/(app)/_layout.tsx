@@ -6,7 +6,8 @@ import { ActivityIndicator, View } from "react-native";
 export default function AppLayout() {
   const { isLoaded, isSignedIn } = useAuth();
 
-  // Show loading indicator while checking auth state
+  console.log('📱 AppLayout - Auth State:', { isLoaded, isSignedIn });
+
   if (!isLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -15,16 +16,21 @@ export default function AppLayout() {
     );
   }
 
-  // Redirect to auth if not signed in
   if (!isSignedIn) {
+    console.log('🚨 AppLayout redirecting to login - user not signed in');
     return <Redirect href="/(auth)/login" />;
   }
 
-  // Render the protected app routes
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
-      {/* Add other app screens here if needed */}
+      <Stack.Screen name="crisis-support" />
+      <Stack.Screen name="journal" />
+      <Stack.Screen name="mood-tracking" />
+      <Stack.Screen name="notifications" />
+      <Stack.Screen name="resources" />
+      <Stack.Screen name="self-assessment" />
+      <Stack.Screen name="video-consultations" />
     </Stack>
   );
 }

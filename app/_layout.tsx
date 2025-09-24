@@ -17,12 +17,11 @@ if (!publishableKey) {
 
 // Component to handle user synchronization with PostgreSQL
 function UserSyncHandler() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
 
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
-      // Use the full user object from useUser hook
       syncUserWithDatabase(user);
     }
   }, [isLoaded, isSignedIn, user]);
@@ -30,23 +29,13 @@ function UserSyncHandler() {
   return null;
 }
 
-// Loading component for authentication states
-function AuthLoading() {
-  const { isLoaded } = useAuth();
-
-  if (!isLoaded) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#7BB8A8" />
-      </View>
-    );
-  }
-
-  return null;
-}
-
 function RootLayoutNav() {
   const { isLoaded, isSignedIn } = useAuth();
+  
+  console.log("🔐 RootLayoutNav - Auth State:", { 
+    isLoaded, 
+    isSignedIn
+  });
 
   if (!isLoaded) {
     return (
@@ -69,7 +58,9 @@ function RootLayoutNav() {
         </>
       ) : (
         // Protected routes - user IS signed in
-        <Stack.Screen name="(app)" />
+        <>
+          <Stack.Screen name="(app)" />
+        </>
       )}
     </Stack>
   );
@@ -80,10 +71,8 @@ export default function RootLayout() {
     <ClerkProvider 
       publishableKey={publishableKey} 
       tokenCache={tokenCache}
-      afterSignInUrl="/(app)/(tabs)/home"
     >
       <SafeAreaProvider>
-        <AuthLoading />
         <UserSyncHandler />
         <RootLayoutNav />
       </SafeAreaProvider>

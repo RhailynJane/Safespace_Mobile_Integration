@@ -97,16 +97,20 @@ export default function ProfileScreen() {
    * Mock logout function for frontend-only implementation
    */
   const handleLogout = async () => {
-    try {
-      // Clear any stored data
-      await AsyncStorage.clear();
-      // Navigate to login screen
-      router.replace("/(auth)/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
-    }
-  };
+  try {
+    console.log('Profile screen logout started...');
+    // Clear any stored data
+    await AsyncStorage.clear();
+    console.log('AsyncStorage cleared');
+    
+    // Use relative path navigation
+    router.replace("../../../(auth)/login");
+    console.log('Navigation completed');
+  } catch (error) {
+    console.error("Logout error:", error);
+    Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+  }
+};
 
   /**
    * Returns the user's first name for display
