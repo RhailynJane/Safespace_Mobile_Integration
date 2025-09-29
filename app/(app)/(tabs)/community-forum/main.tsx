@@ -1,7 +1,3 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component.
- * Reference: chat.deepseek.com
- */
 import { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -26,15 +22,16 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 const { width, height } = Dimensions.get("window");
 
-// Mock data for posts
+// Available emoji reactions
+const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
+
 const POSTS = [
   {
     id: 1,
     title: "Struggling with Sleep Due to Stress?",
     content:
       "Lately, stress has really been affecting my sleep – either I can't fall asleep or I wake up feeling exhausted.\n\nJust wondering... how do you all cope with this?\nAny tips or routines that help you sleep better during stressful times?\n\nWould love to hear what works for you. 😊",
-    likes: 20,
-    comments: 241,
+    reactions: { "❤️": 12, "👍": 8, "😊": 15, "😢": 3, "😮": 2, "🔥": 5 },
     category: "Stress",
     user: {
       name: "Sarah M.",
@@ -46,8 +43,7 @@ const POSTS = [
     title: "Dealing with Anxiety Lately?",
     content:
       "I've been feeling more anxious than usual – overthinking, tight chest, hard to focus. It sneaks in even when things seem okay. 😊\n\nJust checking in... how do you manage your anxiety day-to-day?\nBreathing exercises, journaling, talking to someone?\n\nOpen to any ideas or even just sharing how you feel.\nYou're not alone. 😊",
-    likes: 20,
-    comments: 241,
+    reactions: { "❤️": 20, "👍": 15, "😊": 18, "😢": 8, "😮": 1, "🔥": 3 },
     category: "Support",
     user: {
       name: "Michael T.",
@@ -59,8 +55,7 @@ const POSTS = [
     title: "Little Wins & Mental Health Tips",
     content:
       "Hey everyone! Just wanted to share a few small things that helped my mental health lately:\n- Taking a short walk without my phone 🟧\n- Saying no without feeling guilty\n- Writing down 3 things I'm grateful for before bed\n\nFeel free to drop your own tips or wins-big or small.",
-    likes: 87,
-    comments: 42,
+    reactions: { "❤️": 45, "👍": 32, "😊": 28, "😢": 2, "😮": 5, "🔥": 38 },
     category: "Stories",
     user: {
       name: "John L.",
@@ -69,7 +64,6 @@ const POSTS = [
   },
 ];
 
-// Available categories for filtering posts
 const CATEGORIES = [
   "Trending",
   "Stress",
@@ -79,25 +73,15 @@ const CATEGORIES = [
   "Favorites",
 ];
 
-/**
- * CommunityMainScreen Component
- *
- * Main community forum screen displaying posts, categories, and user interactions.
- * Features a curved background, category filtering, and post interactions.
- */
 export default function CommunityMainScreen() {
-  // State management
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeTab, setActiveTab] = useState("community-forum");
-  const [likedPosts, setLikedPosts] = useState<Set<number>>(new Set());
-  const [commentedPosts, setCommentedPosts] = useState<Set<number>>(new Set());
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
-    new Set()
-  );
+  const [postReactions, setPostReactions] = useState<Map<number, string>>(new Map());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [reactionPickerVisible, setReactionPickerVisible] = useState<number | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isSigningOut, setIsSigningOut] = useState(false);
-  // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
 
@@ -118,9 +102,6 @@ export default function CommunityMainScreen() {
     );
   };
 
-  /**
-   * Enhanced logout function with Clerk integration
-   */
   const handleLogout = async () => {
     if (isSigningOut) return;
 
@@ -141,9 +122,6 @@ export default function CommunityMainScreen() {
     }
   };
 
-  /**
-   * Confirmation dialog for sign out
-   */
   const confirmSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -151,19 +129,12 @@ export default function CommunityMainScreen() {
     ]);
   };
 
-  /**
-   * Generates user initials from profile data
-   * @returns String containing user initials
-   */
   const getInitials = () => {
     const firstName = getDisplayName()?.split(" ")[0] || "";
     const lastName = user?.lastName || "";
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
   };
 
-  /**
-   * Shows the side menu with animation
-   */
   const showSideMenu = () => {
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
@@ -173,9 +144,6 @@ export default function CommunityMainScreen() {
     }).start();
   };
 
-  /**
-   * Hides the side menu with animation
-   */
   const hideSideMenu = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -186,7 +154,6 @@ export default function CommunityMainScreen() {
     });
   };
 
-  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -284,24 +251,22 @@ export default function CommunityMainScreen() {
     },
   ];
 
-  /**
-   * Handles like button press for posts
-   * @param postId - ID of the post to like/unlike
-   */
-  const handleLikePress = (postId: number) => {
-    const newLikedPosts = new Set(likedPosts);
-    if (newLikedPosts.has(postId)) {
-      newLikedPosts.delete(postId);
+  const handleReactionPress = (postId: number, emoji: string) => {
+    const currentReaction = postReactions.get(postId);
+    if (currentReaction === emoji) {
+      // Remove reaction if clicking the same emoji
+      const newReactions = new Map(postReactions);
+      newReactions.delete(postId);
+      setPostReactions(newReactions);
     } else {
-      newLikedPosts.add(postId);
+      // Add or change reaction
+      const newReactions = new Map(postReactions);
+      newReactions.set(postId, emoji);
+      setPostReactions(newReactions);
     }
-    setLikedPosts(newLikedPosts);
+    setReactionPickerVisible(null);
   };
 
-  /**
-   * Handles bookmark button press for posts
-   * @param postId - ID of the post to bookmark/unbookmark
-   */
   const handleBookmarkPress = (postId: number) => {
     const newBookmarkedPosts = new Set(bookmarkedPosts);
     if (newBookmarkedPosts.has(postId)) {
@@ -312,18 +277,14 @@ export default function CommunityMainScreen() {
     setBookmarkedPosts(newBookmarkedPosts);
   };
 
-  /**
-   * Navigates to the comments screen for a specific post
-   * @param postId - ID of the post to view comments for
-   */
   const handlePostPress = (postId: number) => {
+    // Navigate to post detail view (without comments)
     router.push({
-      pathname: "/community-forum/comments",
+      pathname: "/community-forum/post-detail",
       params: { id: postId },
     });
   };
 
-  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -332,10 +293,6 @@ export default function CommunityMainScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  /**
-   * Handles bottom tab navigation
-   * @param tabId - ID of the tab to navigate to
-   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -345,9 +302,12 @@ export default function CommunityMainScreen() {
     }
   };
 
+  const getTotalReactions = (reactions: { [key: string]: number }) => {
+    return Object.values(reactions).reduce((sum, count) => sum + count, 0);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Curved background component */}
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Community Forum" showBack={true} />
 
@@ -357,9 +317,7 @@ export default function CommunityMainScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Browse By Categories Section */}
           <View style={styles.categoriesSection}>
-            {/* Add Post Button */}
             <TouchableOpacity
               style={styles.addPostButton}
               onPress={() => router.push("/community-forum/create")}
@@ -370,7 +328,6 @@ export default function CommunityMainScreen() {
 
             <Text style={styles.browseBySectionTitle}>Browse By</Text>
 
-            {/* Category Filter Buttons */}
             <View style={styles.categoriesContainer}>
               {CATEGORIES.map((category) => (
                 <TouchableOpacity
@@ -396,7 +353,6 @@ export default function CommunityMainScreen() {
             </View>
           </View>
 
-          {/* Posts List Section */}
           <View style={styles.postsSection}>
             {POSTS.map((post) => (
               <TouchableOpacity
@@ -427,33 +383,16 @@ export default function CommunityMainScreen() {
 
                 <View style={styles.postFooter}>
                   <View style={styles.interactionButtons}>
-                    {/* Like Button */}
+                    {/* Reaction Button */}
                     <TouchableOpacity
-                      style={styles.interactionButton}
-                      onPress={() => handleLikePress(post.id)}
+                      style={styles.reactionButton}
+                      onPress={() => setReactionPickerVisible(post.id)}
                     >
-                      <Ionicons
-                        name={
-                          likedPosts.has(post.id) ? "heart" : "heart-outline"
-                        }
-                        size={18}
-                        color={likedPosts.has(post.id) ? "#E53935" : "#FF6B35"}
-                      />
-                      <Text style={styles.interactionText}>{post.likes}</Text>
-                    </TouchableOpacity>
-
-                    {/* Comment Button */}
-                    <TouchableOpacity
-                      style={styles.interactionButton}
-                      onPress={() => handlePostPress(post.id)}
-                    >
-                      <Ionicons
-                        name="chatbubble-outline"
-                        size={18}
-                        color="#FF6B35"
-                      />
+                      <Text style={styles.reactionEmoji}>
+                        {postReactions.get(post.id) || "❤️"}
+                      </Text>
                       <Text style={styles.interactionText}>
-                        {post.comments}
+                        {getTotalReactions(post.reactions)}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -468,23 +407,47 @@ export default function CommunityMainScreen() {
                           ? "bookmark"
                           : "bookmark-outline"
                       }
-                      size={18}
+                      size={24}
                       color={
                         bookmarkedPosts.has(post.id) ? "#FFA000" : "#FF6B35"
                       }
                     />
                   </TouchableOpacity>
                 </View>
+
+                {/* Reaction Picker Modal */}
+                {reactionPickerVisible === post.id && (
+                  <View style={styles.reactionPicker}>
+                    {EMOJI_REACTIONS.map((emoji) => (
+                      <TouchableOpacity
+                        key={emoji}
+                        style={[
+                          styles.emojiButton,
+                          postReactions.get(post.id) === emoji && styles.emojiButtonActive
+                        ]}
+                        onPress={() => handleReactionPress(post.id, emoji)}
+                      >
+                        <Text style={styles.emojiText}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Add extra spacing at the bottom to ensure all content is visible */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </View>
 
-      {/* Side Menu Modal */}
+      {/* Overlay to close reaction picker */}
+      {reactionPickerVisible !== null && (
+        <Pressable
+          style={styles.reactionOverlay}
+          onPress={() => setReactionPickerVisible(null)}
+        />
+      )}
+
       <Modal
         animationType="none"
         transparent={true}
@@ -536,7 +499,6 @@ export default function CommunityMainScreen() {
         </Animated.View>
       </Modal>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -561,7 +523,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    marginBottom: 80, // Space for bottom navigation
+    marginBottom: 80,
   },
   sideMenuItemDisabled: {
     opacity: 0.5,
@@ -577,12 +539,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 30, // Extra padding for scrollable content
-  },
-  addPostContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    justifyContent: "flex-end",
+    paddingBottom: 30,
   },
   addPostButton: {
     backgroundColor: "#2EA78F",
@@ -718,21 +675,59 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 16,
   },
-  interactionButton: {
+  reactionButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: "#F5F5F5",
+  },
+  reactionEmoji: {
+    fontSize: 24,
   },
   interactionText: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#FF6B35",
-    fontWeight: "500",
+    fontWeight: "600",
   },
-  // Bottom spacing to ensure all content is visible
+  reactionPicker: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    alignSelf: "flex-start",
+  },
+  emojiButton: {
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: "#F5F5F5",
+  },
+  emojiButtonActive: {
+    backgroundColor: "#FFE0B2",
+    transform: [{ scale: 1.1 }],
+  },
+  emojiText: {
+    fontSize: 28,
+  },
+  reactionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
   bottomSpacing: {
     height: 30,
   },
-  // Side Menu Styles
   fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",

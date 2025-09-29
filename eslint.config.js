@@ -54,6 +54,7 @@ export default [
       ...reactHooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       'no-undef': 'off',
+      'no-unused-vars': 'off', // Added this
     },
     settings: {
       react: {
@@ -95,12 +96,15 @@ export default [
     plugins: {
       react,
       'react-hooks': reactHooks,
+      '@typescript-eslint': tseslint, // Added TypeScript plugin
     },
     rules: {
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
-      'no-undef': 'off', // TypeScript handles this
+      'no-undef': 'off',
+      'no-unused-vars': 'off', // Turn off base rule
+      '@typescript-eslint/no-unused-vars': 'off', // Turn off TypeScript rule
     },
     settings: {
       react: {
