@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2EA78F",
     height: 35,
     paddingHorizontal: 30,
-    paddingVertical: 10,
+    paddingVertical: 6,
     borderRadius: 25,
     borderColor: "#D36500",
     borderWidth: 1,
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   },
   addPostButtonText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
     paddingVertical: 1,
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#757575",
   },
   categoryText: {
-    fontSize: 9,
+    fontSize: 12,
     color: "#000",
     borderColor: "#FFF",
     fontWeight: "400",
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   postTitle: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "900",
     color: "#333",
     flex: 1,
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   postContent: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#666",
     lineHeight: 18,
     marginBottom: 12,
