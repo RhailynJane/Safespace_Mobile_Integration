@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   View,
   Text,
@@ -13,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import { useState } from "react";
 
 // Available emoji reactions
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -145,44 +145,39 @@ export default function PostDetailScreen() {
             {/* Post Content */}
             <Text style={styles.postContent}>{post.content}</Text>
 
-            {/* Reaction Stats */}
+            {/* Reaction Stats - Now Tappable */}
             <View style={styles.reactionStats}>
               {Object.entries(post.reactions).map(([emoji, count]) => (
-                <View key={emoji} style={styles.reactionStat}>
+                <TouchableOpacity
+                  key={emoji}
+                  style={[
+                    styles.reactionStat,
+                    userReaction === emoji && styles.reactionStatActive,
+                  ]}
+                  onPress={() => handleReactionPress(emoji)}
+                >
                   <Text style={styles.reactionStatEmoji}>{emoji}</Text>
                   <Text style={styles.reactionStatCount}>{count}</Text>
-                </View>
+                </TouchableOpacity>
               ))}
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.actionButtons}>
-              {/* Reaction Button */}
+              
+              {/* Add More Reactions Button */}
               <TouchableOpacity
-                style={styles.reactionButton}
+                style={styles.addMoreReactionButton}
                 onPress={() => setReactionPickerVisible(!reactionPickerVisible)}
               >
-                <Text style={styles.reactionEmoji}>{userReaction || "❤️"}</Text>
-                <Text style={styles.actionButtonText}>
-                  {userReaction ? "Reacted" : "React"}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Bookmark Button */}
-              <TouchableOpacity
-                style={styles.bookmarkButton}
-                onPress={handleBookmarkPress}
-              >
-                <Ionicons
-                  name={bookmarked ? "bookmark" : "bookmark-outline"}
-                  size={24}
-                  color={bookmarked ? "#FFA000" : "#FF6B35"}
-                />
-                <Text style={styles.actionButtonText}>
-                  {bookmarked ? "Saved" : "Save"}
-                </Text>
+                <Ionicons name="add-circle" size={20} color="#4CAF50" />
               </TouchableOpacity>
             </View>
+
+            {/* Action Buttons - Removed, reactions now in stats section */}
+            {userReaction && (
+              <View style={styles.userReactionIndicator}>
+                <Text style={styles.userReactionText}>
+                  You reacted with {userReaction}
+                </Text>
+              </View>
+            )}
 
             {/* Reaction Picker */}
             {reactionPickerVisible && (
@@ -374,11 +369,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#E0E0E0",
     marginBottom: 16,
+    alignItems: "center",
   },
   reactionStat: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: "#F5F5F5",
+  },
+  reactionStatActive: {
+    backgroundColor: "#E8F5E9",
+    borderWidth: 2,
+    borderColor: "#4CAF50",
   },
   reactionStatEmoji: {
     fontSize: 20,
@@ -388,28 +393,28 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#666",
   },
-  actionButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  reactionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+  addMoreReactionButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  reactionEmoji: {
-    fontSize: 24,
+  userReactionIndicator: {
+    backgroundColor: "#E8F5E9",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    alignItems: "center",
   },
-  actionButtonText: {
+  userReactionText: {
     fontSize: 14,
+    color: "#2E7D32",
     fontWeight: "600",
-    color: "#333",
+  },
+  bookmarkSection: {
+    marginBottom: 16,
   },
   bookmarkButton: {
     flexDirection: "row",
@@ -421,13 +426,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#F5F5F5",
   },
+  bookmarkButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
   reactionPicker: {
     flexDirection: "row",
     gap: 8,
     marginTop: 12,
     padding: 12,
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -438,8 +448,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   emojiButton: {
-    padding: 8,
-    borderRadius: 12,
+    padding: 5,
+    borderRadius: 9,
     backgroundColor: "#F5F5F5",
   },
   emojiButtonActive: {
