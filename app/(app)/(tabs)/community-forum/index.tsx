@@ -18,6 +18,9 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { AppHeader } from "../../../../components/AppHeader";
 
+// Note: Ensure AppHeader component is located at: components/AppHeader.tsx
+// The AppHeader automatically displays user initials when no profile image is available
+
 const { width } = Dimensions.get("window");
 
 /**

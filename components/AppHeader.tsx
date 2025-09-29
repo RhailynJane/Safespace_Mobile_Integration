@@ -209,10 +209,10 @@ export const AppHeader = ({
       badge: "Due",
       onPress: () => {
         hideSideMenu();
-        router.push("/app/(app)/self-assessment");
+        router.push("../../self-assessment");
       },
       disabled: false,
-      show: isAssessmentDue, // Only show when assessment is due
+      show: isAssessmentDue,
     },
     {
       icon: "happy",

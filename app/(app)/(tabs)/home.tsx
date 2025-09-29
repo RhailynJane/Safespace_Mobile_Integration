@@ -329,7 +329,7 @@ export default function HomeScreen() {
               <View style={styles.section}>
                 <TouchableOpacity
                   style={styles.pendingTaskCard}
-                  onPress={() => router.push("/(app)/assessment/pre-survey")}
+                  onPress={() => router.push("../")}
                 >
                   <View style={styles.pendingTaskHeader}>
                     <View style={styles.pendingTaskIconContainer}>
