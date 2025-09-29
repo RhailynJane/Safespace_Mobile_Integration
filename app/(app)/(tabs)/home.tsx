@@ -326,7 +326,7 @@ export default function HomeScreen() {
               <View style={styles.section}>
                 <TouchableOpacity
                   style={styles.pendingTaskCard}
-                  onPress={() => router.push("../")}
+                  onPress={() => router.push("../self-assessment")}
                 >
                   <View style={styles.pendingTaskHeader}>
                     <View style={styles.pendingTaskIconContainer}>
