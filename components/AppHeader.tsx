@@ -431,9 +431,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 9,
+    paddingHorizontal: 11,
     paddingVertical: 2,
-    height: 48,
+    marginBottom: 8,
+    height: 38,
   },
   emptyTitle: {
     flex: 1,
