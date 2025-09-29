@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { assessmentTracker } from "../utils/assessmentTracker"; // Adjust path as needed
+import { assessmentTracker } from "../utils/assessmentTracker";
 
 const { width } = Dimensions.get("window");
 
@@ -133,7 +133,7 @@ export const AppHeader = ({
     );
   };
 
-  const loadProfileImage = async () => {
+  const loadProfileImage = useCallback(async () => {
     try {
       if (user?.id) {
         const savedImage = await AsyncStorage.getItem(
@@ -146,13 +146,13 @@ export const AppHeader = ({
     } catch (error) {
       console.log("Error loading profile image:", error);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) {
       loadProfileImage();
     }
-  }, [user?.id]);
+  }, [user?.id, loadProfileImage]);
 
   const getInitials = () => {
     if (user?.firstName && user?.lastName) {
