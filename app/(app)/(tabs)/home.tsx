@@ -150,7 +150,7 @@ export default function HomeScreen() {
   // Add new function
   const checkAssessmentStatus = async () => {
     try {
-      const isDue = await assessmentTracker.isAssessmentDue();
+      const isDue = await assessmentTracker.isAssessmentDue(user?.id || "");
       setIsAssessmentDue(isDue);
     } catch (error) {
       console.error("Error checking assessment status:", error);
