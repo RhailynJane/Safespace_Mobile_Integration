@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import { BlurView } from "expo-blur";
 
 const { width } = Dimensions.get("window");
 
@@ -162,7 +163,7 @@ export default function PreSurveyScreen() {
                       animationType="fade"
                       onRequestClose={() => setShowSuccessModal(false)}
                     >
-                      <View style={styles.modalOverlay}>
+                      <BlurView intensity={80} style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
                           <View style={styles.successIconContainer}>
                             <Ionicons
@@ -194,7 +195,7 @@ export default function PreSurveyScreen() {
                             </Text>
                           </TouchableOpacity>
                         </View>
-                      </View>
+                      </BlurView>
                     </Modal>
                   </View>
                 </View>
@@ -364,62 +365,63 @@ const styles = StyleSheet.create({
     height: 100,
   },
   modalOverlay: {
-  flex: 1,
-  justifyContent: "center",
-  alignItems: "center",
-  padding: 20,
-},
-modalContent: {
-  backgroundColor: "#FFFFFF",
-  borderRadius: 20,
-  padding: 30,
-  width: "100%",
-  maxWidth: 400,
-  alignItems: "center",
-  shadowOffset: {
-    width: 0,
-    height: 4,
+    flex: 1,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
-  shadowOpacity: 0.3,
-  shadowRadius: 4.65,
-  elevation: 8,
-},
-successIconContainer: {
-  marginBottom: 20,
-},
-modalTitle: {
-  fontSize: 20,
-  fontWeight: "700",
-  color: "#333",
-  textAlign: "center",
-  marginBottom: 15,
-},
-modalMessage: {
-  fontSize: 15,
-  color: "#666",
-  textAlign: "center",
-  lineHeight: 22,
-  marginBottom: 25,
-},
-modalButton: {
-  backgroundColor: "#4CAF50",
-  paddingVertical: 14,
-  paddingHorizontal: 40,
-  borderRadius: 12,
-  width: "100%",
-  alignItems: "center",
-  shadowColor: "#4CAF50",
-  shadowOffset: {
-    width: 0,
-    height: 2,
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 30,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
-  shadowOpacity: 0.3,
-  shadowRadius: 3.84,
-  elevation: 5,
-},
-modalButtonText: {
-  fontSize: 16,
-  fontWeight: "600",
-  color: "#FFFFFF",
-},
+  successIconContainer: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  modalButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+    shadowColor: "#4CAF50",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
 });
