@@ -1,6 +1,14 @@
 // lib/api.ts
-const API_BASE_URL = 'http://localhost:8081/api'; // For development
+const getBaseURL = () => {
+  if (__DEV__) {
+    // Replace with YOUR actual IP address
+    return "http://192.168.1.100:3001";
+  } else {
+    return "https://your-production-api.com";
+  }
+};
 
+const API_BASE_URL = getBaseURL();
 export interface SyncUserData {
   clerkUserId: string;
   email: string;
@@ -12,9 +20,9 @@ export interface SyncUserData {
 export const syncUserToDatabase = async (userData: SyncUserData) => {
   try {
     const response = await fetch(`${API_BASE_URL}/sync-user`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(userData),
     });
@@ -22,12 +30,12 @@ export const syncUserToDatabase = async (userData: SyncUserData) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to sync user');
+      throw new Error(data.error || "Failed to sync user");
     }
 
     return data;
   } catch (error) {
-    console.error('API call failed:', error);
+    console.error("API call failed:", error);
     throw error;
   }
 };

@@ -1,19 +1,11 @@
 // utils/api.ts
 import { Platform } from 'react-native';
 
-// Configure your API base URL
 const getBaseURL = () => {
   if (__DEV__) {
-    // Development URLs
-    if (Platform.OS === 'android') {
-      return 'http://10.0.2.2:3001'; // Android emulator
-    } else if (Platform.OS === 'ios') {
-      return 'http://localhost:3001'; // iOS simulator
-    } else {
-      return 'http://localhost:3001'; // Web/Expo Go
-    }
+    // Replace with YOUR actual IP address
+    return 'http://192.168.1.100:3001'; 
   } else {
-    // Production URL - replace with your deployed backend URL
     return 'https://your-production-api.com';
   }
 };
@@ -38,6 +30,13 @@ export interface CreateClientData {
   allergies?: string;
   currentMedications?: string;
   carePlan?: string;
+}
+
+export interface SubmitAssessmentData {
+  clerkUserId: string;
+  responses: Record<string, number>;
+  totalScore: number;
+  assessmentType?: string;
 }
 
 class ApiService {
@@ -91,6 +90,26 @@ class ApiService {
 
   async getClient(userId: number) {
     return this.makeRequest(`/api/clients/${userId}`);
+  }
+
+  // Assessment endpoints
+  async isAssessmentDue(clerkUserId: string) {
+    return this.makeRequest(`/api/assessments/is-due/${clerkUserId}`);
+  }
+
+  async submitAssessment(assessmentData: SubmitAssessmentData) {
+    return this.makeRequest('/api/assessments/submit', {
+      method: 'POST',
+      body: JSON.stringify(assessmentData),
+    });
+  }
+
+  async getAssessmentHistory(clerkUserId: string) {
+    return this.makeRequest(`/api/assessments/history/${clerkUserId}`);
+  }
+
+  async getLatestAssessment(clerkUserId: string) {
+    return this.makeRequest(`/api/assessments/latest/${clerkUserId}`);
   }
 }
 

@@ -94,18 +94,20 @@ export default function PreSurveyScreen() {
     }
 
     const totalScore = calculateScore();
+    console.log("Survey responses:", responses);
+    console.log("Total score:", totalScore);
 
     try {
-      // Submit to database
       if (user?.id) {
         await assessmentTracker.submitAssessment(
           user.id,
           responses,
           totalScore
         );
+        setShowSuccessModal(true);
+      } else {
+        Alert.alert("Error", "User not found. Please try again.");
       }
-
-      setShowSuccessModal(true);
     } catch (error) {
       console.error("Error submitting assessment:", error);
       Alert.alert(

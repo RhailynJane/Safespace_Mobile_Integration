@@ -149,13 +149,17 @@ export default function HomeScreen() {
 
   // Add new function
   const checkAssessmentStatus = async () => {
-    try {
-      const isDue = await assessmentTracker.isAssessmentDue(user?.id || "");
+  try {
+    if (user?.id) {
+      const isDue = await assessmentTracker.isAssessmentDue(user.id);
       setIsAssessmentDue(isDue);
-    } catch (error) {
-      console.error("Error checking assessment status:", error);
+      console.log("Assessment due status:", isDue);
     }
-  };
+  } catch (error) {
+    console.error("Error checking assessment status:", error);
+    setIsAssessmentDue(false);
+  }
+};
 
   // Quick action buttons for main app features
   const quickActions = [
