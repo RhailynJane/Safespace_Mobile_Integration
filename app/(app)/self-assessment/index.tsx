@@ -1,49 +1,53 @@
-/**
- * LLM Prompt: Add concise inline comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
 import { useState } from "react";
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   ScrollView,
-  ActivityIndicator,
   Dimensions,
+  Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
-
+import { BlurView } from "expo-blur";
+import { assessmentTracker } from "../../../utils/assessmentTracker";
+import { useUser } from "@clerk/clerk-expo";
 const { width } = Dimensions.get("window");
 
-export default function AssessmentScreen() {
-  // State for managing side menu visibility
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  // State for loading indicator (not currently used but kept for structure)
-  const [loading, setLoading] = useState(false);
-  // State to track active tab in bottom navigation
+// Survey questions based on Short Warwick-Edinburgh Mental Wellbeing Scale
+const surveyQuestions = [
+  { id: 1, text: "I've been feeling optimistic about the future." },
+  { id: 2, text: "I've been feeling useful." },
+  { id: 3, text: "I've been feeling relaxed." },
+  { id: 4, text: "I've been dealing with problems well." },
+  { id: 5, text: "I've been thinking clearly." },
+  { id: 6, text: "I've been feeling close to other people." },
+  { id: 7, text: "I've been able to make up my own mind about things." },
+];
+
+// Response options for each question
+const responseOptions = [
+  { value: 1, label: "None of the time" },
+  { value: 2, label: "Rarely" },
+  { value: 3, label: "Some of the time" },
+  { value: 4, label: "Often" },
+  { value: 5, label: "All of the time" },
+];
+
+export default function PreSurveyScreen() {
+  // Store responses for all questions (question id -> selected value)
+  const [responses, setResponses] = useState<{ [key: number]: number }>({});
   const [activeTab, setActiveTab] = useState("assessment");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { user } = useUser();
 
-  // Mock user data to replace backend implementation
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-  };
-
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
-  };
-
-  // Configuration for bottom navigation tabs
+  // Bottom navigation configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -52,7 +56,6 @@ export default function AssessmentScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Handler for tab press in bottom navigation
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -62,98 +65,189 @@ export default function AssessmentScreen() {
     }
   };
 
-  // Assessment options data with styling and metadata
-  const assessmentOptions = [
-    {
-      id: "before-appointment",
-      title: "Before Appointment",
-      description: "Complete assessment before meeting with your provider",
-      icon: "calendar-outline",
-      backgroundColor: "#E8F5E8",
-      iconColor: "#4CAF50",
-    },
-    {
-      id: "provider-requested",
-      title: "Provider Requested",
-      description: "Your healthcare provider asked you to complete this",
-      icon: "person-outline",
-      backgroundColor: "#E3F2FD",
-      iconColor: "#2196F3",
-    },
-    {
-      id: "personal-check-in",
-      title: "Personal Check-in",
-      description: "Monitor your mental health progress",
-      icon: "heart-outline",
-      backgroundColor: "#FCE4EC",
-      iconColor: "#E91E63",
-    },
-  ];
-
-  // Handler for when user selects an assessment option
-  const handleAssessmentOption = (optionId: string) => {
-    // All assessment options navigate to the same assessment selection screen
-    router.push("../self-assessment/assessment/selection");
+  // Handle selecting a response for a question
+  const handleResponse = (questionId: number, value: number) => {
+    setResponses((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }));
   };
 
-  // Helper function to get display name from user data
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
+  // Check if all questions have been answered
+  const isComplete = () => {
+    return surveyQuestions.every((q) => responses[q.id] !== undefined);
   };
 
-  // Loading state UI (not currently triggered but kept for structure)
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
+  // Calculate total score (7-35 range)
+  const calculateScore = () => {
+    return Object.values(responses).reduce((sum, val) => sum + val, 0);
+  };
+
+  // Handle survey submission
+  const handleSubmit = async () => {
+    if (!isComplete()) {
+      Alert.alert(
+        "Incomplete Survey",
+        "Please answer all questions before submitting."
+      );
+      return;
+    }
+
+    const totalScore = calculateScore();
+    console.log("Survey responses:", responses);
+    console.log("Total score:", totalScore);
+
+    try {
+      if (user?.id) {
+        await assessmentTracker.submitAssessment(
+          user.id,
+          responses,
+          totalScore
+        );
+        setShowSuccessModal(true);
+      } else {
+        Alert.alert("Error", "User not found. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error submitting assessment:", error);
+      Alert.alert(
+        "Submission Error",
+        "Failed to submit assessment. Please try again."
+      );
+    }
+  };
 
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <AppHeader title="Self-Assessment" showBack={true} />
+        <AppHeader title="Pre-Self Assessment Test" showBack={true} />
 
-        {/* Main scrollable content area */}
-        <View style={styles.content}>
-          <Text style={styles.questionText}>
-            Why are you taking this assessment?
-          </Text>
-        </View>
+        <ScrollView
+          style={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            <Text style={styles.subtitle}>
+              Short Warwick-Edinburgh Mental Wellbeing Scale
+            </Text>
+            <Text style={styles.instructions}>
+              Please rate how you&apos;ve been feeling over the last 2 weeks.
+            </Text>
 
-        {/* Assessment options selection cards */}
-        <View style={styles.optionsContainer}>
-          {assessmentOptions.map((option) => (
+            {/* Survey Questions */}
+            <View style={styles.questionsContainer}>
+              {surveyQuestions.map((question, index) => (
+                <View key={question.id} style={styles.questionBlock}>
+                  <Text style={styles.questionNumber}>
+                    Question {index + 1}
+                  </Text>
+                  <Text style={styles.questionText}>{question.text}</Text>
+
+                  {/* Response Options */}
+                  <View style={styles.optionsContainer}>
+                    {responseOptions.map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.optionButton,
+                          responses[question.id] === option.value &&
+                            styles.optionButtonSelected,
+                        ]}
+                        onPress={() =>
+                          handleResponse(question.id, option.value)
+                        }
+                      >
+                        <View
+                          style={[
+                            styles.radioCircle,
+                            responses[question.id] === option.value &&
+                              styles.radioCircleSelected,
+                          ]}
+                        >
+                          {responses[question.id] === option.value && (
+                            <View style={styles.radioInner} />
+                          )}
+                        </View>
+                        <Text
+                          style={[
+                            styles.optionLabel,
+                            responses[question.id] === option.value &&
+                              styles.optionLabelSelected,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+
+                    {/* Success Modal */}
+                    <Modal
+                      visible={showSuccessModal}
+                      transparent={true}
+                      animationType="fade"
+                      onRequestClose={() => setShowSuccessModal(false)}
+                    >
+                      <BlurView intensity={80} style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                          <View style={styles.successIconContainer}>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={64}
+                              color="#4CAF50"
+                            />
+                          </View>
+
+                          <Text style={styles.modalTitle}>
+                            Survey Submitted Successfully!
+                          </Text>
+
+                          <Text style={styles.modalMessage}>
+                            Your assessment has been completed and will be
+                            reviewed by your assigned support worker. You can
+                            expect to hear from them soon.
+                          </Text>
+
+                          <TouchableOpacity
+                            style={styles.modalButton}
+                            onPress={() => {
+                              setShowSuccessModal(false);
+                              router.replace("/(app)/(tabs)/home");
+                            }}
+                          >
+                            <Text style={styles.modalButtonText}>
+                              Return to Home
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </BlurView>
+                    </Modal>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Submit Button */}
             <TouchableOpacity
-              key={option.id}
               style={[
-                styles.optionCard,
-                { backgroundColor: option.backgroundColor },
+                styles.submitButton,
+                !isComplete() && styles.submitButtonDisabled,
               ]}
-              onPress={() => handleAssessmentOption(option.id)}
+              onPress={handleSubmit}
+              disabled={!isComplete()}
             >
-              <View style={styles.optionIconContainer}>
-                <Ionicons
-                  name={option.icon as any}
-                  size={24}
-                  color={option.iconColor}
-                />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>{option.title}</Text>
-                <Text style={styles.optionDescription}>
-                  {option.description}
-                </Text>
-              </View>
+              <Text style={styles.submitButtonText}>
+                {isComplete()
+                  ? "Submit Survey"
+                  : `${Object.keys(responses).length}/${
+                      surveyQuestions.length
+                    } Answered`}
+              </Text>
             </TouchableOpacity>
-          ))}
-        </View>
 
-        {/* Bottom navigation component */}
+            <View style={styles.bottomPadding} />
+          </View>
+        </ScrollView>
+
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -163,80 +257,40 @@ export default function AssessmentScreen() {
     </CurvedBackground>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
   },
-  loadingContainer: {
+  scrollContent: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  content: {
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    paddingTop: 20,
   },
-  headerTitle: {
+  subtitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#333",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  notificationButton: {
-    position: "relative",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF5722",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  content: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
-  questionText: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#333",
     textAlign: "center",
-    lineHeight: 28,
-    marginTop: 50,
     marginBottom: 10,
-    paddingHorizontal: 20,
   },
-  optionsContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-    gap: 15,
-    marginBottom: 250,
+  instructions: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 30,
+    lineHeight: 20,
   },
-  optionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 20,
+  questionsContainer: {
+    gap: 25,
+  },
+  questionBlock: {
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -244,83 +298,154 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 3,
   },
-  optionIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#FFFFFF",
+  questionNumber: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4CAF50",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#333",
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  optionsContainer: {
+    gap: 10,
+  },
+  optionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "#F5F5F5",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  optionButtonSelected: {
+    backgroundColor: "#E8F5E9",
+    borderColor: "#4CAF50",
+  },
+  radioCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#BDBDBD",
+    marginRight: 12,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 15,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-    marginTop: 10
   },
-  optionContent: {
-    flex: 1,
+  radioCircleSelected: {
+    borderColor: "#4CAF50",
   },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 5,
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#4CAF50",
   },
-  optionDescription: {
+  optionLabel: {
     fontSize: 14,
     color: "#666",
-    lineHeight: 20,
+    textAlign: "center",
+    lineHeight: 18,
   },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
+  optionLabelSelected: {
+    color: "#333",
+    fontWeight: "500",
+  },
+  submitButton: {
+    backgroundColor: "#4CAF50",
+    padding: 18,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 30,
+    shadowColor: "#4CAF50",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#BDBDBD",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  bottomPadding: {
+    height: 100,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 30,
+    width: "100%",
+    maxWidth: 400,
     alignItems: "center",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
+  successIconContainer: {
+    marginBottom: 20,
   },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
     color: "#333",
-    marginLeft: 15,
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 25,
+  },
+  modalButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+    shadowColor: "#4CAF50",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });

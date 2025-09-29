@@ -69,7 +69,7 @@ function RootLayoutNav() {
         router.replace("/(auth)/sign-in");
       }
     }
-  }, [isLoaded, isSignedIn, segments, hasCompletedOnboarding]);
+  }, [isLoaded, isSignedIn, segments, hasCompletedOnboarding, router]);
 
   if (!isLoaded || hasCompletedOnboarding === null) {
     return (
@@ -93,11 +93,38 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   useEffect(() => {
-    // Suppress the useInsertionEffect warning from Clerk/Emotion libraries
+    // Suppress warnings
     LogBox.ignoreLogs([
       'useInsertionEffect must not schedule updates',
       'Non-serializable values were found in the navigation state',
+      '[clerk/telemetry]', // Add this to suppress Clerk telemetry errors
     ]);
+
+    // Additional telemetry error suppression for development
+    if (__DEV__) {
+      const originalError = console.error;
+      const originalWarn = console.warn;
+
+      console.error = (...args) => {
+        if (
+          typeof args[0] === 'string' && 
+          args[0].includes('[clerk/telemetry]')
+        ) {
+          return;
+        }
+        originalError(...args);
+      };
+
+      console.warn = (...args) => {
+        if (
+          typeof args[0] === 'string' && 
+          args[0].includes('[clerk/telemetry]')
+        ) {
+          return;
+        }
+        originalWarn(...args);
+      };
+    }
   }, []);
 
   return (

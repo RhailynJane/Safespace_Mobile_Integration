@@ -54,26 +54,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 16,
+    paddingVertical: 8,      
+    paddingBottom: 12,         // Add extra bottom padding for safe area
     backgroundColor: "#FFFFFF",
-    position: "absolute", // Fixed at bottom
+    position: "absolute",      // Fixed at bottom
     bottom: 0,
     left: 0,
     right: 0,
     borderTopLeftRadius: 40,   // Rounded top corners
     borderTopRightRadius: 40, 
-    shadowColor: "#000",       // Android shadow
+    shadowColor: "#000",       // iOS shadow
     shadowOffset: {
       width: 0,
-      height: -1,              // Shadow above the nav
+      height: -2,              // Shadow above the nav
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 8,              // Android elevation
   },
   navItem: {
     alignItems: "center",
-    padding: 8,
+    padding: 4,                // Reduced from 8 to 4
   },
   navIconContainer: {
     width: 40,
