@@ -74,7 +74,7 @@ export default function PostDetailScreen() {
   if (!post) {
     return (
       <SafeAreaView style={styles.container}>
-        <CurvedBackground />
+        <CurvedBackground style={styles.curvedBackground} />
         <AppHeader title="Post Detail" showBack={true} />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#E0E0E0" />
@@ -109,134 +109,137 @@ export default function PostDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CurvedBackground />
+      <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Post Detail" showBack={true} />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Post Card */}
-        <View style={styles.postCard}>
-          {/* Post Header */}
-          <View style={styles.postHeader}>
-            <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{post.user.name}</Text>
-              <Text style={styles.postMeta}>
-                {post.user.posts} posts • {post.timestamp}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.moreButton}>
-              <Ionicons name="ellipsis-vertical" size={20} color="#999" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Category Badge */}
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{post.category}</Text>
-          </View>
-
-          {/* Post Title */}
-          <Text style={styles.postTitle}>{post.title}</Text>
-
-          {/* Post Content */}
-          <Text style={styles.postContent}>{post.content}</Text>
-
-          {/* Reaction Stats */}
-          <View style={styles.reactionStats}>
-            {Object.entries(post.reactions).map(([emoji, count]) => (
-              <View key={emoji} style={styles.reactionStat}>
-                <Text style={styles.reactionStatEmoji}>{emoji}</Text>
-                <Text style={styles.reactionStatCount}>{count}</Text>
+      <View style={styles.scrollContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Post Card */}
+          <View style={styles.postCard}>
+            {/* Post Header */}
+            <View style={styles.postHeader}>
+              <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{post.user.name}</Text>
+                <Text style={styles.postMeta}>
+                  {post.user.posts} posts • {post.timestamp}
+                </Text>
               </View>
-            ))}
-          </View>
+              <TouchableOpacity style={styles.moreButton}>
+                <Ionicons name="ellipsis-vertical" size={20} color="#999" />
+              </TouchableOpacity>
+            </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            {/* Reaction Button */}
-            <TouchableOpacity
-              style={styles.reactionButton}
-              onPress={() => setReactionPickerVisible(!reactionPickerVisible)}
-            >
-              <Text style={styles.reactionEmoji}>
-                {userReaction || "❤️"}
-              </Text>
-              <Text style={styles.actionButtonText}>
-                {userReaction ? "Reacted" : "React"}
-              </Text>
-            </TouchableOpacity>
+            {/* Category Badge */}
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{post.category}</Text>
+            </View>
 
-            {/* Bookmark Button */}
-            <TouchableOpacity
-              style={styles.bookmarkButton}
-              onPress={handleBookmarkPress}
-            >
-              <Ionicons
-                name={bookmarked ? "bookmark" : "bookmark-outline"}
-                size={24}
-                color={bookmarked ? "#FFA000" : "#FF6B35"}
-              />
-              <Text style={styles.actionButtonText}>
-                {bookmarked ? "Saved" : "Save"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            {/* Post Title */}
+            <Text style={styles.postTitle}>{post.title}</Text>
 
-          {/* Reaction Picker */}
-          {reactionPickerVisible && (
-            <View style={styles.reactionPicker}>
-              {EMOJI_REACTIONS.map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[
-                    styles.emojiButton,
-                    userReaction === emoji && styles.emojiButtonActive,
-                  ]}
-                  onPress={() => handleReactionPress(emoji)}
-                >
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
+            {/* Post Content */}
+            <Text style={styles.postContent}>{post.content}</Text>
+
+            {/* Reaction Stats */}
+            <View style={styles.reactionStats}>
+              {Object.entries(post.reactions).map(([emoji, count]) => (
+                <View key={emoji} style={styles.reactionStat}>
+                  <Text style={styles.reactionStatEmoji}>{emoji}</Text>
+                  <Text style={styles.reactionStatCount}>{count}</Text>
+                </View>
               ))}
             </View>
-          )}
-        </View>
 
-        {/* Related Posts Section */}
-        <View style={styles.relatedSection}>
-          <Text style={styles.relatedTitle}>Related Posts</Text>
-          {POSTS.filter((p) => p.id !== postId && p.category === post.category)
-            .slice(0, 2)
-            .map((relatedPost) => (
+            {/* Action Buttons */}
+            <View style={styles.actionButtons}>
+              {/* Reaction Button */}
               <TouchableOpacity
-                key={relatedPost.id}
-                style={styles.relatedPost}
-                onPress={() =>
-                  router.push({
-                    pathname: "/community-forum/post-detail",
-                    params: { id: relatedPost.id },
-                  })
-                }
+                style={styles.reactionButton}
+                onPress={() => setReactionPickerVisible(!reactionPickerVisible)}
               >
-                <Image
-                  source={{ uri: relatedPost.user.avatar }}
-                  style={styles.relatedAvatar}
-                />
-                <View style={styles.relatedContent}>
-                  <Text style={styles.relatedPostTitle} numberOfLines={2}>
-                    {relatedPost.title}
-                  </Text>
-                  <Text style={styles.relatedPostMeta}>
-                    by {relatedPost.user.name} • {getTotalReactions(relatedPost.reactions)} reactions
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#999" />
+                <Text style={styles.reactionEmoji}>{userReaction || "❤️"}</Text>
+                <Text style={styles.actionButtonText}>
+                  {userReaction ? "Reacted" : "React"}
+                </Text>
               </TouchableOpacity>
-            ))}
-        </View>
-      </ScrollView>
+
+              {/* Bookmark Button */}
+              <TouchableOpacity
+                style={styles.bookmarkButton}
+                onPress={handleBookmarkPress}
+              >
+                <Ionicons
+                  name={bookmarked ? "bookmark" : "bookmark-outline"}
+                  size={24}
+                  color={bookmarked ? "#FFA000" : "#FF6B35"}
+                />
+                <Text style={styles.actionButtonText}>
+                  {bookmarked ? "Saved" : "Save"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Reaction Picker */}
+            {reactionPickerVisible && (
+              <View style={styles.reactionPicker}>
+                {EMOJI_REACTIONS.map((emoji) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={[
+                      styles.emojiButton,
+                      userReaction === emoji && styles.emojiButtonActive,
+                    ]}
+                    onPress={() => handleReactionPress(emoji)}
+                  >
+                    <Text style={styles.emojiText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Related Posts Section */}
+          <View style={styles.relatedSection}>
+            <Text style={styles.relatedTitle}>Related Posts</Text>
+            {POSTS.filter((p) => p.id !== postId && p.category === post.category)
+              .slice(0, 2)
+              .map((relatedPost) => (
+                <TouchableOpacity
+                  key={relatedPost.id}
+                  style={styles.relatedPost}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/community-forum/post-detail",
+                      params: { id: relatedPost.id },
+                    })
+                  }
+                >
+                  <Image
+                    source={{ uri: relatedPost.user.avatar }}
+                    style={styles.relatedAvatar}
+                  />
+                  <View style={styles.relatedContent}>
+                    <Text style={styles.relatedPostTitle} numberOfLines={2}>
+                      {relatedPost.title}
+                    </Text>
+                    <Text style={styles.relatedPostMeta}>
+                      by {relatedPost.user.name} •{" "}
+                      {getTotalReactions(relatedPost.reactions)} reactions
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                </TouchableOpacity>
+              ))}
+          </View>
+
+          <View style={styles.bottomSpacing} />
+        </ScrollView>
+      </View>
 
       {/* Overlay to close reaction picker */}
       {reactionPickerVisible && (
@@ -253,6 +256,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  curvedBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
+  },
+  scrollContainer: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -289,13 +303,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
-    shadowColor: "#000",
+    shadowColor: "grey",
     shadowOffset: {
-      width: 0,
+      width: 2,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
     elevation: 3,
   },
   postHeader: {
@@ -436,23 +450,20 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   reactionOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   relatedSection: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: "grey",
     shadowOffset: {
-      width: 0,
+      width: 2,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.75,
+    shadowRadius: 2,
     elevation: 3,
   },
   relatedTitle: {
@@ -486,5 +497,8 @@ const styles = StyleSheet.create({
   relatedPostMeta: {
     fontSize: 12,
     color: "#757575",
+  },
+  bottomSpacing: {
+    height: 30,
   },
 });
