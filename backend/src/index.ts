@@ -1,22 +1,21 @@
-
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { Pool } from 'pg';
 
 const app = express();
-const PORT = 3001; // Different from Metro's 8081
+const PORT = 3001;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL connection - UPDATE THESE CREDENTIALS TO MATCH YOUR SETUP
+// PostgreSQL connection
 const pool = new Pool({
-  user: 'postgres',           // Your PostgreSQL username
-  host: 'localhost',          // Usually localhost
-  database: 'safespace',      // Your database name
-  password: 'password',       // YOUR ACTUAL PASSWORD HERE - UPDATE THIS!
-  port: 5432,                // Default PostgreSQL port
+  user: 'postgres',
+  host: 'localhost',
+  database: 'safespace',
+  password: 'password',
+  port: 5432,
 });
 
 // Interface definitions
@@ -35,29 +34,24 @@ interface CreateClientRequest {
   emergencyContactRelationship?: string;
 }
 
-// Test database connection with better error handling
+interface SubmitAssessmentRequest {
+  clerkUserId: string;
+  responses: Record<string, number>;
+  totalScore: number;
+  assessmentType?: string;
+}
+
+// Test database connection
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('❌ Error connecting to database:');
-    console.error('Error details:', err.message);
-    console.error('Connection config:', {
-      user: pool.options.user,
-      host: pool.options.host,
-      database: pool.options.database,
-      port: pool.options.port
-    });
-    console.error('\n🔧 To fix database connection:');
-    console.error('1. Make sure PostgreSQL is running');
-    console.error('2. Check your database name and password');
-    console.error('3. Verify the database "safespace" exists');
+    console.error('Error connecting to database:', err.message);
   } else {
-    console.log('✅ Connected to PostgreSQL database successfully!');
-    console.log(`📊 Database: ${pool.options.database} on ${pool.options.host}:${pool.options.port}`);
+    console.log('Connected to PostgreSQL database successfully!');
     if (release) release();
   }
 });
 
-// Test endpoint to verify server is working
+// Test endpoint
 app.get('/', (req: Request, res: Response) => {
   res.json({ 
     message: 'SafeSpace API is running!', 
@@ -66,32 +60,26 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-// Get all users endpoint with better error handling
+// Get all users endpoint
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
-    console.log('📋 Fetching users from database...');
     const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
-    console.log(`✅ Found ${result.rows.length} users`);
     res.json(result.rows);
   } catch (error: any) {
-    console.error('❌ Error fetching users:', error.message);
+    console.error('Error fetching users:', error.message);
     res.status(500).json({ 
       error: 'Database query failed',
-      details: error.message,
-      query: 'SELECT * FROM users ORDER BY created_at DESC'
+      details: error.message
     });
   }
 });
 
-// Sync user endpoint with detailed logging
+// Sync user endpoint
 app.post('/api/sync-user', async (req: Request<{}, {}, SyncUserRequest>, res: Response) => {
   try {
     const { clerkUserId, email, firstName, lastName, phoneNumber } = req.body;
 
-    console.log('👤 Received sync request for user:', { clerkUserId, email, firstName, lastName });
-
     if (!clerkUserId || !email) {
-      console.log('❌ Missing required fields');
       return res.status(400).json({ 
         error: 'clerkUserId and email are required' 
       });
@@ -111,8 +99,6 @@ app.post('/api/sync-user', async (req: Request<{}, {}, SyncUserRequest>, res: Re
       [clerkUserId, firstName, lastName, email, phoneNumber]
     );
 
-    console.log('✅ User synced successfully:', result.rows[0]);
-
     res.json({ 
       success: true, 
       message: 'User synced successfully',
@@ -120,10 +106,7 @@ app.post('/api/sync-user', async (req: Request<{}, {}, SyncUserRequest>, res: Re
     });
 
   } catch (error: any) {
-    console.error('❌ Error syncing user:', error.message);
-    if (error.code) {
-      console.error('Error code:', error.code);
-    }
+    console.error('Error syncing user:', error.message);
     res.status(500).json({ 
       error: 'Internal server error',
       details: error.message
@@ -135,8 +118,6 @@ app.post('/api/sync-user', async (req: Request<{}, {}, SyncUserRequest>, res: Re
 app.post('/api/clients', async (req: Request<{}, {}, CreateClientRequest>, res: Response) => {
   try {
     const { userId, emergencyContactName, emergencyContactPhone, emergencyContactRelationship } = req.body;
-    
-    console.log('👥 Creating client record for user:', userId);
 
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
@@ -155,8 +136,6 @@ app.post('/api/clients', async (req: Request<{}, {}, CreateClientRequest>, res: 
       [userId, emergencyContactName, emergencyContactPhone, emergencyContactRelationship]
     );
 
-    console.log('✅ Client created successfully:', result.rows[0]);
-
     res.json({ 
       success: true, 
       message: 'Client created successfully',
@@ -164,7 +143,7 @@ app.post('/api/clients', async (req: Request<{}, {}, CreateClientRequest>, res: 
     });
 
   } catch (error: any) {
-    console.error('❌ Error creating client:', error.message);
+    console.error('Error creating client:', error.message);
     res.status(500).json({ 
       error: 'Internal server error',
       details: error.message
@@ -172,20 +151,192 @@ app.post('/api/clients', async (req: Request<{}, {}, CreateClientRequest>, res: 
   }
 });
 
-// Start server with better logging
+// =============================================
+// ASSESSMENT ENDPOINTS
+// =============================================
+
+// Check if assessment is due for a user
+app.get('/api/assessments/is-due/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    // First get the user's internal ID
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Check if assessment is due using the database function
+    const result = await pool.query(
+      'SELECT is_assessment_due($1) as is_due',
+      [userId]
+    );
+
+    res.json({ 
+      isDue: result.rows[0].is_due,
+      userId: userId
+    });
+
+  } catch (error: any) {
+    console.error('Error checking assessment:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to check assessment status',
+      details: error.message
+    });
+  }
+});
+
+// Submit assessment
+app.post('/api/assessments/submit', async (req: Request<{}, {}, SubmitAssessmentRequest>, res: Response) => {
+  try {
+    const { clerkUserId, responses, totalScore, assessmentType = 'pre-survey' } = req.body;
+
+    if (!clerkUserId || !responses || totalScore === undefined) {
+      return res.status(400).json({ 
+        error: 'clerkUserId, responses, and totalScore are required' 
+      });
+    }
+
+    // Get user's internal ID
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Insert assessment
+    const result = await pool.query(
+      `INSERT INTO assessments 
+       (user_id, assessment_type, responses, total_score, submitted_to_worker) 
+       VALUES ($1, $2, $3, $4, true) 
+       RETURNING id, user_id, assessment_type, total_score, completed_at, next_due_date`,
+      [userId, assessmentType, JSON.stringify(responses), totalScore]
+    );
+
+    console.log('Assessment submitted successfully:', result.rows[0]);
+
+    res.json({ 
+      success: true, 
+      message: 'Assessment submitted successfully',
+      assessment: result.rows[0]
+    });
+
+  } catch (error: any) {
+    console.error('Error submitting assessment:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to submit assessment',
+      details: error.message
+    });
+  }
+});
+
+// Get user's assessment history
+app.get('/api/assessments/history/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    // Get user's internal ID
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Get assessment history
+    const result = await pool.query(
+      `SELECT id, assessment_type, total_score, completed_at, next_due_date, 
+              submitted_to_worker, reviewed_by_worker
+       FROM assessments 
+       WHERE user_id = $1 
+       ORDER BY completed_at DESC`,
+      [userId]
+    );
+
+    res.json({ 
+      assessments: result.rows,
+      count: result.rows.length
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching assessment history:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch assessment history',
+      details: error.message
+    });
+  }
+});
+
+// Get latest assessment for a user
+app.get('/api/assessments/latest/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    // Get user's internal ID
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Get latest assessment
+    const result = await pool.query(
+      `SELECT id, assessment_type, total_score, responses, completed_at, next_due_date, 
+              submitted_to_worker, reviewed_by_worker
+       FROM assessments 
+       WHERE user_id = $1 
+       ORDER BY completed_at DESC 
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ assessment: null });
+    }
+
+    res.json({ assessment: result.rows[0] });
+
+  } catch (error: any) {
+    console.error('Error fetching latest assessment:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch latest assessment',
+      details: error.message
+    });
+  }
+});
+
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('\n🚀 SafeSpace Backend Server Started!');
-  console.log(`📍 Server running on: http://localhost:${PORT}`);
-  console.log(`📍 From your computer: http://192.168.1.100:${PORT}`);
-  console.log(`📍 Android emulator URL: http://10.0.2.2:${PORT}`);
-  console.log(`🔍 Test in browser: http://localhost:${PORT}/api/users`);
-  console.log(`📱 Your Expo app is on: http://192.168.1.100:8081`);
-  console.log('📝 Server logs will appear below...\n');
+  console.log('\nSafeSpace Backend Server Started!');
+  console.log(`Server running on: http://localhost:${PORT}`);
+  console.log(`Android emulator URL: http://10.0.2.2:${PORT}`);
+  console.log(`Test in browser: http://localhost:${PORT}/api/users`);
+  console.log('Server logs will appear below...\n');
 });
 
 // Handle server shutdown gracefully
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down server...');
+  console.log('\nShutting down server...');
   await pool.end();
   process.exit(0);
 });
