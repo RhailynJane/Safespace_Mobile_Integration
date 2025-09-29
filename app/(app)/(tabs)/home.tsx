@@ -1,8 +1,4 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component.
- * Reference: chat.deepseek.com
- */
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
@@ -11,25 +7,18 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Modal,
-  Pressable,
   ActivityIndicator,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
-  Animated,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { LinearGradient } from "expo-linear-gradient";
-import { useAuth, useUser } from "@clerk/clerk-expo"; // Import Clerk hooks
+import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { AppHeader } from "../../../components/AppHeader";
 import { assessmentTracker } from "../../../utils/assessmentTracker";
-
-const { width } = Dimensions.get("window");
 
 type MoodEntry = {
   id: string;
@@ -50,23 +39,15 @@ type Resource = {
  * HomeScreen Component
  *
  * Main dashboard screen featuring user greeting, quick actions, mood tracking,
- * and resource recommendations. Designed with a clean, modern UI and smooth animations.
- *
- * Integrated with Clerk for authentication and user management.
+ * and resource recommendations. Uses AppHeader for consistent navigation.
  */
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
 
-  // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
 
   const tabs = [
@@ -77,91 +58,6 @@ export default function HomeScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  /**
-   * Enhanced logout function with Clerk integration
-   */
-  const handleLogout = async () => {
-    console.log("HomeScreen logout initiated...");
-
-    if (isSigningOut) {
-      console.log("Already signing out, returning...");
-      return;
-    }
-
-    try {
-      setIsSigningOut(true);
-
-      // Close the side menu first
-      hideSideMenu();
-
-      // Clear local storage
-      await AsyncStorage.clear();
-      console.log("AsyncStorage cleared");
-
-      // Sign out from Clerk
-      if (signOut) {
-        await signOut();
-        console.log("Clerk signOut completed");
-      }
-
-      // Navigate to login screen
-      router.replace("/(auth)/login");
-      console.log("Navigation to login completed");
-    } catch (error) {
-      console.error("Logout error:", error);
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
-
-  /**
-   * Confirmation dialog for sign out
-   */
-  const confirmSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-        onPress: () => console.log("Sign out cancelled"),
-      },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: handleLogout,
-      },
-    ]);
-  };
-
-  // Add to fetchData function
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        fetchRecentMoods(),
-        fetchResources(),
-        checkAssessmentStatus(), // Add this
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Add new function
-  const checkAssessmentStatus = async () => {
-  try {
-    if (user?.id) {
-      const isDue = await assessmentTracker.isAssessmentDue(user.id);
-      setIsAssessmentDue(isDue);
-      console.log("Assessment due status:", isDue);
-    }
-  } catch (error) {
-    console.error("Error checking assessment status:", error);
-    setIsAssessmentDue(false);
-  }
-};
-
-  // Quick action buttons for main app features
   const quickActions = [
     {
       id: "mood",
@@ -202,127 +98,36 @@ export default function HomeScreen() {
   ];
 
   /**
-   * Shows the side menu with smooth fade animation
+   * Check if user needs to complete assessment
    */
-  const showSideMenu = () => {
-    setSideMenuVisible(true);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+  const checkAssessmentStatus = async () => {
+    try {
+      if (user?.id) {
+        const isDue = await assessmentTracker.isAssessmentDue(user.id);
+        setIsAssessmentDue(isDue);
+        console.log("Assessment due status:", isDue);
+      }
+    } catch (error) {
+      console.error("Error checking assessment status:", error);
+      setIsAssessmentDue(false);
+    }
   };
 
   /**
-   * Hides the side menu with fade out animation
+   * Fetch all data needed for the screen
    */
-  const hideSideMenu = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setSideMenuVisible(false);
-    });
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchRecentMoods(),
+        fetchResources(),
+        checkAssessmentStatus(),
+      ]);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  // Side menu navigation items
-  const sideMenuItems = [
-    {
-      icon: "home",
-      title: "Dashboard",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/(tabs)/home");
-      },
-    },
-    {
-      icon: "person",
-      title: "Profile",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/(tabs)/profile");
-      },
-    },
-    {
-      icon: "bar-chart",
-      title: "Self-Assessment",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/self-assessment");
-      },
-    },
-    {
-      icon: "happy",
-      title: "Mood Tracking",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/mood-tracking");
-      },
-    },
-    {
-      icon: "journal",
-      title: "Journaling",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/journal");
-      },
-    },
-    {
-      icon: "library",
-      title: "Resources",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/resources");
-      },
-    },
-    {
-      icon: "help-circle",
-      title: "Crisis Support",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/crisis-support");
-      },
-    },
-    {
-      icon: "chatbubble",
-      title: "Messages",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/(tabs)/messages");
-      },
-    },
-    {
-      icon: "calendar",
-      title: "Appointments",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/(tabs)/appointments");
-      },
-    },
-    {
-      icon: "people",
-      title: "Community Forum",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/community-forum");
-      },
-    },
-    {
-      icon: "videocam",
-      title: "Video Consultations",
-      onPress: () => {
-        hideSideMenu();
-        router.push("/video-consultations");
-      },
-    },
-    {
-      icon: "log-out",
-      title: "Sign Out",
-      onPress: confirmSignOut, // Use confirmation dialog
-      disabled: isSigningOut,
-    },
-  ];
 
   /**
    * Returns emoji representation for mood type
@@ -375,17 +180,24 @@ export default function HomeScreen() {
   };
 
   /**
+   * Returns the user's first name for personalized greeting
+   */
+  const getGreetingName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    return "User";
+  };
+
+  /**
    * Loads mock mood data for demonstration
    */
   const fetchRecentMoods = async () => {
     try {
-      // Try to load moods from local storage first
       const storedMoods = await AsyncStorage.getItem("recentMoods");
 
       if (storedMoods) {
         setRecentMoods(JSON.parse(storedMoods));
       } else {
-        // Create mock data if none exists
         const mockMoods: MoodEntry[] = [
           {
             id: "1",
@@ -424,7 +236,6 @@ export default function HomeScreen() {
    */
   const fetchResources = async () => {
     try {
-      // Mock data for demonstration
       const mockResources: Resource[] = [
         {
           id: "1",
@@ -442,8 +253,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-      loadProfileImage();
-    }, [])
+    }, [user?.id])
   );
 
   /**
@@ -467,60 +277,6 @@ export default function HomeScreen() {
     }
   };
 
-  /**
-   * Loads profile image from local storage
-   */
-  const loadProfileImage = async () => {
-    try {
-      const savedImage = await AsyncStorage.getItem("profileImage");
-      if (savedImage) {
-        setProfileImage(savedImage);
-      }
-    } catch (error) {
-      console.log("Error loading profile image:", error);
-    }
-  };
-
-  /**
-   * Generates initials from user's name for fallback avatar
-   */
-  const getInitials = () => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName.charAt(0)}${user.lastName.charAt(
-        0
-      )}`.toUpperCase();
-    }
-    if (user?.fullName) {
-      const names = user.fullName.split(" ");
-      return names.length > 1
-        ? `${names[0]?.charAt(0) ?? ""}${
-            names[names.length - 1]?.charAt(0) ?? ""
-          }`.toUpperCase()
-        : (names[0]?.charAt(0) ?? "").toUpperCase();
-    }
-    return "U";
-  };
-
-  /**
-   * Returns the user's first name for personalized greeting
-   */
-  const getGreetingName = () => {
-    if (user?.firstName) return user.firstName;
-    if (user?.fullName) return user.fullName.split(" ")[0];
-    return "User";
-  };
-
-  /**
-   * Returns the user's email for display
-   */
-  const getUserEmail = () => {
-    return (
-      user?.primaryEmailAddress?.emailAddress ||
-      user?.emailAddresses?.[0]?.emailAddress ||
-      "No email"
-    );
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -532,33 +288,8 @@ export default function HomeScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/profile/edit")}>
-            <View style={styles.profileImageContainer}>
-              {profileImage ? (
-                <Image
-                  source={{ uri: profileImage }}
-                  style={styles.profileImage}
-                />
-              ) : user?.imageUrl ? (
-                <Image
-                  source={{ uri: user.imageUrl }}
-                  style={styles.profileImage}
-                />
-              ) : (
-                <Text style={styles.initialsText}>{getInitials()}</Text>
-              )}
-            </View>
-          </TouchableOpacity>
-          <View style={styles.headerIcons}>
-            <TouchableOpacity onPress={() => router.push("/notifications")}>
-              <Ionicons name="notifications-outline" size={24} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuButton} onPress={showSideMenu}>
-              <Ionicons name="grid" size={24} color="#000" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Use AppHeader component - handles all navigation and menu */}
+        <AppHeader showBack={false} showMenu={true} showNotifications={true} />
 
         <KeyboardAvoidingView
           style={styles.contentContainer}
@@ -598,7 +329,7 @@ export default function HomeScreen() {
               <View style={styles.section}>
                 <TouchableOpacity
                   style={styles.pendingTaskCard}
-                  onPress={() => router.push("/self-assessment")}
+                  onPress={() => router.push("/(app)/assessment/pre-survey")}
                 >
                   <View style={styles.pendingTaskHeader}>
                     <View style={styles.pendingTaskIconContainer}>
@@ -774,58 +505,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Side Menu Modal */}
-        <Modal
-          animationType="none"
-          transparent={true}
-          visible={sideMenuVisible}
-          onRequestClose={hideSideMenu}
-        >
-          <Animated.View
-            style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
-          >
-            <Pressable
-              style={StyleSheet.absoluteFillObject}
-              onPress={hideSideMenu}
-            />
-            <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getGreetingName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
-              </View>
-              <ScrollView style={styles.sideMenuContent}>
-                {sideMenuItems.map((item, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.sideMenuItem,
-                      item.disabled && styles.sideMenuItemDisabled,
-                    ]}
-                    onPress={item.onPress}
-                    disabled={item.disabled}
-                  >
-                    <Ionicons
-                      name={item.icon as any}
-                      size={20}
-                      color={item.disabled ? "#CCCCCC" : "#757575"}
-                    />
-                    <Text
-                      style={[
-                        styles.sideMenuItemText,
-                        item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && styles.signOutText,
-                      ]}
-                    >
-                      {item.title}
-                      {item.title === "Sign Out" && isSigningOut && "..."}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </Animated.View>
-          </Animated.View>
-        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -841,42 +520,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 5,
-    backgroundColor: "#BAD6D2",
-  },
-  profileImageContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F5E9",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerIcons: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  menuButton: {
-    padding: 4,
-  },
-  content: {
-    flex: 1,
-    paddingBottom: 80,
-  },
   greetingSection: {
-    backgroundColor: "#BAD6D2",
+    backgroundColor: "transparent",
     marginHorizontal: 0,
     paddingVertical: 20,
     paddingHorizontal: 32,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
     borderBottomLeftRadius: 50,
     borderBottomRightRadius: 50,
     marginBottom: 20,
@@ -886,6 +534,10 @@ const styles = StyleSheet.create({
     fontWeight: "300",
     color: "#000",
     marginBottom: 4,
+  },
+  nameText: {
+    fontWeight: "700",
+    color: "#000",
   },
   subGreetingText: {
     fontSize: 15,
@@ -902,33 +554,8 @@ const styles = StyleSheet.create({
     color: "#000",
     marginBottom: 20,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  viewAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: "#4CAF50",
-    fontWeight: "500",
-    marginRight: 4,
-  },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  initialsText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#4CAF50",
+  sectionTitleContainer: {
+    alignSelf: "flex-start",
   },
   helpButton: {
     backgroundColor: "#E4585A",
@@ -985,10 +612,6 @@ const styles = StyleSheet.create({
     width: 85,
     height: 120,
   },
-  trackMoodImage: {
-    width: 130,
-    height: 140,
-  },
   crisisSupportImage: {
     opacity: 0.6,
   },
@@ -1011,9 +634,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.75,
     shadowRadius: 2,
     elevation: 3,
-  },
-  sectionTitleContainer: {
-    alignSelf: "flex-start",
   },
   moodItem: {
     flexDirection: "row",
@@ -1129,57 +749,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  fullScreenOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-start",
-    alignItems: "flex-end",
-  },
-  sideMenu: {
-    paddingTop: 40,
-    width: width * 0.75,
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#000",
-    marginBottom: 4,
-  },
-  nameText: {
-    fontWeight: "700",
-    color: "#000",
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
-  },
   contentContainer: {
     flex: 1,
-    marginBottom: 80, // Space for bottom navigation
+    marginBottom: 80,
   },
   scrollView: {
     flex: 1,
@@ -1188,17 +760,7 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   bottomSpacing: {
-    height: 30, // Additional spacing at the bottom
-  },
-  sideMenuItemDisabled: {
-    opacity: 0.5,
-  },
-  sideMenuItemTextDisabled: {
-    color: "#CCCCCC",
-  },
-  signOutText: {
-    color: "#FF6B6B",
-    fontWeight: "600",
+    height: 30,
   },
   pendingTaskCard: {
     backgroundColor: "#FFF3E0",

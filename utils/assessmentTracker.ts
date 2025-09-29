@@ -86,6 +86,37 @@ export const assessmentTracker = {
     }
   },
 
+  // NEW: Get next due date
+  async getNextDueDate(clerkUserId: string): Promise<Date | null> {
+    try {
+      const latestAssessment = await this.getLatestAssessment(clerkUserId);
+      if (latestAssessment && latestAssessment.next_due_date) {
+        return new Date(latestAssessment.next_due_date);
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting next due date:", error);
+      return null;
+    }
+  },
+
+  // NEW: Get days until next assessment
+  async getDaysUntilNextAssessment(clerkUserId: string): Promise<number | null> {
+    try {
+      const nextDueDate = await this.getNextDueDate(clerkUserId);
+      if (!nextDueDate) return null;
+
+      const now = new Date();
+      const timeDiff = nextDueDate.getTime() - now.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      
+      return daysDiff;
+    } catch (error) {
+      console.error("Error calculating days until assessment:", error);
+      return null;
+    }
+  },
+
   // For testing: Reset assessment
   async resetAssessment(): Promise<void> {
     try {

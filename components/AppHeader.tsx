@@ -16,13 +16,11 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "react-native";
-// Import Clerk hooks
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { assessmentTracker } from "../utils/assessmentTracker"; // Adjust path as needed
 
 const { width } = Dimensions.get("window");
 
-// Props interface for the AppHeader component
 export interface AppHeaderProps {
   title?: string;
   showBack?: boolean;
@@ -39,19 +37,35 @@ export const AppHeader = ({
   showNotifications = true,
   rightActions,
 }: AppHeaderProps) => {
-  // State for managing side menu visibility and profile image
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isAssessmentDue, setIsAssessmentDue] = useState(false);
+  const [checkingAssessment, setCheckingAssessment] = useState(true);
 
-  // Clerk hooks for authentication
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
 
-  // Animation value for fade effects
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Function to show the side menu with animation
+  // Check if assessment is due
+  useEffect(() => {
+    const checkAssessment = async () => {
+      if (user?.id) {
+        try {
+          const isDue = await assessmentTracker.isAssessmentDue(user.id);
+          setIsAssessmentDue(isDue);
+        } catch (error) {
+          console.error("Error checking assessment status:", error);
+        } finally {
+          setCheckingAssessment(false);
+        }
+      }
+    };
+
+    checkAssessment();
+  }, [user?.id]);
+
   const showSideMenu = () => {
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
@@ -61,7 +75,6 @@ export const AppHeader = ({
     }).start();
   };
 
-  // Function to hide the side menu with animation
   const hideSideMenu = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -72,55 +85,24 @@ export const AppHeader = ({
     });
   };
 
-  // Fixed Clerk logout function
   const handleSignOut = async () => {
-    console.log('SIGN OUT BUTTON PRESSED!');
-    
-    if (isSigningOut) {
-      console.log('Already signing out, returning...');
-      return;
-    }
+    if (isSigningOut) return;
     
     try {
-      console.log('Setting isSigningOut to true...');
       setIsSigningOut(true);
-      
-      console.log('Hiding side menu...');
-      hideSideMenu(); // Close the menu first
-      
-      // Clear ALL stored data
-      console.log('Clearing AsyncStorage...');
+      hideSideMenu();
       await AsyncStorage.clear();
-      
-      // Sign out from Clerk
-      console.log('Calling Clerk signOut...');
       await signOut();
-      console.log('Clerk signOut completed');
-      
-      // Use absolute path for navigation (more reliable)
-      console.log('Navigating to login...');
       router.replace("/(auth)/login");
-      
     } catch (error) {
       console.error('Sign out error:', error);
-      
-      // Show error alert with fallback navigation
       Alert.alert(
         "Sign Out Error",
         "There was an issue signing out. Please try again.",
         [
           { 
             text: "Try Again", 
-            onPress: () => {
-              // Try different navigation approaches
-              try {
-                router.replace("/(auth)/login");
-              } catch (navError) {
-                console.log('Fallback navigation failed:', navError);
-                // Last resort - try going back to root
-                router.replace("/");
-              }
-            }
+            onPress: () => router.replace("/(auth)/login")
           },
           { 
             text: "Cancel",
@@ -133,7 +115,6 @@ export const AppHeader = ({
     }
   };
 
-  // Confirmation dialog for sign out
   const confirmSignOut = () => {
     Alert.alert(
       "Sign Out",
@@ -142,7 +123,6 @@ export const AppHeader = ({
         {
           text: "Cancel",
           style: "cancel",
-          onPress: () => console.log('Sign out cancelled')
         },
         {
           text: "Sign Out",
@@ -153,7 +133,6 @@ export const AppHeader = ({
     );
   };
 
-  // Load profile image from AsyncStorage
   const loadProfileImage = async () => {
     try {
       if (user?.id) {
@@ -169,39 +148,31 @@ export const AppHeader = ({
     }
   };
 
-  // Load profile image when component mounts or user changes
   useEffect(() => {
     if (user?.id) {
       loadProfileImage();
     }
   }, [user?.id]);
 
-  // Generate initials from user's name for profile placeholder
   const getInitials = () => {
     if (user?.firstName && user?.lastName) {
-      return `${user.firstName.charAt(0)}${user.lastName.charAt(
-        0
-      )}`.toUpperCase();
+      return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
     }
     if (user?.fullName) {
       const names = user.fullName.split(" ");
       return names.length > 1
-        ? `${names[0]?.charAt(0) ?? ""}${
-            names[names.length - 1]?.charAt(0) ?? ""
-          }`.toUpperCase()
+        ? `${names[0]?.charAt(0) ?? ""}${names[names.length - 1]?.charAt(0) ?? ""}`.toUpperCase()
         : (names[0]?.charAt(0) ?? "").toUpperCase();
     }
     return "U";
   };
 
-  // Get greeting name from user data
   const getGreetingName = () => {
     if (user?.firstName) return user.firstName;
     if (user?.fullName) return user.fullName.split(" ")[0];
     return "User";
   };
 
-  // Get user email
   const getUserEmail = () => {
     return (
       user?.primaryEmailAddress?.emailAddress ||
@@ -210,8 +181,8 @@ export const AppHeader = ({
     );
   };
 
-  // Menu items with corrected navigation paths
-  const sideMenuItems = [
+  // Base menu items
+  const baseMenuItems = [
     {
       icon: "home",
       title: "Dashboard",
@@ -220,6 +191,7 @@ export const AppHeader = ({
         router.push("/(tabs)/home");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "person",
@@ -229,15 +201,18 @@ export const AppHeader = ({
         router.push("/(tabs)/profile");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "bar-chart",
       title: "Self-Assessment",
+      badge: "Due",
       onPress: () => {
         hideSideMenu();
-        router.push("/self-assessment");
+        router.push("/app/(app)/self-assessment");
       },
       disabled: false,
+      show: isAssessmentDue, // Only show when assessment is due
     },
     {
       icon: "happy",
@@ -247,6 +222,7 @@ export const AppHeader = ({
         router.push("/mood-tracking");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "journal",
@@ -256,6 +232,7 @@ export const AppHeader = ({
         router.push("/journal");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "library",
@@ -265,6 +242,7 @@ export const AppHeader = ({
         router.push("/resources");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "help-circle",
@@ -274,6 +252,7 @@ export const AppHeader = ({
         router.push("/crisis-support");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "chatbubble",
@@ -283,6 +262,7 @@ export const AppHeader = ({
         router.push("/(tabs)/messages");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "calendar",
@@ -292,6 +272,7 @@ export const AppHeader = ({
         router.push("/(tabs)/appointments");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "people",
@@ -301,6 +282,7 @@ export const AppHeader = ({
         router.push("/community-forum");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "videocam",
@@ -310,16 +292,20 @@ export const AppHeader = ({
         router.push("/video-consultations");
       },
       disabled: false,
+      show: true,
     },
     {
       icon: "log-out",
       title: "Sign Out",
-      onPress: confirmSignOut, // Use the confirmation dialog
+      onPress: confirmSignOut,
       disabled: isSigningOut,
+      show: true,
     },
   ];
 
-  // Don't render if user is not available (still loading)
+  // Filter menu items based on show property
+  const sideMenuItems = baseMenuItems.filter(item => item.show);
+
   if (!user && isSignedIn) {
     return (
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
@@ -332,35 +318,21 @@ export const AppHeader = ({
 
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
-      {/* Main Header Container */}
       <View style={styles.header}>
-        {/* Left Section: Back Button or Profile Image */}
         {showBack ? (
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
-            accessibilityLabel="Go back"
           >
             <Ionicons name="arrow-undo-sharp" size={24} color="black" />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/profile/edit")}
-            accessibilityLabel="Edit profile"
-          >
+          <TouchableOpacity onPress={() => router.push("/(tabs)/profile/edit")}>
             <View style={styles.profileImageContainer}>
               {profileImage ? (
-                <Image
-                  source={{ uri: profileImage }}
-                  style={styles.profileImage}
-                  accessibilityLabel="Profile photo"
-                />
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
               ) : user?.imageUrl ? (
-                <Image
-                  source={{ uri: user.imageUrl }}
-                  style={styles.profileImage}
-                  accessibilityLabel="Profile photo"
-                />
+                <Image source={{ uri: user.imageUrl }} style={styles.profileImage} />
               ) : (
                 <Text style={styles.initialsText}>{getInitials()}</Text>
               )}
@@ -368,43 +340,32 @@ export const AppHeader = ({
           </TouchableOpacity>
         )}
 
-        {/* Center Section: Title */}
         <View style={styles.titleContainer}>
           {title ? (
-            <Text style={styles.headerTitle} accessibilityRole="header">
-              {title}
-            </Text>
+            <Text style={styles.headerTitle}>{title}</Text>
           ) : (
             <View style={styles.emptyTitle} />
           )}
         </View>
 
-        {/* Right Section: Icons and Actions */}
         <View style={styles.headerIcons}>
           {rightActions}
 
           {showNotifications && (
-            <TouchableOpacity
-              onPress={() => router.push("/notifications")}
-              accessibilityLabel="View notifications"
-            >
+            <TouchableOpacity onPress={() => router.push("/notifications")}>
               <Ionicons name="notifications-outline" size={24} color="#666" />
             </TouchableOpacity>
           )}
 
           {showMenu && (
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={showSideMenu}
-              accessibilityLabel="Open menu"
-            >
+            <TouchableOpacity style={styles.menuButton} onPress={showSideMenu}>
               <Ionicons name="grid" size={24} color="#666" />
+              {isAssessmentDue && <View style={styles.notificationDot} />}
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Side Menu Modal */}
       <Modal
         animationType="none"
         transparent={true}
@@ -412,13 +373,10 @@ export const AppHeader = ({
         onRequestClose={hideSideMenu}
         statusBarTranslucent={true}
       >
-        <Animated.View
-          style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
-        >
+        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
           <Pressable
             style={StyleSheet.absoluteFillObject}
             onPress={hideSideMenu}
-            accessibilityLabel="Close menu"
           />
 
           <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
@@ -436,7 +394,6 @@ export const AppHeader = ({
                     item.disabled && styles.sideMenuItemDisabled,
                   ]}
                   onPress={item.onPress}
-                  accessibilityLabel={item.title}
                   disabled={item.disabled}
                 >
                   <Ionicons
@@ -454,6 +411,11 @@ export const AppHeader = ({
                     {item.title}
                     {item.title === "Sign Out" && isSigningOut && "..."}
                   </Text>
+                  {item.badge && (
+                    <View style={styles.dueBadge}>
+                      <Text style={styles.dueBadgeText}>{item.badge}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -464,7 +426,6 @@ export const AppHeader = ({
   );
 };
 
-// Updated styles with sign out text color
 const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
@@ -524,6 +485,16 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: 4,
+    position: "relative",
+  },
+  notificationDot: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FF6B6B",
   },
   fullScreenOverlay: {
     flex: 1,
@@ -571,12 +542,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+    flex: 1,
   },
   sideMenuItemTextDisabled: {
     color: "#CCCCCC",
   },
   signOutText: {
-    color: "#FF6B6B", // Red color for sign out
+    color: "#FF6B6B",
+    fontWeight: "600",
+  },
+  dueBadge: {
+    backgroundColor: "#FF6B6B",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  dueBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
     fontWeight: "600",
   },
   safeArea: {
