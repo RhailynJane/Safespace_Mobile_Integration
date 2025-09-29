@@ -22,16 +22,13 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 const { width, height } = Dimensions.get("window");
 
-// Available emoji reactions
-const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
-
+// Available emoji reactions - used in post-detail only
 const POSTS = [
   {
     id: 1,
     title: "Struggling with Sleep Due to Stress?",
     content:
       "Lately, stress has really been affecting my sleep – either I can't fall asleep or I wake up feeling exhausted.\n\nJust wondering... how do you all cope with this?\nAny tips or routines that help you sleep better during stressful times?\n\nWould love to hear what works for you. 😊",
-    reactions: { "❤️": 12, "👍": 8, "😊": 15, "😢": 3, "😮": 2, "🔥": 5 },
     category: "Stress",
     user: {
       name: "Sarah M.",
@@ -43,7 +40,6 @@ const POSTS = [
     title: "Dealing with Anxiety Lately?",
     content:
       "I've been feeling more anxious than usual – overthinking, tight chest, hard to focus. It sneaks in even when things seem okay. 😊\n\nJust checking in... how do you manage your anxiety day-to-day?\nBreathing exercises, journaling, talking to someone?\n\nOpen to any ideas or even just sharing how you feel.\nYou're not alone. 😊",
-    reactions: { "❤️": 20, "👍": 15, "😊": 18, "😢": 8, "😮": 1, "🔥": 3 },
     category: "Support",
     user: {
       name: "Michael T.",
@@ -55,7 +51,6 @@ const POSTS = [
     title: "Little Wins & Mental Health Tips",
     content:
       "Hey everyone! Just wanted to share a few small things that helped my mental health lately:\n- Taking a short walk without my phone 🟧\n- Saying no without feeling guilty\n- Writing down 3 things I'm grateful for before bed\n\nFeel free to drop your own tips or wins-big or small.",
-    reactions: { "❤️": 45, "👍": 32, "😊": 28, "😢": 2, "😮": 5, "🔥": 38 },
     category: "Stories",
     user: {
       name: "John L.",
@@ -76,10 +71,8 @@ const CATEGORIES = [
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeTab, setActiveTab] = useState("community-forum");
-  const [postReactions, setPostReactions] = useState<Map<number, string>>(new Map());
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [reactionPickerVisible, setReactionPickerVisible] = useState<number | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { signOut, isSignedIn } = useAuth();
@@ -251,22 +244,6 @@ export default function CommunityMainScreen() {
     },
   ];
 
-  const handleReactionPress = (postId: number, emoji: string) => {
-    const currentReaction = postReactions.get(postId);
-    if (currentReaction === emoji) {
-      // Remove reaction if clicking the same emoji
-      const newReactions = new Map(postReactions);
-      newReactions.delete(postId);
-      setPostReactions(newReactions);
-    } else {
-      // Add or change reaction
-      const newReactions = new Map(postReactions);
-      newReactions.set(postId, emoji);
-      setPostReactions(newReactions);
-    }
-    setReactionPickerVisible(null);
-  };
-
   const handleBookmarkPress = (postId: number) => {
     const newBookmarkedPosts = new Set(bookmarkedPosts);
     if (newBookmarkedPosts.has(postId)) {
@@ -382,21 +359,7 @@ export default function CommunityMainScreen() {
                 </Text>
 
                 <View style={styles.postFooter}>
-                  <View style={styles.interactionButtons}>
-                    {/* Reaction Button */}
-                    <TouchableOpacity
-                      style={styles.reactionButton}
-                      onPress={() => setReactionPickerVisible(post.id)}
-                    >
-                      <Text style={styles.reactionEmoji}>
-                        {postReactions.get(post.id) || "❤️"}
-                      </Text>
-                      <Text style={styles.interactionText}>
-                        {getTotalReactions(post.reactions)}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
+            
                   {/* Bookmark Button */}
                   <TouchableOpacity
                     onPress={() => handleBookmarkPress(post.id)}
@@ -414,24 +377,6 @@ export default function CommunityMainScreen() {
                     />
                   </TouchableOpacity>
                 </View>
-
-                {/* Reaction Picker Modal */}
-                {reactionPickerVisible === post.id && (
-                  <View style={styles.reactionPicker}>
-                    {EMOJI_REACTIONS.map((emoji) => (
-                      <TouchableOpacity
-                        key={emoji}
-                        style={[
-                          styles.emojiButton,
-                          postReactions.get(post.id) === emoji && styles.emojiButtonActive
-                        ]}
-                        onPress={() => handleReactionPress(post.id, emoji)}
-                      >
-                        <Text style={styles.emojiText}>{emoji}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -440,13 +385,7 @@ export default function CommunityMainScreen() {
         </ScrollView>
       </View>
 
-      {/* Overlay to close reaction picker */}
-      {reactionPickerVisible !== null && (
-        <Pressable
-          style={styles.reactionOverlay}
-          onPress={() => setReactionPickerVisible(null)}
-        />
-      )}
+      {/* Overlay to close reaction picker - REMOVED */}
 
       <Modal
         animationType="none"
@@ -564,7 +503,7 @@ const styles = StyleSheet.create({
   },
   addPostButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     marginLeft: 8,
     paddingVertical: 1,
@@ -589,8 +528,8 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     width: "30%",
-    paddingHorizontal: 20,
-    paddingVertical: 6,
+    paddingHorizontal: 15,
+    paddingVertical: 3,
     borderRadius: 20,
     backgroundColor: "#FFFFFF",
     height: 30,
@@ -606,7 +545,6 @@ const styles = StyleSheet.create({
     borderColor: "#FFF",
     fontWeight: "400",
     justifyContent: "center",
-    lineHeight: 12,
     alignItems: "center",
     textAlign: "center",
   },
@@ -631,6 +569,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.75,
     shadowRadius: 2,
     elevation: 3,
+    overflow: "visible",
   },
   postHeader: {
     flexDirection: "row",
@@ -675,56 +614,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 16,
   },
-  reactionButton: {
+  reactionDisplay: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 12,
     backgroundColor: "#F5F5F5",
   },
-  reactionEmoji: {
-    fontSize: 24,
+  reactionDisplayEmoji: {
+    fontSize: 20,
   },
-  interactionText: {
-    fontSize: 14,
-    color: "#FF6B35",
+  reactionDisplayCount: {
+    fontSize: 13,
+    color: "#666",
     fontWeight: "600",
   },
-  reactionPicker: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    alignSelf: "flex-start",
-  },
-  emojiButton: {
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: "#F5F5F5",
-  },
-  emojiButtonActive: {
-    backgroundColor: "#FFE0B2",
-    transform: [{ scale: 1.1 }],
-  },
-  emojiText: {
-    fontSize: 28,
-  },
-  reactionOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
+
   bottomSpacing: {
     height: 30,
   },
