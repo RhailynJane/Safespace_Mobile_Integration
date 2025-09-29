@@ -1,26 +1,7 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
 
-// Determine the correct API URL based on the platform
-const getApiUrl = () => {
-  if (__DEV__) {
-    // Development mode
-    if (Platform.OS === 'android') {
-      // Android emulator uses 10.0.2.2 to access host machine's localhost
-      return 'http://10.0.2.2:3001/api';
-    } else if (Platform.OS === 'ios') {
-      // iOS simulator can use localhost
-      return 'http://localhost:3001/api';
-    } else {
-      // Web or other platforms
-      return 'http://localhost:3001/api';
-    }
-  }
-  // Production mode - replace with your production API URL
-  return 'https://your-production-api.com/api';
-};
-
-const API_URL = getApiUrl();
+// Use your local network IP that's working for assessments
+const API_URL = 'http://192.168.1.100:3001/api';
 
 export interface MoodEntry {
   id: string;
@@ -50,12 +31,10 @@ export interface MoodFilters {
   offset?: number;
 }
 
-// Configure axios defaults
-axios.defaults.timeout = 10000; // 10 second timeout
+axios.defaults.timeout = 10000;
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 export const moodApi = {
-  // Create a new mood entry
   createMood: async (data: CreateMoodData) => {
     try {
       const response = await axios.post(`${API_URL}/moods`, data);
@@ -69,7 +48,6 @@ export const moodApi = {
     }
   },
 
-  // Get recent moods
   getRecentMoods: async (clerkUserId: string, limit: number = 10) => {
     try {
       const response = await axios.get(`${API_URL}/moods/recent/${clerkUserId}`, {
@@ -85,7 +63,6 @@ export const moodApi = {
     }
   },
 
-  // Get mood history with filters
   getMoodHistory: async (clerkUserId: string, filters?: MoodFilters) => {
     try {
       const response = await axios.get(`${API_URL}/moods/history/${clerkUserId}`, {
@@ -101,7 +78,6 @@ export const moodApi = {
     }
   },
 
-  // Get mood statistics
   getMoodStats: async (clerkUserId: string, days: number = 30) => {
     try {
       const response = await axios.get(`${API_URL}/moods/stats/${clerkUserId}`, {
@@ -117,7 +93,6 @@ export const moodApi = {
     }
   },
 
-  // Get all factors
   getFactors: async (clerkUserId: string) => {
     try {
       const response = await axios.get(`${API_URL}/moods/factors/${clerkUserId}`);
@@ -131,7 +106,6 @@ export const moodApi = {
     }
   },
 
-  // Update mood entry
   updateMood: async (moodId: string, data: Partial<CreateMoodData>) => {
     try {
       const response = await axios.put(`${API_URL}/moods/${moodId}`, data);
@@ -145,7 +119,6 @@ export const moodApi = {
     }
   },
 
-  // Delete mood entry
   deleteMood: async (moodId: string) => {
     try {
       const response = await axios.delete(`${API_URL}/moods/${moodId}`);
