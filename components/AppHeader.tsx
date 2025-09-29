@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 2,
     marginBottom: 8,
-    height: 38,
+    height: 42,
   },
   emptyTitle: {
     flex: 1,
