@@ -19,6 +19,7 @@ import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { assessmentTracker } from "../../../utils/assessmentTracker";
+import BottomNavigation from "../../../components/BottomNavigation";
 
 type MoodEntry = {
   id: string;
@@ -50,6 +51,7 @@ export default function HomeScreen() {
 
   const { user } = useUser();
 
+  // Bottom navigation configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -57,6 +59,15 @@ export default function HomeScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
 
   const quickActions = [
     {
@@ -477,31 +488,11 @@ export default function HomeScreen() {
         </KeyboardAvoidingView>
 
         {/* Bottom Navigation */}
-        <View style={styles.bottomNav}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={styles.navItem}
-              onPress={() => {
-                setActiveTab(tab.id);
-                if (tab.id !== "home") router.push(`/(tabs)/${tab.id}`);
-              }}
-            >
-              <View
-                style={[
-                  styles.navIconContainer,
-                  activeTab === tab.id && styles.activeIconContainer,
-                ]}
-              >
-                <Ionicons
-                  name={tab.icon as any}
-                  size={24}
-                  color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
-                />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
