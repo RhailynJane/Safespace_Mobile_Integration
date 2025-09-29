@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   },
   navItem: {
     alignItems: "center",
-    padding: 16,               
+    padding: 14,               
   },
   navIconContainer: {
     width: 40,
