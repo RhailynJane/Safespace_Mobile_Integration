@@ -21,7 +21,7 @@ import PasswordStep from "../../components/PasswordStep";
 import EmailVerificationStep from "../../components/EmailVerificationStep";
 import SuccessStep from "../../components/SuccessStep";
 import { CaptchaHandler } from "../../utils/captcha-handler";
-import { apiService } from '../../utils/api';
+import { apiService } from "../../utils/api";
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -111,15 +111,15 @@ export default function SignupScreen() {
     if (age < 18) {
       Alert.alert(
         "Age Requirement",
-        "You must be 18 years or older to use SafeSpace. If you need support, please contact a trusted adult or call a crisis helpline.",
+        "You must be 18 years or older to use SafeSpace. If you're under 18 and need support, please reach out to a trusted adult, school counselor, or contact Kids Help Phone at 1-800-668-6868 (available 24/7) or text CONNECT to 686868.",
         [
           {
             text: "OK",
             onPress: () => {
               // Reset age field
               updateSignupData({ age: "" });
-            }
-          }
+            },
+          },
         ]
       );
       return;
@@ -243,7 +243,7 @@ export default function SignupScreen() {
 
         // Sync user data with your database
         try {
-          console.log('Syncing user with database...');
+          console.log("Syncing user with database...");
           const syncResult = await apiService.syncUser({
             clerkUserId: signUpAttempt.createdUserId!,
             email: signupData.email,
@@ -252,7 +252,7 @@ export default function SignupScreen() {
             phoneNumber: signupData.phoneNumber,
           });
 
-          console.log('User synced successfully:', syncResult);
+          console.log("User synced successfully:", syncResult);
 
           // Create client record
           if (syncResult.user?.id) {
@@ -260,15 +260,15 @@ export default function SignupScreen() {
               await apiService.createClient({
                 userId: syncResult.user.id,
               });
-              console.log('Client record created successfully');
+              console.log("Client record created successfully");
             } catch (clientError) {
-              console.error('Failed to create client record:', clientError);
+              console.error("Failed to create client record:", clientError);
             }
           }
 
           setCurrentStep("success");
         } catch (syncError) {
-          console.error('Failed to sync user with database:', syncError);
+          console.error("Failed to sync user with database:", syncError);
           setCurrentStep("success");
         }
       } else {
