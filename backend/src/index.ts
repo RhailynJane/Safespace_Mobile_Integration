@@ -340,3 +340,418 @@ process.on('SIGINT', async () => {
   await pool.end();
   process.exit(0);
 });
+
+//Mood Tracking Interfaces and Endpoints
+interface CreateMoodRequest {
+  clerkUserId: string;
+  moodType: 'very-happy' | 'happy' | 'neutral' | 'sad' | 'very-sad';
+  intensity: number;
+  notes?: string;
+  factors?: string[];
+}
+
+interface MoodFilterParams {
+  moodType?: string;
+  startDate?: string;
+  endDate?: string;
+  factors?: string;
+  limit?: string;
+  offset?: string;
+}
+
+// =============================================
+// MOOD TRACKING ENDPOINTS
+// =============================================
+
+// Create a new mood entry
+app.post('/api/moods', async (req: Request<{}, {}, CreateMoodRequest>, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { clerkUserId, moodType, intensity, notes, factors } = req.body;
+
+    // Validation
+    if (!clerkUserId || !moodType || !intensity) {
+      return res.status(400).json({ 
+        error: 'clerkUserId, moodType, and intensity are required' 
+      });
+    }
+
+    if (intensity < 1 || intensity > 5) {
+      return res.status(400).json({ 
+        error: 'Intensity must be between 1 and 5' 
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Get user's internal ID
+    const userResult = await client.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Insert mood entry
+    const moodResult = await client.query(
+      `INSERT INTO mood_entries (user_id, clerk_user_id, mood_type, intensity, notes) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, mood_type, intensity, notes, created_at`,
+      [userId, clerkUserId, moodType, intensity, notes || null]
+    );
+
+    const moodEntry = moodResult.rows[0];
+
+    // Insert mood factors if provided
+    if (factors && factors.length > 0) {
+      const factorInserts = factors.map(factor =>
+        client.query(
+          'INSERT INTO mood_factors (mood_entry_id, factor) VALUES ($1, $2)',
+          [moodEntry.id, factor]
+        )
+      );
+      await Promise.all(factorInserts);
+    }
+
+    await client.query('COMMIT');
+
+    // Get complete mood entry with factors
+    const completeEntry = await client.query(
+      `SELECT 
+        me.id, me.mood_type, me.intensity, me.notes, me.created_at,
+        get_mood_emoji(me.mood_type) as mood_emoji,
+        get_mood_label(me.mood_type) as mood_label,
+        COALESCE(
+          json_agg(
+            json_build_object('factor', mf.factor)
+          ) FILTER (WHERE mf.factor IS NOT NULL),
+          '[]'
+        ) as mood_factors
+      FROM mood_entries me
+      LEFT JOIN mood_factors mf ON me.id = mf.mood_entry_id
+      WHERE me.id = $1
+      GROUP BY me.id`,
+      [moodEntry.id]
+    );
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Mood entry created successfully',
+      mood: completeEntry.rows[0]
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error creating mood entry:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to create mood entry',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Get recent moods for a user (last 10)
+app.get('/api/moods/recent/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    const result = await pool.query(
+      `SELECT 
+        me.id, me.mood_type, me.intensity, me.notes, me.created_at,
+        get_mood_emoji(me.mood_type) as mood_emoji,
+        get_mood_label(me.mood_type) as mood_label,
+        COALESCE(
+          json_agg(
+            json_build_object('factor', mf.factor)
+          ) FILTER (WHERE mf.factor IS NOT NULL),
+          '[]'
+        ) as mood_factors
+      FROM mood_entries me
+      LEFT JOIN mood_factors mf ON me.id = mf.mood_entry_id
+      WHERE me.clerk_user_id = $1
+      GROUP BY me.id
+      ORDER BY me.created_at DESC
+      LIMIT $2`,
+      [clerkUserId, limit]
+    );
+
+    res.json({ 
+      moods: result.rows,
+      count: result.rows.length
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching recent moods:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch recent moods',
+      details: error.message
+    });
+  }
+});
+
+// Get mood history with filters and search
+app.get('/api/moods/history/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { 
+      moodType, 
+      startDate, 
+      endDate, 
+      factors, 
+      limit = '50', 
+      offset = '0' 
+    } = req.query as MoodFilterParams;
+
+    let query = `
+      SELECT 
+        me.id, me.mood_type, me.intensity, me.notes, me.created_at,
+        get_mood_emoji(me.mood_type) as mood_emoji,
+        get_mood_label(me.mood_type) as mood_label,
+        COALESCE(
+          json_agg(
+            json_build_object('factor', mf.factor)
+          ) FILTER (WHERE mf.factor IS NOT NULL),
+          '[]'
+        ) as mood_factors
+      FROM mood_entries me
+      LEFT JOIN mood_factors mf ON me.id = mf.mood_entry_id
+      WHERE me.clerk_user_id = $1
+    `;
+
+    const params: any[] = [clerkUserId];
+    let paramIndex = 2;
+
+    // Filter by mood type
+    if (moodType) {
+      query += ` AND me.mood_type = $${paramIndex}`;
+      params.push(moodType);
+      paramIndex++;
+    }
+
+    // Filter by date range
+    if (startDate) {
+      query += ` AND me.created_at >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      query += ` AND me.created_at <= $${paramIndex}`;
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    query += ` GROUP BY me.id`;
+
+    // Filter by factors (after grouping)
+    if (factors) {
+      const factorArray = factors.split(',').map(f => f.trim());
+      query += ` HAVING bool_or(mf.factor = ANY($${paramIndex}))`;
+      params.push(factorArray);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY me.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const result = await pool.query(query, params);
+
+    // Get total count for pagination
+    const countResult = await pool.query(
+      'SELECT COUNT(*) FROM mood_entries WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    res.json({ 
+      moods: result.rows,
+      count: result.rows.length,
+      total: parseInt(countResult.rows[0].count),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching mood history:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch mood history',
+      details: error.message
+    });
+  }
+});
+
+// Get mood statistics for a user
+app.get('/api/moods/stats/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { days = '30' } = req.query;
+
+    const result = await pool.query(
+      `SELECT 
+        mood_type,
+        COUNT(*) as count,
+        AVG(intensity) as avg_intensity,
+        get_mood_emoji(mood_type) as emoji,
+        get_mood_label(mood_type) as label
+      FROM mood_entries
+      WHERE clerk_user_id = $1
+        AND created_at >= NOW() - INTERVAL '${parseInt(days as string)} days'
+      GROUP BY mood_type
+      ORDER BY count DESC`,
+      [clerkUserId]
+    );
+
+    // Get most common factors
+    const factorsResult = await pool.query(
+      `SELECT mf.factor, COUNT(*) as count
+      FROM mood_factors mf
+      JOIN mood_entries me ON mf.mood_entry_id = me.id
+      WHERE me.clerk_user_id = $1
+        AND me.created_at >= NOW() - INTERVAL '${parseInt(days as string)} days'
+      GROUP BY mf.factor
+      ORDER BY count DESC
+      LIMIT 10`,
+      [clerkUserId]
+    );
+
+    res.json({
+      moodDistribution: result.rows,
+      topFactors: factorsResult.rows,
+      period: `${days} days`
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching mood stats:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch mood statistics',
+      details: error.message
+    });
+  }
+});
+
+// Update a mood entry
+app.put('/api/moods/:moodId', async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { moodId } = req.params;
+    const { intensity, notes, factors } = req.body;
+
+    await client.query('BEGIN');
+
+    // Update mood entry
+    const updateResult = await client.query(
+      `UPDATE mood_entries 
+       SET intensity = COALESCE($1, intensity),
+           notes = COALESCE($2, notes),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3
+       RETURNING *`,
+      [intensity, notes, moodId]
+    );
+
+    if (updateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Mood entry not found' });
+    }
+
+    // Update factors if provided
+    if (factors) {
+      // Delete existing factors
+      await client.query('DELETE FROM mood_factors WHERE mood_entry_id = $1', [moodId]);
+      
+      // Insert new factors
+      if (factors.length > 0) {
+        const factorInserts = factors.map((factor: string) =>
+          client.query(
+            'INSERT INTO mood_factors (mood_entry_id, factor) VALUES ($1, $2)',
+            [moodId, factor]
+          )
+        );
+        await Promise.all(factorInserts);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.json({ 
+      success: true, 
+      message: 'Mood entry updated successfully',
+      mood: updateResult.rows[0]
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error updating mood entry:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to update mood entry',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete a mood entry
+app.delete('/api/moods/:moodId', async (req: Request, res: Response) => {
+  try {
+    const { moodId } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM mood_entries WHERE id = $1 RETURNING id',
+      [moodId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mood entry not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Mood entry deleted successfully' 
+    });
+
+  } catch (error: any) {
+    console.error('Error deleting mood entry:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to delete mood entry',
+      details: error.message
+    });
+  }
+});
+
+// Get all unique factors across user's mood entries
+app.get('/api/moods/factors/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    const result = await pool.query(
+      `SELECT DISTINCT mf.factor, COUNT(*) as usage_count
+      FROM mood_factors mf
+      JOIN mood_entries me ON mf.mood_entry_id = me.id
+      WHERE me.clerk_user_id = $1
+      GROUP BY mf.factor
+      ORDER BY usage_count DESC`,
+      [clerkUserId]
+    );
+
+    res.json({ 
+      factors: result.rows
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching factors:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch factors',
+      details: error.message
+    });
+  }
+});
