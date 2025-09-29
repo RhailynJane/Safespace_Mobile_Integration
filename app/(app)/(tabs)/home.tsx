@@ -100,7 +100,7 @@ export default function HomeScreen() {
   /**
    * Check if user needs to complete assessment
    */
-  const checkAssessmentStatus = async () => {
+  const checkAssessmentStatus = useCallback(async () => {
     try {
       if (user?.id) {
         const isDue = await assessmentTracker.isAssessmentDue(user.id);
@@ -111,27 +111,7 @@ export default function HomeScreen() {
       console.error("Error checking assessment status:", error);
       setIsAssessmentDue(false);
     }
-  };
-
-  // Move fetchData inside useFocusEffect to avoid dependency issues
-  useFocusEffect(
-    useCallback(() => {
-      const fetchData = async () => {
-        setLoading(true);
-        try {
-          await Promise.all([
-            fetchRecentMoods(),
-            fetchResources(),
-            checkAssessmentStatus(),
-          ]);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    }, [user?.id])
-  );
+  }, [user?.id]);
 
   /**
    * Returns emoji representation for mood type
@@ -195,7 +175,7 @@ export default function HomeScreen() {
   /**
    * Loads mock mood data for demonstration
    */
-  const fetchRecentMoods = async () => {
+  const fetchRecentMoods = useCallback(async () => {
     try {
       const storedMoods = await AsyncStorage.getItem("recentMoods");
 
@@ -233,12 +213,12 @@ export default function HomeScreen() {
       console.log("Error loading mood data");
       setRecentMoods([]);
     }
-  };
+  }, []);
 
   /**
    * Loads mock resource data for demonstration
    */
-  const fetchResources = async () => {
+  const fetchResources = useCallback(async () => {
     try {
       const mockResources: Resource[] = [
         {
@@ -252,7 +232,26 @@ export default function HomeScreen() {
     } catch (error) {
       setResources([]);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchData = async () => {
+        setLoading(true);
+        try {
+          await Promise.all([
+            fetchRecentMoods(),
+            fetchResources(),
+            checkAssessmentStatus(),
+          ]);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchData();
+    }, [fetchRecentMoods, fetchResources, checkAssessmentStatus])
+  );
 
   /**
    * Formats date into relative or short format
