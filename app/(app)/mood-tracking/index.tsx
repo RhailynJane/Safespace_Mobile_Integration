@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,15 +12,17 @@ import {
   ScrollView,
   Animated,
   Dimensions,
-  Modal,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "@clerk/clerk-expo";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { moodApi, MoodEntry } from "../../../utils/moodApi";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -37,22 +39,11 @@ interface MoodOption {
 }
 
 const MoodTrackingScreen = () => {
-  // Mock user data for frontend demonstration
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-  };
-  
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
-  };
-
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [recentEntries, setRecentEntries] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { user } = useUser();
   const [activeEmoji, setActiveEmoji] = useState<MoodType | null>(null);
   const [activeTab, setActiveTab] = useState("mood");
+  const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Navigation tabs configuration
   const tabs = [
@@ -116,42 +107,29 @@ const MoodTrackingScreen = () => {
     },
   ]).current;
 
+  // Load recent moods from API
+  const loadRecentMoods = useCallback(async () => {
+    if (!user?.id) return;
 
-  // Helper function to get emoji representation for mood type
-  const getEmojiForMood = (moodType: string) => {
-    switch (moodType) {
-      case "very-happy":
-        return "😄";
-      case "happy":
-        return "🙂";
-      case "neutral":
-        return "😐";
-      case "sad":
-        return "🙁";
-      case "very-sad":
-        return "😢";
-      default:
-        return "😐";
+    try {
+      setLoading(true);
+      const data = await moodApi.getRecentMoods(user.id, 5);
+      setRecentEntries(data.moods || []);
+    } catch (error) {
+      console.error("Error loading recent moods:", error);
+      // Silent fail - just show empty state
+      setRecentEntries([]);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  // Helper function to get label for mood type
-  const getLabelForMood = (moodType: string) => {
-    switch (moodType) {
-      case "very-happy":
-        return "Very Happy";
-      case "happy":
-        return "Happy";
-      case "neutral":
-        return "Neutral";
-      case "sad":
-        return "Sad";
-      case "very-sad":
-        return "Very Sad";
-      default:
-        return "Unknown";
-    }
-  };
+  // Load recent moods when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadRecentMoods();
+    }, [loadRecentMoods])
+  );
 
   // Handle emoji press animation for visual feedback
   const handleEmojiPressIn = (moodId: MoodType) => {
@@ -225,140 +203,101 @@ const MoodTrackingScreen = () => {
     );
   };
 
-  // Mock recent mood entries for demonstration
-  const mockRecentEntries = [
-    {
-      id: 1,
-      mood_type: "happy",
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      mood_emoji: getEmojiForMood("happy"),
-      mood_label: getLabelForMood("happy"),
-    },
-    {
-      id: 2,
-      mood_type: "neutral",
-      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      mood_emoji: getEmojiForMood("neutral"),
-      mood_label: getLabelForMood("neutral"),
-    },
-    {
-      id: 3,
-      mood_type: "very-happy",
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      mood_emoji: getEmojiForMood("very-happy"),
-      mood_label: getLabelForMood("very-happy"),
-    },
-  ];
-
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
         {/* Header with navigation controls */}
         <AppHeader title="Mood Tracker" showBack={true} />
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Mood selection section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How are you feeling?</Text>
-          <Text style={styles.sectionSubtitle}>
-            Tap an emoji to log your mood
-          </Text>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {/* Mood selection section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>How are you feeling?</Text>
+            <Text style={styles.sectionSubtitle}>
+              Tap an emoji to log your mood
+            </Text>
 
-          <View style={styles.moodGrid}>
-            <View style={styles.moodRow}>
-              {moodOptions.slice(0, 3).map(renderMoodEmoji)}
-            </View>
-            <View style={styles.moodRow}>
-              {moodOptions.slice(3, 5).map(renderMoodEmoji)}
+            <View style={styles.moodGrid}>
+              <View style={styles.moodRow}>
+                {moodOptions.slice(0, 3).map(renderMoodEmoji)}
+              </View>
+              <View style={styles.moodRow}>
+                {moodOptions.slice(3, 5).map(renderMoodEmoji)}
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Recent moods section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Moods</Text>
+          {/* Recent moods section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Moods</Text>
 
-          {loading ? (
-            <Text style={styles.loadingText}>Loading...</Text>
-          ) : mockRecentEntries.length > 0 ? (
-            mockRecentEntries.map((entry, index) => (
-              <View key={index} style={styles.moodCard}>
-                <Text
-                  style={[
-                    styles.moodCardEmoji,
-                    {
-                      color: moodOptions.find((m) => m.id === entry.mood_type)
-                        ?.color,
-                    },
-                  ]}
-                >
-                  {entry.mood_emoji}
-                </Text>
-                <View style={styles.moodCardContent}>
-                  <Text style={styles.moodCardTitle}>{entry.mood_label}</Text>
-                  <Text style={styles.moodCardDate}>
-                    {new Date(entry.created_at).toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                </View>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={Colors.primary} />
               </View>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>No recent entries</Text>
-            </View>
-          )}
-        </View>
+            ) : recentEntries.length > 0 ? (
+              recentEntries.map((entry, index) => (
+                <View key={entry.id || index} style={styles.moodCard}>
+                  <Text
+                    style={[
+                      styles.moodCardEmoji,
+                      {
+                        color: moodOptions.find((m) => m.id === entry.mood_type)
+                          ?.color,
+                      },
+                    ]}
+                  >
+                    {entry.mood_emoji}
+                  </Text>
+                  <View style={styles.moodCardContent}>
+                    <Text style={styles.moodCardTitle}>{entry.mood_label}</Text>
+                    <Text style={styles.moodCardDate}>
+                      {new Date(entry.created_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="happy-outline" size={48} color="#CCC" />
+                <Text style={styles.emptyStateText}>No recent entries</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Start tracking your mood by selecting an emoji above
+                </Text>
+              </View>
+            )}
+          </View>
 
-        {/* Navigation to view full mood history */}
-        <TouchableOpacity
-          style={styles.historyLink}
-          onPress={() => router.push("../mood-tracking/mood-history")}
-        >
-          <Text style={styles.historyLinkText}>View Mood History</Text>
-          <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Navigation to view full mood history */}
+          <TouchableOpacity
+            style={styles.historyLink}
+            onPress={() => router.push("../mood-tracking/mood-history")}
+          >
+            <Text style={styles.historyLinkText}>View Mood History</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        </ScrollView>
 
-      {/* Bottom navigation bar */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-     </SafeAreaView>
+        {/* Bottom navigation bar */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
     </CurvedBackground>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "Transparent",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceSecondary,
-  },
-  backButton: {
-    padding: Spacing.sm,
-  },
-  headerTitle: {
-    ...Typography.title,
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  menuButton: {
-    padding: Spacing.sm,
   },
   scrollContainer: {
     paddingBottom: Spacing.xl,
@@ -402,6 +341,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#000",
   },
+  loadingContainer: {
+    padding: Spacing.lg,
+    alignItems: "center",
+  },
   moodCard: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
@@ -434,74 +377,20 @@ const styles = StyleSheet.create({
   emptyState: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
-    padding: Spacing.lg,
+    padding: Spacing.xl,
     alignItems: "center",
   },
   emptyStateText: {
     ...Typography.body,
     color: Colors.textSecondary,
+    marginTop: Spacing.md,
+    fontWeight: "500",
   },
-  loadingText: {
-    ...Typography.body,
+  emptyStateSubtext: {
+    ...Typography.caption,
     color: Colors.textSecondary,
+    marginTop: Spacing.xs,
     textAlign: "center",
-    padding: Spacing.lg,
-  },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: width * 0.75,
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    backgroundColor: "#F9F9F9",
-  },
-  profileContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  profileName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-  },
-  closeButton: {
-    padding: 5,
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
   },
   historyLink: {
     flexDirection: "row",

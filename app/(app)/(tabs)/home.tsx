@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { moodApi } from "../../../utils/moodApi"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
@@ -184,47 +185,19 @@ export default function HomeScreen() {
   };
 
   /**
-   * Loads mock mood data for demonstration
-   */
-  const fetchRecentMoods = useCallback(async () => {
-    try {
-      const storedMoods = await AsyncStorage.getItem("recentMoods");
-
-      if (storedMoods) {
-        setRecentMoods(JSON.parse(storedMoods));
-      } else {
-        const mockMoods: MoodEntry[] = [
-          {
-            id: "1",
-            mood_type: "happy",
-            created_at: new Date().toISOString(),
-            mood_emoji: getEmojiForMood("happy"),
-            mood_label: getLabelForMood("happy"),
-          },
-          {
-            id: "2",
-            mood_type: "neutral",
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-            mood_emoji: getEmojiForMood("neutral"),
-            mood_label: getLabelForMood("neutral"),
-          },
-          {
-            id: "3",
-            mood_type: "sad",
-            created_at: new Date(Date.now() - 172800000).toISOString(),
-            mood_emoji: getEmojiForMood("sad"),
-            mood_label: getLabelForMood("sad"),
-          },
-        ];
-
-        setRecentMoods(mockMoods);
-        await AsyncStorage.setItem("recentMoods", JSON.stringify(mockMoods));
-      }
-    } catch (error) {
-      console.log("Error loading mood data");
-      setRecentMoods([]);
+ * Loads mood data from backend
+ */
+const fetchRecentMoods = useCallback(async () => {
+  try {
+    if (user?.id) {
+      const data = await moodApi.getRecentMoods(user.id, 3);
+      setRecentMoods(data.moods);
     }
-  }, []);
+  } catch (error) {
+    console.log("Error loading mood data:", error);
+    setRecentMoods([]);
+  }
+}, [user?.id]);
 
   /**
    * Loads mock resource data for demonstration

@@ -13,19 +13,23 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  Modal,
-  Pressable,
+  Switch,
   Dimensions,
   StatusBar,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
+import { moodApi } from "../../../utils/moodApi";
 
 const { width } = Dimensions.get("window");
+
+// Character limit for notes
+const NOTES_MAX_LENGTH = 200;
 
 // Define mood types for type safety
 type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad";
@@ -61,39 +65,20 @@ const tabs = [
 ];
 
 export default function MoodLoggingScreen() {
-  // Mock user data for frontend demonstration
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-  };
-
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
-  };
-
-  // Get selected mood from navigation parameters
+  const { user } = useUser();
   const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
 
-  // State for mood data including type, intensity, factors, and notes
+  // State for mood data including type, intensity, factors, notes, and sharing
   const [moodData, setMoodData] = useState({
     type: selectedMood as MoodType,
     intensity: 3,
     factors: [] as string[],
     notes: "",
+    shareWithSupportWorker: false,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("mood");
-
-  // Get display name from user profile for personalization
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
-  };
 
   // Handle intensity slider value change
   const handleIntensityChange = (value: number) => {
@@ -110,25 +95,67 @@ export default function MoodLoggingScreen() {
     }));
   };
 
-  // Handle notes text input change
+  // Handle notes text input change with character limit
   const handleNotesChange = (text: string) => {
-    setMoodData((prev) => ({ ...prev, notes: text }));
+    if (text.length <= NOTES_MAX_LENGTH) {
+      setMoodData((prev) => ({ ...prev, notes: text }));
+    }
   };
 
-  // Handle form submission with mock success response
+  // Toggle share with support worker
+  const handleShareToggle = (value: boolean) => {
+    setMoodData((prev) => ({ ...prev, shareWithSupportWorker: value }));
+  };
+
+  // Handle form submission with API call
   const handleSubmit = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      Alert.alert("Mood Logged!", "Your mood has been saved successfully.", [
-        {
-          text: "OK",
-          onPress: () => router.replace("../mood-tracking/mood-history"),
-        },
-      ]);
+    try {
+      // Create mood entry via API
+      await moodApi.createMood({
+        clerkUserId: user.id,
+        moodType: moodData.type,
+        intensity: moodData.intensity,
+        notes: moodData.notes,
+        factors: moodData.factors,
+      });
+
+      // If sharing with support worker is enabled, send notification
+      // TODO: Implement support worker notification system
+      if (moodData.shareWithSupportWorker) {
+        console.log("Sharing mood with support worker...");
+        // This would call a separate API endpoint to notify support workers
+      }
+
+      Alert.alert(
+        "Success!",
+        "Your mood has been logged successfully.",
+        [
+          {
+            text: "View History",
+            onPress: () => router.replace("../mood-tracking/mood-history"),
+          },
+          {
+            text: "Log Another",
+            onPress: () => router.replace("../mood-tracking"),
+            style: "cancel",
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error.message || "Failed to log mood. Please try again."
+      );
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
   };
 
   // Handle bottom navigation tab presses
@@ -141,6 +168,9 @@ export default function MoodLoggingScreen() {
     }
   };
 
+  // Calculate character count for notes
+  const notesCharCount = moodData.notes.length;
+
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
@@ -152,12 +182,7 @@ export default function MoodLoggingScreen() {
           />
         </View>
 
-        {/* Elegant curved background with gradient colors - positioned absolutely */}
-        <View style={styles.backgroundContainer}>
-          <CurvedBackground />
-        </View>
-
-        <AppHeader title="Mood Tracker" showBack={true} />
+        <AppHeader title="Log Your Mood" showBack={true} />
 
         {/* Main Content */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -175,7 +200,7 @@ export default function MoodLoggingScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Intensity (1-5)</Text>
             <View style={styles.sliderContainer}>
-              <Text>1</Text>
+              <Text style={styles.sliderLabel}>1</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={1}
@@ -187,7 +212,7 @@ export default function MoodLoggingScreen() {
                 maximumTrackTintColor="#E0E0E0"
                 thumbTintColor="#4CAF50"
               />
-              <Text>5</Text>
+              <Text style={styles.sliderLabel}>5</Text>
             </View>
             <Text style={styles.intensityValue}>
               Current: {moodData.intensity}
@@ -196,7 +221,12 @@ export default function MoodLoggingScreen() {
 
           {/* Mood factors selection section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Factors</Text>
+            <Text style={styles.sectionTitle}>
+              What&apos;s affecting your mood?
+            </Text>
+            <Text style={styles.sectionSubtitle}>
+              Select all that apply
+            </Text>
             <View style={styles.factorsContainer}>
               {moodFactors.map((factor) => (
                 <TouchableOpacity
@@ -222,28 +252,82 @@ export default function MoodLoggingScreen() {
             </View>
           </View>
 
-          {/* Notes input section */}
+          {/* Notes input section with character counter */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
+            <View style={styles.notesHeader}>
+              <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+              <Text
+                style={[
+                  styles.charCounter,
+                  notesCharCount >= NOTES_MAX_LENGTH && styles.charCounterMax,
+                ]}
+              >
+                {notesCharCount}/{NOTES_MAX_LENGTH}
+              </Text>
+            </View>
             <TextInput
               style={styles.notesInput}
               placeholder="Add any notes about your mood..."
+              placeholderTextColor="#999"
               value={moodData.notes}
               onChangeText={handleNotesChange}
               multiline
+              maxLength={NOTES_MAX_LENGTH}
             />
+          </View>
+
+          {/* Share with support worker toggle */}
+          <View style={styles.section}>
+            <View style={styles.shareContainer}>
+              <View style={styles.shareTextContainer}>
+                <Text style={styles.sectionTitle}>
+                  Share with Support Worker
+                </Text>
+                <Text style={styles.shareSubtext}>
+                  Allow your support worker to view this mood entry
+                </Text>
+              </View>
+              <Switch
+                value={moodData.shareWithSupportWorker}
+                onValueChange={handleShareToggle}
+                trackColor={{ false: "#E0E0E0", true: "#A5D6A7" }}
+                thumbColor={
+                  moodData.shareWithSupportWorker ? "#4CAF50" : "#F5F5F5"
+                }
+                ios_backgroundColor="#E0E0E0"
+              />
+            </View>
+            {moodData.shareWithSupportWorker && (
+              <View style={styles.shareNotice}>
+                <Ionicons name="information-circle" size={16} color="#2E7D32" />
+                <Text style={styles.shareNoticeText}>
+                  Your support worker will be notified about this mood entry
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Submit button */}
           <TouchableOpacity
-            style={styles.submitButton}
+            style={[
+              styles.submitButton,
+              isSubmitting && styles.submitButtonDisabled,
+            ]}
             onPress={handleSubmit}
             disabled={isSubmitting}
           >
             {isSubmitting ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.submitButtonText}>Save Mood Entry</Text>
+              <>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color="#FFF"
+                  style={styles.submitIcon}
+                />
+                <Text style={styles.submitButtonText}>Save Mood Entry</Text>
+              </>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -266,82 +350,63 @@ const styles = StyleSheet.create({
     marginTop: -50,
     paddingTop: 50,
   },
-  headerContainer: {
-    marginTop: 0,
-    paddingTop: 0,
-  },
-  tempHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "#FFFFFF",
-  },
-  tempHeaderTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
-  },
-  backgroundContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: -1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "#FFFFFF",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
-  },
   scrollContainer: {
     padding: 20,
-    paddingBottom: 80,
+    paddingBottom: 100,
   },
   moodDisplay: {
     alignItems: "center",
     marginVertical: 24,
-  },
-  moodEmoji: {
-    fontSize: 64,
-    marginBottom: 8,
-  },
-  moodLabel: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333",
-  },
-  section: {
-    marginBottom: 24,
     backgroundColor: "#FFFFFF",
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 16,
+    padding: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    elevation: 3,
+  },
+  moodEmoji: {
+    fontSize: 72,
+    marginBottom: 12,
+  },
+  moodLabel: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: "#333",
+  },
+  section: {
+    marginBottom: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
     elevation: 2,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: "#999",
     marginBottom: 12,
   },
   sliderContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
+    marginTop: 8,
+  },
+  sliderLabel: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
   },
   slider: {
     flex: 1,
@@ -351,7 +416,9 @@ const styles = StyleSheet.create({
   intensityValue: {
     textAlign: "center",
     marginTop: 8,
-    color: "#666",
+    color: "#4CAF50",
+    fontSize: 15,
+    fontWeight: "600",
   },
   factorsContainer: {
     flexDirection: "row",
@@ -362,100 +429,100 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: "#EEE",
-    borderWidth: 1,
-    borderColor: "#DDD",
+    backgroundColor: "#F5F5F5",
+    borderWidth: 1.5,
+    borderColor: "#E0E0E0",
   },
   selectedFactorButton: {
     backgroundColor: "#4CAF50",
     borderColor: "#4CAF50",
   },
   factorText: {
-    color: "#333",
+    color: "#666",
+    fontSize: 13,
+    fontWeight: "500",
   },
   selectedFactorText: {
     color: "#FFF",
+    fontWeight: "600",
+  },
+  notesHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  charCounter: {
+    fontSize: 13,
+    color: "#999",
+    fontWeight: "500",
+  },
+  charCounterMax: {
+    color: "#F44336",
+    fontWeight: "600",
   },
   notesInput: {
     minHeight: 100,
     borderWidth: 1,
-    borderColor: "#DDD",
+    borderColor: "#E0E0E0",
     borderRadius: 8,
     padding: 12,
     textAlignVertical: "top",
+    fontSize: 15,
+    color: "#333",
+  },
+  shareContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  shareTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  shareSubtext: {
+    fontSize: 13,
+    color: "#999",
+    marginTop: 4,
+  },
+  shareNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#E8F5E9",
+    borderRadius: 8,
+    gap: 8,
+  },
+  shareNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#2E7D32",
   },
   submitButton: {
     backgroundColor: "#4CAF50",
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 16,
+    justifyContent: "center",
+    marginTop: 12,
     marginBottom: 32,
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
+  submitIcon: {
+    marginRight: 8,
   },
   submitButtonText: {
     color: "#FFF",
     fontWeight: "600",
     fontSize: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
-  },
-  bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-    backgroundColor: "#FFFFFF",
-  },
-  navButton: {
-    alignItems: "center",
-    padding: 8,
-  },
-  navButtonText: {
-    fontSize: 12,
-    marginTop: 4,
   },
 });
