@@ -1,5 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
+ * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -27,6 +27,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth, useUser } from "@clerk/clerk-expo"; // Import Clerk hooks
 import CurvedBackground from "../../../components/CurvedBackground";
+import { assessmentTracker } from "../../../utils/assessmentTracker";
 
 const { width } = Dimensions.get("window");
 
@@ -62,6 +63,7 @@ export default function HomeScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isAssessmentDue, setIsAssessmentDue] = useState(false);
 
   // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
@@ -79,33 +81,32 @@ export default function HomeScreen() {
    * Enhanced logout function with Clerk integration
    */
   const handleLogout = async () => {
-    console.log('HomeScreen logout initiated...');
-    
+    console.log("HomeScreen logout initiated...");
+
     if (isSigningOut) {
-      console.log('Already signing out, returning...');
+      console.log("Already signing out, returning...");
       return;
     }
-    
+
     try {
       setIsSigningOut(true);
-      
+
       // Close the side menu first
       hideSideMenu();
-      
+
       // Clear local storage
       await AsyncStorage.clear();
-      console.log('AsyncStorage cleared');
-      
+      console.log("AsyncStorage cleared");
+
       // Sign out from Clerk
       if (signOut) {
         await signOut();
-        console.log('Clerk signOut completed');
+        console.log("Clerk signOut completed");
       }
-      
+
       // Navigate to login screen
       router.replace("/(auth)/login");
-      console.log('Navigation to login completed');
-      
+      console.log("Navigation to login completed");
     } catch (error) {
       console.error("Logout error:", error);
       Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
@@ -118,22 +119,42 @@ export default function HomeScreen() {
    * Confirmation dialog for sign out
    */
   const confirmSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-          onPress: () => console.log('Sign out cancelled')
-        },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: handleLogout
-        }
-      ]
-    );
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+        onPress: () => console.log("Sign out cancelled"),
+      },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: handleLogout,
+      },
+    ]);
+  };
+
+  // Add to fetchData function
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchRecentMoods(),
+        fetchResources(),
+        checkAssessmentStatus(), // Add this
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add new function
+  const checkAssessmentStatus = async () => {
+    try {
+      const isDue = await assessmentTracker.isAssessmentDue();
+      setIsAssessmentDue(isDue);
+    } catch (error) {
+      console.error("Error checking assessment status:", error);
+    }
   };
 
   // Quick action buttons for main app features
@@ -414,18 +435,6 @@ export default function HomeScreen() {
     }
   };
 
-  /**
-   * Fetches all required data for the dashboard
-   */
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([fetchRecentMoods(), fetchResources()]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useFocusEffect(
     useCallback(() => {
       fetchData();
@@ -473,12 +482,16 @@ export default function HomeScreen() {
    */
   const getInitials = () => {
     if (user?.firstName && user?.lastName) {
-      return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+      return `${user.firstName.charAt(0)}${user.lastName.charAt(
+        0
+      )}`.toUpperCase();
     }
     if (user?.fullName) {
       const names = user.fullName.split(" ");
-      return names.length > 1 
-        ? `${names[0]?.charAt(0) ?? ""}${names[names.length - 1]?.charAt(0) ?? ""}`.toUpperCase()
+      return names.length > 1
+        ? `${names[0]?.charAt(0) ?? ""}${
+            names[names.length - 1]?.charAt(0) ?? ""
+          }`.toUpperCase()
         : (names[0]?.charAt(0) ?? "").toUpperCase();
     }
     return "U";
@@ -514,11 +527,9 @@ export default function HomeScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/profile/edit")}
-          >
+          <TouchableOpacity onPress={() => router.push("/(tabs)/profile/edit")}>
             <View style={styles.profileImageContainer}>
               {profileImage ? (
                 <Image
@@ -577,6 +588,50 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
             </View>
+
+            {/* Pending Assessment Task - Only show if due */}
+            {isAssessmentDue && (
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={styles.pendingTaskCard}
+                  onPress={() => router.push("/self-assessment")}
+                >
+                  <View style={styles.pendingTaskHeader}>
+                    <View style={styles.pendingTaskIconContainer}>
+                      <Ionicons
+                        name="clipboard-outline"
+                        size={28}
+                        color="#FF9800"
+                      />
+                    </View>
+                    <View style={styles.pendingTaskBadge}>
+                      <Text style={styles.pendingTaskBadgeText}>
+                        ACTION REQUIRED
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.pendingTaskTitle}>
+                    Complete Your Assessment
+                  </Text>
+                  <Text style={styles.pendingTaskDescription}>
+                    Please complete your mental wellbeing assessment. This helps
+                    your support worker provide better care.
+                  </Text>
+
+                  <View style={styles.pendingTaskFooter}>
+                    <Text style={styles.pendingTaskTime}>
+                      Takes 5-7 minutes
+                    </Text>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color="#FF9800"
+                    />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Quick Actions Grid */}
             <View style={styles.section}>
@@ -663,7 +718,9 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={resource.id}
                     style={styles.resourceCard}
-                    onPress={() => router.push(`../resources/understanding-anxiety`)}
+                    onPress={() =>
+                      router.push(`../resources/understanding-anxiety`)
+                    }
                   >
                     <View style={styles.resourceInfo}>
                       <Text style={styles.resourceTitle}>{resource.title}</Text>
@@ -686,7 +743,7 @@ export default function HomeScreen() {
             <View style={styles.bottomSpacing} />
           </ScrollView>
         </KeyboardAvoidingView>
-        
+
         {/* Bottom Navigation */}
         <View style={styles.bottomNav}>
           {tabs.map((tab) => (
@@ -749,11 +806,13 @@ export default function HomeScreen() {
                       size={20}
                       color={item.disabled ? "#CCCCCC" : "#757575"}
                     />
-                    <Text style={[
-                      styles.sideMenuItemText,
-                      item.disabled && styles.sideMenuItemTextDisabled,
-                      item.title === "Sign Out" && styles.signOutText,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.sideMenuItemText,
+                        item.disabled && styles.sideMenuItemTextDisabled,
+                        item.title === "Sign Out" && styles.signOutText,
+                      ]}
+                    >
                       {item.title}
                       {item.title === "Sign Out" && isSigningOut && "..."}
                     </Text>
@@ -1116,13 +1175,13 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-      marginBottom: 80, // Space for bottom navigation
-    },
+    marginBottom: 80, // Space for bottom navigation
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 30, 
+    paddingBottom: 30,
   },
   bottomSpacing: {
     height: 30, // Additional spacing at the bottom
@@ -1136,5 +1195,68 @@ const styles = StyleSheet.create({
   signOutText: {
     color: "#FF6B6B",
     fontWeight: "600",
+  },
+  pendingTaskCard: {
+    backgroundColor: "#FFF3E0",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: "#FF9800",
+    shadowColor: "#FF9800",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  pendingTaskHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  pendingTaskIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pendingTaskBadge: {
+    backgroundColor: "#FF9800",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pendingTaskBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  pendingTaskTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#E65100",
+    marginBottom: 8,
+  },
+  pendingTaskDescription: {
+    fontSize: 14,
+    color: "#5D4037",
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  pendingTaskFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  pendingTaskTime: {
+    fontSize: 13,
+    color: "#757575",
+    fontWeight: "500",
   },
 });
