@@ -16,7 +16,8 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { BlurView } from "expo-blur";
-
+import { assessmentTracker } from "../../../utils/assessmentTracker";
+import { useUser } from "@clerk/clerk-expo";
 const { width } = Dimensions.get("window");
 
 // Survey questions based on Short Warwick-Edinburgh Mental Wellbeing Scale
@@ -44,6 +45,7 @@ export default function PreSurveyScreen() {
   const [responses, setResponses] = useState<{ [key: number]: number }>({});
   const [activeTab, setActiveTab] = useState("assessment");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { user } = useUser();
 
   // Bottom navigation configuration
   const tabs = [
@@ -82,7 +84,7 @@ export default function PreSurveyScreen() {
   };
 
   // Handle survey submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isComplete()) {
       Alert.alert(
         "Incomplete Survey",
@@ -91,8 +93,28 @@ export default function PreSurveyScreen() {
       return;
     }
 
-    setShowSuccessModal(true);
+    const totalScore = calculateScore();
+
+    try {
+      // Submit to database
+      if (user?.id) {
+        await assessmentTracker.submitAssessment(
+          user.id,
+          responses,
+          totalScore
+        );
+      }
+
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error("Error submitting assessment:", error);
+      Alert.alert(
+        "Submission Error",
+        "Failed to submit assessment. Please try again."
+      );
+    }
   };
+
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
