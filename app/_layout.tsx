@@ -2,9 +2,10 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "../utils/cache";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -22,6 +23,8 @@ function UserSyncHandler() {
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
       syncUserWithDatabase(user);
+      // Mark onboarding as completed when user is created
+      AsyncStorage.setItem("hasCompletedOnboarding", "true");
     }
   }, [isLoaded, isSignedIn, user]);
 
@@ -32,15 +35,26 @@ function RootLayoutNav() {
   const { isLoaded, isSignedIn } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   
   console.log("🔐 RootLayoutNav - Auth State:", { 
     isLoaded, 
     isSignedIn,
-    segments
+    segments,
+    hasCompletedOnboarding
   });
 
+  // Check onboarding status on mount
   useEffect(() => {
-    if (!isLoaded) return;
+    const checkOnboarding = async () => {
+      const completed = await AsyncStorage.getItem("hasCompletedOnboarding");
+      setHasCompletedOnboarding(completed === "true");
+    };
+    checkOnboarding();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || hasCompletedOnboarding === null) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const inAppGroup = segments[0] === "(app)";
@@ -49,12 +63,15 @@ function RootLayoutNav() {
       // User is signed in but not in the app group, redirect to home
       router.replace("/(app)/home");
     } else if (!isSignedIn && !inAuthGroup) {
-      // User is signed out but not in auth group, redirect to onboarding or index
-      router.replace("/onboarding");
+      // User is signed out but not in auth group
+      if (hasCompletedOnboarding) {
+        // User has an account, go to sign-in
+        router.replace("/(auth)/sign-in");
+      }
     }
-  }, [isLoaded, isSignedIn, segments]);
+  }, [isLoaded, isSignedIn, segments, hasCompletedOnboarding]);
 
-  if (!isLoaded) {
+  if (!isLoaded || hasCompletedOnboarding === null) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#7BB8A8" />
