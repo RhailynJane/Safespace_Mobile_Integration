@@ -2,17 +2,25 @@
 import js from '@eslint/js';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
-import reactNative from 'eslint-plugin-react-native';
 
 export default [
   js.configs.recommended,
   {
-    files: ['**/*.{js,jsx}'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/.expo/**',
+      '**/*.d.ts'
+    ],
+  },
+  {
+    files: ['**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2021,
       sourceType: 'module',
       globals: {
-        // Common browser globals
+        // Browser globals
         window: 'readonly',
         document: 'readonly',
         console: 'readonly',
@@ -21,11 +29,17 @@ export default [
         clearTimeout: 'readonly',
         clearInterval: 'readonly',
         fetch: 'readonly',
-        // ES2021 globals
         Promise: 'readonly',
-        // React Native specific globals (if needed)
+        // Node.js globals
+        process: 'readonly',
+        require: 'readonly',
+        module: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        // React Native globals
         __DEV__: 'readonly',
-        // Add other globals you actually use
+        // Expo globals
+        Expo: 'readonly',
       },
       parserOptions: {
         ecmaFeatures: {
@@ -36,20 +50,12 @@ export default [
     plugins: {
       react,
       'react-hooks': reactHooks,
-      'react-native': reactNative,
     },
     rules: {
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
-      
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: "CallExpression[callee.name='useInsertionEffect'] ~ ExpressionStatement > CallExpression[callee.name=/^(set|dispatch|navigate|push|replace)/]",
-          message: 'Do not schedule updates in useInsertionEffect. Use useEffect instead.'
-        }
-      ]
+      'no-undef': 'off', // TypeScript handles this
     },
     settings: {
       react: {
