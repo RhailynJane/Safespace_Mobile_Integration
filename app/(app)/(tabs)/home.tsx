@@ -113,21 +113,25 @@ export default function HomeScreen() {
     }
   };
 
-  /**
-   * Fetch all data needed for the screen
-   */
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        fetchRecentMoods(),
-        fetchResources(),
-        checkAssessmentStatus(),
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Move fetchData inside useFocusEffect to avoid dependency issues
+  useFocusEffect(
+    useCallback(() => {
+      const fetchData = async () => {
+        setLoading(true);
+        try {
+          await Promise.all([
+            fetchRecentMoods(),
+            fetchResources(),
+            checkAssessmentStatus(),
+          ]);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchData();
+    }, [user?.id])
+  );
 
   /**
    * Returns emoji representation for mood type
@@ -249,12 +253,6 @@ export default function HomeScreen() {
       setResources([]);
     }
   };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchData();
-    }, [user?.id])
-  );
 
   /**
    * Formats date into relative or short format
