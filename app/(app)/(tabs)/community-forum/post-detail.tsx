@@ -129,9 +129,6 @@ export default function PostDetailScreen() {
                   {post.user.posts} posts • {post.timestamp}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.moreButton}>
-                <Ionicons name="ellipsis-vertical" size={20} color="#999" />
-              </TouchableOpacity>
             </View>
 
             {/* Category Badge */}

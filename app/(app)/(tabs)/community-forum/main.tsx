@@ -349,9 +349,6 @@ export default function CommunityMainScreen() {
                     />
                     <Text style={styles.postTitle}>{post.title}</Text>
                   </View>
-                  <TouchableOpacity style={styles.moreButton}>
-                    <Ionicons name="ellipsis-vertical" size={18} color="#999" />
-                  </TouchableOpacity>
                 </View>
 
                 <Text style={styles.postContent} numberOfLines={4}>
