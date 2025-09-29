@@ -11,11 +11,13 @@ import {
   Modal,
   TextInput,
   Alert,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
 import { useFocusEffect } from "@react-navigation/native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
@@ -48,9 +50,13 @@ export default function MoodHistoryScreen() {
   // Filter states
   const [selectedMoodType, setSelectedMoodType] = useState<string>("");
   const [selectedFactors, setSelectedFactors] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Date picker states
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   // Pagination
   const [offset, setOffset] = useState(0);
@@ -71,8 +77,13 @@ export default function MoodHistoryScreen() {
       };
 
       if (selectedMoodType) filters.moodType = selectedMoodType;
-      if (startDate) filters.startDate = startDate;
-      if (endDate) filters.endDate = endDate;
+      if (startDate) filters.startDate = startDate.toISOString();
+      if (endDate) {
+        // Set end date to end of day
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        filters.endDate = endOfDay.toISOString();
+      }
       if (selectedFactors.length > 0) {
         filters.factors = selectedFactors.join(",");
       }
@@ -90,11 +101,14 @@ export default function MoodHistoryScreen() {
       setHasMore(data.moods.length === LIMIT);
     } catch (error) {
       console.error("Error loading mood history:", error);
-      Alert.alert("Error", "Failed to load mood history");
+      if (reset && moodHistory.length === 0) {
+        // Only show alert on initial load if there's an error
+        Alert.alert("Info", "Unable to load mood history. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  }, [user?.id, selectedMoodType, selectedFactors, startDate, endDate, offset]);
+  }, [user?.id, selectedMoodType, selectedFactors, startDate, endDate, offset, moodHistory.length]);
 
   // Load available factors
   const loadFactors = useCallback(async () => {
@@ -111,14 +125,17 @@ export default function MoodHistoryScreen() {
   // Initial load
   useFocusEffect(
     useCallback(() => {
-      loadMoodHistory(true);
-      loadFactors();
-    }, [loadMoodHistory, loadFactors])
+      if (user?.id) {
+        loadMoodHistory(true);
+        loadFactors();
+      }
+    }, [user?.id, loadMoodHistory, loadFactors])
   );
 
   // Apply filters
   const applyFilters = () => {
     setFilterModalVisible(false);
+    setOffset(0);
     loadMoodHistory(true);
   };
 
@@ -126,10 +143,10 @@ export default function MoodHistoryScreen() {
   const clearFilters = () => {
     setSelectedMoodType("");
     setSelectedFactors([]);
-    setStartDate("");
-    setEndDate("");
+    setStartDate(null);
+    setEndDate(null);
     setSearchQuery("");
-    setFilterModalVisible(false);
+    setOffset(0);
     loadMoodHistory(true);
   };
 
@@ -140,6 +157,32 @@ export default function MoodHistoryScreen() {
         ? prev.filter((f) => f !== factor)
         : [...prev, factor]
     );
+  };
+
+  // Handle date change for start date
+  const onStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setStartDate(selectedDate);
+    }
+  };
+
+  // Handle date change for end date
+  const onEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setEndDate(selectedDate);
+    }
+  };
+
+  // Format date for display
+  const formatDate = (date: Date | null) => {
+    if (!date) return "Select date";
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   // Filter by search query (client-side for notes)
@@ -235,9 +278,14 @@ export default function MoodHistoryScreen() {
 
   if (loading && offset === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <AppHeader title="Mood History" showBack={true} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
     );
   }
 
@@ -271,6 +319,52 @@ export default function MoodHistoryScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Active filters display */}
+        {activeFiltersCount > 0 && (
+          <View style={styles.activeFiltersContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {selectedMoodType && (
+                <View style={styles.activeFilterChip}>
+                  <Text style={styles.activeFilterText}>
+                    {moodTypes.find(m => m.value === selectedMoodType)?.label}
+                  </Text>
+                  <TouchableOpacity onPress={() => setSelectedMoodType("")}>
+                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              {startDate && (
+                <View style={styles.activeFilterChip}>
+                  <Text style={styles.activeFilterText}>
+                    From: {formatDate(startDate)}
+                  </Text>
+                  <TouchableOpacity onPress={() => setStartDate(null)}>
+                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              {endDate && (
+                <View style={styles.activeFilterChip}>
+                  <Text style={styles.activeFilterText}>
+                    To: {formatDate(endDate)}
+                  </Text>
+                  <TouchableOpacity onPress={() => setEndDate(null)}>
+                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              {selectedFactors.map((factor) => (
+                <View key={factor} style={styles.activeFilterChip}>
+                  <Text style={styles.activeFilterText}>{factor}</Text>
+                  <TouchableOpacity onPress={() => toggleFactor(factor)}>
+                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Mood History List */}
         <FlatList
           data={filteredHistory}
@@ -297,7 +391,7 @@ export default function MoodHistoryScreen() {
           }
           ListFooterComponent={
             loading && offset > 0 ? (
-              <ActivityIndicator size="small" color="#4CAF50" />
+              <ActivityIndicator size="small" color="#4CAF50" style={{ marginVertical: 20 }} />
             ) : null
           }
         />
@@ -372,11 +466,68 @@ export default function MoodHistoryScreen() {
                   </>
                 )}
 
-                {/* Date Range (Placeholder - you can add date pickers) */}
+                {/* Date Range Filter */}
                 <Text style={styles.filterLabel}>Date Range</Text>
-                <Text style={styles.dateNote}>
-                  Advanced date filtering coming soon
-                </Text>
+                
+                {/* Start Date */}
+                <View style={styles.dateInputContainer}>
+                  <Text style={styles.dateLabel}>From:</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowStartDatePicker(true)}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {formatDate(startDate)}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                  </TouchableOpacity>
+                  {startDate && (
+                    <TouchableOpacity onPress={() => setStartDate(null)}>
+                      <Ionicons name="close-circle" size={20} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* End Date */}
+                <View style={styles.dateInputContainer}>
+                  <Text style={styles.dateLabel}>To:</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowEndDatePicker(true)}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {formatDate(endDate)}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                  </TouchableOpacity>
+                  {endDate && (
+                    <TouchableOpacity onPress={() => setEndDate(null)}>
+                      <Ionicons name="close-circle" size={20} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Date Pickers */}
+                {showStartDatePicker && (
+                  <DateTimePicker
+                    value={startDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onStartDateChange}
+                    maximumDate={endDate || new Date()}
+                  />
+                )}
+
+                {showEndDatePicker && (
+                  <DateTimePicker
+                    value={endDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onEndDateChange}
+                    minimumDate={startDate || undefined}
+                    maximumDate={new Date()}
+                  />
+                )}
               </ScrollView>
 
               <View style={styles.modalActions}>
@@ -461,6 +612,25 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 12,
     fontWeight: "600",
+  },
+  activeFiltersContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  activeFilterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F5E9",
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    gap: 6,
+  },
+  activeFilterText: {
+    color: "#2E7D32",
+    fontSize: 13,
+    fontWeight: "500",
   },
   listContent: {
     padding: 16,
@@ -643,11 +813,31 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
     fontWeight: "500",
   },
-  dateNote: {
+  dateInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  dateLabel: {
     fontSize: 14,
-    color: "#999",
-    fontStyle: "italic",
-    marginBottom: 16,
+    color: "#666",
+    width: 50,
+  },
+  dateButton: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: "#333",
   },
   modalActions: {
     flexDirection: "row",
