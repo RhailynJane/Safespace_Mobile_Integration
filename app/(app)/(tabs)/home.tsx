@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -47,6 +48,8 @@ export default function HomeScreen() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const { user } = useUser();
 
@@ -96,6 +99,15 @@ export default function HomeScreen() {
       onPress: () => router.push("/crisis-support"),
     },
   ];
+
+  /**
+   * Generates initials from user's name for profile placeholder
+   */
+  const getInitials = () => {
+    const firstName = user?.firstName || "";
+    const lastName = user?.lastName || "";
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
+  };
 
   /**
    * Check if user needs to complete assessment
@@ -167,6 +179,18 @@ export default function HomeScreen() {
       default:
         return "Unknown";
     }
+  };
+
+  /**
+   * Shows the side menu with animation
+   */
+  const showSideMenu = () => {
+    setSideMenuVisible(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
   };
 
   /**
@@ -288,8 +312,24 @@ export default function HomeScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container} edges={["top"]}>
-        {/* Use AppHeader component - handles all navigation and menu */}
-        <AppHeader showBack={false} showMenu={true} showNotifications={true} />
+        {/* Header with profile and navigation icons */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.push("/(app)/(tabs)/profile/edit")}
+          >
+            <View style={styles.profileImageContainer}>
+              <Text style={styles.initialsText}>{getInitials()}</Text>
+            </View>
+          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity onPress={() => router.push("/notifications")}>
+              <Ionicons name="notifications-outline" size={24} color="#666" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton} onPress={showSideMenu}>
+              <Ionicons name="grid" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <KeyboardAvoidingView
           style={styles.contentContainer}
@@ -824,5 +864,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#757575",
     fontWeight: "500",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 15,
+  },
+  profileImageContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#E8F5E9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  initialsText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#4CAF50",
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  menuButton: {
+    padding: 4,
   },
 });
