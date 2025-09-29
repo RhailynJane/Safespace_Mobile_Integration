@@ -113,7 +113,7 @@ export default function MoodHistoryScreen() {
     useCallback(() => {
       loadMoodHistory(true);
       loadFactors();
-    }, [user?.id])
+    }, [loadMoodHistory, loadFactors])
   );
 
   // Apply filters
