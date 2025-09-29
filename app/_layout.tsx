@@ -1,11 +1,11 @@
-// app/_layout.tsx
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "../utils/cache";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -23,6 +23,8 @@ function UserSyncHandler() {
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
       syncUserWithDatabase(user);
+      // Mark onboarding as completed when user is created
+      AsyncStorage.setItem("hasCompletedOnboarding", "true");
     }
   }, [isLoaded, isSignedIn, user]);
 
@@ -31,13 +33,45 @@ function UserSyncHandler() {
 
 function RootLayoutNav() {
   const { isLoaded, isSignedIn } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   
   console.log("🔐 RootLayoutNav - Auth State:", { 
     isLoaded, 
-    isSignedIn
+    isSignedIn,
+    segments,
+    hasCompletedOnboarding
   });
 
-  if (!isLoaded) {
+  // Check onboarding status on mount
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      const completed = await AsyncStorage.getItem("hasCompletedOnboarding");
+      setHasCompletedOnboarding(completed === "true");
+    };
+    checkOnboarding();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || hasCompletedOnboarding === null) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+    const inAppGroup = segments[0] === "(app)";
+
+    if (isSignedIn && !inAppGroup) {
+      // User is signed in but not in the app group, redirect to home
+      router.replace("/(app)/home");
+    } else if (!isSignedIn && !inAuthGroup) {
+      // User is signed out but not in auth group
+      if (hasCompletedOnboarding) {
+        // User has an account, go to sign-in
+        router.replace("/(auth)/sign-in");
+      }
+    }
+  }, [isLoaded, isSignedIn, segments, hasCompletedOnboarding]);
+
+  if (!isLoaded || hasCompletedOnboarding === null) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#7BB8A8" />
@@ -47,21 +81,12 @@ function RootLayoutNav() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {!isSignedIn ? (
-        // Public routes - user is NOT signed in
-        <>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="loading" />
-          <Stack.Screen name="quote" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(auth)" />
-        </>
-      ) : (
-        // Protected routes - user IS signed in
-        <>
-          <Stack.Screen name="(app)" />
-        </>
-      )}
+      <Stack.Screen name="index" />
+      <Stack.Screen name="loading" />
+      <Stack.Screen name="quote" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(app)" />
     </Stack>
   );
 }
@@ -69,11 +94,6 @@ function RootLayoutNav() {
 export default function RootLayout() {
   useEffect(() => {
     // Suppress the useInsertionEffect warning from Clerk/Emotion libraries
-    LogBox.ignoreLogs([
-      'useInsertionEffect must not schedule updates',
-    ]);
-    
-    // Optional: Suppress other common third-party warnings
     LogBox.ignoreLogs([
       'useInsertionEffect must not schedule updates',
       'Non-serializable values were found in the navigation state',

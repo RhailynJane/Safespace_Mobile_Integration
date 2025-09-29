@@ -1,8 +1,3 @@
-/**
- * LLM Prompt: Add concise inline comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-
 import { useState } from "react";
 import {
   View,
@@ -17,23 +12,19 @@ import { Ionicons } from "@expo/vector-icons";
 // Local interface for signup data
 interface SignupData {
   password: string;
+  confirmPassword: string;
 }
 
 // Props interface for the PasswordStep component
 interface PasswordStepProps {
-  data: SignupData; // Current form data containing all signup fields
-  onUpdate: (data: Partial<SignupData>) => void; // Callback to update password field
-  onNext: () => void; // Callback to proceed to next step (account creation)
-  onBack: () => void; // Callback to go back to previous step
-  stepNumber: number; // Current step number for progress indication
-  loading?: boolean; // Optional loading state during account creation
+  data: SignupData;
+  onUpdate: (data: Partial<SignupData>) => void;
+  onNext: () => void;
+  onBack: () => void;
+  stepNumber: number;
+  loading?: boolean;
 }
 
-/**
- * PasswordStep - Second step of the signup process
- * Handles password creation with real-time validation and visual feedback
- * Shows password requirements and validates them as user types
- */
 export default function PasswordStep({
   data,
   onUpdate,
@@ -42,49 +33,55 @@ export default function PasswordStep({
   stepNumber,
   loading = false,
 }: PasswordStepProps) {
-  // State to toggle password visibility (show/hide password text)
+  // State to toggle password visibility
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  /**
-   * Validates password against all security requirements
-   * @returns boolean indicating if password meets all requirements
-   */
+  // Validates password against all security requirements
   const validatePassword = () => {
     const requirements = [
       { test: data.password.length >= 8, message: "8 characters minimum" },
-      { test: /\d/.test(data.password), message: "a number" }, // Must contain at least one digit
+      { test: /\d/.test(data.password), message: "a number" },
       {
-        test: /[!@#$%^&*(),.?":{}|<>]/.test(data.password), // Must contain special character
+        test: /[!@#$%^&*(),.?":{}|<>]/.test(data.password),
         message: "a symbol",
       },
     ];
 
-    // Check if any requirements are not met
     const failedRequirements = requirements.filter((req) => !req.test);
     return failedRequirements.length === 0;
   };
 
-  /**
-   * Handles form submission
-   * Validates password and either proceeds or shows error message
-   */
+  // Handles form submission
   const handleSubmit = () => {
-    if (validatePassword()) {
-      onNext(); // Proceed to account creation
-    } else {
-      // Show alert if password doesn't meet requirements
+    if (!validatePassword()) {
       Alert.alert(
         "Password Requirements",
         "Please ensure your password meets all requirements"
       );
+      return;
     }
+
+    if (!data.confirmPassword) {
+      Alert.alert(
+        "Confirm Password",
+        "Please confirm your password"
+      );
+      return;
+    }
+
+    if (data.password !== data.confirmPassword) {
+      Alert.alert(
+        "Passwords Don't Match",
+        "Please make sure both passwords are identical"
+      );
+      return;
+    }
+
+    onNext();
   };
 
-  /**
-   * Returns password requirements with their current validation status
-   * Used for real-time visual feedback as user types
-   * @returns array of requirement objects with test results and messages
-   */
+  // Returns password requirements with their current validation status
   const getPasswordRequirements = () => {
     return [
       { test: data.password.length >= 8, message: "8 characters minimum" },
@@ -96,18 +93,20 @@ export default function PasswordStep({
     ];
   };
 
+  // Check if passwords match (only show when both fields have values)
+  const passwordsMatch = data.password && data.confirmPassword && data.password === data.confirmPassword;
+  const passwordsDontMatch = data.password && data.confirmPassword && data.password !== data.confirmPassword;
+
   return (
     <View style={styles.container}>
-      {/* Step header */}
       <Text style={styles.title}>Account Setup</Text>
       <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
 
       <View style={styles.formContainer}>
-        {/* Password Input Field with visibility toggle */}
+        {/* Password Input Field */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Password</Text>
           <View style={styles.inputWrapper}>
-            {/* Lock icon to indicate password field */}
             <Ionicons
               name="lock-closed-outline"
               size={20}
@@ -119,9 +118,8 @@ export default function PasswordStep({
               placeholder="Enter password"
               value={data.password}
               onChangeText={(text) => onUpdate({ password: text })}
-              secureTextEntry={!showPassword} // Hide/show password based on state
+              secureTextEntry={!showPassword}
             />
-            {/* Eye icon to toggle password visibility */}
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeIcon}
@@ -135,18 +133,16 @@ export default function PasswordStep({
           </View>
         </View>
 
-        {/* Password Requirements with real-time validation feedback */}
+        {/* Password Requirements */}
         <View style={styles.requirementsContainer}>
           {getPasswordRequirements().map((requirement, index) => (
             <View key={index} style={styles.requirementRow}>
-              {/* Colored dot indicating requirement status */}
               <View
                 style={[
                   styles.requirementDot,
                   { backgroundColor: requirement.test ? "#4CAF50" : "#E0E0E0" },
                 ]}
               />
-              {/* Requirement text with dynamic color based on validation */}
               <Text
                 style={[
                   styles.requirementText,
@@ -159,11 +155,59 @@ export default function PasswordStep({
           ))}
         </View>
 
-        {/* Create Account Button with loading state */}
+        {/* Confirm Password Input Field */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Confirm Password</Text>
+          <View style={[
+            styles.inputWrapper,
+            passwordsDontMatch && styles.inputWrapperError,
+            passwordsMatch && styles.inputWrapperSuccess
+          ]}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={20}
+              color="#999"
+              style={styles.inputIcon}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Re-enter password"
+              value={data.confirmPassword}
+              onChangeText={(text) => onUpdate({ confirmPassword: text })}
+              secureTextEntry={!showConfirmPassword}
+            />
+            <TouchableOpacity
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={styles.eyeIcon}
+            >
+              <Ionicons
+                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color="#999"
+              />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Password Match Indicator */}
+          {passwordsMatch && (
+            <View style={styles.matchIndicator}>
+              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+              <Text style={styles.matchText}>Passwords match</Text>
+            </View>
+          )}
+          {passwordsDontMatch && (
+            <View style={styles.matchIndicator}>
+              <Ionicons name="close-circle" size={16} color="#E43232" />
+              <Text style={styles.errorMatchText}>Passwords don't match</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Create Account Button */}
         <TouchableOpacity
           style={[styles.continueButton, loading && styles.disabledButton]}
           onPress={handleSubmit}
-          disabled={loading} // Disable button during account creation
+          disabled={loading}
         >
           <Text style={styles.continueButtonText}>
             {loading ? "Creating Account..." : "Create an Account"}
@@ -175,13 +219,10 @@ export default function PasswordStep({
 }
 
 const styles = StyleSheet.create({
-  // Main container - centers content vertically and horizontally
   container: {
     flex: 1,
     alignItems: "center",
   },
-
-  // Main step title styling
   title: {
     fontSize: 24,
     fontWeight: "600",
@@ -189,109 +230,104 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
-
-  // Step progress indicator
   subtitle: {
     fontSize: 16,
-    color: "#666", // Medium gray for secondary text
+    color: "#666",
     textAlign: "center",
-    marginBottom: 32, // Large margin before form content
+    marginBottom: 32,
   },
-
-  // Container for all form elements
   formContainer: {
     width: "100%",
   },
-
-  // Container for password input with label
   inputContainer: {
     marginBottom: 20,
   },
-
-  // Password input label styling
   inputLabel: {
     fontSize: 14,
     fontWeight: "500",
     color: "#333",
     marginBottom: 8,
   },
-
-  // Wrapper for password input with icons and background
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 12, // Rounded corners for modern look
+    borderRadius: 12,
     paddingHorizontal: 16,
-    height: 50, // Consistent height with other input fields
-    shadowColor: "#000", // Subtle shadow for depth
+    height: 50,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1, // Android shadow
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
-
-  // Lock icon positioning within input wrapper
+  inputWrapperError: {
+    borderColor: "#E43232",
+  },
+  inputWrapperSuccess: {
+    borderColor: "#4CAF50",
+  },
   inputIcon: {
-    marginRight: 12, // Space between icon and text input
+    marginRight: 12,
   },
-
-  // Password text input field styling
   input: {
-    flex: 1, // Take remaining space after icons
+    flex: 1,
     fontSize: 12,
     color: "#757575",
   },
-
-  // Eye icon for password visibility toggle
   eyeIcon: {
-    padding: 4, // Larger touch target for better usability
+    padding: 4,
   },
-
-  // Primary create account button styling
   continueButton: {
-    backgroundColor: "#7BB8A8", // Teal brand color
-    borderRadius: 25, // Highly rounded corners
-    paddingVertical: 16, // Comfortable touch target
+    backgroundColor: "#7BB8A8",
+    borderRadius: 25,
+    paddingVertical: 16,
     alignItems: "center",
-    marginTop: 20, // Space above button
+    marginTop: 20,
   },
-
-  // Create account button text styling
   continueButtonText: {
-    color: "#FFFFFF", // White text on teal background
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: "600", // Semi-bold for emphasis
+    fontWeight: "600",
   },
-
-  // Container for password requirements list
   requirementsContainer: {
-    marginTop: 16, // Space below password input
-    marginBottom: 20, // Space before button
+    marginTop: 0,
+    marginBottom: 20,
   },
-
-  // Individual password requirement row
   requirementRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12, // Consistent spacing between requirements
+    marginBottom: 12,
   },
-
-  // Colored dot showing requirement validation status
   requirementDot: {
     width: 8,
     height: 8,
-    borderRadius: 4, // Perfect circle
-    marginRight: 12, // Space between dot and text
+    borderRadius: 4,
+    marginRight: 12,
   },
-
-  // Password requirement text styling
   requirementText: {
     fontSize: 14,
   },
-
-  // Styling for disabled button state during loading
   disabledButton: {
-    opacity: 0.6, // Reduced opacity to indicate disabled state
+    opacity: 0.6,
+  },
+  matchIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  matchText: {
+    fontSize: 12,
+    color: "#4CAF50",
+    marginLeft: 4,
+    fontWeight: "500",
+  },
+  errorMatchText: {
+    fontSize: 12,
+    color: "#E43232",
+    marginLeft: 4,
+    fontWeight: "500",
   },
 });
