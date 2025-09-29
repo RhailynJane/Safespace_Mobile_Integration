@@ -1,5 +1,4 @@
-// app/_layout.tsx
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "../utils/cache";
@@ -31,11 +30,29 @@ function UserSyncHandler() {
 
 function RootLayoutNav() {
   const { isLoaded, isSignedIn } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
   
   console.log("🔐 RootLayoutNav - Auth State:", { 
     isLoaded, 
-    isSignedIn
+    isSignedIn,
+    segments
   });
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+    const inAppGroup = segments[0] === "(app)";
+
+    if (isSignedIn && !inAppGroup) {
+      // User is signed in but not in the app group, redirect to home
+      router.replace("/(app)/home");
+    } else if (!isSignedIn && !inAuthGroup) {
+      // User is signed out but not in auth group, redirect to onboarding or index
+      router.replace("/onboarding");
+    }
+  }, [isLoaded, isSignedIn, segments]);
 
   if (!isLoaded) {
     return (
@@ -47,21 +64,12 @@ function RootLayoutNav() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {!isSignedIn ? (
-        // Public routes - user is NOT signed in
-        <>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="loading" />
-          <Stack.Screen name="quote" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(auth)" />
-        </>
-      ) : (
-        // Protected routes - user IS signed in
-        <>
-          <Stack.Screen name="(app)" />
-        </>
-      )}
+      <Stack.Screen name="index" />
+      <Stack.Screen name="loading" />
+      <Stack.Screen name="quote" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(app)" />
     </Stack>
   );
 }
@@ -69,11 +77,6 @@ function RootLayoutNav() {
 export default function RootLayout() {
   useEffect(() => {
     // Suppress the useInsertionEffect warning from Clerk/Emotion libraries
-    LogBox.ignoreLogs([
-      'useInsertionEffect must not schedule updates',
-    ]);
-    
-    // Optional: Suppress other common third-party warnings
     LogBox.ignoreLogs([
       'useInsertionEffect must not schedule updates',
       'Non-serializable values were found in the navigation state',
