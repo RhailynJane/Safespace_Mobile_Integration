@@ -1,6 +1,26 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 
-const API_URL = 'http://localhost:3001/api';
+// Determine the correct API URL based on the platform
+const getApiUrl = () => {
+  if (__DEV__) {
+    // Development mode
+    if (Platform.OS === 'android') {
+      // Android emulator uses 10.0.2.2 to access host machine's localhost
+      return 'http://10.0.2.2:3001/api';
+    } else if (Platform.OS === 'ios') {
+      // iOS simulator can use localhost
+      return 'http://localhost:3001/api';
+    } else {
+      // Web or other platforms
+      return 'http://localhost:3001/api';
+    }
+  }
+  // Production mode - replace with your production API URL
+  return 'https://your-production-api.com/api';
+};
+
+const API_URL = getApiUrl();
 
 export interface MoodEntry {
   id: string;
@@ -30,52 +50,112 @@ export interface MoodFilters {
   offset?: number;
 }
 
+// Configure axios defaults
+axios.defaults.timeout = 10000; // 10 second timeout
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+
 export const moodApi = {
   // Create a new mood entry
   createMood: async (data: CreateMoodData) => {
-    const response = await axios.post(`${API_URL}/moods`, data);
-    return response.data;
+    try {
+      const response = await axios.post(`${API_URL}/moods`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Create mood error:', error.message);
+      if (error.response) {
+        throw new Error(error.response.data.error || 'Failed to create mood');
+      }
+      throw new Error('Network error - cannot reach server');
+    }
   },
 
   // Get recent moods
   getRecentMoods: async (clerkUserId: string, limit: number = 10) => {
-    const response = await axios.get(`${API_URL}/moods/recent/${clerkUserId}`, {
-      params: { limit }
-    });
-    return response.data;
+    try {
+      const response = await axios.get(`${API_URL}/moods/recent/${clerkUserId}`, {
+        params: { limit }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Get recent moods error:', error.message);
+      if (error.response) {
+        throw new Error(error.response.data.error || 'Failed to fetch recent moods');
+      }
+      throw new Error('Network error - cannot reach server');
+    }
   },
 
   // Get mood history with filters
   getMoodHistory: async (clerkUserId: string, filters?: MoodFilters) => {
-    const response = await axios.get(`${API_URL}/moods/history/${clerkUserId}`, {
-      params: filters
-    });
-    return response.data;
+    try {
+      const response = await axios.get(`${API_URL}/moods/history/${clerkUserId}`, {
+        params: filters
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Get mood history error:', error.message);
+      if (error.response) {
+        throw new Error(error.response.data.error || 'Failed to fetch mood history');
+      }
+      throw new Error('Network error - cannot reach server');
+    }
   },
 
   // Get mood statistics
   getMoodStats: async (clerkUserId: string, days: number = 30) => {
-    const response = await axios.get(`${API_URL}/moods/stats/${clerkUserId}`, {
-      params: { days }
-    });
-    return response.data;
+    try {
+      const response = await axios.get(`${API_URL}/moods/stats/${clerkUserId}`, {
+        params: { days }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Get mood stats error:', error.message);
+      if (error.response) {
+        throw new Error(error.response.data.error || 'Failed to fetch mood statistics');
+      }
+      throw new Error('Network error - cannot reach server');
+    }
   },
 
   // Get all factors
   getFactors: async (clerkUserId: string) => {
-    const response = await axios.get(`${API_URL}/moods/factors/${clerkUserId}`);
-    return response.data;
+    try {
+      const response = await axios.get(`${API_URL}/moods/factors/${clerkUserId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Get factors error:', error.message);
+      if (error.response) {
+        throw new Error(error.response.data.error || 'Failed to fetch factors');
+      }
+      throw new Error('Network error - cannot reach server');
+    }
   },
 
   // Update mood entry
   updateMood: async (moodId: string, data: Partial<CreateMoodData>) => {
-    const response = await axios.put(`${API_URL}/moods/${moodId}`, data);
-    return response.data;
+    try {
+      const response = await axios.put(`${API_URL}/moods/${moodId}`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Update mood error:', error.message);
+      if (error.response) {
+        throw new Error(error.response.data.error || 'Failed to update mood');
+      }
+      throw new Error('Network error - cannot reach server');
+    }
   },
 
   // Delete mood entry
   deleteMood: async (moodId: string) => {
-    const response = await axios.delete(`${API_URL}/moods/${moodId}`);
-    return response.data;
+    try {
+      const response = await axios.delete(`${API_URL}/moods/${moodId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Delete mood error:', error.message);
+      if (error.response) {
+        throw new Error(error.response.data.error || 'Failed to delete mood');
+      }
+      throw new Error('Network error - cannot reach server');
+    }
   },
 };
