@@ -10,11 +10,16 @@ CREATE TABLE mood_entries (
     mood_type VARCHAR(20) NOT NULL,
     intensity INTEGER NOT NULL CHECK (intensity >= 1 AND intensity <= 5),
     notes TEXT,
+    share_with_support_worker BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT chk_mood_type CHECK (mood_type IN ('very-happy', 'happy', 'neutral', 'sad', 'very-sad'))
 );
+
+-- Add comment to document the share column
+COMMENT ON COLUMN mood_entries.share_with_support_worker IS 
+'Indicates if the user has chosen to share this mood entry with their assigned support worker';
 
 -- Mood factors table (what influenced the mood)
 CREATE TABLE mood_factors (
@@ -29,6 +34,8 @@ CREATE INDEX idx_mood_entries_user_id ON mood_entries(user_id);
 CREATE INDEX idx_mood_entries_clerk_user_id ON mood_entries(clerk_user_id);
 CREATE INDEX idx_mood_entries_created_at ON mood_entries(created_at);
 CREATE INDEX idx_mood_entries_mood_type ON mood_entries(mood_type);
+CREATE INDEX idx_mood_entries_shared ON mood_entries(share_with_support_worker) 
+    WHERE share_with_support_worker = TRUE;
 CREATE INDEX idx_mood_factors_mood_entry_id ON mood_factors(mood_entry_id);
 CREATE INDEX idx_mood_factors_factor ON mood_factors(factor);
 
