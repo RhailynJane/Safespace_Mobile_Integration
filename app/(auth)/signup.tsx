@@ -33,6 +33,7 @@ export interface SignupData {
   age: string;
   phoneNumber: string;
   password: string;
+  confirmPassword: string;
   verificationCode: string;
 }
 
@@ -51,6 +52,7 @@ export default function SignupScreen() {
     age: "",
     phoneNumber: "",
     password: "",
+    confirmPassword: "",
     verificationCode: "",
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -93,6 +95,36 @@ export default function SignupScreen() {
       return;
     }
 
+    // Validate age
+    if (!signupData.age) {
+      setErrorMessage("Age is required");
+      return;
+    }
+
+    const age = parseInt(signupData.age);
+    if (isNaN(age) || age < 1 || age > 120) {
+      setErrorMessage("Please enter a valid age");
+      return;
+    }
+
+    // Check if user is 18 or older
+    if (age < 18) {
+      Alert.alert(
+        "Age Requirement",
+        "You must be 18 years or older to use SafeSpace. If you need support, please contact a trusted adult or call a crisis helpline.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              // Reset age field
+              updateSignupData({ age: "" });
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     setCurrentStep("password");
   };
 
@@ -112,6 +144,17 @@ export default function SignupScreen() {
     }
     if (signupData.password.length < 8) {
       setErrorMessage("Password must be at least 8 characters long");
+      return;
+    }
+
+    // Validate confirm password
+    if (!signupData.confirmPassword) {
+      setErrorMessage("Please confirm your password");
+      return;
+    }
+
+    if (signupData.password !== signupData.confirmPassword) {
+      setErrorMessage("Passwords do not match");
       return;
     }
 
@@ -170,94 +213,83 @@ export default function SignupScreen() {
   };
 
   // Handle email verification
-  // Update the handleVerification function in your signup component
-const handleVerification = async () => {
-  if (!isLoaded || !signUp) {
-    setErrorMessage("Authentication service not ready");
-    return;
-  }
+  const handleVerification = async () => {
+    if (!isLoaded || !signUp) {
+      setErrorMessage("Authentication service not ready");
+      return;
+    }
 
-  setErrorMessage(null);
+    setErrorMessage(null);
 
-  if (
-    !signupData.verificationCode ||
-    signupData.verificationCode.length !== 6
-  ) {
-    setErrorMessage("Please enter the 6-digit verification code");
-    return;
-  }
+    if (
+      !signupData.verificationCode ||
+      signupData.verificationCode.length !== 6
+    ) {
+      setErrorMessage("Please enter the 6-digit verification code");
+      return;
+    }
 
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    // Attempt email verification with Clerk
-    const signUpAttempt = await signUp.attemptEmailAddressVerification({
-      code: signupData.verificationCode,
-    });
+    try {
+      // Attempt email verification with Clerk
+      const signUpAttempt = await signUp.attemptEmailAddressVerification({
+        code: signupData.verificationCode,
+      });
 
-    if (signUpAttempt.status === "complete") {
-      // User successfully verified - set active session
-      await setActive({ session: signUpAttempt.createdSessionId });
+      if (signUpAttempt.status === "complete") {
+        // User successfully verified - set active session
+        await setActive({ session: signUpAttempt.createdSessionId });
 
-      // Sync user data with your database
-      try {
-        console.log('Syncing user with database...');
-        const syncResult = await apiService.syncUser({
-          clerkUserId: signUpAttempt.createdUserId!,
-          email: signupData.email,
-          firstName: signupData.firstName,
-          lastName: signupData.lastName,
-          phoneNumber: signupData.phoneNumber,
-        });
+        // Sync user data with your database
+        try {
+          console.log('Syncing user with database...');
+          const syncResult = await apiService.syncUser({
+            clerkUserId: signUpAttempt.createdUserId!,
+            email: signupData.email,
+            firstName: signupData.firstName,
+            lastName: signupData.lastName,
+            phoneNumber: signupData.phoneNumber,
+          });
 
-        console.log('User synced successfully:', syncResult);
+          console.log('User synced successfully:', syncResult);
 
-        // Create client record
-        if (syncResult.user?.id) {
-          try {
-            await apiService.createClient({
-              userId: syncResult.user.id,
-              // Add any additional client data if you have it in signupData
-              // emergencyContactName: signupData.emergencyContactName,
-              // emergencyContactPhone: signupData.emergencyContactPhone,
-              // emergencyContactRelationship: signupData.emergencyContactRelationship,
-            });
-            console.log('Client record created successfully');
-          } catch (clientError) {
-            console.error('Failed to create client record:', clientError);
-            // Don't fail the signup process if client creation fails
+          // Create client record
+          if (syncResult.user?.id) {
+            try {
+              await apiService.createClient({
+                userId: syncResult.user.id,
+              });
+              console.log('Client record created successfully');
+            } catch (clientError) {
+              console.error('Failed to create client record:', clientError);
+            }
           }
+
+          setCurrentStep("success");
+        } catch (syncError) {
+          console.error('Failed to sync user with database:', syncError);
+          setCurrentStep("success");
         }
-
-        setCurrentStep("success");
-      } catch (syncError) {
-        console.error('Failed to sync user with database:', syncError);
-        // Still proceed to success since Clerk authentication worked
-        setCurrentStep("success");
-        // Optionally show a warning to the user
-        // setErrorMessage("Account created successfully, but some data may need to be updated later.");
+      } else {
+        setErrorMessage("Verification incomplete. Please try again.");
+        console.log("Verification status:", signUpAttempt.status);
       }
-    } else {
-      // Handle incomplete verification
-      setErrorMessage("Verification incomplete. Please try again.");
-      console.log("Verification status:", signUpAttempt.status);
-    }
-  } catch (err: any) {
-    console.error("Verification error:", err);
+    } catch (err: any) {
+      console.error("Verification error:", err);
 
-    // Handle specific Clerk errors
-    if (err.errors) {
-      const clerkError = err.errors[0];
-      setErrorMessage(
-        clerkError?.message || "Invalid verification code. Please try again."
-      );
-    } else {
-      setErrorMessage("Invalid verification code. Please try again.");
+      if (err.errors) {
+        const clerkError = err.errors[0];
+        setErrorMessage(
+          clerkError?.message || "Invalid verification code. Please try again."
+        );
+      } else {
+        setErrorMessage("Invalid verification code. Please try again.");
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Add a resend function
   const handleResendCode = async () => {
@@ -349,6 +381,9 @@ const handleVerification = async () => {
               onNext={nextStep}
               stepNumber={getStepNumber()}
             />
+            {errorMessage && (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            )}
             <TouchableOpacity
               style={styles.footerContainer}
               onPress={() => router.push("/(auth)/login")}
@@ -399,14 +434,14 @@ const handleVerification = async () => {
             onBack={prevStep}
             stepNumber={getStepNumber()}
             loading={loading}
-            onResendCode={handleResendCode} // Add this line
+            onResendCode={handleResendCode}
           />
         );
 
       case "success":
         return (
           <SuccessStep
-            onContinue={() => router.replace("/(app)/(tabs)/home")}
+            onContinue={() => router.replace("/(app)/home")}
             onSignIn={() => router.replace("/(auth)/login")}
           />
         );
@@ -425,17 +460,14 @@ const handleVerification = async () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Decorative ellipse at the top */}
           <View style={styles.topEllipse}></View>
 
-          {/* Logo display (hidden on success screen) */}
           {currentStep !== "success" && (
             <View style={styles.logoContainer}>
               <SafeSpaceLogo size={218} />
             </View>
           )}
 
-          {/* Render the current step component */}
           {renderCurrentStep()}
         </ScrollView>
       </KeyboardAvoidingView>
