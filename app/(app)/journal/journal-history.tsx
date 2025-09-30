@@ -8,6 +8,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  TextInput,
+  Modal,
+  Platform,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,8 +20,9 @@ import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-type FilterType = "all" | "week" | "month";
+type FilterType = "all" | "week" | "month" | "custom";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -31,33 +35,43 @@ const tabs = [
 export default function JournalHistoryScreen() {
   const { user } = useUser();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("journal");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.id) {
-        fetchEntries();
-      }
-    }, [user?.id, activeFilter])
-  );
-
-  const getDateFilters = () => {
+  // Move getDateFilters outside of fetchEntries and use useCallback
+  const getDateFilters = React.useCallback(() => {
     const now = new Date();
     let startDate: Date | undefined;
+    let endDate: Date | undefined;
 
     if (activeFilter === "week") {
       startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     } else if (activeFilter === "month") {
       startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (activeFilter === "custom" && customStartDate) {
+      startDate = new Date(customStartDate);
+      if (customEndDate) {
+        endDate = new Date(customEndDate);
+        endDate.setHours(23, 59, 59, 999); // End of day
+      }
     }
 
-    return startDate ? { startDate: startDate.toISOString() } : {};
-  };
+    return {
+      ...(startDate && { startDate: startDate.toISOString() }),
+      ...(endDate && { endDate: endDate.toISOString() }),
+    };
+  }, [activeFilter, customStartDate, customEndDate]);
 
-  const fetchEntries = async () => {
+  const fetchEntries = React.useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -65,13 +79,39 @@ export default function JournalHistoryScreen() {
       const filters = getDateFilters();
       const response = await journalApi.getHistory(user.id, filters);
       setEntries(response.entries || []);
+      setFilteredEntries(response.entries || []);
     } catch (error) {
       console.error("Error fetching journal entries:", error);
       Alert.alert("Error", "Failed to load journal history");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, getDateFilters]); // Now getDateFilters is in the dependency array
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        fetchEntries();
+      }
+    }, [user?.id, fetchEntries])
+  );
+
+  // Apply search filter whenever search query or entries change
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredEntries(entries);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = entries.filter(
+      (entry) =>
+        entry.title.toLowerCase().includes(query) ||
+        entry.content.toLowerCase().includes(query) ||
+        entry.tags?.some((tag: string) => tag.toLowerCase().includes(query))
+    );
+    setFilteredEntries(filtered);
+  }, [searchQuery, entries]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -88,6 +128,53 @@ export default function JournalHistoryScreen() {
 
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
+    if (filter === "custom") {
+      setShowDatePicker(true);
+    } else {
+      setCustomStartDate(null);
+      setCustomEndDate(null);
+    }
+  };
+
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartDatePicker(false);
+    if (selectedDate) {
+      setCustomStartDate(selectedDate);
+    }
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      setCustomEndDate(selectedDate);
+    }
+  };
+
+  const handleApplyCustomDate = () => {
+    if (!customStartDate) {
+      Alert.alert("Error", "Please select a start date");
+      return;
+    }
+    
+    // Validate that end date is not before start date
+    if (customEndDate && customEndDate < customStartDate) {
+      Alert.alert("Error", "End date cannot be before start date");
+      return;
+    }
+    
+    setShowDatePicker(false);
+    fetchEntries();
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+  };
+
+  const handleClearDateFilter = () => {
+    setCustomStartDate(null);
+    setCustomEndDate(null);
+    setActiveFilter("all");
+    setShowDatePicker(false);
   };
 
   const formatDate = (dateString: string) => {
@@ -95,6 +182,16 @@ export default function JournalHistoryScreen() {
     const options: Intl.DateTimeFormatOptions = {
       year: "numeric",
       month: "long",
+      day: "numeric",
+    };
+    return date.toLocaleDateString("en-US", options);
+  };
+
+  const formatDateForDisplay = (date: Date | null) => {
+    if (!date) return "";
+    const options: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "short",
       day: "numeric",
     };
     return date.toLocaleDateString("en-US", options);
@@ -184,11 +281,60 @@ export default function JournalHistoryScreen() {
         <ScrollView style={styles.content}>
           <Text style={styles.pageTitle}>My Journal Entries</Text>
 
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons
+              name="search"
+              size={20}
+              color={Colors.textSecondary}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by title, content, or tags..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={Colors.textTertiary}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={handleClearSearch}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={Colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Date Filter Buttons */}
           <View style={styles.filterContainer}>
             {renderFilterButton("all", "All")}
             {renderFilterButton("week", "Week")}
             {renderFilterButton("month", "Month")}
+            {renderFilterButton("custom", "Custom")}
           </View>
+
+          {/* Active Custom Date Filter Display */}
+          {activeFilter === "custom" && customStartDate && (
+            <View style={styles.activeDateFilter}>
+              <Text style={styles.activeDateText}>
+                {formatDateForDisplay(customStartDate)}
+                {customEndDate && ` - ${formatDateForDisplay(customEndDate)}`}
+              </Text>
+              <TouchableOpacity onPress={handleClearDateFilter}>
+                <Ionicons name="close-circle" size={20} color={Colors.primary} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Results Count */}
+          {!loading && (
+            <Text style={styles.resultsCount}>
+              {filteredEntries.length}{" "}
+              {filteredEntries.length === 1 ? "entry" : "entries"} found
+            </Text>
+          )}
 
           <View style={styles.entriesContainer}>
             {loading ? (
@@ -196,34 +342,40 @@ export default function JournalHistoryScreen() {
                 <ActivityIndicator size="large" color={Colors.primary} />
                 <Text style={styles.loadingText}>Loading entries...</Text>
               </View>
-            ) : entries.length > 0 ? (
-              entries.map(renderJournalEntry)
+            ) : filteredEntries.length > 0 ? (
+              filteredEntries.map(renderJournalEntry)
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons
-                  name="book-outline"
+                  name={searchQuery ? "search" : "book-outline"}
                   size={64}
                   color={Colors.textTertiary}
                 />
                 <Text style={styles.emptyStateText}>
-                  No journal entries yet
+                  {searchQuery
+                    ? "No entries match your search"
+                    : "No journal entries yet"}
                 </Text>
                 <Text style={styles.emptyStateSubtext}>
-                  Start writing to capture your thoughts and feelings
+                  {searchQuery
+                    ? "Try a different search term"
+                    : "Start writing to capture your thoughts and feelings"}
                 </Text>
-                <TouchableOpacity
-                  style={styles.addEntryButton}
-                  onPress={() => router.push("/(app)/journal/journal-create")}
-                >
-                  <Text style={styles.addEntryButtonText}>
-                    Write First Entry
-                  </Text>
-                </TouchableOpacity>
+                {!searchQuery && (
+                  <TouchableOpacity
+                    style={styles.addEntryButton}
+                    onPress={() => router.push("/(app)/journal/journal-create")}
+                  >
+                    <Text style={styles.addEntryButtonText}>
+                      Write First Entry
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
           </View>
 
-          {entries.length > 0 && (
+          {filteredEntries.length > 0 && (
             <TouchableOpacity
               style={styles.floatingAddButton}
               onPress={() => router.push("/(app)/journal/journal-create")}
@@ -232,6 +384,97 @@ export default function JournalHistoryScreen() {
             </TouchableOpacity>
           )}
         </ScrollView>
+
+        {/* Custom Date Picker Modal */}
+        <Modal
+          visible={showDatePicker}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowDatePicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Select Date Range</Text>
+
+              <View style={styles.dateInputContainer}>
+                <Text style={styles.dateLabel}>Start Date *</Text>
+                <TouchableOpacity 
+                  style={styles.dateInput}
+                  onPress={() => setShowStartDatePicker(true)}
+                >
+                  <Text style={[
+                    styles.dateInputText,
+                    !customStartDate && styles.dateInputPlaceholder
+                  ]}>
+                    {customStartDate ? formatDateForDisplay(customStartDate) : "Select start date"}
+                  </Text>
+                  <Ionicons name="calendar" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.dateInputContainer}>
+                <Text style={styles.dateLabel}>End Date (Optional)</Text>
+                <TouchableOpacity 
+                  style={styles.dateInput}
+                  onPress={() => setShowEndDatePicker(true)}
+                >
+                  <Text style={[
+                    styles.dateInputText,
+                    !customEndDate && styles.dateInputPlaceholder
+                  ]}>
+                    {customEndDate ? formatDateForDisplay(customEndDate) : "Select end date"}
+                  </Text>
+                  <Ionicons name="calendar" size={20} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => {
+                    setShowDatePicker(false);
+                    setActiveFilter("all");
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalApplyButton,
+                    !customStartDate && styles.modalApplyButtonDisabled
+                  ]}
+                  onPress={handleApplyCustomDate}
+                  disabled={!customStartDate}
+                >
+                  <Text style={styles.modalApplyText}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Date Pickers */}
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={customStartDate || new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleStartDateChange}
+            maximumDate={customEndDate || new Date()}
+          />
+        )}
+
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={customEndDate || new Date()}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleEndDateChange}
+            minimumDate={customStartDate || undefined}
+            maximumDate={new Date()}
+          />
+        )}
 
         <BottomNavigation
           tabs={tabs}
@@ -259,14 +502,36 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "600",
     marginTop: Spacing.xl,
-    marginBottom: Spacing.xxl,
+    marginBottom: Spacing.lg,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    marginBottom: Spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  searchIcon: {
+    marginRight: Spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
+    color: Colors.textPrimary,
   },
   filterContainer: {
     flexDirection: "row",
     backgroundColor: Colors.surfaceSecondary,
     borderRadius: 25,
     padding: 4,
-    marginBottom: Spacing.xxl,
+    marginBottom: Spacing.md,
   },
   filterButton: {
     flex: 1,
@@ -286,10 +551,30 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.textSecondary,
     fontWeight: "500",
+    fontSize: 13,
   },
   filterTextActive: {
     color: Colors.textPrimary,
     fontWeight: "600",
+  },
+  activeDateFilter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.primary + "20",
+    borderRadius: 12,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  activeDateText: {
+    ...Typography.caption,
+    color: Colors.primary,
+    fontWeight: "600",
+  },
+  resultsCount: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.lg,
   },
   entriesContainer: {
     paddingBottom: 100,
@@ -426,5 +711,74 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: Spacing.xl,
+    width: "85%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    ...Typography.title,
+    marginBottom: Spacing.xl,
+    textAlign: "center",
+  },
+  dateInputContainer: {
+    marginBottom: Spacing.lg,
+  },
+  dateLabel: {
+    ...Typography.subtitle,
+    fontWeight: "600",
+    marginBottom: Spacing.sm,
+  },
+  dateInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.primary + "20",
+    borderRadius: 12,
+    padding: Spacing.lg,
+  },
+  dateInputText: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+  },
+  dateInputPlaceholder: {
+    color: Colors.textTertiary,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: Colors.disabled,
+    borderRadius: 12,
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+  },
+  modalCancelText: {
+    ...Typography.button,
+    color: Colors.textSecondary,
+  },
+  modalApplyButton: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: Spacing.lg,
+    alignItems: "center",
+  },
+  modalApplyButtonDisabled: {
+    backgroundColor: Colors.disabled,
+  },
+  modalApplyText: {
+    ...Typography.button,
   },
 });
