@@ -1,7 +1,3 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -10,79 +6,20 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "@clerk/clerk-expo";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
 import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { journalApi, JournalEntry } from "../../../utils/journalApi";
 
-// Mock data for demonstration
-const mockJournalEntries = [
-  {
-    id: "1",
-    title: "A Productive Day",
-    content:
-      "Today I accomplished all my goals and felt really productive. I finished my work tasks ahead of schedule and even had time for a relaxing walk in the park. The weather was beautiful and it helped clear my mind. I'm grateful for these moments of peace and accomplishment.",
-    mood_type: "happy",
-    emoji: "😊",
-    date: "2023-10-15",
-    formattedDate: "October 15, 2023",
-    tags: ["productivity", "gratitude", "mindfulness"],
-  },
-  {
-    id: "2",
-    title: "Feeling Anxious",
-    content:
-      "I've been feeling anxious about the upcoming presentation. I need to remember to practice my breathing exercises and take things one step at a time. It's normal to feel this way before important events, and I know I've prepared well.",
-    mood_type: "anxious",
-    emoji: "😰",
-    date: "2023-10-14",
-    formattedDate: "October 14, 2023",
-    tags: ["anxiety", "self-care"],
-  },
-  {
-    id: "3",
-    title: "Quality Time with Family",
-    content:
-      "Spent the day with family today. We had a wonderful picnic at the lake and enjoyed each other's company. It's important to cherish these moments and create lasting memories with loved ones.",
-    mood_type: "loved",
-    emoji: "❤️",
-    date: "2023-10-12",
-    formattedDate: "October 12, 2023",
-    tags: ["family", "gratitude", "memories"],
-  },
-];
-
-// Mock user data
-const mockUser = {
-  displayName: "Demo User",
-  email: "demo@gmail.com",
-};
-
-// Mock profile data
-const mockProfile = {
-  firstName: "Demo",
-  lastName: "User",
-};
-
-// Interface for journal entries
-interface JournalEntry {
-  id: string;
-  title: string;
-  content: string;
-  mood_type: string | null;
-  emoji: string;
-  date: string;
-  formattedDate: string;
-  tags: string[];
-}
-
-// Filter types for organizing entries
 type FilterType = "all" | "week" | "month";
 
-// Bottom navigation tabs configuration
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community-forum", name: "Community", icon: "people" },
@@ -92,14 +29,50 @@ const tabs = [
 ];
 
 export default function JournalHistoryScreen() {
-  // State for journal entries, loading status, and UI controls
+  const { user } = useUser();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("journal");
 
-  // Handle tab navigation
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        fetchEntries();
+      }
+    }, [user?.id, activeFilter])
+  );
+
+  const getDateFilters = () => {
+    const now = new Date();
+    let startDate: Date | undefined;
+
+    if (activeFilter === "week") {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (activeFilter === "month") {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    return startDate ? { startDate: startDate.toISOString() } : {};
+  };
+
+  const fetchEntries = async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      const filters = getDateFilters();
+      const response = await journalApi.getHistory(user.id, filters);
+      setEntries(response.entries || []);
+    } catch (error) {
+      console.error("Error fetching journal entries:", error);
+      Alert.alert("Error", "Failed to load journal history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -109,47 +82,24 @@ export default function JournalHistoryScreen() {
     }
   };
 
-  // Simulate data fetching with useEffect
-  useEffect(() => {
-    const fetchEntries = async () => {
-      try {
-        setLoading(true);
-        // Simulate network request delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Filter entries based on active filter (mock implementation)
-        let filteredEntries = [...mockJournalEntries];
-
-        if (activeFilter === "week") {
-          // In a real app, this would filter to show only last week's entries
-          filteredEntries = filteredEntries.slice(0, 2);
-        } else if (activeFilter === "month") {
-          // In a real app, this would filter to show only last month's entries
-          filteredEntries = filteredEntries.slice(0, 1);
-        }
-
-        setEntries(filteredEntries);
-      } catch (error) {
-        console.error("Error fetching journal entries:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEntries();
-  }, [activeFilter]);
-
-  // Navigate to individual journal entry view
   const handleEntryPress = (entryId: string) => {
     router.push(`/(app)/journal/journal-entry/${entryId}`);
   };
 
-  // Change the active filter for entries
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
   };
 
-  // Render filter button with active state styling
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const options: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    };
+    return date.toLocaleDateString("en-US", options);
+  };
+
   const renderFilterButton = (filter: FilterType, label: string) => (
     <TouchableOpacity
       style={[
@@ -169,7 +119,6 @@ export default function JournalHistoryScreen() {
     </TouchableOpacity>
   );
 
-  // Render individual journal entry card
   const renderJournalEntry = (entry: JournalEntry) => {
     const isExpanded = expandedEntry === entry.id;
 
@@ -182,7 +131,7 @@ export default function JournalHistoryScreen() {
         <View style={styles.entryHeader}>
           <View style={styles.entryInfo}>
             <Text style={styles.entryTitle}>{entry.title}</Text>
-            <Text style={styles.entryDate}>{entry.formattedDate}</Text>
+            <Text style={styles.entryDate}>{formatDate(entry.created_at)}</Text>
           </View>
           <View style={styles.entryMeta}>
             {entry.emoji ? (
@@ -204,13 +153,20 @@ export default function JournalHistoryScreen() {
           {entry.content}
         </Text>
 
-        {entry.tags.length > 0 && (
+        {entry.tags && entry.tags.length > 0 && (
           <View style={styles.tagsContainer}>
-            {entry.tags.map((tag) => (
-              <View key={tag} style={styles.tag}>
+            {entry.tags.map((tag: string, index: number) => (
+              <View key={`${entry.id}-${tag}-${index}`} style={styles.tag}>
                 <Text style={styles.tagText}>{tag}</Text>
               </View>
             ))}
+          </View>
+        )}
+
+        {entry.share_with_support_worker && (
+          <View style={styles.sharedBadge}>
+            <Ionicons name="people" size={12} color={Colors.primary} />
+            <Text style={styles.sharedText}>Shared with Support Worker</Text>
           </View>
         )}
 
@@ -228,17 +184,18 @@ export default function JournalHistoryScreen() {
         <ScrollView style={styles.content}>
           <Text style={styles.pageTitle}>My Journal Entries</Text>
 
-          {/* Filter controls for organizing entries */}
           <View style={styles.filterContainer}>
             {renderFilterButton("all", "All")}
             {renderFilterButton("week", "Week")}
             {renderFilterButton("month", "Month")}
           </View>
 
-          {/* Journal entries list or empty state */}
           <View style={styles.entriesContainer}>
             {loading ? (
-              <Text style={styles.loadingText}>Loading entries...</Text>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.loadingText}>Loading entries...</Text>
+              </View>
             ) : entries.length > 0 ? (
               entries.map(renderJournalEntry)
             ) : (
@@ -266,7 +223,6 @@ export default function JournalHistoryScreen() {
             )}
           </View>
 
-          {/* Floating action button for adding new entries */}
           {entries.length > 0 && (
             <TouchableOpacity
               style={styles.floatingAddButton}
@@ -277,7 +233,6 @@ export default function JournalHistoryScreen() {
           )}
         </ScrollView>
 
-        {/* Bottom navigation for app navigation */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -297,7 +252,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.md,
-    marginBottom: 60, // Space for bottom navigation
+    marginBottom: 60,
   },
   pageTitle: {
     ...Typography.title,
@@ -322,10 +277,7 @@ const styles = StyleSheet.create({
   filterButtonActive: {
     backgroundColor: Colors.surface,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 1,
@@ -340,7 +292,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   entriesContainer: {
-    paddingBottom: 100, // Space for floating button
+    paddingBottom: 100,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.xxl,
+  },
+  loadingText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
   },
   entryCard: {
     backgroundColor: Colors.surface,
@@ -348,10 +309,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     marginBottom: Spacing.lg,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
@@ -396,6 +354,38 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     fontWeight: "500",
   },
+  tagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  tag: {
+    backgroundColor: Colors.primary + "20",
+    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  tagText: {
+    ...Typography.caption,
+    color: Colors.primary,
+  },
+  sharedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.primary + "20",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  sharedText: {
+    ...Typography.caption,
+    color: Colors.primary,
+    marginLeft: 4,
+    fontSize: 10,
+  },
   emptyState: {
     alignItems: "center",
     paddingVertical: Spacing.huge,
@@ -423,7 +413,7 @@ const styles = StyleSheet.create({
   },
   floatingAddButton: {
     position: "absolute",
-    bottom: 80, // Adjusted for bottom navigation
+    bottom: 80,
     right: Spacing.xl,
     width: 56,
     height: 56,
@@ -432,33 +422,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
-  },
-  loadingText: {
-    textAlign: "center",
-    color: Colors.textSecondary,
-    marginVertical: Spacing.xl,
-  },
-  tagsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-  },
-  tag: {
-    backgroundColor: Colors.primary + "20",
-    borderRadius: 12,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-  },
-  tagText: {
-    ...Typography.caption,
-    color: Colors.primary,
   },
 });
