@@ -45,7 +45,7 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
-const MAX_CHARACTERS = 1000;
+const MAX_CHARACTERS = 2000;
 
 export default function JournalEditScreen() {
   const { id } = useLocalSearchParams();
@@ -127,7 +127,11 @@ export default function JournalEditScreen() {
   };
 
   const handleSave = async () => {
-    if (!journalData.title.trim() || !journalData.content.trim()) {
+    if (
+      !journalData.title.trim() ||
+      !journalData.content.trim() ||
+      !journalData.emotion
+    ) {
       Alert.alert("Missing Fields", "Please fill all required fields");
       return;
     }
@@ -189,13 +193,16 @@ export default function JournalEditScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <AppHeader title="Edit Journal" showBack={true} showMenu={true} />
-
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <AppHeader title="Edit Journal" showBack={true} showMenu={true} />
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            style={{ marginBottom: 60 }}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.createContainer}>
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>Journal Title *</Text>
@@ -234,7 +241,8 @@ export default function JournalEditScreen() {
               </View>
 
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Select your Emotion *</Text>
+                <Text style={styles.fieldLabel}>How are you feeling? *</Text>
+                <Text style={styles.emotionSubtext}>Select your current mood</Text>
                 <View style={styles.emotionsContainer}>
                   {emotionOptions.map((emotion) => (
                     <TouchableOpacity
@@ -245,8 +253,15 @@ export default function JournalEditScreen() {
                           styles.emotionButtonSelected,
                       ]}
                       onPress={() => handleEmotionSelect(emotion)}
+                      activeOpacity={0.8}
                     >
                       <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
+                      <Text style={[
+                        styles.emotionLabel,
+                        journalData.emotion === emotion.id && styles.emotionLabelSelected
+                      ]}>
+                        {emotion.label}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -284,6 +299,7 @@ export default function JournalEditScreen() {
                 style={styles.cancelButton}
                 onPress={handleCancel}
                 disabled={saving}
+                activeOpacity={0.8}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -292,6 +308,7 @@ export default function JournalEditScreen() {
                 style={[styles.saveButton, saving && styles.disabledButton]}
                 onPress={handleSave}
                 disabled={saving}
+                activeOpacity={0.8}
               >
                 {saving ? (
                   <ActivityIndicator color={Colors.surface} />
@@ -321,11 +338,22 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: Spacing.xl,
-    paddingBottom: 80,
+    paddingTop: Spacing.md,
   },
   createContainer: {
     flex: 1,
     paddingTop: Spacing.xl,
+  },
+  pageTitle: {
+    ...Typography.title,
+    textAlign: "center",
+    marginBottom: Spacing.md,
+  },
+  pageSubtitle: {
+    ...Typography.caption,
+    textAlign: "center",
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xxl,
   },
   fieldContainer: {
     marginBottom: Spacing.xxl,
@@ -333,13 +361,16 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...Typography.subtitle,
     fontWeight: "600",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   labelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: Spacing.md,
+  },
+  characterRow: {
+    alignItems: "flex-end",
   },
   characterCount: {
     ...Typography.caption,
@@ -350,49 +381,64 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   titleInput: {
-    backgroundColor: Colors.primary + "20",
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
-    borderWidth: 2,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: Colors.disabled,
   },
   contentInput: {
-    backgroundColor: Colors.primary + "20",
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
-    height: 150,
-    borderWidth: 2,
-    borderColor: "transparent",
+    height: 450,
+    borderWidth: 1,
+    borderColor: Colors.disabled,
+    textAlignVertical: 'top',
+  },
+  // Emotion Styles
+  emotionSubtext: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.lg,
   },
   emotionsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.md,
+    flexWrap: "wrap",
+    gap: Spacing.md,
   },
   emotionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    flex: 1,
+    minWidth: "30%",
     backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: Spacing.md,
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   emotionButtonSelected: {
-    backgroundColor: Colors.primary + "30",
-    borderWidth: 2,
     borderColor: Colors.primary,
+    backgroundColor: Colors.primary + "08", // Very subtle background
   },
   emotionEmoji: {
-    fontSize: 24,
+    fontSize: 28,
+    marginBottom: Spacing.xs,
+  },
+  emotionLabel: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    fontSize: 12,
+  },
+  emotionLabelSelected: {
+    color: Colors.primary,
+    fontWeight: "600",
   },
   shareContainer: {
     flexDirection: "row",
@@ -401,6 +447,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.disabled,
   },
   shareTextContainer: {
     flex: 1,
@@ -414,15 +462,17 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: Spacing.xl,
     gap: Spacing.lg,
+    marginBottom: Spacing.huge,
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: Colors.disabled,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.disabled,
   },
   cancelButtonText: {
     ...Typography.button,

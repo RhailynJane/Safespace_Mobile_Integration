@@ -61,20 +61,6 @@ BEFORE UPDATE ON journal_entries
 FOR EACH ROW
 EXECUTE FUNCTION update_journal_entry_timestamp();
 
--- Insert default templates
-INSERT INTO journal_templates (name, description, prompts, icon) VALUES
-('Daily Reflection', 'Reflect on your day and emotions', 
- '["What happened today that made you feel this way?", "What are you grateful for?", "What could you improve tomorrow?"]'::jsonb, 
- 'sunny'),
-('Gratitude Journal', 'Focus on positive moments', 
- '["What are three things you''re grateful for today?", "Who made you smile today?", "What small victory did you achieve?"]'::jsonb, 
- 'heart'),
-('Anxiety Check-in', 'Process anxious thoughts', 
- '["What is making you anxious right now?", "What evidence supports this worry?", "What is within your control?"]'::jsonb, 
- 'alert-circle'),
-('Free Writing', 'Write whatever comes to mind', 
- '["What''s on your mind right now?"]'::jsonb, 
- 'create');
 
 COMMENT ON COLUMN journal_entries.share_with_support_worker IS 
 'Indicates if the user has chosen to share this journal entry with their assigned support worker';
