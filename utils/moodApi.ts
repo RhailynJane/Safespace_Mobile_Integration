@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// Use your local network IP that's working for assessments
-const API_URL = 'http://192.168.1.100:3001/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface MoodEntry {
   id: string;

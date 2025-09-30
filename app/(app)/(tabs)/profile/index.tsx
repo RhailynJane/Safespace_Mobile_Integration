@@ -17,7 +17,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 
-const API_URL = 'http://192.168.1.100:3001'; // Fixed: removed /api from base URL
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 interface ProfileData {
   firstName: string;
@@ -70,7 +70,7 @@ export default function ProfileScreen() {
       console.log('Sending user data:', userData);
 
       // Fixed URL - removed duplicate /api
-      const response = await fetch(`${API_URL}/api/sync-user`, {
+      const response = await fetch(`${API_URL}/sync-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,46 +97,91 @@ export default function ProfileScreen() {
   };
 
   // Fetch profile data from backend
-  const fetchProfileData = useCallback(async () => {
-    if (!user?.id) return;
+const fetchProfileData = useCallback(async () => {
+  if (!user?.id) return;
+
+  // Move syncUserWithBackend inside the callback
+  const syncUserWithBackend = async () => {
+    if (!user?.id) {
+      console.log('No user ID available');
+      return;
+    }
 
     try {
-      setLoading(true);
+      console.log('Attempting to sync user with backend...');
       
-      // First sync user with backend (non-blocking)
-      try {
-        await syncUserWithBackend();
-      } catch (syncError) {
-        console.log('Sync failed, continuing with local data...');
-        // Continue loading profile even if sync fails
-      }
-      
-      // Load local storage for additional data
-      const savedProfileData = await AsyncStorage.getItem('profileData');
-      if (savedProfileData) {
-        const parsedData = JSON.parse(savedProfileData);
-        setProfileData(prev => ({
-          ...prev,
-          ...parsedData
-        }));
+      const userData = {
+        clerkUserId: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumbers[0]?.phoneNumber,
+      };
+
+      console.log('Sending user data:', userData);
+
+      const response = await fetch(`${API_URL}/sync-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response error:', errorText);
+        throw new Error(`Failed to sync user with backend: ${response.status} - ${errorText}`);
       }
 
-      // Set data from Clerk user object
+      const data = await response.json();
+      console.log('User synced successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error syncing user:', error);
+    }
+  };
+
+  try {
+    setLoading(true);
+    
+    // First sync user with backend (non-blocking)
+    try {
+      await syncUserWithBackend();
+    } catch (syncError) {
+      console.log('Sync failed, continuing with local data...');
+      // Continue loading profile even if sync fails
+    }
+    
+    // Load local storage for additional data
+    const savedProfileData = await AsyncStorage.getItem('profileData');
+    if (savedProfileData) {
+      const parsedData = JSON.parse(savedProfileData);
       setProfileData(prev => ({
         ...prev,
-        firstName: user.firstName || prev.firstName || "User",
-        lastName: user.lastName || prev.lastName || "",
-        email: user.emailAddresses[0]?.emailAddress || prev.email || "",
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
-        profileImageUrl: user.imageUrl || prev.profileImageUrl,
+        ...parsedData
       }));
-
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-    } finally {
-      setLoading(false);
     }
-  }, [user]);
+
+    // Set data from Clerk user object
+    setProfileData(prev => ({
+      ...prev,
+      firstName: user.firstName || prev.firstName || "User",
+      lastName: user.lastName || prev.lastName || "",
+      email: user.emailAddresses[0]?.emailAddress || prev.email || "",
+      phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
+      profileImageUrl: user.imageUrl || prev.profileImageUrl,
+    }));
+
+  } catch (error) {
+    console.error('Error fetching profile data:', error);
+  } finally {
+    setLoading(false);
+  }
+}, [user]); // Only user is needed as dependency now
 
   useEffect(() => {
     fetchProfileData();

@@ -1,7 +1,7 @@
 // journalApi.ts
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.100:3001/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface JournalEntry {
   id: string;
