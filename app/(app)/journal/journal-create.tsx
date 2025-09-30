@@ -56,7 +56,7 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
-const MAX_CHARACTERS = 1000;
+const MAX_CHARACTERS = 2000;
 
 export default function JournalCreateScreen() {
   const { user } = useUser();
@@ -75,6 +75,7 @@ export default function JournalCreateScreen() {
   const [loading, setLoading] = useState(false);
   const [characterCount, setCharacterCount] = useState(0);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<JournalTemplate | null>(null);
 
   useEffect(() => {
     fetchTemplates();
@@ -112,11 +113,17 @@ export default function JournalCreateScreen() {
     }));
   };
 
-  const handleTemplateSelect = (templateId: number) => {
+  const handleTemplateSelect = (template: JournalTemplate) => {
+    const newTemplateId = journalData.templateId === template.id ? null : template.id;
+    const newContent = newTemplateId === template.id ? template.prompts[0] : journalData.content;
+    
     setJournalData((prev) => ({
       ...prev,
-      templateId: prev.templateId === templateId ? null : templateId,
+      templateId: newTemplateId,
+      content: newContent || prev.content,
     }));
+
+    setSelectedTemplate(newTemplateId === template.id ? template : null);
   };
 
   const handleToggleShare = (value: boolean) => {
@@ -205,7 +212,14 @@ export default function JournalCreateScreen() {
       {!loadingTemplates && templates.length > 0 && (
         <View style={styles.fieldContainer}>
           <Text style={styles.fieldLabel}>Choose a Template (Optional)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <Text style={styles.templateSubtext}>
+            Select a template to get started with guided prompts
+          </Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.templatesScrollContainer}
+          >
             {templates.map((template) => (
               <TouchableOpacity
                 key={template.id}
@@ -214,29 +228,40 @@ export default function JournalCreateScreen() {
                   journalData.templateId === template.id &&
                     styles.templateCardSelected,
                 ]}
-                onPress={() => handleTemplateSelect(template.id)}
+                onPress={() => handleTemplateSelect(template)}
+                activeOpacity={0.8}
               >
-                <Ionicons
-                  name={template.icon as any}
-                  size={24}
-                  color={
-                    journalData.templateId === template.id
-                      ? Colors.primary
-                      : Colors.textSecondary
-                  }
-                />
+                <View style={styles.templateIconContainer}>
+                  <Ionicons
+                    name={template.icon as any}
+                    size={20}
+                    color={
+                      journalData.templateId === template.id
+                        ? Colors.primary
+                        : Colors.textSecondary
+                    }
+                  />
+                </View>
                 <Text
                   style={[
                     styles.templateName,
                     journalData.templateId === template.id &&
                       styles.templateNameSelected,
                   ]}
+                  numberOfLines={1}
                 >
                   {template.name}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
+        </View>
+      )}
+
+      {loadingTemplates && (
+        <View style={styles.templatesLoadingContainer}>
+          <ActivityIndicator size="small" color={Colors.primary} />
+          <Text style={styles.templatesLoadingText}>Loading templates...</Text>
         </View>
       )}
 
@@ -253,16 +278,26 @@ export default function JournalCreateScreen() {
 
       <View style={styles.fieldContainer}>
         <View style={styles.labelRow}>
-          <Text style={styles.fieldLabel}>Write your Entry *</Text>
-          <Text
-            style={[
-              styles.characterCount,
-              characterCount >= MAX_CHARACTERS && styles.characterCountMax,
-            ]}
-          >
-            {characterCount}/{MAX_CHARACTERS}
-          </Text>
+          <View>
+            <Text style={styles.fieldLabel}>Write your Entry *</Text>
+            {selectedTemplate && (
+              <Text style={styles.templatePromptHint}>
+                Using template: {selectedTemplate.name}
+              </Text>
+            )}
+          </View>
+          <View style={styles.characterRow}>
+            <Text
+              style={[
+                styles.characterCount,
+                characterCount >= MAX_CHARACTERS && styles.characterCountMax,
+              ]}
+            >
+              {characterCount}/{MAX_CHARACTERS}
+            </Text>
+          </View>
         </View>
+        
         <TextInput
           style={styles.contentInput}
           placeholder="Write about your day, feelings or anything on your mind..."
@@ -276,7 +311,8 @@ export default function JournalCreateScreen() {
       </View>
 
       <View style={styles.fieldContainer}>
-        <Text style={styles.fieldLabel}>Select your Emotion *</Text>
+        <Text style={styles.fieldLabel}>How are you feeling? *</Text>
+        <Text style={styles.emotionSubtext}>Select your current mood</Text>
         <View style={styles.emotionsContainer}>
           {emotionOptions.map((emotion) => (
             <TouchableOpacity
@@ -287,8 +323,15 @@ export default function JournalCreateScreen() {
                   styles.emotionButtonSelected,
               ]}
               onPress={() => handleEmotionSelect(emotion)}
+              activeOpacity={0.8}
             >
               <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
+              <Text style={[
+                styles.emotionLabel,
+                journalData.emotion === emotion.id && styles.emotionLabelSelected
+              ]}>
+                {emotion.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -326,7 +369,11 @@ export default function JournalCreateScreen() {
           Your journal entry has been saved successfully
         </Text>
 
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+        <TouchableOpacity 
+          style={styles.closeButton} 
+          onPress={handleClose}
+          activeOpacity={0.8}
+        >
           <Text style={styles.closeButtonText}>View All Entries</Text>
         </TouchableOpacity>
       </View>
@@ -338,7 +385,11 @@ export default function JournalCreateScreen() {
 
     return (
       <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+        <TouchableOpacity 
+          style={styles.cancelButton} 
+          onPress={handleCancel}
+          activeOpacity={0.8}
+        >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
 
@@ -346,6 +397,7 @@ export default function JournalCreateScreen() {
           style={[styles.saveButton, loading && styles.disabledButton]}
           onPress={handleSave}
           disabled={loading}
+          activeOpacity={0.8}
         >
           {loading ? (
             <ActivityIndicator color={Colors.surface} />
@@ -368,6 +420,7 @@ export default function JournalCreateScreen() {
           <ScrollView
             contentContainerStyle={styles.scrollContainer}
             style={{ marginBottom: 60 }}
+            showsVerticalScrollIndicator={false}
           >
             {currentStep === "create" && renderCreateStep()}
             {currentStep === "success" && renderSuccessStep()}
@@ -416,13 +469,16 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...Typography.subtitle,
     fontWeight: "600",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   labelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: Spacing.md,
+  },
+  characterRow: {
+    alignItems: "flex-end",
   },
   characterCount: {
     ...Typography.caption,
@@ -433,23 +489,39 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   titleInput: {
-    backgroundColor: Colors.primary + "20",
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
-    borderWidth: 2,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: Colors.disabled,
   },
   contentInput: {
-    backgroundColor: Colors.primary + "20",
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
     height: 150,
-    borderWidth: 2,
-    borderColor: "transparent",
+    borderWidth: 1,
+    borderColor: Colors.disabled,
+    textAlignVertical: 'top',
+  },
+  // Template Styles
+  templateSubtext: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.lg,
+  },
+  templatePromptHint: {
+    ...Typography.caption,
+    color: Colors.primary,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  templatesScrollContainer: {
+    paddingRight: Spacing.xl,
   },
   templateCard: {
     backgroundColor: Colors.surface,
@@ -457,48 +529,77 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     marginRight: Spacing.md,
     alignItems: "center",
-    minWidth: 100,
+    minWidth: 90,
     borderWidth: 2,
-    borderColor: "transparent",
+    borderColor: 'transparent',
   },
   templateCardSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primary + "10",
+    backgroundColor: Colors.primary + "08", // Very subtle background
+  },
+  templateIconContainer: {
+    marginBottom: Spacing.sm,
   },
   templateName: {
     ...Typography.caption,
-    marginTop: Spacing.sm,
     color: Colors.textSecondary,
+    textAlign: "center",
+    fontSize: 12,
   },
   templateNameSelected: {
     color: Colors.primary,
     fontWeight: "600",
   },
+  templatesLoadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.lg,
+  },
+  templatesLoadingText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginLeft: Spacing.sm,
+  },
+  // Emotion Styles
+  emotionSubtext: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.lg,
+  },
   emotionsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.md,
+    flexWrap: "wrap",
+    gap: Spacing.md,
   },
   emotionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    flex: 1,
+    minWidth: "30%",
     backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: Spacing.md,
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   emotionButtonSelected: {
-    backgroundColor: Colors.primary + "30",
-    borderWidth: 2,
     borderColor: Colors.primary,
+    backgroundColor: Colors.primary + "08", // Very subtle background
   },
   emotionEmoji: {
-    fontSize: 24,
+    fontSize: 28,
+    marginBottom: Spacing.xs,
+  },
+  emotionLabel: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    fontSize: 12,
+  },
+  emotionLabelSelected: {
+    color: Colors.primary,
+    fontWeight: "600",
   },
   shareContainer: {
     flexDirection: "row",
@@ -507,6 +608,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.disabled,
   },
   shareTextContainer: {
     flex: 1,
@@ -525,10 +628,12 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: Colors.disabled,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.disabled,
   },
   cancelButtonText: {
     ...Typography.button,
