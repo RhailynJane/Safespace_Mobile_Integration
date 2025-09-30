@@ -12,6 +12,7 @@ import {
   Platform,
   Switch,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -76,6 +77,8 @@ export default function JournalCreateScreen() {
   const [characterCount, setCharacterCount] = useState(0);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<JournalTemplate | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     fetchTemplates();
@@ -172,7 +175,15 @@ export default function JournalCreateScreen() {
 
       if (response.success) {
         setSavedEntryId(response.entry.id);
-        setCurrentStep("success");
+        
+        // Set success message based on sharing status
+        if (journalData.shareWithSupportWorker) {
+          setSuccessMessage("Journal created and shared with your support worker");
+        } else {
+          setSuccessMessage("Journal entry created successfully");
+        }
+        
+        setShowSuccessModal(true);
       }
     } catch (error: any) {
       console.error("Error saving journal entry:", error);
@@ -180,6 +191,11 @@ export default function JournalCreateScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    router.push("/(app)/journal");
   };
 
   const handleCancel = () => {
@@ -197,9 +213,39 @@ export default function JournalCreateScreen() {
     );
   };
 
-  const handleClose = () => {
-    router.push("/(app)/journal");
-  };
+  const renderSuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent
+      animationType="fade"
+      onRequestClose={handleSuccessClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.successModal}>
+          <View style={styles.successIcon}>
+            <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
+          </View>
+          <Text style={styles.successTitle}>Success!</Text>
+          <Text style={styles.successMessage}>{successMessage}</Text>
+          {journalData.shareWithSupportWorker && (
+            <View style={styles.sharedInfo}>
+              <Ionicons name="people" size={20} color={Colors.primary} />
+              <Text style={styles.sharedInfoText}>
+                Your support worker has been notified
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.successButton}
+            onPress={handleSuccessClose}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.successButtonText}>View All Entries</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   const renderCreateStep = () => (
     <View style={styles.createContainer}>
@@ -360,28 +406,8 @@ export default function JournalCreateScreen() {
     </View>
   );
 
-  const renderSuccessStep = () => (
-    <View style={styles.successContainer}>
-      <View style={styles.successMessage}>
-        <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
-        <Text style={styles.successTitle}>Entry Saved!</Text>
-        <Text style={styles.successSubtitle}>
-          Your journal entry has been saved successfully
-        </Text>
-
-        <TouchableOpacity 
-          style={styles.closeButton} 
-          onPress={handleClose}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.closeButtonText}>View All Entries</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   const renderActionButtons = () => {
-    if (currentStep === "success") return null;
+    if (showSuccessModal) return null;
 
     return (
       <View style={styles.actionButtons}>
@@ -423,10 +449,11 @@ export default function JournalCreateScreen() {
             showsVerticalScrollIndicator={false}
           >
             {currentStep === "create" && renderCreateStep()}
-            {currentStep === "success" && renderSuccessStep()}
             {renderActionButtons()}
           </ScrollView>
         </KeyboardAvoidingView>
+
+        {renderSuccessModal()}
 
         <BottomNavigation
           tabs={tabs}
@@ -535,7 +562,7 @@ const styles = StyleSheet.create({
   },
   templateCardSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primary + "08", // Very subtle background
+    backgroundColor: Colors.primary + "08",
   },
   templateIconContainer: {
     marginBottom: Spacing.sm,
@@ -585,7 +612,7 @@ const styles = StyleSheet.create({
   },
   emotionButtonSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primary + "08", // Very subtle background
+    backgroundColor: Colors.primary + "08",
   },
   emotionEmoji: {
     fontSize: 28,
@@ -652,40 +679,61 @@ const styles = StyleSheet.create({
   saveButtonText: {
     ...Typography.button,
   },
-  successContainer: {
+  // Success Modal Styles
+  modalOverlay: {
     flex: 1,
-    paddingTop: Spacing.xl,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
-  },
-  successMessage: {
     alignItems: "center",
+    padding: Spacing.xl,
+  },
+  successModal: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.xxl,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  successIcon: {
+    marginBottom: Spacing.lg,
   },
   successTitle: {
     ...Typography.title,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
-  successSubtitle: {
-    ...Typography.caption,
+    marginBottom: Spacing.md,
     textAlign: "center",
-    marginBottom: Spacing.xl,
-    color: Colors.textSecondary,
   },
-  closeButton: {
+  successMessage: {
+    ...Typography.body,
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+  },
+  sharedInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary + "20",
+    borderRadius: 12,
+    padding: Spacing.md,
+    marginBottom: Spacing.xl,
+    alignSelf: "stretch",
+  },
+  sharedInfoText: {
+    ...Typography.caption,
+    color: Colors.primary,
+    marginLeft: Spacing.sm,
+    flex: 1,
+  },
+  successButton: {
     backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
+    alignSelf: "stretch",
+    alignItems: "center",
   },
-  closeButtonText: {
+  successButtonText: {
     ...Typography.button,
   },
 });
