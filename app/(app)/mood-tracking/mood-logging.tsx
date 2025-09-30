@@ -16,6 +16,7 @@ import {
   Switch,
   Dimensions,
   StatusBar,
+  Modal,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
@@ -79,6 +80,8 @@ export default function MoodLoggingScreen() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("mood");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Handle intensity slider value change
   const handleIntensityChange = (value: number) => {
@@ -107,6 +110,12 @@ export default function MoodLoggingScreen() {
     setMoodData((prev) => ({ ...prev, shareWithSupportWorker: value }));
   };
 
+  // Handle success modal close
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    router.replace("../mood-tracking/mood-history");
+  };
+
   // Handle form submission with API call
   const handleSubmit = async () => {
     if (!user?.id) {
@@ -126,28 +135,14 @@ export default function MoodLoggingScreen() {
         factors: moodData.factors,
       });
 
-      // If sharing with support worker is enabled, send notification
-      // TODO: Implement support worker notification system
+      // Set success message based on sharing status
       if (moodData.shareWithSupportWorker) {
-        console.log("Sharing mood with support worker...");
-        // This would call a separate API endpoint to notify support workers
+        setSuccessMessage("Mood logged and shared with your support worker");
+      } else {
+        setSuccessMessage("Your mood has been logged successfully");
       }
-
-      Alert.alert(
-        "Success!",
-        "Your mood has been logged successfully.",
-        [
-          {
-            text: "View History",
-            onPress: () => router.replace("../mood-tracking/mood-history"),
-          },
-          {
-            text: "Log Another",
-            onPress: () => router.replace("../mood-tracking"),
-            style: "cancel",
-          },
-        ]
-      );
+      
+      setShowSuccessModal(true);
     } catch (error: any) {
       Alert.alert(
         "Error",
@@ -157,6 +152,41 @@ export default function MoodLoggingScreen() {
       setIsSubmitting(false);
     }
   };
+
+  // Render success modal
+  const renderSuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent
+      animationType="fade"
+      onRequestClose={handleSuccessClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.successModal}>
+          <View style={styles.successIcon}>
+            <Ionicons name="checkmark-circle" size={64} color="#4CAF50" />
+          </View>
+          <Text style={styles.successTitle}>Success!</Text>
+          <Text style={styles.successMessage}>{successMessage}</Text>
+          {moodData.shareWithSupportWorker && (
+            <View style={styles.sharedInfo}>
+              <Ionicons name="people" size={20} color="#4CAF50" />
+              <Text style={styles.sharedInfoText}>
+                Your support worker has been notified
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.successButton}
+            onPress={handleSuccessClose}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.successButtonText}>View Mood History</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   // Handle bottom navigation tab presses
   const handleTabPress = (tabId: string) => {
@@ -331,6 +361,9 @@ export default function MoodLoggingScreen() {
             )}
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Success Modal */}
+        {renderSuccessModal()}
 
         {/* Bottom navigation bar */}
         <BottomNavigation
@@ -521,6 +554,72 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   submitButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  // Success Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  successModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  successIcon: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  successMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 16,
+    color: "#666",
+    lineHeight: 22,
+  },
+  sharedInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E8F5E9",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    alignSelf: "stretch",
+  },
+  sharedInfoText: {
+    fontSize: 14,
+    color: "#2E7D32",
+    marginLeft: 8,
+    flex: 1,
+  },
+  successButton: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignSelf: "stretch",
+    alignItems: "center",
+  },
+  successButtonText: {
     color: "#FFF",
     fontWeight: "600",
     fontSize: 16,

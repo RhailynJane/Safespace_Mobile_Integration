@@ -1,7 +1,3 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -10,80 +6,56 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "@clerk/clerk-expo";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { journalApi, JournalEntry } from "../../../utils/journalApi";
 
-// Mock data
-const mockUser = {
-  displayName: "Demo User",
-  email: "demo@gmail.com",
-};
-
-const mockProfile = {
-  firstName: "Demo",
-  lastName: "User",
-};
-
-// Mock journal entries data
-const mockJournalEntries = [
-  {
-    id: "1",
-    title: "A Reflective Day",
-    content:
-      "Today I spent time thinking about my goals and aspirations. It was a productive day overall.",
-    mood_type: "reflective",
-    emoji: "🤔",
-    date: "2023-10-15",
-    formattedDate: "Oct 15, 2023",
-    tags: ["reflection", "goals"],
-  },
-  {
-    id: "2",
-    title: "Morning Gratitude",
-    content:
-      "I'm grateful for the beautiful sunrise and the opportunity to start a new day fresh.",
-    mood_type: "grateful",
-    emoji: "🙏",
-    date: "2023-10-14",
-    formattedDate: "Oct 14, 2023",
-    tags: ["gratitude", "morning"],
-  },
+const tabs = [
+  { id: "home", name: "Home", icon: "home" },
+  { id: "community-forum", name: "Community", icon: "people" },
+  { id: "appointments", name: "Appointments", icon: "calendar" },
+  { id: "messages", name: "Messages", icon: "chatbubbles" },
+  { id: "profile", name: "Profile", icon: "person" },
 ];
 
 export default function JournalScreen() {
-  const [journalEntries, setJournalEntries] = useState(mockJournalEntries);
-  const [loading, setLoading] = useState(false); // Set to false since we're using mock data
+  const { user } = useUser();
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journal");
 
-  // No need for backend fetch in this frontend-only version
-  useEffect(() => {
-    // Simulate loading delay for demonstration
-    const timer = setTimeout(() => {
-      setJournalEntries(mockJournalEntries);
+  const fetchRecentEntries = React.useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      const response = await journalApi.getRecentEntries(user.id, 2);
+      setJournalEntries(response.entries || []);
+    } catch (error) {
+      console.error("Error fetching journal entries:", error);
+      Alert.alert("Error", "Failed to load journal entries");
+    } finally {
       setLoading(false);
-    }, 500);
+    }
+  }, [user?.id]);
 
-    return () => clearTimeout(timer);
-  }, []);
+  // Add useFocusEffect to fetch data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        fetchRecentEntries();
+      }
+    }, [user?.id, fetchRecentEntries])
+  );
 
-  // Navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
-
-  /**
-   * Handles tab press navigation
-   * @param tabId - The ID of the tab to navigate to
-   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -93,26 +65,26 @@ export default function JournalScreen() {
     }
   };
 
-  /**
-   * Navigates to the journal creation screen
-   */
   const handleCreateJournal = () => {
     router.push("/(app)/journal/journal-create");
   };
 
-  /**
-   * Navigates to view all journal entries
-   */
   const handleViewAllEntries = () => {
     router.push("/(app)/journal/journal-history");
   };
 
-  /**
-   * Handles pressing on a specific journal entry
-   * @param entryId - The ID of the journal entry to view
-   */
   const handleEntryPress = (entryId: string) => {
     router.push(`/(app)/journal/journal-entry/${entryId}`);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const options: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    };
+    return date.toLocaleDateString("en-US", options);
   };
 
   return (
@@ -126,7 +98,6 @@ export default function JournalScreen() {
               Express your thoughts and feelings
             </Text>
 
-            {/* Create Journal Card - Main call to action */}
             <TouchableOpacity
               style={styles.createCard}
               onPress={handleCreateJournal}
@@ -156,16 +127,18 @@ export default function JournalScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Recent Journal Entries Section */}
             <View style={styles.recentSection}>
               <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
 
               <View style={styles.recentContainer}>
                 {loading ? (
-                  <Text style={styles.noEntriesText}>Loading...</Text>
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                    <Text style={styles.loadingText}>Loading entries...</Text>
+                  </View>
                 ) : journalEntries.length > 0 ? (
                   <>
-                    {journalEntries.slice(0, 2).map((entry) => (
+                    {journalEntries.map((entry) => (
                       <TouchableOpacity
                         key={entry.id}
                         style={styles.entryCard}
@@ -178,13 +151,23 @@ export default function JournalScreen() {
                           <View style={styles.entryInfo}>
                             <Text style={styles.entryTitle}>{entry.title}</Text>
                             <Text style={styles.entryDate}>
-                              {entry.formattedDate}
+                              {formatDate(entry.created_at)}
                             </Text>
                           </View>
                         </View>
                         <Text style={styles.entryPreview} numberOfLines={2}>
                           {entry.content}
                         </Text>
+                        {entry.share_with_support_worker && (
+                          <View style={styles.sharedBadge}>
+                            <Ionicons
+                              name="people"
+                              size={12}
+                              color={Colors.primary}
+                            />
+                            <Text style={styles.sharedText}>Shared</Text>
+                          </View>
+                        )}
                       </TouchableOpacity>
                     ))}
 
@@ -218,7 +201,6 @@ export default function JournalScreen() {
           </View>
         </ScrollView>
 
-        {/* Bottom Navigation Component */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -228,6 +210,7 @@ export default function JournalScreen() {
     </CurvedBackground>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -236,7 +219,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xxl, // Extra padding for bottom nav
+    paddingBottom: Spacing.xxl,
   },
   content: {
     flex: 1,
@@ -254,10 +237,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     marginBottom: Spacing.xxl,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
@@ -304,6 +284,16 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     minHeight: 200,
   },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.xl,
+  },
+  loadingText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
+  },
   entryCard: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
@@ -335,6 +325,22 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textSecondary,
     lineHeight: 18,
+  },
+  sharedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.primary + "20",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  sharedText: {
+    ...Typography.caption,
+    color: Colors.primary,
+    marginLeft: 4,
+    fontSize: 10,
   },
   noEntriesText: {
     ...Typography.caption,
