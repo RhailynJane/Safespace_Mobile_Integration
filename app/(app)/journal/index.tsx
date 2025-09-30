@@ -32,15 +32,7 @@ export default function JournalScreen() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journal");
 
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.id) {
-        fetchRecentEntries();
-      }
-    }, [user?.id])
-  );
-
-  const fetchRecentEntries = async () => {
+  const fetchRecentEntries = React.useCallback(async () => {
     if (!user?.id) return;
 
     try {
@@ -53,7 +45,7 @@ export default function JournalScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

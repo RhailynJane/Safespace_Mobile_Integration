@@ -1,7 +1,3 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -14,6 +10,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Switch,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,29 +19,8 @@ import { Colors, Spacing, Typography } from "../../../../constants/theme";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import { journalApi, JournalEntry } from "../../../../utils/journalApi";
 
-// Mock user data
-const mockUser = {
-  displayName: "Demo User",
-  email: "demo@gmail.com",
-  uid: "demo-user-id",
-};
-
-const mockProfile = {
-  firstName: "Demo",
-  lastName: "User",
-};
-
-// Navigation tabs configuration
-const tabs = [
-  { id: "home", name: "Home", icon: "home" },
-  { id: "community-forum", name: "Community", icon: "people" },
-  { id: "appointments", name: "Appointments", icon: "calendar" },
-  { id: "messages", name: "Messages", icon: "chatbubbles" },
-  { id: "profile", name: "Profile", icon: "person" },
-];
-
-// Emotion types and options for journal entries
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 
 interface EmotionOption {
@@ -60,25 +37,16 @@ const emotionOptions: EmotionOption[] = [
   { id: "very-happy", emoji: "😄", label: "Very Happy" },
 ];
 
-// Mock journal entry data for demonstration
-const mockJournalEntry = {
-  id: "1",
-  title: "My Journal Entry",
-  content:
-    "Today was a productive day. I accomplished many tasks and felt satisfied with my progress.",
-  mood_type: "happy" as EmotionType,
-  emoji: "🙂",
-  tags: ["productive", "satisfied"],
-  created_at: new Date().toISOString(),
-};
+const tabs = [
+  { id: "home", name: "Home", icon: "home" },
+  { id: "community-forum", name: "Community", icon: "people" },
+  { id: "appointments", name: "Appointments", icon: "calendar" },
+  { id: "messages", name: "Messages", icon: "chatbubbles" },
+  { id: "profile", name: "Profile", icon: "person" },
+];
 
-/**
- * JournalEditScreen Component
- *
- * A screen for editing existing journal entries with a beautiful curved background.
- * Users can modify the title, content, and emotional state of their journal entry.
- * Includes navigation controls and a visually appealing interface.
- */
+const MAX_CHARACTERS = 1000;
+
 export default function JournalEditScreen() {
   const { id } = useLocalSearchParams();
   const [journalData, setJournalData] = useState({
@@ -86,17 +54,43 @@ export default function JournalEditScreen() {
     content: "",
     emotion: null as EmotionType | null,
     emoji: "",
-    tags: [] as string[],
+    shareWithSupportWorker: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("journal");
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [characterCount, setCharacterCount] = useState(0);
 
-  /**
-   * Handles navigation tab presses
-   * @param tabId - The ID of the tab to navigate to
-   */
+  useEffect(() => {
+    if (id) {
+      fetchEntry();
+    }
+  }, [id]);
+
+  const fetchEntry = async () => {
+    try {
+      setLoading(true);
+      const response = await journalApi.getEntry(id as string);
+      const entry = response.entry;
+      
+      setJournalData({
+        title: entry.title,
+        content: entry.content,
+        emotion: entry.emotion_type as EmotionType,
+        emoji: entry.emoji || "",
+        shareWithSupportWorker: entry.share_with_support_worker,
+      });
+      setCharacterCount(entry.content.length);
+    } catch (error) {
+      console.error("Error fetching journal entry:", error);
+      Alert.alert("Error", "Failed to load journal entry", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -106,53 +100,17 @@ export default function JournalEditScreen() {
     }
   };
 
-  // Simulate loading journal entry data on component mount
-  useEffect(() => {
-    const fetchEntry = async () => {
-      try {
-        setLoading(true);
-        // Simulate network request delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // Use mock data for frontend demonstration
-        setJournalData({
-          title: mockJournalEntry.title,
-          content: mockJournalEntry.content,
-          emotion: mockJournalEntry.mood_type,
-          emoji: mockJournalEntry.emoji,
-          tags: mockJournalEntry.tags,
-        });
-      } catch (error) {
-        console.error("Error fetching journal entry:", error);
-        Alert.alert("Error", "Failed to load journal entry");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEntry();
-  }, [id]);
-
-  /**
-   * Updates the journal title in state
-   * @param text - The new title text
-   */
   const handleTitleChange = (text: string) => {
     setJournalData((prev) => ({ ...prev, title: text }));
   };
 
-  /**
-   * Updates the journal content in state
-   * @param text - The new content text
-   */
   const handleContentChange = (text: string) => {
-    setJournalData((prev) => ({ ...prev, content: text }));
+    if (text.length <= MAX_CHARACTERS) {
+      setJournalData((prev) => ({ ...prev, content: text }));
+      setCharacterCount(text.length);
+    }
   };
 
-  /**
-   * Handles emotion selection for the journal entry
-   * @param emotion - The selected emotion option
-   */
   const handleEmotionSelect = (emotion: EmotionOption) => {
     setJournalData((prev) => ({
       ...prev,
@@ -161,40 +119,44 @@ export default function JournalEditScreen() {
     }));
   };
 
-  /**
-   * Saves the journal entry changes (frontend simulation)
-   */
+  const handleToggleShare = (value: boolean) => {
+    setJournalData((prev) => ({
+      ...prev,
+      shareWithSupportWorker: value,
+    }));
+  };
+
   const handleSave = async () => {
     if (!journalData.title.trim() || !journalData.content.trim()) {
-      Alert.alert("Missing Fields", "Please fill all fields before saving");
+      Alert.alert("Missing Fields", "Please fill all required fields");
       return;
     }
 
     setSaving(true);
 
     try {
-      // Simulate network request delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // In a real app, this would call an API to save the changes
-      console.log("Saving journal entry:", {
-        ...journalData,
-        id: id || "new-entry",
+      await journalApi.updateEntry(id as string, {
+        title: journalData.title.trim(),
+        content: journalData.content.trim(),
+        emotionType: journalData.emotion || undefined,
+        emoji: journalData.emoji,
+        shareWithSupportWorker: journalData.shareWithSupportWorker,
       });
 
-      // Navigate back after successful "save"
-      router.back();
-    } catch (error) {
+      Alert.alert("Success", "Journal entry updated successfully", [
+        {
+          text: "OK",
+          onPress: () => router.back(),
+        },
+      ]);
+    } catch (error: any) {
       console.error("Error updating journal entry:", error);
-      Alert.alert("Error", "Failed to update journal entry");
+      Alert.alert("Error", error.message || "Failed to update journal entry");
     } finally {
       setSaving(false);
     }
   };
 
-  /**
-   * Handles cancel action with confirmation dialog
-   */
   const handleCancel = () => {
     Alert.alert(
       "Discard Changes?",
@@ -210,28 +172,24 @@ export default function JournalEditScreen() {
     );
   };
 
-  // Show loading state while data is being fetched
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <CurvedBackground>
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <AppHeader title="Edit Journal" showBack={true} showMenu={true} />
           <View style={styles.centered}>
-            <Text>Loading your journal entry...</Text>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Loading entry...</Text>
           </View>
-        </CurvedBackground>
-      </SafeAreaView>
+        </SafeAreaView>
+      </CurvedBackground>
     );
   }
 
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <AppHeader
-          title="Edit Journal"
-          showBack={true}
-          showMenu={true}
-          onMenuPress={() => setSideMenuVisible(true)}
-        />
+        <AppHeader title="Edit Journal" showBack={true} showMenu={true} />
 
         <KeyboardAvoidingView
           style={styles.container}
@@ -239,9 +197,8 @@ export default function JournalEditScreen() {
         >
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.createContainer}>
-              {/* Journal Title Input */}
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Journal Title</Text>
+                <Text style={styles.fieldLabel}>Journal Title *</Text>
                 <TextInput
                   style={styles.titleInput}
                   placeholder="Give your entry a title..."
@@ -251,9 +208,19 @@ export default function JournalEditScreen() {
                 />
               </View>
 
-              {/* Journal Content Input */}
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Write your Entry</Text>
+                <View style={styles.labelRow}>
+                  <Text style={styles.fieldLabel}>Write your Entry *</Text>
+                  <Text
+                    style={[
+                      styles.characterCount,
+                      characterCount >= MAX_CHARACTERS &&
+                        styles.characterCountMax,
+                    ]}
+                  >
+                    {characterCount}/{MAX_CHARACTERS}
+                  </Text>
+                </View>
                 <TextInput
                   style={styles.contentInput}
                   placeholder="Write about your day, feelings or anything on your mind..."
@@ -262,12 +229,12 @@ export default function JournalEditScreen() {
                   multiline
                   textAlignVertical="top"
                   placeholderTextColor={Colors.textTertiary}
+                  maxLength={MAX_CHARACTERS}
                 />
               </View>
 
-              {/* Emotion Selection */}
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Select your Emotion</Text>
+                <Text style={styles.fieldLabel}>Select your Emotion *</Text>
                 <View style={styles.emotionsContainer}>
                   {emotionOptions.map((emotion) => (
                     <TouchableOpacity
@@ -284,13 +251,39 @@ export default function JournalEditScreen() {
                   ))}
                 </View>
               </View>
+
+              <View style={styles.fieldContainer}>
+                <View style={styles.shareContainer}>
+                  <View style={styles.shareTextContainer}>
+                    <Text style={styles.fieldLabel}>
+                      Share with Support Worker
+                    </Text>
+                    <Text style={styles.shareSubtext}>
+                      Your support worker will be able to view this entry
+                    </Text>
+                  </View>
+                  <Switch
+                    value={journalData.shareWithSupportWorker}
+                    onValueChange={handleToggleShare}
+                    trackColor={{
+                      false: Colors.disabled,
+                      true: Colors.primary + "50",
+                    }}
+                    thumbColor={
+                      journalData.shareWithSupportWorker
+                        ? Colors.primary
+                        : Colors.surface
+                    }
+                  />
+                </View>
+              </View>
             </View>
 
-            {/* Action Buttons */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={handleCancel}
+                disabled={saving}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -300,9 +293,11 @@ export default function JournalEditScreen() {
                 onPress={handleSave}
                 disabled={saving}
               >
-                <Text style={styles.saveButtonText}>
-                  {saving ? "Saving..." : "Save Changes"}
-                </Text>
+                {saving ? (
+                  <ActivityIndicator color={Colors.surface} />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -326,7 +321,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: Spacing.xl,
-    paddingBottom: 80, // Space for bottom navigation
+    paddingBottom: 80,
   },
   createContainer: {
     flex: 1,
@@ -339,6 +334,20 @@ const styles = StyleSheet.create({
     ...Typography.subtitle,
     fontWeight: "600",
     marginBottom: Spacing.md,
+  },
+  labelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  characterCount: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+  },
+  characterCountMax: {
+    color: Colors.error,
+    fontWeight: "600",
   },
   titleInput: {
     backgroundColor: Colors.primary + "20",
@@ -372,10 +381,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
@@ -387,6 +393,23 @@ const styles = StyleSheet.create({
   },
   emotionEmoji: {
     fontSize: 24,
+  },
+  shareContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: Spacing.lg,
+  },
+  shareTextContainer: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  shareSubtext: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: 4,
   },
   actionButtons: {
     flexDirection: "row",
@@ -422,5 +445,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
   },
 });
