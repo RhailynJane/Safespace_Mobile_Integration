@@ -47,6 +47,15 @@ export default function JournalScreen() {
     }
   }, [user?.id]);
 
+  // Add useFocusEffect to fetch data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        fetchRecentEntries();
+      }
+    }, [user?.id, fetchRecentEntries])
+  );
+
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
