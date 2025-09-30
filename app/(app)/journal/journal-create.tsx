@@ -1,8 +1,4 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,30 +10,21 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Switch,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "@clerk/clerk-expo";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
 import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { journalApi, JournalTemplate } from "../../../utils/journalApi";
 
-// Mock user data
-const mockUser = {
-  displayName: "Demo User",
-  email: "demo@gmail.com",
-};
-
-const mockProfile = {
-  firstName: "Demo",
-  lastName: "User",
-};
-
-// Emotion type definitions for the journal entry
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 type CreateStep = "create" | "success";
 
-// Emotion option interface and data
 interface EmotionOption {
   id: EmotionType;
   emoji: string;
@@ -52,15 +39,15 @@ const emotionOptions: EmotionOption[] = [
   { id: "very-happy", emoji: "😄", label: "Very Happy" },
 ];
 
-// Journal data interface
 interface JournalData {
   title: string;
   content: string;
   emotion: EmotionType | null;
   emoji: string;
+  templateId: number | null;
+  shareWithSupportWorker: boolean;
 }
 
-// Navigation tabs configuration
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community-forum", name: "Community", icon: "people" },
@@ -69,44 +56,54 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
-/**
- * JournalCreateScreen Component
- *
- * A screen for creating new journal entries with emotion selection.
- * Features a two-step process: creation and success confirmation.
- * Uses mock data for frontend demonstration purposes.
- */
+const MAX_CHARACTERS = 1000;
+
 export default function JournalCreateScreen() {
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
+  const [templates, setTemplates] = useState<JournalTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [journalData, setJournalData] = useState<JournalData>({
     title: "",
     content: "",
     emotion: null,
     emoji: "",
+    templateId: null,
+    shareWithSupportWorker: false,
   });
   const [loading, setLoading] = useState(false);
+  const [characterCount, setCharacterCount] = useState(0);
+  const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
 
-  /**
-   * Handles title input change
-   * @param text - The new title text
-   */
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      setLoadingTemplates(true);
+      const response = await journalApi.getTemplates();
+      setTemplates(response.templates || []);
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+      Alert.alert("Error", "Failed to load journal templates");
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
   const handleTitleChange = (text: string) => {
     setJournalData((prev) => ({ ...prev, title: text }));
   };
 
-  /**
-   * Handles content input change
-   * @param text - The new content text
-   */
   const handleContentChange = (text: string) => {
-    setJournalData((prev) => ({ ...prev, content: text }));
+    if (text.length <= MAX_CHARACTERS) {
+      setJournalData((prev) => ({ ...prev, content: text }));
+      setCharacterCount(text.length);
+    }
   };
 
-  /**
-   * Handles emotion selection
-   * @param emotion - The selected emotion option
-   */
   const handleEmotionSelect = (emotion: EmotionOption) => {
     setJournalData((prev) => ({
       ...prev,
@@ -115,10 +112,20 @@ export default function JournalCreateScreen() {
     }));
   };
 
-  /**
-   * Handles tab press navigation
-   * @param tabId - The ID of the tab to navigate to
-   */
+  const handleTemplateSelect = (templateId: number) => {
+    setJournalData((prev) => ({
+      ...prev,
+      templateId: prev.templateId === templateId ? null : templateId,
+    }));
+  };
+
+  const handleToggleShare = (value: boolean) => {
+    setJournalData((prev) => ({
+      ...prev,
+      shareWithSupportWorker: value,
+    }));
+  };
+
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -128,39 +135,46 @@ export default function JournalCreateScreen() {
     }
   };
 
-  /**
-   * Handles saving the journal entry (mock implementation)
-   * Validates inputs and simulates a successful save
-   */
   const handleSave = async () => {
     if (
       !journalData.title.trim() ||
       !journalData.content.trim() ||
       !journalData.emotion
     ) {
-      Alert.alert("Missing Fields", "Please fill all fields before saving");
+      Alert.alert("Missing Fields", "Please fill all required fields");
+      return;
+    }
+
+    if (!user?.id) {
+      Alert.alert("Error", "User not authenticated");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await journalApi.createEntry({
+        clerkUserId: user.id,
+        title: journalData.title.trim(),
+        content: journalData.content.trim(),
+        emotionType: journalData.emotion,
+        emoji: journalData.emoji,
+        templateId: journalData.templateId || undefined,
+        shareWithSupportWorker: journalData.shareWithSupportWorker,
+      });
 
-      // Mock successful save
-      setCurrentStep("success");
-    } catch (error) {
+      if (response.success) {
+        setSavedEntryId(response.entry.id);
+        setCurrentStep("success");
+      }
+    } catch (error: any) {
       console.error("Error saving journal entry:", error);
-      Alert.alert("Error", "Failed to save journal entry");
+      Alert.alert("Error", error.message || "Failed to save journal entry");
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Handles cancel action with confirmation
-   */
   const handleCancel = () => {
     Alert.alert(
       "Discard Entry?",
@@ -176,16 +190,10 @@ export default function JournalCreateScreen() {
     );
   };
 
-  /**
-   * Handles closing the success screen
-   */
   const handleClose = () => {
     router.push("/(app)/journal");
   };
 
-  /**
-   * Renders the journal creation form
-   */
   const renderCreateStep = () => (
     <View style={styles.createContainer}>
       <Text style={styles.pageTitle}>Add New Journal</Text>
@@ -193,8 +201,47 @@ export default function JournalCreateScreen() {
         Express your thoughts and feelings
       </Text>
 
+      {/* Template Selection */}
+      {!loadingTemplates && templates.length > 0 && (
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Choose a Template (Optional)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {templates.map((template) => (
+              <TouchableOpacity
+                key={template.id}
+                style={[
+                  styles.templateCard,
+                  journalData.templateId === template.id &&
+                    styles.templateCardSelected,
+                ]}
+                onPress={() => handleTemplateSelect(template.id)}
+              >
+                <Ionicons
+                  name={template.icon as any}
+                  size={24}
+                  color={
+                    journalData.templateId === template.id
+                      ? Colors.primary
+                      : Colors.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.templateName,
+                    journalData.templateId === template.id &&
+                      styles.templateNameSelected,
+                  ]}
+                >
+                  {template.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       <View style={styles.fieldContainer}>
-        <Text style={styles.fieldLabel}>Journal Title</Text>
+        <Text style={styles.fieldLabel}>Journal Title *</Text>
         <TextInput
           style={styles.titleInput}
           placeholder="Give your entry a title..."
@@ -205,7 +252,17 @@ export default function JournalCreateScreen() {
       </View>
 
       <View style={styles.fieldContainer}>
-        <Text style={styles.fieldLabel}>Write your Entry</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.fieldLabel}>Write your Entry *</Text>
+          <Text
+            style={[
+              styles.characterCount,
+              characterCount >= MAX_CHARACTERS && styles.characterCountMax,
+            ]}
+          >
+            {characterCount}/{MAX_CHARACTERS}
+          </Text>
+        </View>
         <TextInput
           style={styles.contentInput}
           placeholder="Write about your day, feelings or anything on your mind..."
@@ -214,11 +271,12 @@ export default function JournalCreateScreen() {
           multiline
           textAlignVertical="top"
           placeholderTextColor={Colors.textTertiary}
+          maxLength={MAX_CHARACTERS}
         />
       </View>
 
       <View style={styles.fieldContainer}>
-        <Text style={styles.fieldLabel}>Select your Emotion</Text>
+        <Text style={styles.fieldLabel}>Select your Emotion *</Text>
         <View style={styles.emotionsContainer}>
           {emotionOptions.map((emotion) => (
             <TouchableOpacity
@@ -235,78 +293,46 @@ export default function JournalCreateScreen() {
           ))}
         </View>
       </View>
+
+      <View style={styles.fieldContainer}>
+        <View style={styles.shareContainer}>
+          <View style={styles.shareTextContainer}>
+            <Text style={styles.fieldLabel}>Share with Support Worker</Text>
+            <Text style={styles.shareSubtext}>
+              Your support worker will be able to view this entry
+            </Text>
+          </View>
+          <Switch
+            value={journalData.shareWithSupportWorker}
+            onValueChange={handleToggleShare}
+            trackColor={{ false: Colors.disabled, true: Colors.primary + "50" }}
+            thumbColor={
+              journalData.shareWithSupportWorker
+                ? Colors.primary
+                : Colors.surface
+            }
+          />
+        </View>
+      </View>
     </View>
   );
 
-  /**
-   * Renders the success confirmation screen
-   */
   const renderSuccessStep = () => (
     <View style={styles.successContainer}>
-      <Text style={styles.pageTitle}>Express your thoughts and feelings</Text>
-
-      <View style={styles.createCardDisabled}>
-        <View style={styles.createCardContent}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="book" size={32} color={Colors.warning} />
-          </View>
-
-          <View style={styles.createTextContainer}>
-            <Text style={styles.createTitle}>Create Journal</Text>
-            <Text style={styles.createSubtitle}>
-              Set up a journal based on your current mood & conditions
-            </Text>
-          </View>
-
-          <View style={styles.createButton}>
-            <Ionicons
-              name="add-circle-outline"
-              size={28}
-              color={Colors.textSecondary}
-            />
-          </View>
-        </View>
-      </View>
-
       <View style={styles.successMessage}>
+        <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
         <Text style={styles.successTitle}>Entry Saved!</Text>
         <Text style={styles.successSubtitle}>
           Your journal entry has been saved successfully
         </Text>
 
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-          <Text style={styles.closeButtonText}>Close</Text>
+          <Text style={styles.closeButtonText}>View All Entries</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.recentSection}>
-        <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
-
-        <View style={styles.recentContainer}>
-          <View style={styles.entryCard}>
-            <View style={styles.entryHeader}>
-              <Text style={styles.entryEmoji}>{journalData.emoji}</Text>
-              <View style={styles.entryInfo}>
-                <Text style={styles.entryTitle}>{journalData.title}</Text>
-                <Text style={styles.entryDate}>Today, 9:41 AM</Text>
-              </View>
-            </View>
-            <Text style={styles.entryPreview} numberOfLines={2}>
-              {journalData.content}
-            </Text>
-          </View>
-
-          <TouchableOpacity style={styles.viewAllButton}>
-            <Text style={styles.viewAllText}>View Journal Entries</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </View>
   );
 
-  /**
-   * Renders the action buttons (Cancel/Save)
-   */
   const renderActionButtons = () => {
     if (currentStep === "success") return null;
 
@@ -321,9 +347,11 @@ export default function JournalCreateScreen() {
           onPress={handleSave}
           disabled={loading}
         >
-          <Text style={styles.saveButtonText}>
-            {loading ? "Saving..." : "Save"}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color={Colors.surface} />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -390,6 +418,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: Spacing.md,
   },
+  labelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  characterCount: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+  },
+  characterCountMax: {
+    color: Colors.error,
+    fontWeight: "600",
+  },
   titleInput: {
     backgroundColor: Colors.primary + "20",
     borderRadius: 12,
@@ -409,6 +451,29 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
   },
+  templateCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: Spacing.lg,
+    marginRight: Spacing.md,
+    alignItems: "center",
+    minWidth: 100,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  templateCardSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + "10",
+  },
+  templateName: {
+    ...Typography.caption,
+    marginTop: Spacing.sm,
+    color: Colors.textSecondary,
+  },
+  templateNameSelected: {
+    color: Colors.primary,
+    fontWeight: "600",
+  },
   emotionsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -422,10 +487,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
@@ -437,6 +499,23 @@ const styles = StyleSheet.create({
   },
   emotionEmoji: {
     fontSize: 24,
+  },
+  shareContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: Spacing.lg,
+  },
+  shareTextContainer: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  shareSubtext: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: 4,
   },
   actionButtons: {
     flexDirection: "row",
@@ -471,57 +550,13 @@ const styles = StyleSheet.create({
   successContainer: {
     flex: 1,
     paddingTop: Spacing.xl,
-  },
-  createCardDisabled: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: Spacing.xl,
-    marginBottom: Spacing.xl,
-    opacity: 0.6,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  createCardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.warning + "20",
-    alignItems: "center",
     justifyContent: "center",
-    marginRight: Spacing.lg,
-  },
-  createTextContainer: {
-    flex: 1,
-  },
-  createTitle: {
-    ...Typography.subtitle,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  createSubtitle: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  createButton: {
-    padding: Spacing.sm,
-    marginBottom: 20,
   },
   successMessage: {
     alignItems: "center",
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: Spacing.xl,
-    marginBottom: Spacing.xl,
+    padding: Spacing.xxl,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -530,12 +565,13 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     ...Typography.title,
+    marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
   },
   successSubtitle: {
     ...Typography.caption,
     textAlign: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
     color: Colors.textSecondary,
   },
   closeButton: {
@@ -546,57 +582,5 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     ...Typography.button,
-  },
-  recentSection: {
-    flex: 1,
-  },
-  sectionTitle: {
-    ...Typography.subtitle,
-    fontWeight: "600",
-    marginBottom: Spacing.lg,
-  },
-  recentContainer: {
-    backgroundColor: Colors.primary + "20",
-    borderRadius: 16,
-    padding: Spacing.xl,
-  },
-  entryCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  entryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  entryEmoji: {
-    fontSize: 24,
-    marginRight: Spacing.md,
-  },
-  entryInfo: {
-    flex: 1,
-  },
-  entryTitle: {
-    ...Typography.body,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  entryDate: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  entryPreview: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-  },
-  viewAllButton: {
-    alignItems: "center",
-  },
-  viewAllText: {
-    ...Typography.link,
-    textDecorationLine: "underline",
   },
 });

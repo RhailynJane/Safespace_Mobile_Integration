@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { Pool } from 'pg';
 
+
 const app = express();
 const PORT = 3001;
 
@@ -753,5 +754,461 @@ app.get('/api/moods/factors/:clerkUserId', async (req: Request, res: Response) =
       error: 'Failed to fetch factors',
       details: error.message
     });
+  }
+});
+
+
+// journal.types.ts
+export interface CreateJournalRequest {
+  clerkUserId: string;
+  title: string;
+  content: string;
+  emotionType?: 'very-sad' | 'sad' | 'neutral' | 'happy' | 'very-happy';
+  emoji?: string;
+  templateId?: number;
+  tags?: string[];
+  shareWithSupportWorker?: boolean;
+}
+
+export interface UpdateJournalRequest {
+  title?: string;
+  content?: string;
+  emotionType?: string;
+  emoji?: string;
+  tags?: string[];
+  shareWithSupportWorker?: boolean;
+}
+
+export interface JournalFilters {
+  emotionType?: string;
+  startDate?: string;
+  endDate?: string;
+  tags?: string;
+  limit?: number;
+  offset?: number;
+}
+
+
+// =============================================
+// JOURNALING ENDPOINTS
+// =============================================
+
+// Get all templates
+app.get('/api/journal/templates', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, description, prompts, icon, created_at 
+       FROM journal_templates 
+       ORDER BY name`
+    );
+
+    res.json({ 
+      templates: result.rows,
+      count: result.rows.length
+    });
+  } catch (error: any) {
+    console.error('Error fetching journal templates:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch journal templates',
+      details: error.message
+    });
+  }
+});
+
+// Create a new journal entry
+app.post('/api/journal', async (req: Request<{}, {}, CreateJournalRequest>, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { 
+      clerkUserId, 
+      title, 
+      content, 
+      emotionType, 
+      emoji, 
+      templateId,
+      tags, 
+      shareWithSupportWorker 
+    } = req.body;
+
+    // Validation
+    if (!clerkUserId || !title || !content) {
+      return res.status(400).json({ 
+        error: 'clerkUserId, title, and content are required' 
+      });
+    }
+
+    if (content.length > 1000) {
+      return res.status(400).json({ 
+        error: 'Content must not exceed 1000 characters' 
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Get user's internal ID
+    const userResult = await client.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Insert journal entry
+    const entryResult = await client.query(
+      `INSERT INTO journal_entries (
+        user_id, clerk_user_id, title, content, emotion_type, emoji, 
+        template_id, share_with_support_worker
+      ) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+       RETURNING id, title, content, emotion_type, emoji, template_id, 
+                 share_with_support_worker, created_at, updated_at`,
+      [
+        userId, 
+        clerkUserId, 
+        title, 
+        content, 
+        emotionType || null, 
+        emoji || null,
+        templateId || null,
+        shareWithSupportWorker || false
+      ]
+    );
+
+    const entry = entryResult.rows[0];
+
+    // Insert tags if provided
+    if (tags && tags.length > 0) {
+      const tagInserts = tags.map(tag =>
+        client.query(
+          'INSERT INTO journal_tags (journal_entry_id, tag) VALUES ($1, $2)',
+          [entry.id, tag]
+        )
+      );
+      await Promise.all(tagInserts);
+    }
+
+    await client.query('COMMIT');
+
+    // Get complete entry with tags
+    const completeEntry = await client.query(
+      `SELECT 
+        je.id, je.title, je.content, je.emotion_type, je.emoji, 
+        je.template_id, je.share_with_support_worker, je.created_at, je.updated_at,
+        COALESCE(
+          json_agg(jt.tag) FILTER (WHERE jt.tag IS NOT NULL),
+          '[]'
+        ) as tags
+      FROM journal_entries je
+      LEFT JOIN journal_tags jt ON je.id = jt.journal_entry_id
+      WHERE je.id = $1
+      GROUP BY je.id`,
+      [entry.id]
+    );
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Journal entry created successfully',
+      entry: completeEntry.rows[0]
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error creating journal entry:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to create journal entry',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Get recent journal entries
+app.get('/api/journal/recent/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 10;
+
+    const result = await pool.query(
+      `SELECT 
+        je.id, je.title, je.content, je.emotion_type, je.emoji, 
+        je.template_id, je.share_with_support_worker, je.created_at, je.updated_at,
+        COALESCE(
+          json_agg(jt.tag) FILTER (WHERE jt.tag IS NOT NULL),
+          '[]'
+        ) as tags
+      FROM journal_entries je
+      LEFT JOIN journal_tags jt ON je.id = jt.journal_entry_id
+      WHERE je.clerk_user_id = $1
+      GROUP BY je.id
+      ORDER BY je.created_at DESC
+      LIMIT $2`,
+      [clerkUserId, limit]
+    );
+
+    res.json({ 
+      entries: result.rows,
+      count: result.rows.length
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching recent journal entries:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch recent journal entries',
+      details: error.message
+    });
+  }
+});
+
+// Get journal history with filters
+app.get('/api/journal/history/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { 
+      emotionType, 
+      startDate, 
+      endDate, 
+      tags, 
+      limit = '50', 
+      offset = '0' 
+    } = req.query as any;
+
+    let query = `
+      SELECT 
+        je.id, je.title, je.content, je.emotion_type, je.emoji, 
+        je.template_id, je.share_with_support_worker, je.created_at, je.updated_at,
+        COALESCE(
+          json_agg(jt.tag) FILTER (WHERE jt.tag IS NOT NULL),
+          '[]'
+        ) as tags
+      FROM journal_entries je
+      LEFT JOIN journal_tags jt ON je.id = jt.journal_entry_id
+      WHERE je.clerk_user_id = $1
+    `;
+
+    const params: any[] = [clerkUserId];
+    let paramIndex = 2;
+
+    // Filter by emotion type
+    if (emotionType) {
+      query += ` AND je.emotion_type = $${paramIndex}`;
+      params.push(emotionType);
+      paramIndex++;
+    }
+
+    // Filter by date range
+    if (startDate) {
+      query += ` AND je.created_at >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      query += ` AND je.created_at <= $${paramIndex}`;
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    query += ` GROUP BY je.id`;
+
+    // Filter by tags (after grouping)
+    if (tags) {
+      const tagArray = tags.split(',').map((t: string) => t.trim());
+      query += ` HAVING bool_or(jt.tag = ANY($${paramIndex}))`;
+      params.push(tagArray);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY je.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const result = await pool.query(query, params);
+
+    // Get total count
+    const countResult = await pool.query(
+      'SELECT COUNT(*) FROM journal_entries WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    res.json({ 
+      entries: result.rows,
+      count: result.rows.length,
+      total: parseInt(countResult.rows[0].count),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching journal history:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch journal history',
+      details: error.message
+    });
+  }
+});
+
+// Get single journal entry by ID
+app.get('/api/journal/:entryId', async (req: Request, res: Response) => {
+  try {
+    const { entryId } = req.params;
+
+    const result = await pool.query(
+      `SELECT 
+        je.id, je.title, je.content, je.emotion_type, je.emoji, 
+        je.template_id, je.share_with_support_worker, je.created_at, je.updated_at,
+        COALESCE(
+          json_agg(jt.tag) FILTER (WHERE jt.tag IS NOT NULL),
+          '[]'
+        ) as tags
+      FROM journal_entries je
+      LEFT JOIN journal_tags jt ON je.id = jt.journal_entry_id
+      WHERE je.id = $1
+      GROUP BY je.id`,
+      [entryId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Journal entry not found' });
+    }
+
+    res.json({ entry: result.rows[0] });
+
+  } catch (error: any) {
+    console.error('Error fetching journal entry:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch journal entry',
+      details: error.message
+    });
+  }
+});
+
+// Update journal entry
+app.put('/api/journal/:entryId', async (req: Request<{entryId: string}, {}, UpdateJournalRequest>, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { entryId } = req.params;
+    const { title, content, emotionType, emoji, tags, shareWithSupportWorker } = req.body;
+
+    if (content && content.length > 1000) {
+      return res.status(400).json({ 
+        error: 'Content must not exceed 1000 characters' 
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Update journal entry
+    const updateResult = await client.query(
+      `UPDATE journal_entries 
+       SET title = COALESCE($1, title),
+           content = COALESCE($2, content),
+           emotion_type = COALESCE($3, emotion_type),
+           emoji = COALESCE($4, emoji),
+           share_with_support_worker = COALESCE($5, share_with_support_worker),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $6
+       RETURNING *`,
+      [title, content, emotionType, emoji, shareWithSupportWorker, entryId]
+    );
+
+    if (updateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Journal entry not found' });
+    }
+
+    // Update tags if provided
+    if (tags) {
+      // Delete existing tags
+      await client.query('DELETE FROM journal_tags WHERE journal_entry_id = $1', [entryId]);
+      
+      // Insert new tags
+      if (tags.length > 0) {
+        const tagInserts = tags.map((tag: string) =>
+          client.query(
+            'INSERT INTO journal_tags (journal_entry_id, tag) VALUES ($1, $2)',
+            [entryId, tag]
+          )
+        );
+        await Promise.all(tagInserts);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    res.json({ 
+      success: true, 
+      message: 'Journal entry updated successfully',
+      entry: updateResult.rows[0]
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error updating journal entry:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to update journal entry',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete journal entry
+app.delete('/api/journal/:entryId', async (req: Request, res: Response) => {
+  try {
+    const { entryId } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM journal_entries WHERE id = $1 RETURNING id',
+      [entryId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Journal entry not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Journal entry deleted successfully' 
+    });
+
+  } catch (error: any) {
+    console.error('Error deleting journal entry:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to delete journal entry',
+      details: error.message
+    });
+  }
+});
+
+// Get entries shared with support worker
+app.get('/api/journal/shared/:supportWorkerId', async (req: Request, res: Response) => {
+  try {
+    const { supportWorkerId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT 
+        je.id, je.title, je.content, je.emotion_type, je.emoji, je.created_at,
+        u.first_name, u.last_name, u.clerk_user_id
+      FROM journal_entries je
+      JOIN users u ON je.user_id = u.id
+      WHERE je.share_with_support_worker = TRUE
+        AND u.assigned_support_worker_id = $1
+      ORDER BY je.created_at DESC
+      LIMIT 50`,
+      [supportWorkerId]
+    );
+
+    res.json({ entries: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching shared journal entries:', error.message);
+    res.status(500).json({ error: 'Failed to fetch shared entries' });
   }
 });
