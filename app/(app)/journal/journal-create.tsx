@@ -56,7 +56,7 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
-const MAX_CHARACTERS = 2000;
+const MAX_CHARACTERS = 1000;
 
 export default function JournalCreateScreen() {
   const { user } = useUser();
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
-    height: 150,
+    height: 450,
     borderWidth: 1,
     borderColor: Colors.disabled,
     textAlignVertical: 'top',
