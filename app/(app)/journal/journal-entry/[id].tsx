@@ -33,25 +33,25 @@ export default function JournalEntryScreen() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    const fetchEntry = async () => {
+      try {
+        setLoading(true);
+        const response = await journalApi.getEntry(id as string);
+        setEntry(response.entry);
+      } catch (error) {
+        console.error("Error fetching journal entry:", error);
+        Alert.alert("Error", "Failed to load journal entry", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (id) {
       fetchEntry();
     }
   }, [id]);
-
-  const fetchEntry = async () => {
-    try {
-      setLoading(true);
-      const response = await journalApi.getEntry(id as string);
-      setEntry(response.entry);
-    } catch (error) {
-      console.error("Error fetching journal entry:", error);
-      Alert.alert("Error", "Failed to load journal entry", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
