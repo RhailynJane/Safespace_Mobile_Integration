@@ -155,7 +155,10 @@ export default function JournalEntryScreen() {
       <SafeAreaView style={styles.container}>
         <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
 
-        <ScrollView style={styles.content}>
+        <ScrollView 
+          style={styles.content}
+          contentContainerStyle={styles.scrollContent}
+        >
           <View style={styles.entryHeader}>
             <Text style={styles.entryDate}>{formatDate(entry.created_at)}</Text>
             <Text style={styles.entryTitle}>{entry.title}</Text>
@@ -189,7 +192,7 @@ export default function JournalEntryScreen() {
 
           <View style={styles.entryActions}>
             <TouchableOpacity
-              style={styles.entryActionButton}
+              style={styles.editButton}
               onPress={handleEdit}
               disabled={deleting}
             >
@@ -198,11 +201,10 @@ export default function JournalEntryScreen() {
                 size={20}
                 color={Colors.primary}
               />
-              <Text style={styles.actionButtonText}>Edit</Text>
+              <Text style={styles.editButtonText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
-                styles.entryActionButton,
                 styles.deleteButton,
                 deleting && styles.disabledButton,
               ]}
@@ -210,11 +212,11 @@ export default function JournalEntryScreen() {
               disabled={deleting}
             >
               {deleting ? (
-                <ActivityIndicator size="small" color={Colors.error} />
+                <ActivityIndicator size="small" color={Colors.surface} />
               ) : (
                 <>
-                  <Ionicons name="trash-outline" size={20} color={Colors.error} />
-                  <Text style={[styles.actionButtonText, styles.deleteText]}>
+                  <Ionicons name="trash-outline" size={20} color={Colors.surface} />
+                  <Text style={styles.deleteButtonText}>
                     Delete
                   </Text>
                 </>
@@ -242,7 +244,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
-    marginBottom: 60,
+  },
+  scrollContent: {
+    paddingBottom: 150,
   },
   loadingContainer: {
     flex: 1,
@@ -336,7 +340,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xxl,
     gap: Spacing.md,
   },
-  entryActionButton: {
+  editButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -344,24 +348,33 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderRadius: 12,
     backgroundColor: Colors.surface,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: Colors.primary,
   },
-  deleteButton: {
-    backgroundColor: Colors.error + "15",
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  actionButtonText: {
+  editButtonText: {
     ...Typography.button,
     color: Colors.primary,
     marginLeft: Spacing.sm,
+    fontWeight: "600",
   },
-  deleteText: {
-    color: Colors.error,
+  deleteButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.lg,
+    borderRadius: 12,
+    backgroundColor: Colors.error,
+    borderWidth: 2,
+    borderColor: Colors.error,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  deleteButtonText: {
+    ...Typography.button,
+    color: Colors.surface,
+    marginLeft: Spacing.sm,
+    fontWeight: "600",
   },
 });
