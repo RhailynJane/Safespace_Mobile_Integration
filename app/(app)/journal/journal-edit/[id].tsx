@@ -61,13 +61,7 @@ export default function JournalEditScreen() {
   const [activeTab, setActiveTab] = useState("journal");
   const [characterCount, setCharacterCount] = useState(0);
 
-  useEffect(() => {
-    if (id) {
-      fetchEntry();
-    }
-  }, [id]);
-
-  const fetchEntry = async () => {
+  const fetchEntry = React.useCallback(async () => {
     try {
       setLoading(true);
       const response = await journalApi.getEntry(id as string);
@@ -89,7 +83,13 @@ export default function JournalEditScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchEntry();
+    }
+  }, [id, fetchEntry]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
