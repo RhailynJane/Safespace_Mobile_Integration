@@ -77,16 +77,37 @@ export default function MoodHistoryScreen() {
       };
 
       if (selectedMoodType) filters.moodType = selectedMoodType;
-      if (startDate) filters.startDate = startDate.toISOString();
+      
+      // Fix date filtering logic
+      if (startDate) {
+        // Set start date to beginning of day
+        const startOfDay = new Date(startDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        filters.startDate = startOfDay.toISOString();
+      }
+      
       if (endDate) {
         // Set end date to end of day
         const endOfDay = new Date(endDate);
         endOfDay.setHours(23, 59, 59, 999);
         filters.endDate = endOfDay.toISOString();
+      } else if (startDate && !endDate) {
+        // If only start date is selected, search for that single day
+        const endOfDay = new Date(startDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        filters.endDate = endOfDay.toISOString();
       }
+      
       if (selectedFactors.length > 0) {
         filters.factors = selectedFactors.join(",");
       }
+
+      console.log('Loading mood history with filters:', {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        moodType: filters.moodType,
+        factors: filters.factors
+      });
 
       const data = await moodApi.getMoodHistory(user.id, filters);
 
@@ -99,6 +120,8 @@ export default function MoodHistoryScreen() {
       }
 
       setHasMore(data.moods.length === LIMIT);
+      
+      console.log('Loaded', data.moods.length, 'mood entries');
     } catch (error) {
       console.error("Error loading mood history:", error);
       if (reset && moodHistory.length === 0) {
@@ -380,7 +403,17 @@ export default function MoodHistoryScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="sad-outline" size={48} color="#999" />
-              <Text style={styles.emptyText}>No mood entries found</Text>
+              <Text style={styles.emptyText}>
+                {activeFiltersCount > 0 
+                  ? "No mood entries found for the selected filters" 
+                  : "No mood entries found"
+                }
+              </Text>
+              {activeFiltersCount > 0 && (
+                <Text style={styles.emptySubtext}>
+                  Try adjusting your filters or clear them to see all entries
+                </Text>
+              )}
               <TouchableOpacity
                 style={styles.addButton}
                 onPress={() => router.push("/(app)/mood-tracking")}
@@ -491,6 +524,7 @@ export default function MoodHistoryScreen() {
                 {/* End Date */}
                 <View style={styles.dateInputContainer}>
                   <Text style={styles.dateLabel}>To:</Text>
+                  <Text style={styles.dateHint}>(Leave empty for single day)</Text>
                   <TouchableOpacity
                     style={styles.dateButton}
                     onPress={() => setShowEndDatePicker(true)}
@@ -711,6 +745,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#999",
     marginTop: 16,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "#999",
     marginBottom: 24,
     textAlign: "center",
   },
@@ -838,6 +878,12 @@ const styles = StyleSheet.create({
   dateButtonText: {
     fontSize: 14,
     color: "#333",
+  },
+  dateHint: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: 'italic',
+    marginLeft: 8,
   },
   modalActions: {
     flexDirection: "row",
