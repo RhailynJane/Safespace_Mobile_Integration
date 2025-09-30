@@ -58,12 +58,27 @@ export default function JournalHistoryScreen() {
     } else if (activeFilter === "month") {
       startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     } else if (activeFilter === "custom" && customStartDate) {
+      // For custom dates, set start date to beginning of day
       startDate = new Date(customStartDate);
+      startDate.setHours(0, 0, 0, 0); // Start of day
+      
       if (customEndDate) {
         endDate = new Date(customEndDate);
         endDate.setHours(23, 59, 59, 999); // End of day
+      } else {
+        // If no end date is selected, only filter by start date (single day)
+        endDate = new Date(customStartDate);
+        endDate.setHours(23, 59, 59, 999); // End of the same day
       }
     }
+
+    console.log('Date filters:', {
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      activeFilter,
+      customStartDate: customStartDate?.toISOString(),
+      customEndDate: customEndDate?.toISOString()
+    });
 
     return {
       ...(startDate && { startDate: startDate.toISOString() }),
@@ -77,7 +92,11 @@ export default function JournalHistoryScreen() {
     try {
       setLoading(true);
       const filters = getDateFilters();
+      console.log('Fetching entries with filters:', filters);
+      
       const response = await journalApi.getHistory(user.id, filters);
+      console.log('API response:', response.entries?.length, 'entries');
+      
       setEntries(response.entries || []);
       setFilteredEntries(response.entries || []);
     } catch (error) {
@@ -86,7 +105,7 @@ export default function JournalHistoryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, getDateFilters]); // Now getDateFilters is in the dependency array
+  }, [user?.id, getDateFilters]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -133,6 +152,8 @@ export default function JournalHistoryScreen() {
     } else {
       setCustomStartDate(null);
       setCustomEndDate(null);
+      // Fetch entries immediately when switching to non-custom filters
+      fetchEntries();
     }
   };
 
@@ -175,6 +196,7 @@ export default function JournalHistoryScreen() {
     setCustomEndDate(null);
     setActiveFilter("all");
     setShowDatePicker(false);
+    fetchEntries();
   };
 
   const formatDate = (dateString: string) => {
@@ -321,6 +343,7 @@ export default function JournalHistoryScreen() {
               <Text style={styles.activeDateText}>
                 {formatDateForDisplay(customStartDate)}
                 {customEndDate && ` - ${formatDateForDisplay(customEndDate)}`}
+                {!customEndDate && " (Single Day)"}
               </Text>
               <TouchableOpacity onPress={handleClearDateFilter}>
                 <Ionicons name="close-circle" size={20} color={Colors.primary} />
@@ -354,14 +377,18 @@ export default function JournalHistoryScreen() {
                 <Text style={styles.emptyStateText}>
                   {searchQuery
                     ? "No entries match your search"
+                    : activeFilter === "custom" 
+                    ? "No entries found for selected date range"
                     : "No journal entries yet"}
                 </Text>
                 <Text style={styles.emptyStateSubtext}>
                   {searchQuery
                     ? "Try a different search term"
+                    : activeFilter === "custom"
+                    ? "Try selecting a different date range"
                     : "Start writing to capture your thoughts and feelings"}
                 </Text>
-                {!searchQuery && (
+                {!searchQuery && activeFilter !== "custom" && (
                   <TouchableOpacity
                     style={styles.addEntryButton}
                     onPress={() => router.push("/(app)/journal/journal-create")}
@@ -414,6 +441,9 @@ export default function JournalHistoryScreen() {
 
               <View style={styles.dateInputContainer}>
                 <Text style={styles.dateLabel}>End Date (Optional)</Text>
+                <Text style={styles.dateHint}>
+                  Leave empty to search for a single day
+                </Text>
                 <TouchableOpacity 
                   style={styles.dateInput}
                   onPress={() => setShowEndDatePicker(true)}
@@ -422,7 +452,7 @@ export default function JournalHistoryScreen() {
                     styles.dateInputText,
                     !customEndDate && styles.dateInputPlaceholder
                   ]}>
-                    {customEndDate ? formatDateForDisplay(customEndDate) : "Select end date"}
+                    {customEndDate ? formatDateForDisplay(customEndDate) : "Select end date (optional)"}
                   </Text>
                   <Ionicons name="calendar" size={20} color={Colors.textSecondary} />
                 </TouchableOpacity>
@@ -752,6 +782,12 @@ const styles = StyleSheet.create({
   },
   dateInputPlaceholder: {
     color: Colors.textTertiary,
+  },
+  dateHint: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    fontStyle: 'italic',
   },
   modalButtons: {
     flexDirection: "row",
