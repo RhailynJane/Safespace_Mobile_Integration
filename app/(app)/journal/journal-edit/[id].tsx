@@ -12,6 +12,7 @@ import {
   Platform,
   Switch,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -60,6 +61,8 @@ export default function JournalEditScreen() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("journal");
   const [characterCount, setCharacterCount] = useState(0);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const fetchEntry = React.useCallback(async () => {
     try {
@@ -147,18 +150,25 @@ export default function JournalEditScreen() {
         shareWithSupportWorker: journalData.shareWithSupportWorker,
       });
 
-      Alert.alert("Success", "Journal entry updated successfully", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+      // Set success message based on sharing status
+      if (journalData.shareWithSupportWorker) {
+        setSuccessMessage("Journal updated and shared with your support worker");
+      } else {
+        setSuccessMessage("Journal entry updated successfully");
+      }
+      
+      setShowSuccessModal(true);
     } catch (error: any) {
       console.error("Error updating journal entry:", error);
       Alert.alert("Error", error.message || "Failed to update journal entry");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    router.back();
   };
 
   const handleCancel = () => {
@@ -175,6 +185,40 @@ export default function JournalEditScreen() {
       ]
     );
   };
+
+  const renderSuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent
+      animationType="fade"
+      onRequestClose={handleSuccessClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.successModal}>
+          <View style={styles.successIcon}>
+            <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
+          </View>
+          <Text style={styles.successTitle}>Success!</Text>
+          <Text style={styles.successMessage}>{successMessage}</Text>
+          {journalData.shareWithSupportWorker && (
+            <View style={styles.sharedInfo}>
+              <Ionicons name="people" size={20} color={Colors.primary} />
+              <Text style={styles.sharedInfoText}>
+                Your support worker has been notified
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.successButton}
+            onPress={handleSuccessClose}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.successButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   if (loading) {
     return (
@@ -204,6 +248,11 @@ export default function JournalEditScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.createContainer}>
+              <Text style={styles.pageTitle}>Edit Journal Entry</Text>
+              <Text style={styles.pageSubtitle}>
+                Update your thoughts and feelings
+              </Text>
+
               <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>Journal Title *</Text>
                 <TextInput
@@ -320,6 +369,8 @@ export default function JournalEditScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
 
+        {renderSuccessModal()}
+
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -395,7 +446,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     ...Typography.body,
     color: Colors.textPrimary,
-    height: 450,
+    height: 150,
     borderWidth: 1,
     borderColor: Colors.disabled,
     textAlignVertical: 'top',
@@ -424,7 +475,7 @@ const styles = StyleSheet.create({
   },
   emotionButtonSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primary + "08", // Very subtle background
+    backgroundColor: Colors.primary + "08",
   },
   emotionEmoji: {
     fontSize: 28,
@@ -500,5 +551,62 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textSecondary,
     marginTop: Spacing.md,
+  },
+  // Success Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  successModal: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: Spacing.xxl,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  successIcon: {
+    marginBottom: Spacing.lg,
+  },
+  successTitle: {
+    ...Typography.title,
+    marginBottom: Spacing.md,
+    textAlign: "center",
+  },
+  successMessage: {
+    ...Typography.body,
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+  },
+  sharedInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primary + "20",
+    borderRadius: 12,
+    padding: Spacing.md,
+    marginBottom: Spacing.xl,
+    alignSelf: "stretch",
+  },
+  sharedInfoText: {
+    ...Typography.caption,
+    color: Colors.primary,
+    marginLeft: Spacing.sm,
+    flex: 1,
+  },
+  successButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    alignSelf: "stretch",
+    alignItems: "center",
+  },
+  successButtonText: {
+    ...Typography.button,
   },
 });
