@@ -47,7 +47,7 @@ export default function PostSuccessScreen() {
    * Handles navigation to view the newly created post
    */
   const handleViewPost = () => {
-    router.replace("/(app)/(tabs)/community-forum/main");
+    router.replace("/(app)/(tabs)/community-forum");
   };
 
   /**

@@ -91,7 +91,7 @@ export default function CreatePostScreen() {
       });
       
       Alert.alert("✅ Draft Saved", "Your post has been saved as a draft. You can find it in your profile.");
-      router.push("/community-forum/main");
+      router.push("/community-forum");
     } catch (error) {
       console.error('Error saving draft:', error);
       Alert.alert("Save Failed", "Unable to save draft. Please try again.");

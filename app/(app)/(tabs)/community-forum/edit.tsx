@@ -104,7 +104,7 @@ export default function EditPostScreen() {
             try {
               await communityApi.deletePost(postId);
               Alert.alert("Success", "Post deleted successfully!");
-              router.replace("/community-forum.main");
+              router.replace("/community-forum");
             } catch (error) {
               console.error("Error deleting post:", error);
               Alert.alert("Error", "Failed to delete post");
