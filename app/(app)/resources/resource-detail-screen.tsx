@@ -8,26 +8,17 @@ import {
   ScrollView,
   TouchableOpacity,
   Share,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
-import { 
-  isBookmarked as checkLocalBookmark, 
-  addBookmark as addLocalBookmark, 
-  removeBookmark as removeLocalBookmark 
-} from "../../../utils/resourcesApi";
 
 export default function ResourceDetailScreen() {
   const params = useLocalSearchParams();
-  const { userId } = useAuth();
   
-  const [bookmarked, setBookmarked] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Extract resource data from params
   const resource = {
@@ -41,21 +32,6 @@ export default function ResourceDetailScreen() {
     backgroundColor: params.backgroundColor as string,
   };
 
-  useEffect(() => {
-    const checkBookmarkStatus = async () => {
-      try {
-        const isBooked = await checkLocalBookmark(resource.id);
-        setBookmarked(isBooked);
-      } catch (error) {
-        console.error("Error checking bookmark status:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkBookmarkStatus();
-  }, [resource.id]);
-
   // Handle share functionality
   const handleShare = async () => {
     try {
@@ -66,24 +42,6 @@ export default function ResourceDetailScreen() {
       await Share.share({ message });
     } catch (error) {
       console.error("Error sharing:", error);
-    }
-  };
-
-  // Handle bookmark toggle
-  const handleBookmark = async () => {
-    try {
-      if (bookmarked) {
-        await removeLocalBookmark(resource.id);
-        setBookmarked(false);
-        Alert.alert("Removed", "Resource removed from your bookmarks");
-      } else {
-        await addLocalBookmark(resource.id);
-        setBookmarked(true);
-        Alert.alert("Saved", "Resource saved to your bookmarks");
-      }
-    } catch (error) {
-      console.error("Error toggling bookmark:", error);
-      Alert.alert("Error", "Could not update bookmark. Please try again.");
     }
   };
 
@@ -159,27 +117,8 @@ export default function ResourceDetailScreen() {
             </View>
           </View>
 
-          {/* Action Buttons */}
+          {/* Action Buttons - ONLY SHARE NOW */}
           <View style={styles.actionBar}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleBookmark}
-            >
-              <Ionicons
-                name={bookmarked ? "bookmark" : "bookmark-outline"}
-                size={24}
-                color={bookmarked ? "#4CAF50" : "#666"}
-              />
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  bookmarked && styles.actionButtonTextActive,
-                ]}
-              >
-                {bookmarked ? "Saved" : "Save"}
-              </Text>
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
               <Ionicons name="share-outline" size={24} color="#666" />
               <Text style={styles.actionButtonText}>Share</Text>
@@ -329,13 +268,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#F0F0F0",
     backgroundColor: "#FAFAFA",
+    justifyContent: "center", // Center the single button
   },
   actionButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
+    paddingHorizontal: 24,
     backgroundColor: "#FFF",
     borderRadius: 12,
     gap: 8,
@@ -349,9 +289,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#666",
-  },
-  actionButtonTextActive: {
-    color: "#4CAF50",
   },
   contentContainer: {
     paddingHorizontal: 20,
