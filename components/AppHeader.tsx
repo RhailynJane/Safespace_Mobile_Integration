@@ -381,9 +381,19 @@ export const AppHeader = ({
 
           <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
             <View style={styles.sideMenuHeader}>
-              <Text style={styles.profileName}>{getGreetingName()}</Text>
-              <Text style={styles.profileEmail}>{getUserEmail()}</Text>
-            </View>
+  {/* Add this avatar container */}
+  <View style={styles.profileAvatar}>
+    {profileImage ? (
+      <Image source={{ uri: profileImage }} style={styles.profileAvatarImage} />
+    ) : user?.imageUrl ? (
+      <Image source={{ uri: user.imageUrl }} style={styles.profileAvatarImage} />
+    ) : (
+      <Text style={styles.profileAvatarText}>{getInitials()}</Text>
+    )}
+  </View>
+  <Text style={styles.profileName}>{getGreetingName()}</Text>
+  <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+</View>
 
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -565,5 +575,24 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     backgroundColor: "transparent",
+  },
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#7CB9A9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  profileAvatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  profileAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "bold",
   },
 });
