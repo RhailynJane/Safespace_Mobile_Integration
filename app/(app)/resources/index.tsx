@@ -145,7 +145,7 @@ export default function ResourcesScreen() {
   const handleResourcePress = (resource: Resource) => {
     // Navigate to resource detail screen with resource data
     router.push({
-      pathname: "/(app)/resources/detail",
+      pathname: "../resources/resource-detail-screen",
       params: {
         id: resource.id,
         title: resource.title,
