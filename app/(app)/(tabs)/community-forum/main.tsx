@@ -38,13 +38,15 @@ const CATEGORIES = [
   "Therapy",
   "Affirmation",
   "Awareness",
-  "Bookmark"
+  "Bookmark",
 ];
 
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeTab, setActiveTab] = useState("community-forum");
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
+    new Set()
+  );
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,29 +68,32 @@ export default function CommunityMainScreen() {
   }, [selectedCategory]);
 
   const loadUserReactions = async (clerkUserId: string, posts: any[]) => {
-  try {
-    const userReactions: { [postId: number]: string } = {};
-    
-    // Load reactions for each post
-    for (const post of posts) {
-      const response = await communityApi.getUserReaction(post.id, clerkUserId);
-      if (response.userReaction) {
-        userReactions[post.id] = response.userReaction;
+    try {
+      const userReactions: { [postId: number]: string } = {};
+
+      // Load reactions for each post
+      for (const post of posts) {
+        const response = await communityApi.getUserReaction(
+          post.id,
+          clerkUserId
+        );
+        if (response.userReaction) {
+          userReactions[post.id] = response.userReaction;
+        }
       }
+
+      return userReactions;
+    } catch (error) {
+      console.error("Error loading user reactions:", error);
+      return {};
     }
-    
-    return userReactions;
-  } catch (error) {
-    console.error('Error loading user reactions:', error);
-    return {};
-  }
-};
+  };
 
   const loadInitialData = async () => {
     try {
       await Promise.all([loadCategories(), loadPosts()]);
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      console.error("Error loading initial data:", error);
       Alert.alert("Error", "Failed to load community data");
     }
   };
@@ -98,93 +103,97 @@ export default function CommunityMainScreen() {
       const response = await communityApi.getCategories();
       setCategories(response.categories);
     } catch (error) {
-      console.error('Error loading categories:', error);
+      console.error("Error loading categories:", error);
     }
   };
 
-  
-
   const loadPosts = async () => {
-  try {
-    setLoading(true);
-    
-    let response;
-    if (selectedCategory === 'Bookmark') {
-      // Load bookmarked posts
-      if (!user?.id) {
-        Alert.alert("Sign In Required", "Please sign in to view bookmarked posts");
-        setPosts([]);
-        return;
+    try {
+      setLoading(true);
+
+      let response;
+      if (selectedCategory === "Bookmark") {
+        // Load bookmarked posts
+        if (!user?.id) {
+          Alert.alert(
+            "Sign In Required",
+            "Please sign in to view bookmarked posts"
+          );
+          setPosts([]);
+          return;
+        }
+        response = await communityApi.getBookmarkedPosts(user.id);
+        // Transform the response to match posts structure
+        response = { posts: response.bookmarks || [] };
+      } else {
+        // Load regular posts
+        response = await communityApi.getPosts({
+          category:
+            selectedCategory === "Trending" ? undefined : selectedCategory,
+          limit: 20,
+        });
       }
-      response = await communityApi.getBookmarkedPosts(user.id);
-      // Transform the response to match posts structure
-      response = { posts: response.bookmarks || [] };
-    } else {
-      // Load regular posts
-      response = await communityApi.getPosts({
-        category: selectedCategory === 'Trending' ? undefined : selectedCategory,
-        limit: 20
-      });
+
+      const postsWithReactions = response.posts;
+      setPosts(postsWithReactions);
+
+      // Load bookmarks and reactions for current user (except for bookmark category)
+      if (user?.id && selectedCategory !== "Bookmark") {
+        await Promise.all([
+          loadUserBookmarks(user.id),
+          loadUserReactions(user.id, postsWithReactions),
+        ]);
+      }
+    } catch (error) {
+      console.error("Error loading posts:", error);
+      Alert.alert("Error", "Failed to load posts");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    
-    const postsWithReactions = response.posts;
-    setPosts(postsWithReactions);
-    
-    // Load bookmarks and reactions for current user (except for bookmark category)
-    if (user?.id && selectedCategory !== 'Bookmark') {
-      await Promise.all([
-        loadUserBookmarks(user.id),
-        loadUserReactions(user.id, postsWithReactions)
-      ]);
+  };
+
+  // Add reaction handler
+  const handleReactionPress = async (postId: number, emoji: string) => {
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to react to posts");
+      return;
     }
-  } catch (error) {
-    console.error('Error loading posts:', error);
-    Alert.alert("Error", "Failed to load posts");
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
 
-// Add reaction handler
-const handleReactionPress = async (postId: number, emoji: string) => {
-  if (!user?.id) {
-    Alert.alert("Error", "Please sign in to react to posts");
-    return;
-  }
+    try {
+      const response = await communityApi.reactToPost(postId, user.id, emoji);
 
-  try {
-    const response = await communityApi.reactToPost(postId, user.id, emoji);
-    
-    // Update the specific post with new reaction data
-    setPosts(prevPosts => 
-      prevPosts.map(post => 
-        post.id === postId 
-          ? { 
-              ...post, 
-              reactions: response.reactions,
-              reaction_count: (post.reaction_count || 0) + response.reactionChange
-            } 
-          : post
-      )
-    );
+      // Update the specific post with new reaction data
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                reactions: response.reactions,
+                reaction_count:
+                  (post.reaction_count || 0) + response.reactionChange,
+              }
+            : post
+        )
+      );
 
-    // Update user reaction state if needed
-    // You might want to maintain a separate state for user reactions
-  } catch (error) {
-    console.error('Error reacting to post:', error);
-    Alert.alert("Error", "Failed to update reaction");
-  }
-};
-
+      // Update user reaction state if needed
+      // You might want to maintain a separate state for user reactions
+    } catch (error) {
+      console.error("Error reacting to post:", error);
+      Alert.alert("Error", "Failed to update reaction");
+    }
+  };
 
   const loadUserBookmarks = async (clerkUserId: string) => {
     try {
       const response = await communityApi.getBookmarkedPosts(clerkUserId);
-      const bookmarkedIds = new Set<number>(response.bookmarks.map((post: any) => post.id as number));
+      const bookmarkedIds = new Set<number>(
+        response.bookmarks.map((post: any) => post.id as number)
+      );
       setBookmarkedPosts(bookmarkedIds);
     } catch (error) {
-      console.error('Error loading bookmarks:', error);
+      console.error("Error loading bookmarks:", error);
     }
   };
 
@@ -263,30 +272,30 @@ const handleReactionPress = async (postId: number, emoji: string) => {
   };
 
   const handleBookmarkPress = async (postId: number) => {
-  if (!user?.id) {
-    Alert.alert("Error", "Please sign in to bookmark posts");
-    return;
-  }
-
-  try {
-    const response = await communityApi.toggleBookmark(postId, user.id);
-    
-    const newBookmarkedPosts = new Set(bookmarkedPosts);
-    if (response.bookmarked) {
-      newBookmarkedPosts.add(postId);
-    } else {
-      newBookmarkedPosts.delete(postId);
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to bookmark posts");
+      return;
     }
-    setBookmarkedPosts(newBookmarkedPosts);
 
-    if (selectedCategory === 'Bookmark') {
-      loadPosts(); // Reload to reflect the change
+    try {
+      const response = await communityApi.toggleBookmark(postId, user.id);
+
+      const newBookmarkedPosts = new Set(bookmarkedPosts);
+      if (response.bookmarked) {
+        newBookmarkedPosts.add(postId);
+      } else {
+        newBookmarkedPosts.delete(postId);
+      }
+      setBookmarkedPosts(newBookmarkedPosts);
+
+      if (selectedCategory === "Bookmark") {
+        loadPosts(); // Reload to reflect the change
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+      Alert.alert("Error", "Failed to update bookmark");
     }
-  } catch (error) {
-    console.error('Error toggling bookmark:', error);
-    Alert.alert("Error", "Failed to update bookmark");
-  }
-};
+  };
 
   const handlePostPress = (postId: number) => {
     router.push({
@@ -439,8 +448,8 @@ const handleReactionPress = async (postId: number, emoji: string) => {
 
             <Text style={styles.browseBySectionTitle}>Browse By</Text>
 
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.categoriesScrollView}
             >
@@ -478,79 +487,108 @@ const handleReactionPress = async (postId: number, emoji: string) => {
               </View>
             ) : posts.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="document-text-outline" size={64} color="#E0E0E0" />
+                <Ionicons
+                  name="document-text-outline"
+                  size={64}
+                  color="#E0E0E0"
+                />
                 <Text style={styles.emptyText}>No posts found</Text>
                 <Text style={styles.emptySubtext}>
-                  {selectedCategory === 'Trending' 
-                    ? 'Be the first to share something with the community!'
+                  {selectedCategory === "Trending"
+                    ? "Be the first to share something with the community!"
                     : `No posts in ${selectedCategory} category yet`}
                 </Text>
               </View>
             ) : (
-              posts.map((post) => (
-                <TouchableOpacity
-                  key={post.id}
-                  style={styles.postCard}
-                  onPress={() => handlePostPress(post.id)}
-                >
-                  <View style={styles.postHeader}>
-                    <View style={styles.postUserInfo}>
-                      <View style={styles.avatarContainer}>
-                        <Text style={styles.avatarText}>
-                          {post.author_name?.charAt(0) || 'U'}
+              <>
+                {posts.map((post) => (
+                  <TouchableOpacity
+                    key={post.id}
+                    style={styles.postCard}
+                    onPress={() => handlePostPress(post.id)}
+                  >
+                    <View style={styles.postHeader}>
+                      <View style={styles.postUserInfo}>
+                        <View style={styles.avatarContainer}>
+                          <Text style={styles.avatarText}>
+                            {post.author_name?.charAt(0) || "U"}
+                          </Text>
+                        </View>
+                        <View style={styles.postTitleContainer}>
+                          <Text style={styles.postTitle} numberOfLines={2}>
+                            {post.title}
+                          </Text>
+                          <Text style={styles.postAuthor}>
+                            {post.author_name} •{" "}
+                            {new Date(post.created_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text style={styles.postContent} numberOfLines={4}>
+                      {post.content}
+                    </Text>
+
+                    {/* Reactions Row */}
+                    <View style={styles.reactionsRow}>
+                      <View style={styles.reactionsContainer}>
+                        {post.reactions &&
+                          Object.entries(post.reactions)
+                            .slice(0, 3)
+                            .map(([emoji, count]) => (
+                              <TouchableOpacity
+                                key={emoji}
+                                style={styles.reactionPill}
+                                onPress={() =>
+                                  handleReactionPress(post.id, emoji)
+                                }
+                              >
+                                <Text style={styles.reactionEmoji}>
+                                  {emoji}
+                                </Text>
+                                <Text style={styles.reactionCount}>
+                                  {count as number}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                        {post.reactions &&
+                          Object.keys(post.reactions).length > 3 && (
+                            <Text style={styles.moreReactions}>
+                              +{Object.keys(post.reactions).length - 3} more
+                            </Text>
+                          )}
+                      </View>
+
+                      {/* Bookmark Button */}
+                      <TouchableOpacity
+                        onPress={() => handleBookmarkPress(post.id)}
+                        style={styles.bookmarkButton}
+                      >
+                        <Ionicons
+                          name={
+                            bookmarkedPosts.has(post.id)
+                              ? "bookmark"
+                              : "bookmark-outline"
+                          }
+                          size={24}
+                          color={
+                            bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {post.category_name && (
+                      <View style={styles.categoryBadge}>
+                        <Text style={styles.categoryBadgeText}>
+                          {post.category_name}
                         </Text>
                       </View>
-                      <View style={styles.postTitleContainer}>
-                        <Text style={styles.postTitle} numberOfLines={2}>
-                          {post.title}
-                        </Text>
-                        <Text style={styles.postAuthor}>
-                          {post.author_name} • {new Date(post.created_at).toLocaleDateString()}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <Text style={styles.postContent} numberOfLines={4}>
-                    {post.content}
-                  </Text>
-
-                  <View style={styles.postFooter}>
-                    <View style={styles.reactionContainer}>
-                      <Ionicons name="heart" size={16} color="#FF6B6B" />
-                      <Text style={styles.reactionCount}>
-                        {post.reaction_count || 0}
-                      </Text>
-                    </View>
-                    
-                    {/* Bookmark Button */}
-                    <TouchableOpacity
-                      onPress={() => handleBookmarkPress(post.id)}
-                      style={styles.bookmarkButton}
-                    >
-                      <Ionicons
-                        name={
-                          bookmarkedPosts.has(post.id)
-                            ? "bookmark"
-                            : "bookmark-outline"
-                        }
-                        size={24}
-                        color={
-                          bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"
-                        }
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {post.category_name && (
-                    <View style={styles.categoryBadge}>
-                      <Text style={styles.categoryBadgeText}>
-                        {post.category_name}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </>
             )}
           </View>
 
@@ -824,7 +862,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reactionCount: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#666",
     fontWeight: "500",
   },
@@ -904,5 +942,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
+  },
+  reactionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  reactionsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  reactionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  reactionEmoji: {
+    fontSize: 14,
+  },
+
+  moreReactions: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
   },
 });
