@@ -38,6 +38,7 @@ const CATEGORIES = [
   "Therapy",
   "Affirmation",
   "Awareness",
+  "Bookmark"
 ];
 
 export default function CommunityMainScreen() {
@@ -64,6 +65,25 @@ export default function CommunityMainScreen() {
     }
   }, [selectedCategory]);
 
+  const loadUserReactions = async (clerkUserId: string, posts: any[]) => {
+  try {
+    const userReactions: { [postId: number]: string } = {};
+    
+    // Load reactions for each post
+    for (const post of posts) {
+      const response = await communityApi.getUserReaction(post.id, clerkUserId);
+      if (response.userReaction) {
+        userReactions[post.id] = response.userReaction;
+      }
+    }
+    
+    return userReactions;
+  } catch (error) {
+    console.error('Error loading user reactions:', error);
+    return {};
+  }
+};
+
   const loadInitialData = async () => {
     try {
       await Promise.all([loadCategories(), loadPosts()]);
@@ -82,27 +102,81 @@ export default function CommunityMainScreen() {
     }
   };
 
+  
+
   const loadPosts = async () => {
-    try {
-      setLoading(true);
-      const response = await communityApi.getPosts({
+  try {
+    setLoading(true);
+    
+    let response;
+    if (selectedCategory === 'Bookmark') {
+      // Load bookmarked posts
+      if (!user?.id) {
+        Alert.alert("Sign In Required", "Please sign in to view bookmarked posts");
+        setPosts([]);
+        return;
+      }
+      response = await communityApi.getBookmarkedPosts(user.id);
+      // Transform the response to match posts structure
+      response = { posts: response.bookmarks || [] };
+    } else {
+      // Load regular posts
+      response = await communityApi.getPosts({
         category: selectedCategory === 'Trending' ? undefined : selectedCategory,
         limit: 20
       });
-      setPosts(response.posts);
-      
-      // Load bookmarks for current user
-      if (user?.id) {
-        await loadUserBookmarks(user.id);
-      }
-    } catch (error) {
-      console.error('Error loading posts:', error);
-      Alert.alert("Error", "Failed to load posts");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+    
+    const postsWithReactions = response.posts;
+    setPosts(postsWithReactions);
+    
+    // Load bookmarks and reactions for current user (except for bookmark category)
+    if (user?.id && selectedCategory !== 'Bookmark') {
+      await Promise.all([
+        loadUserBookmarks(user.id),
+        loadUserReactions(user.id, postsWithReactions)
+      ]);
+    }
+  } catch (error) {
+    console.error('Error loading posts:', error);
+    Alert.alert("Error", "Failed to load posts");
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
+// Add reaction handler
+const handleReactionPress = async (postId: number, emoji: string) => {
+  if (!user?.id) {
+    Alert.alert("Error", "Please sign in to react to posts");
+    return;
+  }
+
+  try {
+    const response = await communityApi.reactToPost(postId, user.id, emoji);
+    
+    // Update the specific post with new reaction data
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === postId 
+          ? { 
+              ...post, 
+              reactions: response.reactions,
+              reaction_count: (post.reaction_count || 0) + response.reactionChange
+            } 
+          : post
+      )
+    );
+
+    // Update user reaction state if needed
+    // You might want to maintain a separate state for user reactions
+  } catch (error) {
+    console.error('Error reacting to post:', error);
+    Alert.alert("Error", "Failed to update reaction");
+  }
+};
+
 
   const loadUserBookmarks = async (clerkUserId: string) => {
     try {
@@ -189,26 +263,30 @@ export default function CommunityMainScreen() {
   };
 
   const handleBookmarkPress = async (postId: number) => {
-    if (!user?.id) {
-      Alert.alert("Error", "Please sign in to bookmark posts");
-      return;
-    }
+  if (!user?.id) {
+    Alert.alert("Error", "Please sign in to bookmark posts");
+    return;
+  }
 
-    try {
-      const response = await communityApi.toggleBookmark(postId, user.id);
-      
-      const newBookmarkedPosts = new Set(bookmarkedPosts);
-      if (response.bookmarked) {
-        newBookmarkedPosts.add(postId);
-      } else {
-        newBookmarkedPosts.delete(postId);
-      }
-      setBookmarkedPosts(newBookmarkedPosts);
-    } catch (error) {
-      console.error('Error toggling bookmark:', error);
-      Alert.alert("Error", "Failed to update bookmark");
+  try {
+    const response = await communityApi.toggleBookmark(postId, user.id);
+    
+    const newBookmarkedPosts = new Set(bookmarkedPosts);
+    if (response.bookmarked) {
+      newBookmarkedPosts.add(postId);
+    } else {
+      newBookmarkedPosts.delete(postId);
     }
-  };
+    setBookmarkedPosts(newBookmarkedPosts);
+
+    if (selectedCategory === 'Bookmark') {
+      loadPosts(); // Reload to reflect the change
+    }
+  } catch (error) {
+    console.error('Error toggling bookmark:', error);
+    Alert.alert("Error", "Failed to update bookmark");
+  }
+};
 
   const handlePostPress = (postId: number) => {
     router.push({
