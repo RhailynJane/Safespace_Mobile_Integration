@@ -1,7 +1,7 @@
 /**
- * Resource Detail Screen - Display full resource content
+ * Resource Detail Screen - Display full resource content with bookmark
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,46 +11,92 @@ import {
   TouchableOpacity,
   Share,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import { apiService } from "../../../utils/api";
 
 export default function ResourceDetailScreen() {
   const params = useLocalSearchParams();
+  const { userId } = useAuth();
+  
   const [bookmarked, setBookmarked] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Extract resource data from params
   const resource = {
-    id: params.id as string,
+    id: parseInt(params.id as string),
     title: params.title as string,
     content: params.content as string,
     author: params.author as string,
     type: params.type as string,
     category: params.category as string,
+    imageEmoji: params.imageEmoji as string,
+    backgroundColor: params.backgroundColor as string,
   };
+
+  useEffect(() => {
+  const checkBookmarkStatus = async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const result = await apiService.isBookmarked(userId, resource.id);
+      setBookmarked(result.isBookmarked);
+    } catch (error) {
+      console.error("Error checking bookmark status:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  checkBookmarkStatus();
+}, [userId, resource.id]); // Add dependencies that the function uses
 
   // Handle share functionality
   const handleShare = async () => {
     try {
-      await Share.share({
-        message: `${resource.title}\n\n"${resource.content}"\n\n— ${resource.author}`,
-      });
+      const message = resource.author
+        ? `${resource.title}\n\n"${resource.content}"\n\n— ${resource.author}`
+        : `${resource.title}\n\n${resource.content}`;
+
+      await Share.share({ message });
     } catch (error) {
       console.error("Error sharing:", error);
     }
   };
 
   // Handle bookmark toggle
-  const handleBookmark = () => {
-    setBookmarked(!bookmarked);
-    Alert.alert(
-      bookmarked ? "Removed from Bookmarks" : "Bookmarked",
-      bookmarked
-        ? "Resource removed from your saved items"
-        : "Resource saved to your bookmarks"
-    );
+  const handleBookmark = async () => {
+    if (!userId) {
+      Alert.alert(
+        "Sign In Required",
+        "Please sign in to bookmark resources.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    try {
+      if (bookmarked) {
+        await apiService.removeBookmark(userId, resource.id);
+        setBookmarked(false);
+        Alert.alert("Removed", "Resource removed from your bookmarks");
+      } else {
+        await apiService.addBookmark(userId, resource.id);
+        setBookmarked(true);
+        Alert.alert("Saved", "Resource saved to your bookmarks");
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+      Alert.alert("Error", "Could not update bookmark. Please try again.");
+    }
   };
 
   // Get category color
@@ -65,6 +111,19 @@ export default function ResourceDetailScreen() {
     };
     return colors[resource.category] || "#4CAF50";
   };
+
+  if (loading) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <AppHeader title="Resource" showBack={true} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
 
   return (
     <CurvedBackground>
@@ -89,9 +148,18 @@ export default function ResourceDetailScreen() {
               </Text>
             </View>
 
+            <View style={styles.titleRow}>
+              <View style={[
+                styles.emojiContainer,
+                { backgroundColor: resource.backgroundColor }
+              ]}>
+                <Text style={styles.emojiLarge}>{resource.imageEmoji}</Text>
+              </View>
+            </View>
+
             <Text style={styles.title}>{resource.title}</Text>
 
-            {resource.author && (
+            {resource.author && resource.author !== "Unknown" && (
               <Text style={styles.author}>By {resource.author}</Text>
             )}
 
@@ -142,7 +210,7 @@ export default function ResourceDetailScreen() {
           <View style={styles.reflectionSection}>
             <Text style={styles.reflectionTitle}>💭 Take a Moment</Text>
             <Text style={styles.reflectionText}>
-              Reflect on how this resonates with you. Consider writing down your
+              Reflect on how this resonates with you. Consider journaling your
               thoughts or discussing with someone you trust.
             </Text>
           </View>
@@ -200,6 +268,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   header: {
     paddingHorizontal: 20,
     paddingTop: 10,
@@ -217,6 +290,20 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFF",
     letterSpacing: 1,
+  },
+  titleRow: {
+    marginBottom: 15,
+  },
+  emojiContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+  },
+  emojiLarge: {
+    fontSize: 40,
   },
   title: {
     fontSize: 26,

@@ -1,8 +1,3 @@
-/**
- * Resources API Service - 100% Offline Version
- * No external API calls - all content stored locally
- */
-
 export interface Resource {
   id: string;
   title: string;
@@ -408,4 +403,192 @@ export async function getQuoteOfTheDay(): Promise<Resource | null> {
   
   const quotes = ALL_RESOURCES.filter(r => r.type === 'Quote');
   return quotes.length > 0 ? quotes[dayOfYear % quotes.length] ?? null : null;
+}
+
+// External API service integration
+class ExternalApiService {
+  private zenQuotesUrl = 'https://zenquotes.io/api';
+  private affirmationUrl = 'https://www.affirmations.dev';
+
+  // Get random inspirational quote from ZenQuotes
+  async getRandomQuote(): Promise<{ quote: string; author: string }> {
+    try {
+      const response = await fetch(`${this.zenQuotesUrl}/random`);
+      const data = await response.json();
+      
+      if (data && data[0]) {
+        return {
+          quote: data[0].q,
+          author: data[0].a
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching quote from API:', error);
+    }
+    
+    // Fallback to your existing quotes
+    const quotes = ALL_RESOURCES.filter(r => r.type === 'Quote');
+    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+if (!randomQuote) {
+  // Fallback if no quotes found
+  return {
+    quote: "This moment is perfect as it is.",
+    author: "Mindfulness Proverb"
+  };
+}
+return {
+  quote: randomQuote.content,
+  author: randomQuote.author || 'Unknown'
+};
+  }
+
+  // Get random affirmation from affirmations.dev
+  async getRandomAffirmation(): Promise<string> {
+    try {
+      const response = await fetch(this.affirmationUrl);
+      const data = await response.json();
+      return data.affirmation;
+    } catch (error) {
+      console.error('Error fetching affirmation:', error);
+      
+      // Fallback to your existing affirmations
+      const affirmations = ALL_RESOURCES.filter(r => r.type === 'Affirmation');
+      const randomAffirmation = affirmations[Math.floor(Math.random() * affirmations.length)];
+      return randomAffirmation?.content ?? 'No affirmation available';
+    }
+  }
+
+  // Get today's quote (cached for the day)
+  async getTodaysQuote(): Promise<Resource> {
+    const today = new Date().toDateString();
+    const cachedQuote = await this.getCachedQuote(today);
+    
+    if (cachedQuote) {
+      return cachedQuote;
+    }
+
+    const externalQuote = await this.getRandomQuote();
+    const newQuote: Resource = {
+      id: `external-quote-${Date.now()}`,
+      title: 'Daily Inspiration',
+      type: 'Quote',
+      duration: '1 min',
+      category: 'motivation',
+      content: externalQuote.quote,
+      author: externalQuote.author,
+      image: '💫',
+      backgroundColor: '#FFF9C4',
+      tags: ['daily', 'inspiration', 'motivation']
+    };
+
+    await this.cacheQuote(newQuote, today);
+    return newQuote;
+  }
+
+  // Simple caching using AsyncStorage
+  private async getCachedQuote(date: string): Promise<Resource | null> {
+    try {
+      // If you have AsyncStorage or similar
+      // const cached = await AsyncStorage.getItem(`quote-${date}`);
+      // return cached ? JSON.parse(cached) : null;
+      return null; // Implement based on your storage solution
+    // eslint-disable-next-line no-unreachable
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private async cacheQuote(quote: Resource, date: string): Promise<void> {
+    try {
+      // await AsyncStorage.setItem(`quote-${date}`, JSON.stringify(quote));
+    } catch (error) {
+      console.error('Error caching quote:', error);
+    }
+  }
+}
+
+export const externalApiService = new ExternalApiService();
+
+// Enhanced functions that combine local + external resources
+export async function fetchAllResourcesWithExternal(): Promise<Resource[]> {
+  await delay(300);
+  
+  try {
+    // Get today's external quote
+    const todaysQuote = await externalApiService.getTodaysQuote();
+    
+    // Combine with local resources, replacing any existing daily quote
+    const localResources = ALL_RESOURCES.filter(r => !r.id.startsWith('external-quote'));
+    return [todaysQuote, ...localResources];
+  } catch (error) {
+    console.error('Error fetching external resources:', error);
+    return ALL_RESOURCES; // Fallback to local only
+  }
+}
+
+export async function getDailyAffirmation(): Promise<Resource> {
+  try {
+    const affirmationText = await externalApiService.getRandomAffirmation();
+    
+    return {
+      id: `external-affirmation-${Date.now()}`,
+      title: 'Daily Affirmation',
+      type: 'Affirmation',
+      duration: '2 mins',
+      category: 'motivation',
+      content: affirmationText,
+      image: '🌟',
+      backgroundColor: '#E8F5E8',
+      tags: ['affirmation', 'daily', 'positivity']
+    };
+  } catch (error) {
+    // Fallback to local affirmation
+    const localAffirmations = ALL_RESOURCES.filter(r => r.type === 'Affirmation');
+    return localAffirmations[0] || ALL_RESOURCES[0] || {
+      id: 'default',
+      title: 'Default Resource',
+      type: 'Affirmation',
+      duration: '0 mins',
+      category: 'default',
+      content: 'This is a default resource.',
+      image: '📄',
+      backgroundColor: '#FFFFFF',
+      tags: []
+    };
+  }
+}
+
+export async function getRandomQuote(): Promise<Resource> {
+  try {
+    const quoteData = await externalApiService.getRandomQuote();
+    
+    return {
+      id: `external-quote-random-${Date.now()}`,
+      title: 'Inspirational Quote',
+      type: 'Quote',
+      duration: '1 min',
+      category: 'motivation',
+      content: quoteData.quote,
+      author: quoteData.author,
+      image: '💭',
+      backgroundColor: '#FFF3E0',
+      tags: ['quote', 'inspiration']
+    };
+  } catch (error) {
+    const localQuotes = ALL_RESOURCES.filter(r => r.type === 'Quote');
+return localQuotes.length > 0 
+    ? localQuotes[Math.floor(Math.random() * localQuotes.length)]! // Add the ! here
+    : {
+        id: 'default',
+        title: 'Default Quote',
+        type: 'Quote',
+        duration: '0 mins',
+        category: 'default',
+        content: 'This is a default quote.',
+        author: 'Unknown',
+        image: '📄',
+        backgroundColor: '#FFFFFF',
+        tags: []
+    };
+  }
 }

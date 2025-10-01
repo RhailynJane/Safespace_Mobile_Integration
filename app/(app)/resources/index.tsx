@@ -1,6 +1,6 @@
 /**
  * Resources Screen - Mental Health Resources Browser
- * Integrates with ZenQuotes and Quotable APIs
+ * Integrates with backend API and bookmark system
  */
 import { useState, useEffect } from "react";
 import {
@@ -17,19 +17,68 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
-import {
-  fetchAllResources,
-  fetchResourcesByCategory,
-  searchResources,
-  getQuoteOfTheDay,
-  CATEGORIES,
-  Resource,
-} from "../../../utils/resourcesApi";
+import { apiService, Resource } from "../../../utils/api";
+
+// Category definitions
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+const CATEGORIES: Category[] = [
+  {
+    id: 'saved',
+    name: 'Saved',
+    icon: '💾',
+    color: '#9C27B0',
+  },
+  {
+    id: 'stress',
+    name: 'Stress',
+    icon: '💧',
+    color: '#FF8A65',
+  },
+  {
+    id: 'anxiety',
+    name: 'Anxiety',
+    icon: '🧠',
+    color: '#81C784',
+  },
+  {
+    id: 'depression',
+    name: 'Depression',
+    icon: '👥',
+    color: '#64B5F6',
+  },
+  {
+    id: 'sleep',
+    name: 'Sleep',
+    icon: '🛏️',
+    color: '#4DD0E1',
+  },
+  {
+    id: 'motivation',
+    name: 'Motivation',
+    icon: '⚡',
+    color: '#FFB74D',
+  },
+  {
+    id: 'mindfulness',
+    name: 'Mindfulness',
+    icon: '🧘',
+    color: '#BA68C8',
+  }
+];
 
 export default function ResourcesScreen() {
+  const { userId } = useAuth();
+  
   // State management
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,7 +86,7 @@ export default function ResourcesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [resources, setResources] = useState<Resource[]>([]);
-  const [quoteOfTheDay, setQuoteOfTheDay] = useState<Resource | null>(null);
+  const [featuredResource, setFeaturedResource] = useState<Resource | null>(null);
 
   // Navigation tabs configuration
   const tabs = [
@@ -51,20 +100,23 @@ export default function ResourcesScreen() {
   // Load resources on component mount
   useEffect(() => {
     loadResources();
-    loadQuoteOfTheDay();
   }, []);
 
   // Load resources from API
   const loadResources = async () => {
     try {
       setLoading(true);
-      const data = await fetchAllResources();
+      const data = await apiService.getResources();
       setResources(data);
+      
+      // Set first quote/affirmation as featured
+      const featured = data.find(r => r.type === 'Quote' || r.type === 'Affirmation');
+      setFeaturedResource(featured || null);
     } catch (error) {
       console.error("Error loading resources:", error);
       Alert.alert(
         "Connection Error",
-        "Could not load resources. Please check your internet connection.",
+        "Could not load resources. Please check your connection.",
         [{ text: "OK" }]
       );
     } finally {
@@ -72,21 +124,10 @@ export default function ResourcesScreen() {
     }
   };
 
-  // Load quote of the day
-  const loadQuoteOfTheDay = async () => {
-    try {
-      const quote = await getQuoteOfTheDay();
-      setQuoteOfTheDay(quote);
-    } catch (error) {
-      console.error("Error loading quote of the day:", error);
-    }
-  };
-
   // Handle pull-to-refresh
   const onRefresh = async () => {
     setRefreshing(true);
     await loadResources();
-    await loadQuoteOfTheDay();
     setRefreshing(false);
   };
 
@@ -95,10 +136,27 @@ export default function ResourcesScreen() {
     const newCategory = selectedCategory === categoryId ? "" : categoryId;
     setSelectedCategory(newCategory);
 
-    if (newCategory) {
+    if (newCategory === 'saved') {
+      // Load bookmarked resources
+      if (!userId) {
+        Alert.alert("Sign In Required", "Please sign in to view saved resources.");
+        return;
+      }
+      
       setLoading(true);
       try {
-        const categoryResources = await fetchResourcesByCategory(newCategory);
+        const bookmarks = await apiService.getBookmarks(userId);
+        setResources(bookmarks);
+      } catch (error) {
+        console.error("Error loading bookmarks:", error);
+        Alert.alert("Error", "Could not load saved resources.");
+      } finally {
+        setLoading(false);
+      }
+    } else if (newCategory) {
+      setLoading(true);
+      try {
+        const categoryResources = await apiService.getResourcesByCategory(newCategory);
         setResources(categoryResources);
       } catch (error) {
         console.error("Error loading category resources:", error);
@@ -116,7 +174,7 @@ export default function ResourcesScreen() {
       const timeoutId = setTimeout(async () => {
         setLoading(true);
         try {
-          const searchResults = await searchResources(searchQuery);
+          const searchResults = await apiService.searchResources(searchQuery);
           setResources(searchResults);
         } catch (error) {
           console.error("Error searching resources:", error);
@@ -126,10 +184,12 @@ export default function ResourcesScreen() {
       }, 500);
 
       return () => clearTimeout(timeoutId);
-    } else if (searchQuery.length === 0) {
+    } else if (searchQuery.length === 0 && selectedCategory === "") {
       loadResources();
     }
-  }, [searchQuery]);
+
+    return undefined; // Explicitly return undefined for other cases
+  }, [searchQuery, selectedCategory]);
 
   // Handle tab navigation
   const handleTabPress = (tabId: string) => {
@@ -143,31 +203,20 @@ export default function ResourcesScreen() {
 
   // Handle resource selection
   const handleResourcePress = (resource: Resource) => {
-    // Navigate to resource detail screen with resource data
     router.push({
-      pathname: "../resources/resource-detail-screen",
+      pathname: "/(app)/resources/resource-detail-screen",
       params: {
-        id: resource.id,
+        id: resource.id.toString(),
         title: resource.title,
         content: resource.content,
         author: resource.author || "Unknown",
         type: resource.type,
         category: resource.category,
+        imageEmoji: resource.image_emoji,
+        backgroundColor: resource.background_color,
       },
     });
   };
-
-  // Filter resources locally
-  const filteredResources = resources.filter((resource) => {
-    const matchesSearch = searchQuery.length <= 2 || 
-      resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      resource.content.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesCategory =
-      selectedCategory === "" || resource.category === selectedCategory;
-    
-    return matchesSearch && matchesCategory;
-  });
 
   return (
     <CurvedBackground>
@@ -186,14 +235,14 @@ export default function ResourcesScreen() {
             />
           }
         >
-          {/* Quote of the Day Section */}
-          {quoteOfTheDay && (
-            <View style={styles.quoteOfTheDayContainer}>
-              <View style={styles.quoteCard}>
-                <Text style={styles.quoteLabel}>💫 Quote of the Day</Text>
-                <Text style={styles.quoteText}>&quot;{quoteOfTheDay.content}&quot;</Text>
-                {quoteOfTheDay.author && (
-                  <Text style={styles.quoteAuthor}>— {quoteOfTheDay.author}</Text>
+          {/* Featured Resource Section */}
+          {featuredResource && selectedCategory === "" && (
+            <View style={styles.featuredContainer}>
+              <View style={styles.featuredCard}>
+                <Text style={styles.featuredLabel}>✨ Featured</Text>
+                <Text style={styles.featuredText}>&quot;{featuredResource.content}&quot;</Text>
+                {featuredResource.author && (
+                  <Text style={styles.featuredAuthor}>— {featuredResource.author}</Text>
                 )}
               </View>
             </View>
@@ -259,7 +308,9 @@ export default function ResourcesScreen() {
           {/* Resources List */}
           <View style={styles.resourcesSection}>
             <Text style={styles.resourcesSectionTitle}>
-              {selectedCategory
+              {selectedCategory === 'saved'
+                ? "Saved Resources"
+                : selectedCategory
                 ? `${CATEGORIES.find((c) => c.id === selectedCategory)?.name} Resources`
                 : "All Resources"}
             </Text>
@@ -269,17 +320,25 @@ export default function ResourcesScreen() {
                 <ActivityIndicator size="large" color="#4CAF50" />
                 <Text style={styles.loadingText}>Loading resources...</Text>
               </View>
-            ) : filteredResources.length === 0 ? (
+            ) : resources.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🔍</Text>
-                <Text style={styles.emptyText}>No resources found</Text>
+                <Text style={styles.emptyIcon}>
+                  {selectedCategory === 'saved' ? '💾' : '🔍'}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {selectedCategory === 'saved' 
+                    ? "No saved resources yet"
+                    : "No resources found"}
+                </Text>
                 <Text style={styles.emptySubtext}>
-                  Try adjusting your search or filters
+                  {selectedCategory === 'saved'
+                    ? "Bookmark resources to access them quickly"
+                    : "Try adjusting your search or filters"}
                 </Text>
               </View>
             ) : (
               <View style={styles.resourcesList}>
-                {filteredResources.map((resource) => (
+                {resources.map((resource) => (
                   <TouchableOpacity
                     key={resource.id}
                     style={styles.resourceCard}
@@ -289,10 +348,10 @@ export default function ResourcesScreen() {
                     <View
                       style={[
                         styles.resourceImageContainer,
-                        { backgroundColor: resource.backgroundColor },
+                        { backgroundColor: resource.background_color },
                       ]}
                     >
-                      <Text style={styles.resourceEmoji}>{resource.image}</Text>
+                      <Text style={styles.resourceEmoji}>{resource.image_emoji}</Text>
                     </View>
 
                     <View style={styles.resourceContent}>
@@ -354,12 +413,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
   },
-  quoteOfTheDayContainer: {
+  featuredContainer: {
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 5,
   },
-  quoteCard: {
+  featuredCard: {
     backgroundColor: "#FFF",
     borderRadius: 20,
     padding: 20,
@@ -371,7 +430,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: "#4CAF50",
   },
-  quoteLabel: {
+  featuredLabel: {
     fontSize: 12,
     fontWeight: "600",
     color: "#4CAF50",
@@ -379,14 +438,14 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  quoteText: {
+  featuredText: {
     fontSize: 16,
     fontStyle: "italic",
     color: "#333",
     lineHeight: 24,
     marginBottom: 8,
   },
-  quoteAuthor: {
+  featuredAuthor: {
     fontSize: 14,
     color: "#666",
     textAlign: "right",
