@@ -1212,3 +1212,214 @@ app.get('/api/journal/shared/:supportWorkerId', async (req: Request, res: Respon
     res.status(500).json({ error: 'Failed to fetch shared entries' });
   }
 });
+
+// =============================================
+// RESOURCES ENDPOINTS
+// =============================================
+
+// Get all resources
+app.get('/api/resources', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM resources 
+      ORDER BY created_at DESC
+    `);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching resources:', error);
+    res.status(500).json({ error: 'Failed to fetch resources' });
+  }
+});
+
+// Get resources by category
+app.get('/api/resources/category/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    
+    const result = await pool.query(
+      'SELECT * FROM resources WHERE category = $1 ORDER BY created_at DESC',
+      [category]
+    );
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching category resources:', error);
+    res.status(500).json({ error: 'Failed to fetch resources' });
+  }
+});
+
+// Search resources
+app.get('/api/resources/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    const result = await pool.query(`
+      SELECT * FROM resources 
+      WHERE title ILIKE $1 
+         OR content ILIKE $1 
+         OR $2 = ANY(tags)
+      ORDER BY created_at DESC
+    `, [`%${q}%`, q]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error searching resources:', error);
+    res.status(500).json({ error: 'Failed to search resources' });
+  }
+});
+
+// Get single resource
+app.get('/api/resources/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'SELECT * FROM resources WHERE id = $1',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Resource not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching resource:', error);
+    res.status(500).json({ error: 'Failed to fetch resource' });
+  }
+});
+
+// =============================================
+// BOOKMARKS ENDPOINTS
+// =============================================
+
+// Get user's bookmarks
+app.get('/api/bookmarks/:clerkUserId', async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+    
+    // Get user_id from clerk_user_id
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Get bookmarked resources
+    const result = await pool.query(`
+      SELECT r.*, b.saved_at 
+      FROM resources r
+      INNER JOIN bookmarks b ON r.id = b.resource_id
+      WHERE b.user_id = $1
+      ORDER BY b.saved_at DESC
+    `, [userId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching bookmarks:', error);
+    res.status(500).json({ error: 'Failed to fetch bookmarks' });
+  }
+});
+
+// Add bookmark
+app.post('/api/bookmarks', async (req, res) => {
+  try {
+    const { clerkUserId, resourceId } = req.body;
+    
+    // Get user_id
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Insert bookmark (ON CONFLICT to handle duplicates)
+    const result = await pool.query(`
+      INSERT INTO bookmarks (user_id, resource_id)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id, resource_id) DO NOTHING
+      RETURNING *
+    `, [userId, resourceId]);
+    
+    res.json({ 
+      success: true, 
+      bookmark: result.rows[0],
+      message: 'Resource bookmarked successfully'
+    });
+  } catch (error) {
+    console.error('Error adding bookmark:', error);
+    res.status(500).json({ error: 'Failed to add bookmark' });
+  }
+});
+
+// Remove bookmark
+app.delete('/api/bookmarks/:clerkUserId/:resourceId', async (req, res) => {
+  try {
+    const { clerkUserId, resourceId } = req.params;
+    
+    // Get user_id
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Delete bookmark
+    await pool.query(
+      'DELETE FROM bookmarks WHERE user_id = $1 AND resource_id = $2',
+      [userId, resourceId]
+    );
+    
+    res.json({ 
+      success: true,
+      message: 'Bookmark removed successfully'
+    });
+  } catch (error) {
+    console.error('Error removing bookmark:', error);
+    res.status(500).json({ error: 'Failed to remove bookmark' });
+  }
+});
+
+// Check if resource is bookmarked
+app.get('/api/bookmarks/:clerkUserId/check/:resourceId', async (req, res) => {
+  try {
+    const { clerkUserId, resourceId } = req.params;
+    
+    const userResult = await pool.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.json({ isBookmarked: false });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    const result = await pool.query(
+      'SELECT EXISTS(SELECT 1 FROM bookmarks WHERE user_id = $1 AND resource_id = $2) as is_bookmarked',
+      [userId, resourceId]
+    );
+    
+    res.json({ isBookmarked: result.rows[0].is_bookmarked });
+  } catch (error) {
+    console.error('Error checking bookmark:', error);
+    res.status(500).json({ error: 'Failed to check bookmark' });
+  }
+});
