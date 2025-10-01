@@ -1,6 +1,6 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
+ * Enhanced Create Post Screen with Modern UI Design
+ * Features improved typography, better spacing, and visual enhancements
  */
 import { useState, useEffect } from "react";
 import {
@@ -15,6 +15,8 @@ import {
   TextInput,
   Switch,
   ActivityIndicator,
+  Dimensions,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -23,6 +25,8 @@ import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../../utils/communityForumApi";
+
+const { width } = Dimensions.get("window");
 
 export default function CreatePostScreen() {
   const params = useLocalSearchParams();
@@ -35,6 +39,15 @@ export default function CreatePostScreen() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -57,12 +70,12 @@ export default function CreatePostScreen() {
 
   const handleSaveDraft = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to save drafts");
+      Alert.alert("Sign In Required", "Please sign in to save drafts");
       return;
     }
 
     if (!postTitle.trim() || !postContent.trim()) {
-      Alert.alert("Error", "Please add a title and content");
+      Alert.alert("Missing Information", "Please add a title and content for your post");
       return;
     }
 
@@ -77,11 +90,11 @@ export default function CreatePostScreen() {
         isDraft: true,
       });
       
-      Alert.alert("Draft Saved", "Your post has been saved as a draft.");
+      Alert.alert("✅ Draft Saved", "Your post has been saved as a draft. You can find it in your profile.");
       router.back();
     } catch (error) {
       console.error('Error saving draft:', error);
-      Alert.alert("Error", "Failed to save draft");
+      Alert.alert("Save Failed", "Unable to save draft. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -89,12 +102,12 @@ export default function CreatePostScreen() {
 
   const handlePublish = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to create posts");
+      Alert.alert("Sign In Required", "Please sign in to create posts");
       return;
     }
 
     if (!postTitle.trim() || !postContent.trim()) {
-      Alert.alert("Error", "Please add a title and content");
+      Alert.alert("Missing Information", "Please add a title and content for your post");
       return;
     }
 
@@ -112,7 +125,7 @@ export default function CreatePostScreen() {
       router.push("/community-forum/create/success");
     } catch (error) {
       console.error('Error creating post:', error);
-      Alert.alert("Error", "Failed to create post");
+      Alert.alert("Post Failed", "Unable to publish post. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -135,124 +148,181 @@ export default function CreatePostScreen() {
     }
   };
 
+  const getCharacterColor = (length: number, max: number) => {
+    if (length > max * 0.9) return "#FF6B6B";
+    if (length > max * 0.8) return "#FFA726";
+    return "#666";
+  };
+
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <AppHeader title="Community Forum" showBack={true} />
-        <ScrollView style={styles.content}>
-          {/* Title Section */}
-          <View style={styles.titleSection}>
-            <Text style={styles.mainTitle}>Post Content</Text>
-            {selectedCategory && (
-              <Text style={styles.categoryIndicator}>
-                Category: {selectedCategory}
+        <AppHeader title="Create Post" showBack={true} />
+        
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+          <ScrollView 
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Header Section */}
+            <View style={styles.headerSection}>
+              <Text style={styles.subtitle}>
+                Share your thoughts with the community
               </Text>
-            )}
-          </View>
+              
+              {selectedCategory && (
+                <View style={styles.categoryBadge}>
+                  <Ionicons name="pricetag" size={14} color="#FFFFFF" />
+                  <Text style={styles.categoryText}>{selectedCategory}</Text>
+                </View>
+              )}
+            </View>
 
-          {/* User Profile Summary with Post Card Inside */}
-          <View style={styles.profileCard}>
-            <View style={styles.profileSection}>
-              <View style={styles.profileContainer}>
-                <View style={styles.profileImageContainer}>
-                  <View style={styles.profileImageFallback}>
-                    <Text style={styles.initialsText}>{getInitials()}</Text>
+            {/* Author Profile */}
+            <View style={styles.authorSection}>
+              <Text style={styles.sectionLabel}>Author</Text>
+              <View style={styles.authorCard}>
+                <View style={styles.authorInfo}>
+                  <View style={styles.avatarContainer}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{getInitials()}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.authorDetails}>
+                    <Text style={styles.authorName}>{getDisplayName()}</Text>
+                    <Text style={styles.authorRole}>Community Member</Text>
                   </View>
                 </View>
-                <View style={styles.profileTextContainer}>
-                  <Text style={styles.userName}>{getDisplayName()}</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+              </View>
+            </View>
+
+            {/* Post Content Section */}
+            <View style={styles.contentSection}>
+              <Text style={styles.sectionLabel}>Post Details</Text>
+              
+              {/* Title Input */}
+              <View style={styles.inputGroup}>
+                <View style={styles.inputHeader}>
+                  <Text style={styles.inputLabel}>Post Title</Text>
+                  <Text style={[styles.charCount, { color: getCharacterColor(postTitle.length, 100) }]}>
+                    {postTitle.length}/100
+                  </Text>
+                </View>
+                <TextInput
+                  style={styles.titleInput}
+                  placeholder="Give your post a meaningful title..."
+                  placeholderTextColor="#999"
+                  value={postTitle}
+                  onChangeText={setPostTitle}
+                  maxLength={100}
+                />
+              </View>
+
+              {/* Content Input */}
+              <View style={styles.inputGroup}>
+                <View style={styles.inputHeader}>
+                  <Text style={styles.inputLabel}>Your Story</Text>
+                  <Text style={[styles.charCount, { color: getCharacterColor(postContent.length, 1000) }]}>
+                    {postContent.length}/1000
+                  </Text>
+                </View>
+                <View style={styles.contentInputContainer}>
+                  <TextInput
+                    style={styles.contentInput}
+                    multiline
+                    placeholder="Share your experiences, ask questions, or offer support to others..."
+                    placeholderTextColor="#999"
+                    value={postContent}
+                    onChangeText={setPostContent}
+                    textAlignVertical="top"
+                    maxLength={1000}
+                  />
+                  <View style={styles.contentTips}>
+                    <Ionicons name="bulb-outline" size={16} color="#7CB9A9" />
+                    <Text style={styles.tipsText}>
+                      Be authentic and respectful in your sharing
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
-            
-            {/* Post Title Input */}
-            <View style={styles.titleInputContainer}>
-              <TextInput
-                style={styles.titleInput}
-                placeholder="Post title..."
-                value={postTitle}
-                onChangeText={setPostTitle}
-                maxLength={100}
-              />
-              <Text style={styles.charCount}>
-                {postTitle.length}/100
-              </Text>
-            </View>
 
-            {/* Post Content Card */}
-            <View style={styles.postCard}>
-              <TextInput
-                style={styles.postInput}
-                multiline
-                placeholder="Share your thoughts, experiences, or questions..."
-                value={postContent}
-                onChangeText={setPostContent}
-                textAlignVertical="top"
-                maxLength={1000}
-              />
-
-              {/* Character Count */}
-              <View style={styles.postActions}>
-                <Text style={styles.charCount}>
-                  {postContent.length}/1000
-                </Text>
+            {/* Privacy Settings */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.sectionLabel}>Privacy Settings</Text>
+              <View style={styles.privacyCard}>
+                <View style={styles.privacyInfo}>
+                  <Ionicons 
+                    name={isPrivate ? "lock-closed" : "earth"} 
+                    size={20} 
+                    color={isPrivate ? "#FF6B6B" : "#4CAF50"} 
+                  />
+                  <View style={styles.privacyTextContainer}>
+                    <Text style={styles.privacyTitle}>
+                      {isPrivate ? "Private Post" : "Public Post"}
+                    </Text>
+                    <Text style={styles.privacyDescription}>
+                      {isPrivate 
+                        ? "Only visible to you and support workers" 
+                        : "Visible to all community members"
+                      }
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={isPrivate}
+                  onValueChange={setIsPrivate}
+                  thumbColor={isPrivate ? "#FF6B6B" : "#FFFFFF"}
+                  trackColor={{ false: "#B0BEC5", true: "#FFCDD2" }}
+                  ios_backgroundColor="#B0BEC5"
+                />
               </View>
             </View>
 
-            <View style={styles.divider} />
-          </View>
+            {/* Action Buttons */}
+            <View style={styles.actionsSection}>
+              <TouchableOpacity
+                style={[
+                  styles.draftButton,
+                  (loading || !postTitle.trim() || !postContent.trim()) && styles.buttonDisabled
+                ]}
+                onPress={handleSaveDraft}
+                disabled={loading || !postTitle.trim() || !postContent.trim()}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#666" />
+                ) : (
+                  <>
+                    <Ionicons name="save-outline" size={20} color="#666" />
+                    <Text style={styles.draftButtonText}>Save Draft</Text>
+                  </>
+                )}
+              </TouchableOpacity>
 
-          {/* Privacy Settings */}
-          <View style={styles.privacyContainer}>
-            <View style={styles.privacyRow}>
-              <Text style={styles.privacyText}>Hide from Community?</Text>
-              <Switch
-                value={isPrivate}
-                onValueChange={setIsPrivate}
-                thumbColor={isPrivate ? "#4CAF50" : "#f4f3f4"}
-                trackColor={{ false: "#767577", true: "#81b0ff" }}
-              />
+              <TouchableOpacity
+                style={[
+                  styles.publishButton,
+                  (!postContent.trim() || !postTitle.trim() || loading) && styles.publishButtonDisabled
+                ]}
+                onPress={handlePublish}
+                disabled={!postContent.trim() || !postTitle.trim() || loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="send" size={20} color="#FFFFFF" />
+                    <Text style={styles.publishButtonText}>Publish to Community</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-            {isPrivate && (
-              <Text style={styles.privacyNote}>
-                This post will only be visible to you and support workers.
-              </Text>
-            )}
-          </View>
 
-          {/* Action Buttons */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[
-                styles.draftButton,
-                loading && styles.buttonDisabled
-              ]}
-              onPress={handleSaveDraft}
-              disabled={loading || !postTitle.trim() || !postContent.trim()}
-            >
-              {loading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={styles.draftButtonText}>Save as Draft</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.publishButton,
-                (!postContent.trim() || !postTitle.trim() || loading) && styles.publishButtonDisabled
-              ]}
-              onPress={handlePublish}
-              disabled={!postContent.trim() || !postTitle.trim() || loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={styles.publishButtonText}>Publish Post</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+            <View style={styles.bottomSpacing} />
+          </ScrollView>
+        </Animated.View>
 
         {/* Bottom Navigation */}
         <BottomNavigation
@@ -269,247 +339,292 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
-    paddingBottom: 100,
-  },
-  curvedBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: -1,
-  },
-  headerContainer: {
-    backgroundColor: "#transparent",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  communityPostButton: {
-    backgroundColor: "#EDE7EC",
-    paddingHorizontal: 40,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 0.5,
-    borderColor: "#000",
-  },
-  communityPostButtonText: {
-    color: "#000",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  headerRight: {
-    width: 24, // Placeholder for balance
-  },
-  titleSection: {
-    paddingHorizontal: 15,
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-  },
-  mainTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: "#000",
-    textAlign: "center",
   },
   content: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "transparent",
   },
-  profileCard: {
-    backgroundColor: "#EDE7EC",
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 20,
-    shadowColor: "#999",
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+  scrollView: {
+    flex: 1,
   },
-  profileSection: {
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  
+  // Header Section
+  headerSection: {
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 10,
+  },
+  headerIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(124, 185, 169, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 16,
   },
-  profileContainer: {
+  mainTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#1A1A1A",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 16,
+    lineHeight: 22,
+  },
+  categoryBadge: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  profileImageContainer: {
-    width: 40,
-    height: 40,
+    backgroundColor: "#7CB9A9",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#E0E0E0",
-    justifyContent: "center",
+    gap: 6,
+  },
+  categoryText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  
+  // Author Section
+  authorSection: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 12,
+  },
+  authorCard: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  authorInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  avatarContainer: {
     marginRight: 12,
   },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  profileImageFallback: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#4CAF50",
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#7CB9A9",
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  initialsText: {
-    fontSize: 16,
-    fontWeight: "bold",
+  avatarText: {
     color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  profileTextContainer: {
-    justifyContent: "center",
+  authorDetails: {
+    flex: 1,
   },
-  userName: {
+  authorName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#212121",
+    color: "#1A1A1A",
+    marginBottom: 2,
   },
-  postCard: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 8,
-    padding: 12,
+  authorRole: {
+    fontSize: 14,
+    color: "#666",
   },
-  postInput: {
-    minHeight: 120,
-    fontSize: 12,
-    textAlignVertical: "top",
-    color: "#424242",
+  
+  // Content Section
+  contentSection: {
+    marginBottom: 24,
   },
-  charCount: {
-    fontSize: 12,
-    color: "#999",
-    textAlign: "right",
-    marginTop: 8,
+  inputGroup: {
+    marginBottom: 20,
   },
-  postActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  actionIcons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  iconButton: {
-    padding: 4,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 16,
-  },
-  privacyContainer: {
-    backgroundColor: "transparent",
-    borderRadius: 12,
-    marginTop: 10,
-    padding: 16,
-  },
-  privacyRow: {
+  inputHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
   },
-  privacyText: {
+  inputLabel: {
     fontSize: 16,
-    color: "#000",
-    fontWeight: "700",
+    fontWeight: "600",
+    color: "#1A1A1A",
   },
-  privacyNote: {
+  charCount: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  titleInput: {
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 12,
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#1A1A1A",
+    borderWidth: 2,
+    borderColor: "#F0F0F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  contentInputContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#F0F0F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    overflow: "hidden",
+  },
+  contentInput: {
+    minHeight: 160,
+    padding: 16,
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#1A1A1A",
+    textAlignVertical: "top",
+  },
+  contentTips: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "rgba(124, 185, 169, 0.05)",
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+    gap: 8,
+  },
+  tipsText: {
+    fontSize: 12,
+    color: "#7CB9A9",
+    fontWeight: "500",
+    flex: 1,
+  },
+  
+  // Settings Section
+  settingsSection: {
+    marginBottom: 32,
+  },
+  privacyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  privacyInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  privacyTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  privacyTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1A1A1A",
+    marginBottom: 2,
+  },
+  privacyDescription: {
     fontSize: 14,
     color: "#666",
-    fontStyle: "italic",
+    lineHeight: 18,
   },
-  footer: {
-    flexDirection: "column",
-    padding: 20,
-    backgroundColor: "transparent",
-    borderTopWidth: 1,
-    borderTopColor: "transparent",
+  
+  // Actions Section
+  actionsSection: {
     gap: 12,
     marginBottom: 40,
   },
   draftButton: {
-    backgroundColor: "#B6D5CF",
-    paddingVertical: 16,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "white",
+    flexDirection: "row",
     alignItems: "center",
-    marginRight: 30,
-    marginLeft: 30,
-    shadowColor: "#999",
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+    justifyContent: "center",
+    backgroundColor: "#F8F9FA",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#E9ECEF",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   draftButtonText: {
-    color: "#000",
     fontSize: 16,
     fontWeight: "600",
+    color: "#666",
   },
   publishButton: {
-    backgroundColor: "#7CB9A9",
-    paddingVertical: 16,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "white",
+    flexDirection: "row",
     alignItems: "center",
-    marginRight: 30,
-    marginLeft: 30,
-    shadowColor: "#999",
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+    justifyContent: "center",
+    backgroundColor: "#7CB9A9",
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: "#7CB9A9",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   publishButtonDisabled: {
     backgroundColor: "#B6D5CF",
+    shadowColor: "#B6D5CF",
   },
   publishButtonText: {
-    color: "#000",
     fontSize: 16,
-    fontWeight: "600",
-  },
-  categoryIndicator: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 4,
-    textAlign: "center",
-  },
-  titleInputContainer: {
-    marginBottom: 16,
-  },
-  titleInput: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    padding: 12,
-    backgroundColor: "#F8F9FA",
-    borderRadius: 8,
-    marginBottom: 4,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  
+  bottomSpacing: {
+    height: 20,
   },
 });
