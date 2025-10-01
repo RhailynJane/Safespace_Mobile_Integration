@@ -86,9 +86,29 @@ class CommunityForumApi {
 
   // User posts
   async getUserPosts(clerkUserId: string, includeDrafts = false) {
+    const params = new URLSearchParams();
+    if (includeDrafts) params.append("includeDrafts", "true");
+
     return this.fetchWithAuth(
-      `/community/my-posts/${clerkUserId}?includeDrafts=${includeDrafts}`
+      `/community/my-posts/${clerkUserId}?${params.toString()}`
     );
+  }
+
+  async updatePost(
+    postId: number,
+    updates: { isDraft?: boolean; title?: string; content?: string }
+  ) {
+    return this.fetchWithAuth(`/community/posts/${postId}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  }
+
+  // Delete post
+  async deletePost(postId: number) {
+    return this.fetchWithAuth(`/community/posts/${postId}`, {
+      method: "DELETE",
+    });
   }
 
   // Categories
