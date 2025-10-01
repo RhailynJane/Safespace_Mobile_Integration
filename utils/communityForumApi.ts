@@ -89,6 +89,10 @@ class CommunityForumApi {
   async getCategories() {
     return this.fetchWithAuth('/community/categories');
   }
+
+  async getUserReaction(postId: number, clerkUserId: string) {
+  return this.fetchWithAuth(`/community/posts/${postId}/user-reaction/${clerkUserId}`);
+}
 }
 
 export const communityApi = new CommunityForumApi();
