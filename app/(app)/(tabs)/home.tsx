@@ -21,6 +21,12 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { assessmentTracker } from "../../../utils/assessmentTracker";
 import BottomNavigation from "../../../components/BottomNavigation";
+import { 
+  Resource, 
+  fetchAllResourcesWithExternal,
+  getRandomQuote,
+  getDailyAffirmation 
+} from "../../../utils/resourcesApi";
 
 type MoodEntry = {
   id: string;
@@ -28,13 +34,6 @@ type MoodEntry = {
   created_at: string;
   mood_emoji?: string;
   mood_label?: string;
-};
-
-type Resource = {
-  id: string;
-  title: string;
-  duration: string;
-  onPress?: () => void;
 };
 
 /**
@@ -185,35 +184,41 @@ export default function HomeScreen() {
   };
 
   /**
- * Loads mood data from backend
- */
-const fetchRecentMoods = useCallback(async () => {
-  try {
-    if (user?.id) {
-      const data = await moodApi.getRecentMoods(user.id, 3);
-      setRecentMoods(data.moods);
+   * Loads mood data from backend
+   */
+  const fetchRecentMoods = useCallback(async () => {
+    try {
+      if (user?.id) {
+        const data = await moodApi.getRecentMoods(user.id, 3);
+        setRecentMoods(data.moods);
+      }
+    } catch (error) {
+      console.log("Error loading mood data:", error);
+      setRecentMoods([]);
     }
-  } catch (error) {
-    console.log("Error loading mood data:", error);
-    setRecentMoods([]);
-  }
-}, [user?.id]);
+  }, [user?.id]);
 
   /**
-   * Loads mock resource data for demonstration
+   * Loads real resources from local API
    */
   const fetchResources = useCallback(async () => {
     try {
-      const mockResources: Resource[] = [
-        {
-          id: "1",
-          title: "Understanding Anxiety",
-          duration: "10 min",
-        },
-      ];
-
-      setResources(mockResources);
+      // Get all resources and pick 2-3 random ones for recommendations
+      const allResources = await fetchAllResourcesWithExternal();
+      
+      // Filter for quick, actionable resources (exercises, affirmations, quotes)
+      const recommendedResources = allResources
+        .filter(resource => 
+          resource.type === 'Exercise' || 
+          resource.type === 'Affirmation' || 
+          resource.type === 'Quote'
+        )
+        .sort(() => Math.random() - 0.5) // Shuffle array
+        .slice(0, 3); // Take 3 random ones
+      
+      setResources(recommendedResources);
     } catch (error) {
+      console.error("Error loading resources:", error);
       setResources([]);
     }
   }, []);
@@ -255,6 +260,65 @@ const fetchRecentMoods = useCallback(async () => {
         month: "short",
         day: "numeric",
       });
+    }
+  };
+
+  /**
+   * Handle resource press - navigate to resource detail
+   */
+  const handleResourcePress = (resource: Resource) => {
+    router.push({
+      pathname: "/(app)/resources/resource-detail-screen",
+      params: {
+        id: resource.id,
+        title: resource.title,
+        content: resource.content,
+        author: resource.author || "Unknown",
+        type: resource.type,
+        category: resource.category,
+        imageEmoji: resource.image_emoji,
+        backgroundColor: resource.backgroundColor,
+      },
+    });
+  };
+
+  /**
+   * Get resource type icon
+   */
+  const getResourceIcon = (type: string) => {
+    switch (type) {
+      case 'Exercise':
+        return 'fitness-outline';
+      case 'Affirmation':
+        return 'heart-outline';
+      case 'Quote':
+        return 'chatbubble-outline';
+      case 'Article':
+        return 'document-text-outline';
+      case 'Guide':
+        return 'book-outline';
+      default:
+        return 'library-outline';
+    }
+  };
+
+  /**
+   * Get resource type color
+   */
+  const getResourceColor = (type: string) => {
+    switch (type) {
+      case 'Exercise':
+        return '#4CAF50';
+      case 'Affirmation':
+        return '#FF9800';
+      case 'Quote':
+        return '#2196F3';
+      case 'Article':
+        return '#9C27B0';
+      case 'Guide':
+        return '#607D8B';
+      default:
+        return '#757575';
     }
   };
 
@@ -406,12 +470,16 @@ const fetchRecentMoods = useCallback(async () => {
                 <View style={styles.recentMoods}>
                   {recentMoods.map((mood) => (
                     <View key={mood.id} style={styles.moodItem}>
-                      <Text style={styles.moodEmoji}>{mood.mood_emoji}</Text>
+                      <Text style={styles.moodEmoji}>
+                        {getEmojiForMood(mood.mood_type)}
+                      </Text>
                       <View style={styles.moodDetails}>
                         <Text style={styles.moodDate}>
                           {formatDate(mood.created_at)}
                         </Text>
-                        <Text style={styles.moodText}>{mood.mood_label}</Text>
+                        <Text style={styles.moodText}>
+                          {getLabelForMood(mood.mood_type)}
+                        </Text>
                       </View>
                     </View>
                   ))}
@@ -434,17 +502,47 @@ const fetchRecentMoods = useCallback(async () => {
                   <TouchableOpacity
                     key={resource.id}
                     style={styles.resourceCard}
-                    onPress={() =>
-                      router.push(`../resources/understanding-anxiety`)
-                    }
+                    onPress={() => handleResourcePress(resource)}
                   >
-                    <View style={styles.resourceInfo}>
-                      <Text style={styles.resourceTitle}>{resource.title}</Text>
-                      <Text style={styles.resourceDuration}>
-                        {resource.duration}
-                      </Text>
+                    <View style={styles.resourceHeader}>
+                      <View 
+                        style={[
+                          styles.resourceIconContainer,
+                          { backgroundColor: resource.backgroundColor || '#EDE7EC' }
+                        ]}
+                      >
+                        <Text style={styles.resourceEmoji}>
+                          {resource.image_emoji}
+                        </Text>
+                      </View>
+                      <View style={styles.resourceInfo}>
+                        <Text style={styles.resourceTitle} numberOfLines={2}>
+                          {resource.title}
+                        </Text>
+                        <View style={styles.resourceMeta}>
+                          <View style={styles.resourceTypeBadge}>
+                            <Ionicons 
+                              name={getResourceIcon(resource.type) as any} 
+                              size={14} 
+                              color={getResourceColor(resource.type)} 
+                            />
+                            <Text 
+                              style={[
+                                styles.resourceType,
+                                { color: getResourceColor(resource.type) }
+                              ]}
+                            >
+                              {resource.type}
+                            </Text>
+                          </View>
+                          <View style={styles.resourceDot} />
+                          <Text style={styles.resourceDuration}>
+                            {resource.duration}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                    <Ionicons name="play-circle" size={32} color="#4CAF50" />
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
                 ))
               ) : (
@@ -454,6 +552,17 @@ const fetchRecentMoods = useCallback(async () => {
                     Check back later for new content
                   </Text>
                 </View>
+              )}
+              
+              {/* View All Resources Button */}
+              {resources.length > 0 && (
+                <TouchableOpacity
+                  style={styles.viewAllButton}
+                  onPress={() => router.push("/resources")}
+                >
+                  <Text style={styles.viewAllButtonText}>View All Resources</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#4CAF50" />
+                </TouchableOpacity>
               )}
             </View>
             <View style={styles.bottomSpacing} />
@@ -662,6 +771,22 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
+  resourceHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  resourceIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  resourceEmoji: {
+    fontSize: 20,
+  },
   resourceInfo: {
     flex: 1,
   },
@@ -671,9 +796,46 @@ const styles = StyleSheet.create({
     color: "#000",
     marginBottom: 4,
   },
+  resourceMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  resourceTypeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  resourceType: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  resourceDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "#666",
+    marginHorizontal: 6,
+  },
   resourceDuration: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#757575",
+  },
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    marginTop: 8,
+  },
+  viewAllButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4CAF50",
+    marginRight: 8,
   },
   bottomNav: {
     flexDirection: "row",
