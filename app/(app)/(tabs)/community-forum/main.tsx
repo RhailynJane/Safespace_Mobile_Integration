@@ -14,6 +14,7 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -22,7 +23,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Alert } from "react-native";
 import { communityApi } from "../../../../utils/communityForumApi";
 
 const { width, height } = Dimensions.get("window");
@@ -41,14 +41,17 @@ const CATEGORIES = [
   "Bookmark",
 ];
 
+// Define the tab types
+type ViewType = "newsfeed" | "my-posts";
+
 export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
+  const [activeView, setActiveView] = useState<ViewType>("newsfeed");
   const [activeTab, setActiveTab] = useState("community-forum");
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
-    new Set()
-  );
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [posts, setPosts] = useState<any[]>([]);
+  const [myPosts, setMyPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
@@ -62,32 +65,12 @@ export default function CommunityMainScreen() {
   }, []);
 
   useEffect(() => {
-    if (selectedCategory) {
+    if (selectedCategory && activeView === "newsfeed") {
       loadPosts();
+    } else if (activeView === "my-posts") {
+      loadMyPosts();
     }
-  }, [selectedCategory]);
-
-  const loadUserReactions = async (clerkUserId: string, posts: any[]) => {
-    try {
-      const userReactions: { [postId: number]: string } = {};
-
-      // Load reactions for each post
-      for (const post of posts) {
-        const response = await communityApi.getUserReaction(
-          post.id,
-          clerkUserId
-        );
-        if (response.userReaction) {
-          userReactions[post.id] = response.userReaction;
-        }
-      }
-
-      return userReactions;
-    } catch (error) {
-      console.error("Error loading user reactions:", error);
-      return {};
-    }
-  };
+  }, [selectedCategory, activeView]);
 
   const loadInitialData = async () => {
     try {
@@ -110,26 +93,18 @@ export default function CommunityMainScreen() {
   const loadPosts = async () => {
     try {
       setLoading(true);
-
       let response;
       if (selectedCategory === "Bookmark") {
-        // Load bookmarked posts
         if (!user?.id) {
-          Alert.alert(
-            "Sign In Required",
-            "Please sign in to view bookmarked posts"
-          );
+          Alert.alert("Sign In Required", "Please sign in to view bookmarked posts");
           setPosts([]);
           return;
         }
         response = await communityApi.getBookmarkedPosts(user.id);
-        // Transform the response to match posts structure
         response = { posts: response.bookmarks || [] };
       } else {
-        // Load regular posts
         response = await communityApi.getPosts({
-          category:
-            selectedCategory === "Trending" ? undefined : selectedCategory,
+          category: selectedCategory === "Trending" ? undefined : selectedCategory,
           limit: 20,
         });
       }
@@ -137,7 +112,6 @@ export default function CommunityMainScreen() {
       const postsWithReactions = response.posts;
       setPosts(postsWithReactions);
 
-      // Load bookmarks and reactions for current user (except for bookmark category)
       if (user?.id && selectedCategory !== "Bookmark") {
         await Promise.all([
           loadUserBookmarks(user.id),
@@ -153,44 +127,47 @@ export default function CommunityMainScreen() {
     }
   };
 
-  // Add reaction handler
-  const handleReactionPress = async (postId: number, emoji: string) => {
+  const loadMyPosts = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to react to posts");
+      Alert.alert("Sign In Required", "Please sign in to view your posts");
+      setMyPosts([]);
+      setLoading(false);
       return;
     }
 
     try {
-      const response = await communityApi.reactToPost(postId, user.id, emoji);
-
-      // Update the specific post with new reaction data
-      setPosts((prevPosts) =>
-        prevPosts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                reactions: response.reactions,
-                reaction_count:
-                  (post.reaction_count || 0) + response.reactionChange,
-              }
-            : post
-        )
-      );
-
-      // Update user reaction state if needed
-      // You might want to maintain a separate state for user reactions
+      setLoading(true);
+      const response = await communityApi.getUserPosts(user.id, true); // Include drafts
+      setMyPosts(response.posts || []);
     } catch (error) {
-      console.error("Error reacting to post:", error);
-      Alert.alert("Error", "Failed to update reaction");
+      console.error("Error loading user posts:", error);
+      Alert.alert("Error", "Failed to load your posts");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const loadUserReactions = async (clerkUserId: string, posts: any[]) => {
+    try {
+      const userReactions: { [postId: number]: string } = {};
+      for (const post of posts) {
+        const response = await communityApi.getUserReaction(post.id, clerkUserId);
+        if (response.userReaction) {
+          userReactions[post.id] = response.userReaction;
+        }
+      }
+      return userReactions;
+    } catch (error) {
+      console.error("Error loading user reactions:", error);
+      return {};
     }
   };
 
   const loadUserBookmarks = async (clerkUserId: string) => {
     try {
       const response = await communityApi.getBookmarkedPosts(clerkUserId);
-      const bookmarkedIds = new Set<number>(
-        response.bookmarks.map((post: any) => post.id as number)
-      );
+      const bookmarkedIds = new Set<number>(response.bookmarks?.map((post: any) => post.id as number) || []);
       setBookmarkedPosts(bookmarkedIds);
     } catch (error) {
       console.error("Error loading bookmarks:", error);
@@ -199,7 +176,127 @@ export default function CommunityMainScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadPosts();
+    if (activeView === "newsfeed") {
+      loadPosts();
+    } else {
+      loadMyPosts();
+    }
+  };
+
+  const handleReactionPress = async (postId: number, emoji: string) => {
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to react to posts");
+      return;
+    }
+
+    try {
+      const response = await communityApi.reactToPost(postId, user.id, emoji);
+      
+      // Update posts based on current view
+      if (activeView === "newsfeed") {
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId
+              ? {
+                  ...post,
+                  reactions: response.reactions,
+                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
+                }
+              : post
+          )
+        );
+      } else {
+        setMyPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === postId
+              ? {
+                  ...post,
+                  reactions: response.reactions,
+                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
+                }
+              : post
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error reacting to post:", error);
+      Alert.alert("Error", "Failed to update reaction");
+    }
+  };
+
+  const handleBookmarkPress = async (postId: number) => {
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to bookmark posts");
+      return;
+    }
+
+    try {
+      const response = await communityApi.toggleBookmark(postId, user.id);
+      const newBookmarkedPosts = new Set(bookmarkedPosts);
+      if (response.bookmarked) {
+        newBookmarkedPosts.add(postId);
+      } else {
+        newBookmarkedPosts.delete(postId);
+      }
+      setBookmarkedPosts(newBookmarkedPosts);
+
+      if (selectedCategory === "Bookmark" && activeView === "newsfeed") {
+        loadPosts();
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+      Alert.alert("Error", "Failed to update bookmark");
+    }
+  };
+
+  const handleEditPost = (postId: number) => {
+    // Navigate to edit screen (you'll need to create this)
+    Alert.alert("Coming Soon", "Edit functionality will be available soon!");
+    // router.push({
+    //   pathname: "/community-forum/edit",
+    //   params: { id: postId },
+    // });
+  };
+
+  const handlePublishDraft = async (postId: number) => {
+    if (!user?.id) return;
+
+    try {
+      // For now, we'll just show an alert since we need to implement the updatePost API
+      Alert.alert("Coming Soon", "Publish functionality will be available in the next update!");
+      // await communityApi.updatePost(postId, { isDraft: false });
+      // Alert.alert("Success", "Post published successfully!");
+      // loadMyPosts(); // Refresh the list
+    } catch (error) {
+      console.error("Error publishing draft:", error);
+      Alert.alert("Error", "Failed to publish post");
+    }
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // For now, we'll just show an alert since we need to implement the deletePost API
+              Alert.alert("Coming Soon", "Delete functionality will be available in the next update!");
+              // await communityApi.deletePost(postId);
+              // Alert.alert("Success", "Post deleted successfully!");
+              // loadMyPosts(); // Refresh the list
+            } catch (error) {
+              console.error("Error deleting post:", error);
+              Alert.alert("Error", "Failed to delete post");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getDisplayName = () => {
@@ -225,12 +322,10 @@ export default function CommunityMainScreen() {
     try {
       setIsSigningOut(true);
       setSideMenuVisible(false);
-
       await AsyncStorage.clear();
       if (signOut) {
         await signOut();
       }
-
       router.replace("/(auth)/login");
     } catch (error) {
       Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
@@ -269,32 +364,6 @@ export default function CommunityMainScreen() {
     }).start(() => {
       setSideMenuVisible(false);
     });
-  };
-
-  const handleBookmarkPress = async (postId: number) => {
-    if (!user?.id) {
-      Alert.alert("Error", "Please sign in to bookmark posts");
-      return;
-    }
-
-    try {
-      const response = await communityApi.toggleBookmark(postId, user.id);
-
-      const newBookmarkedPosts = new Set(bookmarkedPosts);
-      if (response.bookmarked) {
-        newBookmarkedPosts.add(postId);
-      } else {
-        newBookmarkedPosts.delete(postId);
-      }
-      setBookmarkedPosts(newBookmarkedPosts);
-
-      if (selectedCategory === "Bookmark") {
-        loadPosts(); // Reload to reflect the change
-      }
-    } catch (error) {
-      console.error("Error toggling bookmark:", error);
-      Alert.alert("Error", "Failed to update bookmark");
-    }
   };
 
   const handlePostPress = (postId: number) => {
@@ -423,6 +492,9 @@ export default function CommunityMainScreen() {
     },
   ];
 
+  // Determine which posts to display based on current view
+  const displayPosts = activeView === "newsfeed" ? posts : myPosts;
+
   return (
     <SafeAreaView style={styles.container}>
       <CurvedBackground style={styles.curvedBackground} />
@@ -437,76 +509,169 @@ export default function CommunityMainScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          <View style={styles.categoriesSection}>
+          {/* View Tabs */}
+          <View style={styles.viewTabsContainer}>
             <TouchableOpacity
-              style={styles.addPostButton}
-              onPress={() => router.push("/community-forum/create")}
+              style={[
+                styles.viewTab,
+                activeView === "newsfeed" && styles.viewTabActive,
+              ]}
+              onPress={() => setActiveView("newsfeed")}
             >
-              <Ionicons name="add" size={16} color="#FFFFFF" />
-              <Text style={styles.addPostButtonText}>Add Post</Text>
+              <Ionicons 
+                name="newspaper" 
+                size={20} 
+                color={activeView === "newsfeed" ? "#FFFFFF" : "#7CB9A9"} 
+              />
+              <Text style={[
+                styles.viewTabText,
+                activeView === "newsfeed" && styles.viewTabTextActive
+              ]}>
+                Newsfeed
+              </Text>
             </TouchableOpacity>
 
-            <Text style={styles.browseBySectionTitle}>Browse By</Text>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.categoriesScrollView}
+            <TouchableOpacity
+              style={[
+                styles.viewTab,
+                activeView === "my-posts" && styles.viewTabActive,
+              ]}
+              onPress={() => setActiveView("my-posts")}
             >
-              <View style={styles.categoriesContainer}>
-                {CATEGORIES.map((category) => (
-                  <TouchableOpacity
-                    key={category}
-                    style={[
-                      styles.categoryButton,
-                      selectedCategory === category &&
-                        styles.categoryButtonActive,
-                    ]}
-                    onPress={() => setSelectedCategory(category)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryText,
-                        selectedCategory === category &&
-                          styles.categoryTextActive,
-                      ]}
-                    >
-                      {category}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+              <Ionicons 
+                name="person" 
+                size={20} 
+                color={activeView === "my-posts" ? "#FFFFFF" : "#7CB9A9"} 
+              />
+              <Text style={[
+                styles.viewTabText,
+                activeView === "my-posts" && styles.viewTabTextActive
+              ]}>
+                My Posts
+              </Text>
+            </TouchableOpacity>
           </View>
 
+          {/* Categories Section - Only show in Newsfeed */}
+          {activeView === "newsfeed" && (
+            <View style={styles.categoriesSection}>
+              <TouchableOpacity
+                style={styles.addPostButton}
+                onPress={() => router.push("/community-forum/create")}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.addPostButtonText}>Add Post</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.browseBySectionTitle}>Browse By</Text>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoriesScrollView}
+              >
+                <View style={styles.categoriesContainer}>
+                  {CATEGORIES.map((category) => (
+                    <TouchableOpacity
+                      key={category}
+                      style={[
+                        styles.categoryButton,
+                        selectedCategory === category && styles.categoryButtonActive,
+                      ]}
+                      onPress={() => setSelectedCategory(category)}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryText,
+                          selectedCategory === category && styles.categoryTextActive,
+                        ]}
+                      >
+                        {category}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* My Posts Header */}
+          {activeView === "my-posts" && (
+            <View style={styles.myPostsHeader}>
+              <View style={styles.myPostsHeaderContent}>
+                <Ionicons name="document-text" size={24} color="#7CB9A9" />
+                <Text style={styles.myPostsTitle}>My Posts</Text>
+                <Text style={styles.myPostsSubtitle}>
+                  Manage your published posts and drafts
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.addPostButton}
+                onPress={() => router.push("/community-forum/create")}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.addPostButtonText}>New Post</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Posts Section */}
           <View style={styles.postsSection}>
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#7CB9A9" />
-                <Text style={styles.loadingText}>Loading posts...</Text>
+                <Text style={styles.loadingText}>
+                  {activeView === "newsfeed" ? "Loading posts..." : "Loading your posts..."}
+                </Text>
               </View>
-            ) : posts.length === 0 ? (
+            ) : displayPosts.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons
-                  name="document-text-outline"
+                  name={activeView === "newsfeed" ? "document-text-outline" : "create-outline"}
                   size={64}
                   color="#E0E0E0"
                 />
-                <Text style={styles.emptyText}>No posts found</Text>
-                <Text style={styles.emptySubtext}>
-                  {selectedCategory === "Trending"
-                    ? "Be the first to share something with the community!"
-                    : `No posts in ${selectedCategory} category yet`}
+                <Text style={styles.emptyText}>
+                  {activeView === "newsfeed" 
+                    ? selectedCategory === "Trending"
+                      ? "Be the first to share something with the community!"
+                      : `No posts in ${selectedCategory} category yet`
+                    : "You haven't created any posts yet"
+                  }
                 </Text>
+                <Text style={styles.emptySubtext}>
+                  {activeView === "my-posts" && "Create your first post to share with the community!"}
+                </Text>
+                {activeView === "my-posts" && (
+                  <TouchableOpacity
+                    style={styles.createFirstPostButton}
+                    onPress={() => router.push("/community-forum/create")}
+                  >
+                    <Text style={styles.createFirstPostButtonText}>
+                      Create Your First Post
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <>
-                {posts.map((post) => (
+                {displayPosts.map((post) => (
                   <TouchableOpacity
                     key={post.id}
-                    style={styles.postCard}
-                    onPress={() => handlePostPress(post.id)}
+                    style={[
+                      styles.postCard,
+                      post.is_draft && styles.draftPostCard,
+                    ]}
+                    onPress={() => !post.is_draft && handlePostPress(post.id)}
                   >
+                    {/* Draft Badge */}
+                    {post.is_draft && (
+                      <View style={styles.draftBadge}>
+                        <Ionicons name="time" size={12} color="#666" />
+                        <Text style={styles.draftBadgeText}>Draft</Text>
+                      </View>
+                    )}
+
                     <View style={styles.postHeader}>
                       <View style={styles.postUserInfo}>
                         <View style={styles.avatarContainer}>
@@ -521,63 +686,94 @@ export default function CommunityMainScreen() {
                           <Text style={styles.postAuthor}>
                             {post.author_name} •{" "}
                             {new Date(post.created_at).toLocaleDateString()}
+                            {post.is_draft && " • Draft"}
                           </Text>
                         </View>
                       </View>
+
+                      {/* My Posts Actions */}
+                      {activeView === "my-posts" && (
+                        <View style={styles.postActions}>
+                          {post.is_draft ? (
+                            <>
+                              <TouchableOpacity
+                                style={styles.postActionButton}
+                                onPress={() => handleEditPost(post.id)}
+                              >
+                                <Ionicons name="create" size={18} color="#666" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.postActionButton}
+                                onPress={() => handlePublishDraft(post.id)}
+                              >
+                                <Ionicons name="send" size={18} color="#4CAF50" />
+                              </TouchableOpacity>
+                            </>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.postActionButton}
+                              onPress={() => handlePostPress(post.id)}
+                            >
+                              <Ionicons name="eye" size={18} color="#666" />
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity
+                            style={styles.postActionButton}
+                            onPress={() => handleDeletePost(post.id)}
+                          >
+                            <Ionicons name="trash" size={18} color="#FF6B6B" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
 
                     <Text style={styles.postContent} numberOfLines={4}>
                       {post.content}
                     </Text>
 
-                    {/* Reactions Row */}
-                    <View style={styles.reactionsRow}>
-                      <View style={styles.reactionsContainer}>
-                        {post.reactions &&
-                          Object.entries(post.reactions)
-                            .slice(0, 3)
-                            .map(([emoji, count]) => (
-                              <TouchableOpacity
-                                key={emoji}
-                                style={styles.reactionPill}
-                                onPress={() =>
-                                  handleReactionPress(post.id, emoji)
-                                }
-                              >
-                                <Text style={styles.reactionEmoji}>
-                                  {emoji}
-                                </Text>
-                                <Text style={styles.reactionCount}>
-                                  {count as number}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                        {post.reactions &&
-                          Object.keys(post.reactions).length > 3 && (
+                    {/* Reactions and Interactions */}
+                    {!post.is_draft && (
+                      <View style={styles.reactionsRow}>
+                        <View style={styles.reactionsContainer}>
+                          {post.reactions &&
+                            Object.entries(post.reactions)
+                              .slice(0, 3)
+                              .map(([emoji, count]) => (
+                                <TouchableOpacity
+                                  key={emoji}
+                                  style={styles.reactionPill}
+                                  onPress={() => handleReactionPress(post.id, emoji)}
+                                >
+                                  <Text style={styles.reactionEmoji}>
+                                    {emoji}
+                                  </Text>
+                                  <Text style={styles.reactionCount}>
+                                    {count as number}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                          {post.reactions && Object.keys(post.reactions).length > 3 && (
                             <Text style={styles.moreReactions}>
                               +{Object.keys(post.reactions).length - 3} more
                             </Text>
                           )}
-                      </View>
+                        </View>
 
-                      {/* Bookmark Button */}
-                      <TouchableOpacity
-                        onPress={() => handleBookmarkPress(post.id)}
-                        style={styles.bookmarkButton}
-                      >
-                        <Ionicons
-                          name={
-                            bookmarkedPosts.has(post.id)
-                              ? "bookmark"
-                              : "bookmark-outline"
-                          }
-                          size={24}
-                          color={
-                            bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"
-                          }
-                        />
-                      </TouchableOpacity>
-                    </View>
+                        {/* Bookmark Button - Only in Newsfeed */}
+                        {activeView === "newsfeed" && (
+                          <TouchableOpacity
+                            onPress={() => handleBookmarkPress(post.id)}
+                            style={styles.bookmarkButton}
+                          >
+                            <Ionicons
+                              name={bookmarkedPosts.has(post.id) ? "bookmark" : "bookmark-outline"}
+                              size={24}
+                              color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"}
+                            />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
 
                     {post.category_name && (
                       <View style={styles.categoryBadge}>
@@ -596,6 +792,7 @@ export default function CommunityMainScreen() {
         </ScrollView>
       </View>
 
+      {/* Side Menu Modal */}
       <Modal
         animationType="none"
         transparent={true}
@@ -650,6 +847,7 @@ export default function CommunityMainScreen() {
         </Animated.View>
       </Modal>
 
+      {/* Bottom Navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -676,28 +874,56 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 80,
   },
-  sideMenuItemDisabled: {
-    opacity: 0.5,
-  },
-  sideMenuItemTextDisabled: {
-    color: "#CCCCCC",
-  },
-  signOutText: {
-    color: "#FF6B6B",
-    fontWeight: "600",
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 30,
   },
-  categoriesScrollView: {
-    marginHorizontal: -16,
+
+  // View Tabs
+  viewTabsContainer: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginBottom: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
+  viewTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  viewTabActive: {
+    backgroundColor: "#7CB9A9",
+  },
+  viewTabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#7CB9A9",
+  },
+  viewTabTextActive: {
+    color: "#FFFFFF",
+  },
+
+  // Categories Section
   categoriesSection: {
     paddingHorizontal: 16,
     marginBottom: 16,
+  },
+  categoriesScrollView: {
+    marginHorizontal: -16,
   },
   addPostButton: {
     backgroundColor: "#2EA78F",
@@ -759,6 +985,31 @@ const styles = StyleSheet.create({
   categoryTextActive: {
     color: "#FFFFFF",
   },
+
+  // My Posts Header
+  myPostsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  myPostsHeaderContent: {
+    flex: 1,
+  },
+  myPostsTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginTop: 8,
+  },
+  myPostsSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 4,
+  },
+
+  // Posts Section
   postsSection: {
     paddingHorizontal: 16,
     gap: 12,
@@ -783,6 +1034,7 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 16,
     fontWeight: "600",
+    textAlign: "center",
   },
   emptySubtext: {
     fontSize: 14,
@@ -790,6 +1042,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+
+  // Post Cards
   postCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -805,6 +1059,29 @@ const styles = StyleSheet.create({
     elevation: 3,
     overflow: "visible",
   },
+  draftPostCard: {
+    borderColor: "#FFA726",
+    borderWidth: 1,
+    backgroundColor: "#FFFBF0",
+  },
+  draftBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#FFF3CD",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 8,
+    gap: 4,
+  },
+  draftBadgeText: {
+    fontSize: 12,
+    color: "#856404",
+    fontWeight: "500",
+  },
+
+  // Post Header
   postHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -844,31 +1121,67 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 4,
   },
+
+  // Post Actions (My Posts)
+  postActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  postActionButton: {
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: "#F8F9FA",
+  },
+
+  // Post Content
   postContent: {
     fontSize: 14,
     color: "#666",
     lineHeight: 20,
     marginBottom: 12,
   },
-  postFooter: {
+
+  // Reactions Row
+  reactionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 12,
+    marginBottom: 8,
   },
-  reactionContainer: {
+  reactionsContainer: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  reactionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4,
+  },
+  reactionEmoji: {
+    fontSize: 14,
   },
   reactionCount: {
     fontSize: 12,
     color: "#666",
     fontWeight: "500",
   },
+  moreReactions: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
+  },
   bookmarkButton: {
     padding: 4,
   },
+
+  // Category Badge
   categoryBadge: {
     alignSelf: "flex-start",
     backgroundColor: "#E8F5E9",
@@ -882,8 +1195,36 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#4CAF50",
   },
+
+  // Create First Post Button
+  createFirstPostButton: {
+    backgroundColor: "#7CB9A9",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  createFirstPostButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  // Bottom Spacing
   bottomSpacing: {
     height: 30,
+  },
+
+  // Side Menu Styles
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  sideMenuItemTextDisabled: {
+    color: "#CCCCCC",
+  },
+  signOutText: {
+    color: "#FF6B6B",
+    fontWeight: "600",
   },
   fullScreenOverlay: {
     flex: 1,
@@ -942,36 +1283,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     marginLeft: 15,
-  },
-  reactionsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  reactionsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  reactionPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  reactionEmoji: {
-    fontSize: 14,
-  },
-
-  moreReactions: {
-    fontSize: 12,
-    color: "#999",
-    fontStyle: "italic",
   },
 });
