@@ -48,7 +48,9 @@ export default function CommunityMainScreen() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
   const [activeView, setActiveView] = useState<ViewType>("newsfeed");
   const [activeTab, setActiveTab] = useState("community-forum");
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
+    new Set()
+  );
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [posts, setPosts] = useState<any[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
@@ -96,7 +98,10 @@ export default function CommunityMainScreen() {
       let response;
       if (selectedCategory === "Bookmark") {
         if (!user?.id) {
-          Alert.alert("Sign In Required", "Please sign in to view bookmarked posts");
+          Alert.alert(
+            "Sign In Required",
+            "Please sign in to view bookmarked posts"
+          );
           setPosts([]);
           return;
         }
@@ -104,7 +109,8 @@ export default function CommunityMainScreen() {
         response = { posts: response.bookmarks || [] };
       } else {
         response = await communityApi.getPosts({
-          category: selectedCategory === "Trending" ? undefined : selectedCategory,
+          category:
+            selectedCategory === "Trending" ? undefined : selectedCategory,
           limit: 20,
         });
       }
@@ -152,7 +158,10 @@ export default function CommunityMainScreen() {
     try {
       const userReactions: { [postId: number]: string } = {};
       for (const post of posts) {
-        const response = await communityApi.getUserReaction(post.id, clerkUserId);
+        const response = await communityApi.getUserReaction(
+          post.id,
+          clerkUserId
+        );
         if (response.userReaction) {
           userReactions[post.id] = response.userReaction;
         }
@@ -167,7 +176,9 @@ export default function CommunityMainScreen() {
   const loadUserBookmarks = async (clerkUserId: string) => {
     try {
       const response = await communityApi.getBookmarkedPosts(clerkUserId);
-      const bookmarkedIds = new Set<number>(response.bookmarks?.map((post: any) => post.id as number) || []);
+      const bookmarkedIds = new Set<number>(
+        response.bookmarks?.map((post: any) => post.id as number) || []
+      );
       setBookmarkedPosts(bookmarkedIds);
     } catch (error) {
       console.error("Error loading bookmarks:", error);
@@ -191,28 +202,30 @@ export default function CommunityMainScreen() {
 
     try {
       const response = await communityApi.reactToPost(postId, user.id, emoji);
-      
+
       // Update posts based on current view
       if (activeView === "newsfeed") {
-        setPosts(prevPosts =>
-          prevPosts.map(post =>
+        setPosts((prevPosts) =>
+          prevPosts.map((post) =>
             post.id === postId
               ? {
                   ...post,
                   reactions: response.reactions,
-                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
+                  reaction_count:
+                    (post.reaction_count || 0) + response.reactionChange,
                 }
               : post
           )
         );
       } else {
-        setMyPosts(prevPosts =>
-          prevPosts.map(post =>
+        setMyPosts((prevPosts) =>
+          prevPosts.map((post) =>
             post.id === postId
               ? {
                   ...post,
                   reactions: response.reactions,
-                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
+                  reaction_count:
+                    (post.reaction_count || 0) + response.reactionChange,
                 }
               : post
           )
@@ -250,23 +263,29 @@ export default function CommunityMainScreen() {
   };
 
   const handleEditPost = (postId: number) => {
-    // Navigate to edit screen (you'll need to create this)
-    Alert.alert("Coming Soon", "Edit functionality will be available soon!");
-    // router.push({
-    //   pathname: "/community-forum/edit",
-    //   params: { id: postId },
-    // });
+    // Navigate to edit screen with post data
+    const postToEdit = myPosts.find((post) => post.id === postId);
+    if (postToEdit) {
+      router.push({
+        pathname: "/community-forum/edit",
+        params: {
+          id: postId,
+          title: postToEdit.title,
+          content: postToEdit.content,
+          category: postToEdit.category_name,
+          isDraft: postToEdit.is_draft ? "true" : "false",
+        },
+      });
+    }
   };
 
   const handlePublishDraft = async (postId: number) => {
     if (!user?.id) return;
 
     try {
-      // For now, we'll just show an alert since we need to implement the updatePost API
-      Alert.alert("Coming Soon", "Publish functionality will be available in the next update!");
-      // await communityApi.updatePost(postId, { isDraft: false });
-      // Alert.alert("Success", "Post published successfully!");
-      // loadMyPosts(); // Refresh the list
+      await communityApi.updatePost(postId, { isDraft: false });
+      Alert.alert("Success", "Post published successfully!");
+      loadMyPosts(); // Refresh the list
     } catch (error) {
       console.error("Error publishing draft:", error);
       Alert.alert("Error", "Failed to publish post");
@@ -276,7 +295,7 @@ export default function CommunityMainScreen() {
   const handleDeletePost = async (postId: number) => {
     Alert.alert(
       "Delete Post",
-      "Are you sure you want to delete this post?",
+      "Are you sure you want to delete this post? This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -284,11 +303,19 @@ export default function CommunityMainScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              // For now, we'll just show an alert since we need to implement the deletePost API
-              Alert.alert("Coming Soon", "Delete functionality will be available in the next update!");
-              // await communityApi.deletePost(postId);
-              // Alert.alert("Success", "Post deleted successfully!");
-              // loadMyPosts(); // Refresh the list
+              await communityApi.deletePost(postId);
+              Alert.alert("Success", "Post deleted successfully!");
+
+              // Update the UI immediately
+              if (activeView === "my-posts") {
+                setMyPosts((prevPosts) =>
+                  prevPosts.filter((post) => post.id !== postId)
+                );
+              } else {
+                setPosts((prevPosts) =>
+                  prevPosts.filter((post) => post.id !== postId)
+                );
+              }
             } catch (error) {
               console.error("Error deleting post:", error);
               Alert.alert("Error", "Failed to delete post");
@@ -518,15 +545,17 @@ export default function CommunityMainScreen() {
               ]}
               onPress={() => setActiveView("newsfeed")}
             >
-              <Ionicons 
-                name="newspaper" 
-                size={20} 
-                color={activeView === "newsfeed" ? "#FFFFFF" : "#7CB9A9"} 
+              <Ionicons
+                name="newspaper"
+                size={20}
+                color={activeView === "newsfeed" ? "#FFFFFF" : "#7CB9A9"}
               />
-              <Text style={[
-                styles.viewTabText,
-                activeView === "newsfeed" && styles.viewTabTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.viewTabText,
+                  activeView === "newsfeed" && styles.viewTabTextActive,
+                ]}
+              >
                 Newsfeed
               </Text>
             </TouchableOpacity>
@@ -538,15 +567,17 @@ export default function CommunityMainScreen() {
               ]}
               onPress={() => setActiveView("my-posts")}
             >
-              <Ionicons 
-                name="person" 
-                size={20} 
-                color={activeView === "my-posts" ? "#FFFFFF" : "#7CB9A9"} 
+              <Ionicons
+                name="person"
+                size={20}
+                color={activeView === "my-posts" ? "#FFFFFF" : "#7CB9A9"}
               />
-              <Text style={[
-                styles.viewTabText,
-                activeView === "my-posts" && styles.viewTabTextActive
-              ]}>
+              <Text
+                style={[
+                  styles.viewTabText,
+                  activeView === "my-posts" && styles.viewTabTextActive,
+                ]}
+              >
                 My Posts
               </Text>
             </TouchableOpacity>
@@ -576,14 +607,16 @@ export default function CommunityMainScreen() {
                       key={category}
                       style={[
                         styles.categoryButton,
-                        selectedCategory === category && styles.categoryButtonActive,
+                        selectedCategory === category &&
+                          styles.categoryButtonActive,
                       ]}
                       onPress={() => setSelectedCategory(category)}
                     >
                       <Text
                         style={[
                           styles.categoryText,
-                          selectedCategory === category && styles.categoryTextActive,
+                          selectedCategory === category &&
+                            styles.categoryTextActive,
                         ]}
                       >
                         {category}
@@ -621,26 +654,32 @@ export default function CommunityMainScreen() {
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#7CB9A9" />
                 <Text style={styles.loadingText}>
-                  {activeView === "newsfeed" ? "Loading posts..." : "Loading your posts..."}
+                  {activeView === "newsfeed"
+                    ? "Loading posts..."
+                    : "Loading your posts..."}
                 </Text>
               </View>
             ) : displayPosts.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons
-                  name={activeView === "newsfeed" ? "document-text-outline" : "create-outline"}
+                  name={
+                    activeView === "newsfeed"
+                      ? "document-text-outline"
+                      : "create-outline"
+                  }
                   size={64}
                   color="#E0E0E0"
                 />
                 <Text style={styles.emptyText}>
-                  {activeView === "newsfeed" 
+                  {activeView === "newsfeed"
                     ? selectedCategory === "Trending"
                       ? "Be the first to share something with the community!"
                       : `No posts in ${selectedCategory} category yet`
-                    : "You haven't created any posts yet"
-                  }
+                    : "You haven't created any posts yet"}
                 </Text>
                 <Text style={styles.emptySubtext}>
-                  {activeView === "my-posts" && "Create your first post to share with the community!"}
+                  {activeView === "my-posts" &&
+                    "Create your first post to share with the community!"}
                 </Text>
                 {activeView === "my-posts" && (
                   <TouchableOpacity
@@ -700,13 +739,21 @@ export default function CommunityMainScreen() {
                                 style={styles.postActionButton}
                                 onPress={() => handleEditPost(post.id)}
                               >
-                                <Ionicons name="create" size={18} color="#666" />
+                                <Ionicons
+                                  name="create"
+                                  size={18}
+                                  color="#666"
+                                />
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={styles.postActionButton}
                                 onPress={() => handlePublishDraft(post.id)}
                               >
-                                <Ionicons name="send" size={18} color="#4CAF50" />
+                                <Ionicons
+                                  name="send"
+                                  size={18}
+                                  color="#4CAF50"
+                                />
                               </TouchableOpacity>
                             </>
                           ) : (
@@ -742,7 +789,9 @@ export default function CommunityMainScreen() {
                                 <TouchableOpacity
                                   key={emoji}
                                   style={styles.reactionPill}
-                                  onPress={() => handleReactionPress(post.id, emoji)}
+                                  onPress={() =>
+                                    handleReactionPress(post.id, emoji)
+                                  }
                                 >
                                   <Text style={styles.reactionEmoji}>
                                     {emoji}
@@ -752,11 +801,12 @@ export default function CommunityMainScreen() {
                                   </Text>
                                 </TouchableOpacity>
                               ))}
-                          {post.reactions && Object.keys(post.reactions).length > 3 && (
-                            <Text style={styles.moreReactions}>
-                              +{Object.keys(post.reactions).length - 3} more
-                            </Text>
-                          )}
+                          {post.reactions &&
+                            Object.keys(post.reactions).length > 3 && (
+                              <Text style={styles.moreReactions}>
+                                +{Object.keys(post.reactions).length - 3} more
+                              </Text>
+                            )}
                         </View>
 
                         {/* Bookmark Button - Only in Newsfeed */}
@@ -766,9 +816,17 @@ export default function CommunityMainScreen() {
                             style={styles.bookmarkButton}
                           >
                             <Ionicons
-                              name={bookmarkedPosts.has(post.id) ? "bookmark" : "bookmark-outline"}
+                              name={
+                                bookmarkedPosts.has(post.id)
+                                  ? "bookmark"
+                                  : "bookmark-outline"
+                              }
                               size={24}
-                              color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"}
+                              color={
+                                bookmarkedPosts.has(post.id)
+                                  ? "#FFA000"
+                                  : "#666"
+                              }
                             />
                           </TouchableOpacity>
                         )}
