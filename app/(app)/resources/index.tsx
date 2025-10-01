@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useAuth } from "@clerk/clerk-expo";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
@@ -25,10 +24,9 @@ import {
   searchResources,
   getDailyAffirmation,
   getRandomQuote,
-  getBookmarkedResources
 } from "../../../utils/resourcesApi";
 
-// Category definitions
+// Category definitions - REMOVED 'saved' category
 interface Category {
   id: string;
   name: string;
@@ -37,12 +35,6 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
-  {
-    id: 'saved',
-    name: 'Saved',
-    icon: '💾',
-    color: '#9C27B0',
-  },
   {
     id: 'stress',
     name: 'Stress',
@@ -82,9 +74,7 @@ const CATEGORIES: Category[] = [
 ];
 
 export default function ResourcesScreen() {
-  const { userId } = useAuth();
-  
-  // State management
+  // State management - REMOVED userId since we don't need auth for bookmarks
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("resources");
@@ -136,32 +126,17 @@ export default function ResourcesScreen() {
     setRefreshing(false);
   };
 
-  // Handle category filter
-  const handleCategoryPress = async (categoryId: string) => {
+  // Handle category filter - SIMPLIFIED (no saved category)
+  const handleCategoryPress = (categoryId: string) => {
     const newCategory = selectedCategory === categoryId ? "" : categoryId;
     setSelectedCategory(newCategory);
 
-    if (newCategory === 'saved') {
+    if (newCategory) {
       setLoading(true);
-      try {
-        const savedResources = await getBookmarkedResources();
-        setResources(savedResources);
-      } catch (error) {
-        console.error("Error loading saved resources:", error);
-        Alert.alert("Error", "Could not load saved resources.");
-      } finally {
-        setLoading(false);
-      }
-    } else if (newCategory) {
-      setLoading(true);
-      try {
-        const categoryResources = await fetchResourcesByCategory(newCategory);
-        setResources(categoryResources);
-      } catch (error) {
-        console.error("Error loading category resources:", error);
-      } finally {
-        setLoading(false);
-      }
+      fetchResourcesByCategory(newCategory)
+        .then(setResources)
+        .catch(console.error)
+        .finally(() => setLoading(false));
     } else {
       loadResources();
     }
@@ -353,9 +328,7 @@ export default function ResourcesScreen() {
           {/* Resources List */}
           <View style={styles.resourcesSection}>
             <Text style={styles.resourcesSectionTitle}>
-              {selectedCategory === 'saved'
-                ? "Saved Resources"
-                : selectedCategory
+              {selectedCategory
                 ? `${CATEGORIES.find((c) => c.id === selectedCategory)?.name} Resources`
                 : "All Resources"}
             </Text>
@@ -367,18 +340,10 @@ export default function ResourcesScreen() {
               </View>
             ) : resources.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>
-                  {selectedCategory === 'saved' ? '💾' : '🔍'}
-                </Text>
-                <Text style={styles.emptyText}>
-                  {selectedCategory === 'saved' 
-                    ? "No saved resources yet"
-                    : "No resources found"}
-                </Text>
+                <Text style={styles.emptyIcon}>🔍</Text>
+                <Text style={styles.emptyText}>No resources found</Text>
                 <Text style={styles.emptySubtext}>
-                  {selectedCategory === 'saved'
-                    ? "Bookmark resources to access them quickly"
-                    : "Try adjusting your search or filters"}
+                  Try adjusting your search or filters
                 </Text>
               </View>
             ) : (
@@ -558,7 +523,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   categoriesSection: {
-    paddingVertical: 15,
+    paddingVertical: 13,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -587,16 +552,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
   },
   selectedCategory: {
     borderWidth: 3,
     borderColor: "#4CAF50",
-    transform: [{ scale: 1.05 }],
   },
   categoryIcon: {
     fontSize: 28,

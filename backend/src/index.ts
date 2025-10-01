@@ -5,6 +5,8 @@ import { Pool } from 'pg';
 
 const app = express();
 const PORT = 3001;
+const axios = require('axios');
+
 
 // Middleware
 app.use(cors());
@@ -1421,5 +1423,64 @@ app.get('/api/bookmarks/:clerkUserId/check/:resourceId', async (req, res) => {
   } catch (error) {
     console.error('Error checking bookmark:', error);
     res.status(500).json({ error: 'Failed to check bookmark' });
+  }
+});
+
+// External API service
+class ExternalApiService {
+  async getRandomQuote() {
+    try {
+      const response = await axios.get('https://zenquotes.io/api/random');
+      if (response.data && response.data[0]) {
+        return {
+          quote: response.data[0].q,
+          author: response.data[0].a
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching quote:', error);
+    }
+    return null;
+  }
+
+  async getRandomAffirmation() {
+    try {
+      const response = await axios.get('https://www.affirmations.dev');
+      return response.data.affirmation;
+    } catch (error) {
+      console.error('Error fetching affirmation:', error);
+    }
+    return null;
+  }
+}
+
+const externalApiService = new ExternalApiService();
+
+// Add these endpoints to your backend
+app.get('/api/external/quote', async (req, res) => {
+  try {
+    const quote = await externalApiService.getRandomQuote();
+    if (quote) {
+      res.json(quote);
+    } else {
+      res.status(500).json({ error: 'Failed to fetch quote' });
+    }
+  } catch (error) {
+    console.error('Error fetching external quote:', error);
+    res.status(500).json({ error: 'Failed to fetch quote' });
+  }
+});
+
+app.get('/api/external/affirmation', async (req, res) => {
+  try {
+    const affirmation = await externalApiService.getRandomAffirmation();
+    if (affirmation) {
+      res.json({ affirmation });
+    } else {
+      res.status(500).json({ error: 'Failed to fetch affirmation' });
+    }
+  } catch (error) {
+    console.error('Error fetching external affirmation:', error);
+    res.status(500).json({ error: 'Failed to fetch affirmation' });
   }
 });
