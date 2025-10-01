@@ -14,64 +14,110 @@ import {
   Image,
   TextInput,
   Switch,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
+import { useUser } from "@clerk/clerk-expo";
+import { communityApi } from "../../../../../utils/communityForumApi";
 
-/**
- * CreatePostScreen Component
- * 
- * Screen for creating new community posts with options for privacy settings,
- * draft saving, and content creation. Features a curved background and
- * intuitive post creation interface.
- */
 export default function CreatePostScreen() {
-  // State management
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const params = useLocalSearchParams();
+  const { user } = useUser();
+  const selectedCategory = params.category as string;
+  
   const [activeTab, setActiveTab] = useState("community-forum");
   const [postContent, setPostContent] = useState("");
+  const [postTitle, setPostTitle] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Mock user data (replaces backend auth context)
-  const mockUser = {
-    displayName: "Demo user",
-    email: "demo@gmail.com",
-  };
-  
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User"
-  };
-
-  /**
-   * Handles saving post as draft
-   * Shows alert confirmation and updates draft state
-   */
-  const handleSaveDraft = () => {
-    setIsDraft(true);
-    Alert.alert("Draft Saved", "Your post has been saved as a draft.");
+  const getDisplayName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    if (user?.primaryEmailAddress?.emailAddress) {
+      return user.primaryEmailAddress.emailAddress.split("@")[0];
+    }
+    return "User";
   };
 
-  /**
-   * Handles post publishing
-   * Logs post data and navigates to success screen
-   */
-  const handlePublish = () => {
-    console.log("Publishing post:", {
-      category: selectedCategory,
-      content: postContent,
-      isPrivate,
-      isDraft,
-    });
-
-    router.push("/community-forum/create/success");
+  const getInitials = () => {
+    const firstName = user?.firstName || "";
+    const lastName = user?.lastName || "";
+    if (firstName && lastName) {
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    }
+    const displayName = getDisplayName() ?? "";
+    return displayName.charAt(0).toUpperCase();
   };
 
-  // Bottom navigation tabs configuration
+  const handleSaveDraft = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to save drafts");
+      return;
+    }
+
+    if (!postTitle.trim() || !postContent.trim()) {
+      Alert.alert("Error", "Please add a title and content");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await communityApi.createPost({
+        clerkUserId: user.id,
+        title: postTitle,
+        content: postContent,
+        category: selectedCategory,
+        isPrivate,
+        isDraft: true,
+      });
+      
+      Alert.alert("Draft Saved", "Your post has been saved as a draft.");
+      router.back();
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      Alert.alert("Error", "Failed to save draft");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to create posts");
+      return;
+    }
+
+    if (!postTitle.trim() || !postContent.trim()) {
+      Alert.alert("Error", "Please add a title and content");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await communityApi.createPost({
+        clerkUserId: user.id,
+        title: postTitle,
+        content: postContent,
+        category: selectedCategory,
+        isPrivate,
+        isDraft: false,
+      });
+      
+      router.push("/community-forum/create/success");
+    } catch (error) {
+      console.error('Error creating post:', error);
+      Alert.alert("Error", "Failed to create post");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -80,10 +126,6 @@ export default function CreatePostScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  /**
-   * Handles bottom tab navigation
-   * @param tabId - ID of the tab to navigate to
-   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -93,136 +135,132 @@ export default function CreatePostScreen() {
     }
   };
 
-  /**
-   * Gets display name from available user data
-   * @returns String with user's display name or fallback
-   */
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
-  };
-
-  /**
-   * Generates user initials from profile data
-   * @returns String containing user initials
-   */
-  const getInitials = () => {
-    const firstName = mockProfile?.firstName || "";
-    const lastName = mockProfile?.lastName || "";
-    if (firstName && lastName) {
-      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-    }
-    const displayName = getDisplayName() ?? "";
-    return displayName.charAt(0).toUpperCase();
-  };
-
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-          <AppHeader title="Community Forum" showBack={true} />
-          <ScrollView style={styles.content}>
+        <AppHeader title="Community Forum" showBack={true} />
+        <ScrollView style={styles.content}>
+          {/* Title Section */}
+          <View style={styles.titleSection}>
+            <Text style={styles.mainTitle}>Post Content</Text>
+            {selectedCategory && (
+              <Text style={styles.categoryIndicator}>
+                Category: {selectedCategory}
+              </Text>
+            )}
+          </View>
 
-        {/* Title Section */}
-        <View style={styles.titleSection}>
-          <Text style={styles.mainTitle}>Post Content</Text>
-        </View>
-
-        {/* User Profile Summary with Post Card Inside */}
-        <View style={styles.profileCard}>
-          <View style={styles.profileSection}>
-            <View style={styles.profileContainer}>
-              <View style={styles.profileImageContainer}>
-                <View style={styles.profileImageFallback}>
-                  <Text style={styles.initialsText}>{getInitials()}</Text>
+          {/* User Profile Summary with Post Card Inside */}
+          <View style={styles.profileCard}>
+            <View style={styles.profileSection}>
+              <View style={styles.profileContainer}>
+                <View style={styles.profileImageContainer}>
+                  <View style={styles.profileImageFallback}>
+                    <Text style={styles.initialsText}>{getInitials()}</Text>
+                  </View>
+                </View>
+                <View style={styles.profileTextContainer}>
+                  <Text style={styles.userName}>{getDisplayName()}</Text>
                 </View>
               </View>
-              <View style={styles.profileTextContainer}>
-                <Text style={styles.userName}>{getDisplayName()}</Text>
+            </View>
+            
+            {/* Post Title Input */}
+            <View style={styles.titleInputContainer}>
+              <TextInput
+                style={styles.titleInput}
+                placeholder="Post title..."
+                value={postTitle}
+                onChangeText={setPostTitle}
+                maxLength={100}
+              />
+              <Text style={styles.charCount}>
+                {postTitle.length}/100
+              </Text>
+            </View>
+
+            {/* Post Content Card */}
+            <View style={styles.postCard}>
+              <TextInput
+                style={styles.postInput}
+                multiline
+                placeholder="Share your thoughts, experiences, or questions..."
+                value={postContent}
+                onChangeText={setPostContent}
+                textAlignVertical="top"
+                maxLength={1000}
+              />
+
+              {/* Character Count */}
+              <View style={styles.postActions}>
+                <Text style={styles.charCount}>
+                  {postContent.length}/1000
+                </Text>
               </View>
             </View>
-          </View>
-          
-          {/* Post Content Card (inside user card) */}
-          <View style={styles.postCard}>
-            <TextInput
-              style={styles.postInput}
-              multiline
-              placeholder="Share your thoughts, experiences, or questions..."
-              value={postContent}
-              onChangeText={setPostContent}
-              textAlignVertical="top"
-              maxLength={300}
-            />
 
-            {/* Icons and Character Count Row */}
-            <View style={styles.postActions}>
-              <View style={styles.actionIcons}>
-                <TouchableOpacity style={styles.iconButton}>
-                  <Ionicons name="mic-outline" size={20} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
-                  <Ionicons name="camera-outline" size={20} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
-                  <Ionicons name="images-outline" size={20} color="#666" />
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.charCount}>{postContent.length}/300</Text>
+            <View style={styles.divider} />
+          </View>
+
+          {/* Privacy Settings */}
+          <View style={styles.privacyContainer}>
+            <View style={styles.privacyRow}>
+              <Text style={styles.privacyText}>Hide from Community?</Text>
+              <Switch
+                value={isPrivate}
+                onValueChange={setIsPrivate}
+                thumbColor={isPrivate ? "#4CAF50" : "#f4f3f4"}
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
+              />
             </View>
+            {isPrivate && (
+              <Text style={styles.privacyNote}>
+                This post will only be visible to you and support workers.
+              </Text>
+            )}
           </View>
 
-          <View style={styles.divider} />
-        </View>
+          {/* Action Buttons */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={[
+                styles.draftButton,
+                loading && styles.buttonDisabled
+              ]}
+              onPress={handleSaveDraft}
+              disabled={loading || !postTitle.trim() || !postContent.trim()}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <Text style={styles.draftButtonText}>Save as Draft</Text>
+              )}
+            </TouchableOpacity>
 
-        {/* Privacy Settings */}
-        <View style={styles.privacyContainer}>
-          <View style={styles.privacyRow}>
-            <Text style={styles.privacyText}>Hide from Community?</Text>
-            <Switch
-              value={isPrivate}
-              onValueChange={setIsPrivate}
-              thumbColor={isPrivate ? "#4CAF50" : "#f4f3f4"}
-              trackColor={{ false: "#767577", true: "#81b0ff" }}
-            />
+            <TouchableOpacity
+              style={[
+                styles.publishButton,
+                (!postContent.trim() || !postTitle.trim() || loading) && styles.publishButtonDisabled
+              ]}
+              onPress={handlePublish}
+              disabled={!postContent.trim() || !postTitle.trim() || loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <Text style={styles.publishButtonText}>Publish Post</Text>
+              )}
+            </TouchableOpacity>
           </View>
-          {isPrivate && (
-            <Text style={styles.privacyNote}>This post will be private.</Text>
-          )}
-        </View>
+        </ScrollView>
 
-        {/* Action Buttons */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.draftButton}
-            onPress={handleSaveDraft}
-          >
-            <Text style={styles.draftButtonText}>Save as Draft</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.publishButton,
-              !postContent.trim() && styles.publishButtonDisabled
-            ]}
-            onPress={handlePublish}
-            disabled={!postContent.trim()}
-          >
-            <Text style={styles.publishButtonText}>Continue</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
- </SafeAreaView>
-
+        {/* Bottom Navigation */}
+        <BottomNavigation
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+        />
+      </SafeAreaView>
     </CurvedBackground>
   );
 }
@@ -451,5 +489,26 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "600",
+  },
+  categoryIndicator: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  titleInputContainer: {
+    marginBottom: 16,
+  },
+  titleInput: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#212121",
+    padding: 12,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

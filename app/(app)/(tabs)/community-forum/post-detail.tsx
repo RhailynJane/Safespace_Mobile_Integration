@@ -336,7 +336,6 @@ export default function PostDetailScreen() {
   );
 }
 
-// ... keep the existing styles but add new ones for loading and updated components
 const styles = StyleSheet.create({
   container: {
     flex: 1,
