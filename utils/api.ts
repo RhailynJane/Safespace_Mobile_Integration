@@ -42,7 +42,7 @@ export interface SubmitAssessmentData {
 export interface Resource {
   id: number;
   title: string;
-  type: string;
+  type: 'Affirmation' | 'Quote' | 'Article' | 'Exercise' | 'Guide';
   duration: string;
   category: string;
   content: string;
