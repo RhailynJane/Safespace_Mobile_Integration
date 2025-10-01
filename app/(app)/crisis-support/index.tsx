@@ -1,16 +1,11 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
 import { useState } from "react";
+import { Linking } from "react-native";
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   ScrollView,
   ActivityIndicator,
   Dimensions,
@@ -27,7 +22,7 @@ const { width } = Dimensions.get("window");
  * CrisisScreen Component
  *
  * Emergency support screen providing immediate crisis resources including:
- * - Emergency contact numbers (911, crisis hotlines)
+ * - Emergency contact numbers (911, crisis hotlines) with direct calling
  * - Immediate coping strategies
  * - Grounding techniques (5-4-3-2-1 method)
  * - Quick access to professional help
@@ -35,20 +30,8 @@ const { width } = Dimensions.get("window");
  */
 export default function CrisisScreen() {
   // State management
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("crisis");
-
-  // Mock user data 
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-  };
-
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
-  };
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -72,33 +55,41 @@ export default function CrisisScreen() {
     }
   };
 
-
   /**
-   * Gets display name from available user data
-   * @returns String with user's display name or fallback
-   */
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
-  };
-
-  /**
-   * Handles emergency call actions
+   * Handles emergency call actions - opens phone dialer with number
    * @param number - The emergency number to call
    */
-  const handleEmergencyCall = (number: string) => {
-    console.log(`Calling emergency number: ${number}`);
-    alert(`This would call ${number} `);
+  const handleEmergencyCall = async (number: string) => {
+    try {
+      const phoneNumber = `tel:${number}`;
+      const supported = await Linking.canOpenURL(phoneNumber);
+      
+      if (supported) {
+        await Linking.openURL(phoneNumber);
+      } else {
+        console.log("Phone calling not supported");
+      }
+    } catch (error) {
+      console.error("Error making phone call:", error);
+    }
   };
 
   /**
    * Handles distress center website navigation
    */
-  const handleDistressCenter = () => {
-    console.log("Opening Distress Center website");
-    alert("This would open the Distress Center website");
+  const handleDistressCenter = async () => {
+    try {
+      const url = "https://distresscentre.com";
+      const supported = await Linking.canOpenURL(url);
+      
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log("Cannot open URL");
+      }
+    } catch (error) {
+      console.error("Error opening website:", error);
+    }
   };
 
   // Show loading indicator during operations
@@ -120,135 +111,189 @@ export default function CrisisScreen() {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
         >
           {/* Emergency Help Card - High visibility for immediate assistance */}
-          <View style={styles.card}>
-            <View style={styles.section}>
-              <Text style={styles.sectionMainTitle}>Need Immediate Help?</Text>
-              <Text style={styles.sectionText}>
-                If you or someone you know is in crisis, please call 911 or
-                contact a 24/7 crisis line in your area.
-              </Text>
-              <Text style={styles.sectionText}>
-                For urgent mental health support, reach out to the Distress
-                Centre at 403-266-4357 or visit distresscentre.com.
-              </Text>
+          <View style={styles.emergencyCard}>
+            <View style={styles.emergencyHeader}>
+              <Ionicons name="warning" size={28} color="#FFFFFF" />
+              <Text style={styles.emergencyTitle}>Need Immediate Help?</Text>
+            </View>
+            <Text style={styles.emergencyText}>
+              If you or someone you know is in crisis, please call emergency services or contact a 24/7 crisis line immediately.
+            </Text>
+            <View style={styles.emergencyContact}>
+              <Ionicons name="time" size={16} color="#FFFFFF" />
+              <Text style={styles.emergencyContactText}>Available 24/7</Text>
             </View>
           </View>
 
           {/* Emergency Action Buttons */}
           <View style={styles.emergencyButtons}>
             <TouchableOpacity
-              style={[styles.emergencyButton, { backgroundColor: "#E53935" }]}
+              style={[styles.emergencyButton, styles.emergency911]}
               onPress={() => handleEmergencyCall("911")}
             >
-              <Ionicons name="call" size={20} color="#FFFFFF" />
-              <Text style={styles.emergencyButtonText}>Call 911</Text>
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="call" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.buttonTextContainer}>
+                <Text style={styles.emergencyButtonMainText}>Call 911</Text>
+                <Text style={styles.emergencyButtonSubText}>Emergency Services</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.buttonArrow} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.emergencyButton, { backgroundColor: "#4CAF50" }]}
+              style={[styles.emergencyButton, styles.crisisHotline]}
               onPress={() => handleEmergencyCall("988")}
             >
-              <Ionicons name="call" size={20} color="#FFFFFF" />
-              <Text style={styles.emergencyButtonText}>
-                Crisis Hotline: 988
-              </Text>
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="heart" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.buttonTextContainer}>
+                <Text style={styles.emergencyButtonMainText}>Crisis Hotline</Text>
+                <Text style={styles.emergencyButtonSubText}>Call 988</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.buttonArrow} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.emergencyButton, { backgroundColor: "#2196F3" }]}
+              style={[styles.emergencyButton, styles.distressCenter]}
+              onPress={() => handleEmergencyCall("403-266-4357")}
+            >
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="people" size={24} color="#FFFFFF" />
+              </View>
+              <View style={styles.buttonTextContainer}>
+                <Text style={styles.emergencyButtonMainText}>Distress Center</Text>
+                <Text style={styles.emergencyButtonSubText}>403-266-4357</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.buttonArrow} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.emergencyButton, styles.websiteButton]}
               onPress={handleDistressCenter}
             >
-              <Ionicons name="globe" size={20} color="#FFFFFF" />
-              <Text style={styles.emergencyButtonText}>Distress Center</Text>
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="globe" size={24} color="#2196F3" />
+              </View>
+              <View style={styles.buttonTextContainer}>
+                <Text style={[styles.emergencyButtonMainText, styles.websiteText]}>
+                  Visit Website
+                </Text>
+                <Text style={[styles.emergencyButtonSubText, styles.websiteSubText]}>
+                  distresscentre.com
+                </Text>
+              </View>
+              <Ionicons name="open-outline" size={20} color="#2196F3" style={styles.buttonArrow} />
             </TouchableOpacity>
           </View>
 
           {/* Immediate Coping Strategies Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Immediate Coping Strategies</Text>
-            <View style={styles.strategiesList}>
-              <View style={styles.strategyItem}>
-                <View style={styles.strategyNumber}>
-                  <Text style={styles.strategyNumberText}>1</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="flash" size={24} color="#4CAF50" />
+              <Text style={styles.sectionTitle}>Immediate Coping Strategies</Text>
+            </View>
+            <View style={styles.strategiesGrid}>
+              <View style={styles.strategyCard}>
+                <View style={[styles.strategyIcon, { backgroundColor: '#FFEBEE' }]}>
+                  <Ionicons name="water" size={20} color="#E53935" />
                 </View>
-                <Text style={styles.strategyText}>Take slow breaths.</Text>
+                <Text style={styles.strategyText}>Take slow, deep breaths</Text>
               </View>
 
-              <View style={styles.strategyItem}>
-                <View style={styles.strategyNumber}>
-                  <Text style={styles.strategyNumberText}>2</Text>
+              <View style={styles.strategyCard}>
+                <View style={[styles.strategyIcon, { backgroundColor: '#E8F5E8' }]}>
+                  <Ionicons name="shield-checkmark" size={20} color="#4CAF50" />
                 </View>
-                <Text style={styles.strategyText}>
-                  Go to a safe public place.
-                </Text>
+                <Text style={styles.strategyText}>Go to a safe public place</Text>
               </View>
 
-              <View style={styles.strategyItem}>
-                <View style={styles.strategyNumber}>
-                  <Text style={styles.strategyNumberText}>3</Text>
+              <View style={styles.strategyCard}>
+                <View style={[styles.strategyIcon, { backgroundColor: '#E3F2FD' }]}>
+                  <Ionicons name="time" size={20} color="#2196F3" />
                 </View>
-                <Text style={styles.strategyText}>
-                  Focus on getting through the next hour.
-                </Text>
+                <Text style={styles.strategyText}>Focus on the next hour only</Text>
               </View>
 
-              <View style={styles.strategyItem}>
-                <View style={styles.strategyNumber}>
-                  <Text style={styles.strategyNumberText}>4</Text>
+              <View style={styles.strategyCard}>
+                <View style={[styles.strategyIcon, { backgroundColor: '#FFF3E0' }]}>
+                  <Ionicons name="people" size={20} color="#FF9800" />
                 </View>
-                <Text style={styles.strategyText}>
-                  Reach out to someone you trust.
-                </Text>
+                <Text style={styles.strategyText}>Reach out to someone you trust</Text>
               </View>
 
-              <View style={styles.strategyItem}>
-                <View style={styles.strategyNumber}>
-                  <Text style={styles.strategyNumberText}>5</Text>
+              <View style={styles.strategyCard}>
+                <View style={[styles.strategyIcon, { backgroundColor: '#F3E5F5' }]}>
+                  <Ionicons name="remove-circle" size={20} color="#9C27B0" />
                 </View>
-                <Text style={styles.strategyText}>
-                  Remove means of self harm.
-                </Text>
+                <Text style={styles.strategyText}>Remove means of self-harm</Text>
               </View>
 
-              <View style={styles.strategyItem}>
-                <View style={styles.strategyNumber}>
-                  <Text style={styles.strategyNumberText}>6</Text>
+              <View style={styles.strategyCard}>
+                <View style={[styles.strategyIcon, { backgroundColor: '#E0F2F1' }]}>
+                  <Ionicons name="leaf" size={20} color="#009688" />
                 </View>
-                <Text style={styles.strategyText}>
-                  Use grounding techniques (5-4-3-2-1)
-                </Text>
+                <Text style={styles.strategyText}>Use grounding techniques</Text>
               </View>
             </View>
           </View>
 
           {/* Grounding Technique Section */}
           <View style={styles.groundingSection}>
-            <Text style={styles.groundingTitle}>
-              5-4-3-2-1 Grounding Technique
+            <View style={styles.groundingHeader}>
+              <Ionicons name="compass" size={24} color="#2E7D32" />
+              <Text style={styles.groundingTitle}>5-4-3-2-1 Grounding Technique</Text>
+            </View>
+            <Text style={styles.groundingDescription}>
+              When feeling overwhelmed, use your senses to ground yourself in the present moment.
             </Text>
             <View style={styles.groundingSteps}>
-              <Text style={styles.groundingStep}>
-                <Text style={styles.groundingNumber}>5</Text> things you can see
-              </Text>
-              <Text style={styles.groundingStep}>
-                <Text style={styles.groundingNumber}>4</Text> things you can
-                touch
-              </Text>
-              <Text style={styles.groundingStep}>
-                <Text style={styles.groundingNumber}>3</Text> things you can
-                hear
-              </Text>
-              <Text style={styles.groundingStep}>
-                <Text style={styles.groundingNumber}>2</Text> things you can
-                smell
-              </Text>
-              <Text style={styles.groundingStep}>
-                <Text style={styles.groundingNumber}>1</Text> thing you can
-                taste
-              </Text>
+              <View style={styles.groundingStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>5</Text>
+                </View>
+                <Text style={styles.stepText}>things you can see around you</Text>
+              </View>
+              <View style={styles.groundingStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>4</Text>
+                </View>
+                <Text style={styles.stepText}>things you can touch and feel</Text>
+              </View>
+              <View style={styles.groundingStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>3</Text>
+                </View>
+                <Text style={styles.stepText}>things you can hear right now</Text>
+              </View>
+              <View style={styles.groundingStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>2</Text>
+                </View>
+                <Text style={styles.stepText}>things you can smell nearby</Text>
+              </View>
+              <View style={styles.groundingStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>1</Text>
+                </View>
+                <Text style={styles.stepText}>thing you can taste or would like to taste</Text>
+              </View>
             </View>
+          </View>
+
+          {/* Additional Support Section */}
+          <View style={styles.supportSection}>
+            <View style={styles.supportHeader}>
+              <Ionicons name="information-circle" size={24} color="#5D4037" />
+              <Text style={styles.supportTitle}>Remember</Text>
+            </View>
+            <Text style={styles.supportText}>
+              You are not alone. Reaching out for help is a sign of strength. These feelings are temporary, and with support, things can get better.
+            </Text>
           </View>
         </ScrollView>
 
@@ -273,177 +318,245 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "transparent",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
-  },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
     padding: 20,
+    paddingBottom: 100,
   },
-  card: {
-    backgroundColor: "#c22f2fff",
-    borderRadius: 12,
-    padding: 20,
+  emergencyCard: {
+    backgroundColor: "#E53935",
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 24,
+    shadowColor: "#E53935",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  emergencyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  emergencyTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginLeft: 12,
+  },
+  emergencyText: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    lineHeight: 22,
+    marginBottom: 12,
+    opacity: 0.9,
+  },
+  emergencyContact: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  emergencyContactText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    marginLeft: 6,
+    opacity: 0.8,
+  },
+  emergencyButtons: {
+    marginBottom: 32,
+  },
+  emergencyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  emergency911: {
+    backgroundColor: "#E53935",
+  },
+  crisisHotline: {
+    backgroundColor: "#4CAF50",
+  },
+  distressCenter: {
+    backgroundColor: "#2196F3",
+  },
+  websiteButton: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "#2196F3",
+  },
+  buttonIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  buttonTextContainer: {
+    flex: 1,
+  },
+  emergencyButtonMainText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  emergencyButtonSubText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    opacity: 0.9,
+  },
+  websiteText: {
+    color: "#2196F3",
+  },
+  websiteSubText: {
+    color: "#2196F3",
+    opacity: 0.8,
+  },
+  buttonArrow: {
+    opacity: 0.8,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
     color: "#4CAF50",
-    marginBottom: 12,
+    marginLeft: 12,
   },
-  sectionMainTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 12,
-  },
-  sectionText: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-  emergencyButtons: {
-    marginBottom: 30,
-  },
-  emergencyButton: {
+  strategiesGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  strategyCard: {
+    width: "48%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 8,
     marginBottom: 12,
-  },
-  emergencyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  strategiesList: {
-    backgroundColor: "#F9F9F9",
-    borderRadius: 8,
-    padding: 12,
-  },
-  strategyItem: {
-    flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEEEEE",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  strategyNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#4CAF50",
+  strategyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
-  },
-  strategyNumberText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 12,
+    marginBottom: 12,
   },
   strategyText: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#333",
-    flex: 1,
+    textAlign: "center",
+    fontWeight: "500",
+    lineHeight: 18,
   },
   groundingSection: {
     backgroundColor: "#E8F5E9",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 80,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  groundingHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
   },
   groundingTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600",
     color: "#2E7D32",
-    marginBottom: 12,
+    marginLeft: 12,
+  },
+  groundingDescription: {
+    fontSize: 15,
+    color: "#5D4037",
+    lineHeight: 20,
+    marginBottom: 20,
+    opacity: 0.8,
   },
   groundingSteps: {
     marginLeft: 8,
   },
   groundingStep: {
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
   },
-  groundingNumber: {
+  stepNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#2E7D32",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  stepNumberText: {
+    color: "#FFFFFF",
     fontWeight: "bold",
-    color: "#2E7D32",
-  },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
+  },
+  stepText: {
+    fontSize: 16,
+    color: "#5D4037",
+    flex: 1,
+    fontWeight: "500",
+  },
+  supportSection: {
+    backgroundColor: "#FFF3E0",
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  supportHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  supportTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#5D4037",
+    marginLeft: 12,
+  },
+  supportText: {
+    fontSize: 16,
+    color: "#5D4037",
+    lineHeight: 22,
+    textAlign: "center",
+    opacity: 0.9,
   },
 });
