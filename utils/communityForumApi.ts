@@ -6,16 +6,22 @@ const API_BASE_URL = "http://192.168.1.100:3001/api";
 class CommunityForumApi {
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     try {
+      // Get the auth token if available
+      let headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(options.headers as Record<string, string>),
+      };
+
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
+        headers,
         ...options,
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+        );
       }
 
       return await response.json();
@@ -96,7 +102,12 @@ class CommunityForumApi {
 
   async updatePost(
     postId: number,
-    updates: { isDraft?: boolean; title?: string; content?: string }
+    updates: {
+      title?: string;
+      content?: string;
+      category?: string;
+      isDraft?: boolean;
+    }
   ) {
     return this.fetchWithAuth(`/community/posts/${postId}`, {
       method: "PUT",
