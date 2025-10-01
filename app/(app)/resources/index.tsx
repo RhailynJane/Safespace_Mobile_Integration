@@ -1,7 +1,4 @@
-/**
- * Resources Screen - Mental Health Resources Browser
- * Integrates with backend API and bookmark system
- */
+// app/(app)/resources/index.tsx
 import { useState, useEffect } from "react";
 import {
   View,
@@ -21,7 +18,15 @@ import { useAuth } from "@clerk/clerk-expo";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
-import { apiService, Resource } from "../../../utils/api";
+import { 
+  Resource, 
+  fetchAllResourcesWithExternal,
+  fetchResourcesByCategory,
+  searchResources,
+  getDailyAffirmation,
+  getRandomQuote,
+  getBookmarkedResources
+} from "../../../utils/resourcesApi";
 
 // Category definitions
 interface Category {
@@ -102,11 +107,11 @@ export default function ResourcesScreen() {
     loadResources();
   }, []);
 
-  // Load resources from API
+  // Load resources from local API with external integration
   const loadResources = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getResources();
+      const data = await fetchAllResourcesWithExternal();
       setResources(data);
       
       // Set first quote/affirmation as featured
@@ -115,8 +120,8 @@ export default function ResourcesScreen() {
     } catch (error) {
       console.error("Error loading resources:", error);
       Alert.alert(
-        "Connection Error",
-        "Could not load resources. Please check your connection.",
+        "Error",
+        "Could not load resources.",
         [{ text: "OK" }]
       );
     } finally {
@@ -137,18 +142,12 @@ export default function ResourcesScreen() {
     setSelectedCategory(newCategory);
 
     if (newCategory === 'saved') {
-      // Load bookmarked resources
-      if (!userId) {
-        Alert.alert("Sign In Required", "Please sign in to view saved resources.");
-        return;
-      }
-      
       setLoading(true);
       try {
-        const bookmarks = await apiService.getBookmarks(userId);
-        setResources(bookmarks);
+        const savedResources = await getBookmarkedResources();
+        setResources(savedResources);
       } catch (error) {
-        console.error("Error loading bookmarks:", error);
+        console.error("Error loading saved resources:", error);
         Alert.alert("Error", "Could not load saved resources.");
       } finally {
         setLoading(false);
@@ -156,7 +155,7 @@ export default function ResourcesScreen() {
     } else if (newCategory) {
       setLoading(true);
       try {
-        const categoryResources = await apiService.getResourcesByCategory(newCategory);
+        const categoryResources = await fetchResourcesByCategory(newCategory);
         setResources(categoryResources);
       } catch (error) {
         console.error("Error loading category resources:", error);
@@ -174,7 +173,7 @@ export default function ResourcesScreen() {
       const timeoutId = setTimeout(async () => {
         setLoading(true);
         try {
-          const searchResults = await apiService.searchResources(searchQuery);
+          const searchResults = await searchResources(searchQuery);
           setResources(searchResults);
         } catch (error) {
           console.error("Error searching resources:", error);
@@ -188,7 +187,7 @@ export default function ResourcesScreen() {
       loadResources();
     }
 
-    return undefined; // Explicitly return undefined for other cases
+    return undefined;
   }, [searchQuery, selectedCategory]);
 
   // Handle tab navigation
@@ -206,16 +205,36 @@ export default function ResourcesScreen() {
     router.push({
       pathname: "/(app)/resources/resource-detail-screen",
       params: {
-        id: resource.id.toString(),
+        id: resource.id,
         title: resource.title,
         content: resource.content,
         author: resource.author || "Unknown",
         type: resource.type,
         category: resource.category,
         imageEmoji: resource.image_emoji,
-        backgroundColor: resource.background_color,
+        backgroundColor: resource.backgroundColor,
       },
     });
+  };
+
+  // Handle daily affirmation
+  const handleDailyAffirmation = async () => {
+    try {
+      const affirmation = await getDailyAffirmation();
+      handleResourcePress(affirmation);
+    } catch (error) {
+      console.error("Error getting daily affirmation:", error);
+    }
+  };
+
+  // Handle random quote
+  const handleRandomQuote = async () => {
+    try {
+      const quote = await getRandomQuote();
+      handleResourcePress(quote);
+    } catch (error) {
+      console.error("Error getting random quote:", error);
+    }
   };
 
   return (
@@ -247,6 +266,32 @@ export default function ResourcesScreen() {
               </View>
             </View>
           )}
+
+          {/* Quick Actions */}
+          <View style={styles.quickActions}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={handleDailyAffirmation}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#E8F5E8' }]}>
+                  <Text style={styles.actionEmoji}>🌟</Text>
+                </View>
+                <Text style={styles.actionText}>Daily Affirmation</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={handleRandomQuote}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#FFF3E0' }]}>
+                  <Text style={styles.actionEmoji}>💭</Text>
+                </View>
+                <Text style={styles.actionText}>Random Quote</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
@@ -348,7 +393,7 @@ export default function ResourcesScreen() {
                     <View
                       style={[
                         styles.resourceImageContainer,
-                        { backgroundColor: resource.background_color },
+                        { backgroundColor: resource.backgroundColor },
                       ]}
                     >
                       <Text style={styles.resourceEmoji}>{resource.image_emoji}</Text>
@@ -449,6 +494,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textAlign: "right",
+  },
+  quickActions: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  actionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  actionEmoji: {
+    fontSize: 24,
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
   },
   searchContainer: {
     paddingHorizontal: 20,
