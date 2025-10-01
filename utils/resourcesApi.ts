@@ -1,14 +1,8 @@
 /**
- * Resources API Service
- * Integrates with ZenQuotes and Quotable APIs for mental health resources
+ * Resources API Service - 100% Offline Version
+ * No external API calls - all content stored locally
  */
-import axios from 'axios';
 
-// API Base URLs
-const ZENQUOTES_API = 'https://zenquotes.io/api';
-const QUOTABLE_API = 'https://api.quotable.io';
-
-// Resource type definitions
 export interface Resource {
   id: string;
   title: string;
@@ -30,7 +24,6 @@ export interface Category {
   tags: string[];
 }
 
-// Category mappings with API tags
 export const CATEGORIES: Category[] = [
   {
     id: 'stress',
@@ -44,7 +37,7 @@ export const CATEGORIES: Category[] = [
     name: 'Anxiety',
     icon: '🧠',
     color: '#81C784',
-    tags: ['courage', 'strength', 'confidence', 'fear']
+    tags: ['courage', 'strength', 'confidence']
   },
   {
     id: 'depression',
@@ -58,272 +51,361 @@ export const CATEGORIES: Category[] = [
     name: 'Sleep',
     icon: '🛏️',
     color: '#4DD0E1',
-    tags: ['peace', 'rest', 'calm', 'tranquility']
+    tags: ['peace', 'rest', 'calm']
   },
   {
     id: 'motivation',
     name: 'Motivation',
     icon: '⚡',
     color: '#FFB74D',
-    tags: ['success', 'motivation', 'inspiration', 'achievement']
+    tags: ['success', 'motivation', 'inspiration']
   },
   {
     id: 'mindfulness',
     name: 'Mindfulness',
     icon: '🧘',
     color: '#BA68C8',
-    tags: ['mindfulness', 'meditation', 'present', 'awareness']
+    tags: ['mindfulness', 'meditation', 'present']
   }
 ];
 
-// Background colors for variety
-const BACKGROUND_COLORS = [
-  '#E8F5E8', '#E3F2FD', '#FFF3E0', '#F3E5F5', '#E0F2F1', '#FFF9C4'
-];
+// Complete offline resource database
+const ALL_RESOURCES: Resource[] = [
+  // Stress Management Resources
+  {
+    id: 'stress-1',
+    title: 'Box Breathing Technique',
+    type: 'Exercise',
+    duration: '5 mins',
+    category: 'stress',
+    content: 'Box breathing is a powerful stress-relief technique used by Navy SEALs. Breathe in for 4 counts, hold for 4 counts, breathe out for 4 counts, hold for 4 counts. Repeat for 5 minutes. This activates your parasympathetic nervous system, reducing stress hormones and promoting calm.',
+    image: '🧘‍♀️',
+    backgroundColor: '#E8F5E8',
+    tags: ['breathing', 'relaxation', 'stress-relief']
+  },
+  {
+    id: 'stress-2',
+    title: 'Progressive Muscle Relaxation',
+    type: 'Exercise',
+    duration: '12 mins',
+    category: 'stress',
+    content: 'Starting with your toes, tense each muscle group for 5 seconds, then release. Move up through your body: feet, calves, thighs, abdomen, chest, hands, arms, shoulders, neck, and face. Notice the difference between tension and relaxation. This releases physical stress and promotes body awareness.',
+    image: '💪',
+    backgroundColor: '#E8F5E8',
+    tags: ['relaxation', 'body-scan', 'tension-relief']
+  },
+  {
+    id: 'stress-3',
+    title: 'Understanding Stress Response',
+    type: 'Article',
+    duration: '8 mins',
+    category: 'stress',
+    content: 'Stress is your body\'s natural response to challenges. When you face a stressor, your body releases cortisol and adrenaline. While helpful in short bursts, chronic stress can harm your health. Learning to recognize your stress triggers and having healthy coping strategies is key to managing stress effectively.',
+    author: 'Mental Health Foundation',
+    image: '📚',
+    backgroundColor: '#E8F5E8',
+    tags: ['education', 'stress', 'biology']
+  },
 
-// Emoji icons for resources
-const RESOURCE_ICONS = [
-  '🧘‍♀️', '🧠', '📊', '📅', '💪', '🌟', '🌈', '☀️', '🌸', '🎯'
-];
+  // Anxiety Resources
+  {
+    id: 'anxiety-1',
+    title: '5-4-3-2-1 Grounding Technique',
+    type: 'Exercise',
+    duration: '3 mins',
+    category: 'anxiety',
+    content: 'When anxiety strikes, ground yourself in the present moment. Identify: 5 things you can see, 4 things you can touch, 3 things you can hear, 2 things you can smell, 1 thing you can taste. This sensory exercise interrupts anxious thoughts and brings you back to the present.',
+    image: '🧠',
+    backgroundColor: '#E3F2FD',
+    tags: ['grounding', 'anxiety-relief', 'mindfulness']
+  },
+  {
+    id: 'anxiety-2',
+    title: 'Understanding Anxiety',
+    type: 'Article',
+    duration: '10 mins',
+    category: 'anxiety',
+    content: 'Anxiety is excessive worry about future events. It\'s one of the most common mental health conditions. Symptoms include racing thoughts, rapid heartbeat, and restlessness. Remember: anxiety is treatable. Techniques like CBT, mindfulness, and proper breathing can significantly reduce symptoms. You\'re not alone in this.',
+    author: 'Anxiety and Depression Association',
+    image: '💡',
+    backgroundColor: '#E3F2FD',
+    tags: ['education', 'anxiety', 'awareness']
+  },
+  {
+    id: 'anxiety-3',
+    title: 'Worry Time Technique',
+    type: 'Guide',
+    duration: '6 mins',
+    category: 'anxiety',
+    content: 'Schedule 15 minutes daily as "worry time." When anxious thoughts arise outside this time, write them down and save them for your worry period. During worry time, address each concern. This technique helps contain anxiety and prevents it from consuming your entire day.',
+    image: '⏰',
+    backgroundColor: '#E3F2FD',
+    tags: ['anxiety', 'coping', 'scheduling']
+  },
 
-/**
- * Fetch quotes from ZenQuotes API
- */
-async function fetchZenQuotes(count: number = 10): Promise<any[]> {
-  try {
-    const response = await axios.get(`${ZENQUOTES_API}/quotes`);
-    return response.data.slice(0, count);
-  } catch (error) {
-    console.error('ZenQuotes API error:', error);
-    throw error;
-  }
-}
+  // Depression Resources
+  {
+    id: 'depression-1',
+    title: 'Three Good Things Practice',
+    type: 'Exercise',
+    duration: '5 mins',
+    category: 'depression',
+    content: 'Each evening, write down three good things that happened today, no matter how small: a warm cup of coffee, a friend\'s smile, finishing a task. Research shows this simple practice can significantly improve mood and reduce depressive symptoms over 6 weeks. Start tonight.',
+    image: '📝',
+    backgroundColor: '#FFF3E0',
+    tags: ['gratitude', 'positivity', 'journaling']
+  },
+  {
+    id: 'depression-2',
+    title: 'Behavioral Activation',
+    type: 'Article',
+    duration: '10 mins',
+    category: 'depression',
+    content: 'Depression makes you want to withdraw, but isolation worsens symptoms. Behavioral activation is a proven treatment: schedule small, meaningful activities daily, even when you don\'t feel like it. Start with 10-minute activities: a short walk, calling a friend, or listening to music. Action creates motivation, not the other way around.',
+    author: 'Dr. Sarah Mitchell',
+    image: '🎯',
+    backgroundColor: '#FFF3E0',
+    tags: ['depression', 'activation', 'treatment']
+  },
+  {
+    id: 'depression-3',
+    title: 'Daily Mood Tracking',
+    type: 'Guide',
+    duration: '7 mins',
+    category: 'depression',
+    content: 'Track your mood daily using a 1-10 scale. Note what you did that day, who you saw, and what you ate. Over time, you\'ll identify patterns: activities that boost your mood and triggers that lower it. This data helps you make informed decisions about your daily routine and self-care.',
+    image: '📊',
+    backgroundColor: '#FFF3E0',
+    tags: ['mood-tracking', 'awareness', 'data']
+  },
 
-/**
- * Fetch quotes from Quotable API with filtering
- */
-async function fetchQuotableQuotes(tags?: string[], limit: number = 10): Promise<any[]> {
-  try {
-    const params: any = { limit };
-    if (tags && tags.length > 0) {
-      params.tags = tags.join('|'); // OR operator for tags
-    }
-    
-    const response = await axios.get(`${QUOTABLE_API}/quotes`, { params });
-    return response.data.results;
-  } catch (error) {
-    console.error('Quotable API error:', error);
-    throw error;
-  }
-}
+  // Sleep Resources
+  {
+    id: 'sleep-1',
+    title: 'Sleep Hygiene Fundamentals',
+    type: 'Guide',
+    duration: '10 mins',
+    category: 'sleep',
+    content: 'Good sleep hygiene includes: consistent sleep schedule (same bedtime/wake time daily), cool dark bedroom (65-68°F), no screens 1 hour before bed, no caffeine after 2 PM, regular exercise (but not before bed), and a relaxing bedtime routine. Quality sleep is foundational to mental health.',
+    image: '🛏️',
+    backgroundColor: '#F3E5F5',
+    tags: ['sleep', 'routine', 'wellness']
+  },
+  {
+    id: 'sleep-2',
+    title: '4-7-8 Sleep Breathing',
+    type: 'Exercise',
+    duration: '4 mins',
+    category: 'sleep',
+    content: 'Developed by Dr. Andrew Weil, this technique helps you fall asleep faster. Breathe in through your nose for 4 counts, hold for 7 counts, exhale through your mouth for 8 counts. The long exhale activates your relaxation response. Repeat 4 cycles. Practice nightly for best results.',
+    image: '😴',
+    backgroundColor: '#F3E5F5',
+    tags: ['breathing', 'sleep', 'relaxation']
+  },
+  {
+    id: 'sleep-3',
+    title: 'Understanding Sleep and Mental Health',
+    type: 'Article',
+    duration: '9 mins',
+    category: 'sleep',
+    content: 'Sleep and mental health are bidirectional: poor sleep worsens mental health, and mental health issues disrupt sleep. During sleep, your brain processes emotions and consolidates memories. Adults need 7-9 hours nightly. Chronic sleep deprivation increases risk of depression and anxiety by 40%.',
+    author: 'National Sleep Foundation',
+    image: '🌙',
+    backgroundColor: '#F3E5F5',
+    tags: ['sleep', 'mental-health', 'research']
+  },
 
-/**
- * Fetch random quote from Quotable API
- */
-async function fetchRandomQuote(tags?: string[]): Promise<any> {
-  try {
-    const params: any = {};
-    if (tags && tags.length > 0) {
-      params.tags = tags.join(',');
-    }
-    
-    const response = await axios.get(`${QUOTABLE_API}/random`, { params });
-    return response.data;
-  } catch (error) {
-    console.error('Quotable random quote error:', error);
-    throw error;
-  }
-}
-
-/**
- * Transform API response to Resource format
- */
-function transformToResource(quote: any, index: number, category?: string): Resource {
-  const categoryData = category 
-    ? CATEGORIES.find(c => c.id === category)
-    : CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-
-  // Estimate reading time based on content length
-  const wordCount = quote.content?.split(' ').length || quote.q?.split(' ').length || 20;
-  const readingTime = Math.max(1, Math.ceil(wordCount / 50)); // Avg 50 words per minute for reflection
-
-  return {
-    id: quote._id || quote.h || `resource-${index}`,
-    title: quote.content?.slice(0, 50) || quote.q?.slice(0, 50) || 'Inspirational Quote',
+  // Motivation Resources
+  {
+    id: 'motivation-1',
+    title: 'Morning Affirmations',
     type: 'Affirmation',
-    duration: `${readingTime} min`,
-    category: categoryData?.id || 'mindfulness',
-    content: quote.content || quote.q || '',
-    author: quote.author || quote.a || 'Unknown',
-    image: RESOURCE_ICONS[index % RESOURCE_ICONS.length] || '🌟',
-    backgroundColor: BACKGROUND_COLORS[index % BACKGROUND_COLORS.length] || '#FFFFFF',
-    tags: quote.tags || []
-  };
-}
+    duration: '3 mins',
+    category: 'motivation',
+    content: 'Start each morning with these affirmations: "I am capable of handling today\'s challenges. I deserve happiness and peace. I am growing stronger every day. I choose to focus on what I can control. I am worthy of good things." Say them aloud while looking in a mirror for maximum impact.',
+    image: '☀️',
+    backgroundColor: '#FFF9C4',
+    tags: ['affirmations', 'morning', 'positivity']
+  },
+  {
+    id: 'motivation-2',
+    title: 'Micro-Goals Strategy',
+    type: 'Guide',
+    duration: '8 mins',
+    category: 'motivation',
+    content: 'Break large goals into tiny, achievable steps. Instead of "exercise more," try "put on workout clothes" or "walk for 5 minutes." Completing micro-goals releases dopamine, building momentum. Chain these small wins together. Progress, not perfection, is the goal.',
+    image: '🎯',
+    backgroundColor: '#FFF9C4',
+    tags: ['goals', 'motivation', 'progress']
+  },
+  {
+    id: 'motivation-3',
+    title: 'The Power of Yet',
+    type: 'Article',
+    duration: '6 mins',
+    category: 'motivation',
+    content: 'Add "yet" to negative self-talk. "I can\'t do this... yet." "I don\'t understand... yet." This simple word shift changes your mindset from fixed to growth-oriented. It acknowledges current limitations while emphasizing future potential. Your brain is capable of remarkable growth and change.',
+    author: 'Carol Dweck',
+    image: '🌱',
+    backgroundColor: '#FFF9C4',
+    tags: ['mindset', 'growth', 'psychology']
+  },
+
+  // Mindfulness Resources
+  {
+    id: 'mindfulness-1',
+    title: 'Body Scan Meditation',
+    type: 'Exercise',
+    duration: '15 mins',
+    category: 'mindfulness',
+    content: 'Lie down comfortably. Starting with your toes, bring gentle awareness to each body part. Notice sensations without judgment: warmth, tingling, tension, relaxation. Slowly move up through feet, legs, torso, arms, and head. If your mind wanders, gently return to the body. This cultivates present-moment awareness.',
+    image: '🧘',
+    backgroundColor: '#E0F2F1',
+    tags: ['meditation', 'body-scan', 'awareness']
+  },
+  {
+    id: 'mindfulness-2',
+    title: 'Mindful Walking',
+    type: 'Exercise',
+    duration: '10 mins',
+    category: 'mindfulness',
+    content: 'Walk slowly, focusing on each step. Notice how your heel touches the ground, weight shifts forward, toes push off. Feel the air on your skin, hear sounds around you, observe what you see. When thoughts arise, acknowledge them and return to the sensation of walking. This is meditation in motion.',
+    image: '🚶',
+    backgroundColor: '#E0F2F1',
+    tags: ['walking', 'meditation', 'mindfulness']
+  },
+  {
+    id: 'mindfulness-3',
+    title: 'Mindful Eating Practice',
+    type: 'Guide',
+    duration: '12 mins',
+    category: 'mindfulness',
+    content: 'Choose one meal to eat mindfully. Remove distractions. Look at your food, notice colors and textures. Smell it. Take a small bite, chew slowly, notice flavors and sensations. Put your utensil down between bites. This practice improves your relationship with food and teaches you to be present.',
+    image: '🍎',
+    backgroundColor: '#E0F2F1',
+    tags: ['eating', 'mindfulness', 'awareness']
+  },
+
+  // Inspirational Quotes
+  {
+    id: 'quote-1',
+    title: 'On Inner Strength',
+    type: 'Quote',
+    duration: '1 min',
+    category: 'anxiety',
+    content: 'You are braver than you believe, stronger than you seem, and smarter than you think.',
+    author: 'A.A. Milne',
+    image: '💪',
+    backgroundColor: '#E3F2FD',
+    tags: ['strength', 'courage', 'self-belief']
+  },
+  {
+    id: 'quote-2',
+    title: 'On Change',
+    type: 'Quote',
+    duration: '1 min',
+    category: 'motivation',
+    content: 'The only way to make sense out of change is to plunge into it, move with it, and join the dance.',
+    author: 'Alan Watts',
+    image: '🌊',
+    backgroundColor: '#FFF9C4',
+    tags: ['change', 'adaptation', 'growth']
+  },
+  {
+    id: 'quote-3',
+    title: 'On Present Moment',
+    type: 'Quote',
+    duration: '1 min',
+    category: 'mindfulness',
+    content: 'The present moment is the only time over which we have dominion.',
+    author: 'Thích Nhất Hạnh',
+    image: '🧘',
+    backgroundColor: '#E0F2F1',
+    tags: ['present', 'mindfulness', 'awareness']
+  },
+  {
+    id: 'quote-4',
+    title: 'On Perseverance',
+    type: 'Quote',
+    duration: '1 min',
+    category: 'depression',
+    content: 'Even the darkest night will end and the sun will rise.',
+    author: 'Victor Hugo',
+    image: '🌅',
+    backgroundColor: '#FFF3E0',
+    tags: ['hope', 'perseverance', 'optimism']
+  },
+  {
+    id: 'quote-5',
+    title: 'On Self-Compassion',
+    type: 'Quote',
+    duration: '1 min',
+    category: 'stress',
+    content: 'Talk to yourself like you would to someone you love.',
+    author: 'Brené Brown',
+    image: '💝',
+    backgroundColor: '#E8F5E8',
+    tags: ['self-compassion', 'kindness', 'self-talk']
+  },
+  {
+    id: 'quote-6',
+    title: 'On Progress',
+    type: 'Quote',
+    duration: '1 min',
+    category: 'motivation',
+    content: 'Progress is not achieved by luck or accident, but by working on yourself daily.',
+    author: 'Epictetus',
+    image: '📈',
+    backgroundColor: '#FFF9C4',
+    tags: ['progress', 'consistency', 'growth']
+  }
+];
+
+// Simulate async delay for realistic feel
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Fetch all resources (combines multiple API calls)
+ * Fetch all resources - No API calls, instant response
  */
 export async function fetchAllResources(): Promise<Resource[]> {
-  try {
-    // Fetch from both APIs for variety
-    const [zenQuotes, quotableQuotes] = await Promise.allSettled([
-      fetchZenQuotes(5),
-      fetchQuotableQuotes(undefined, 10)
-    ]);
-
-    const resources: Resource[] = [];
-
-    // Process ZenQuotes results
-    if (zenQuotes.status === 'fulfilled') {
-      zenQuotes.value.forEach((quote, index) => {
-        resources.push(transformToResource(quote, index));
-      });
-    }
-
-    // Process Quotable results
-    if (quotableQuotes.status === 'fulfilled') {
-      quotableQuotes.value.forEach((quote, index) => {
-        resources.push(transformToResource(quote, index + 5));
-      });
-    }
-
-    // Add some curated mental health exercises (static but valuable)
-    const curatedResources: Resource[] = [
-      {
-        id: 'breathing-exercise',
-        title: 'Breathing Exercises',
-        type: 'Exercise',
-        duration: '5 mins',
-        category: 'stress',
-        content: 'Practice deep breathing techniques to reduce stress and anxiety. Inhale for 4 counts, hold for 4, exhale for 6.',
-        image: '🧘‍♀️',
-        backgroundColor: '#E8F5E8',
-        tags: ['breathing', 'relaxation', 'stress-relief']
-      },
-      {
-        id: 'sleep-routine',
-        title: 'Better Sleep Routine',
-        type: 'Guide',
-        duration: '15 mins',
-        category: 'sleep',
-        content: 'Create a consistent sleep schedule and bedtime routine to improve sleep quality.',
-        image: '🛏️',
-        backgroundColor: '#F3E5F5',
-        tags: ['sleep', 'routine', 'wellness']
-      },
-      {
-        id: 'mood-tracking',
-        title: 'Mood Tracking Tips',
-        type: 'Article',
-        duration: '8 mins',
-        category: 'depression',
-        content: 'Learn how to track your mood patterns and identify triggers for better mental health.',
-        image: '📊',
-        backgroundColor: '#FFF3E0',
-        tags: ['mood', 'tracking', 'mental-health']
-      }
-    ];
-
-    return [...curatedResources, ...resources];
-  } catch (error) {
-    console.error('Error fetching resources:', error);
-    // Return fallback resources if API fails
-    return getFallbackResources();
-  }
+  await delay(300); // Small delay for realistic loading feel
+  return [...ALL_RESOURCES];
 }
 
 /**
  * Fetch resources by category
  */
 export async function fetchResourcesByCategory(categoryId: string): Promise<Resource[]> {
-  try {
-    const category = CATEGORIES.find(c => c.id === categoryId);
-    if (!category) {
-      return fetchAllResources();
-    }
-
-    // Fetch quotes with category-specific tags
-    const quotes = await fetchQuotableQuotes(category.tags, 15);
-    
-    return quotes.map((quote, index) => 
-      transformToResource(quote, index, categoryId)
-    );
-  } catch (error) {
-    console.error('Error fetching category resources:', error);
-    return [];
-  }
+  await delay(200);
+  return ALL_RESOURCES.filter(resource => resource.category === categoryId);
 }
 
 /**
- * Search resources by query
+ * Search resources locally
  */
 export async function searchResources(query: string): Promise<Resource[]> {
-  try {
-    // Search in Quotable API
-    const response = await axios.get(`${QUOTABLE_API}/search/quotes`, {
-      params: { query, limit: 20 }
-    });
-
-    return response.data.results.map((quote: any, index: number) => 
-      transformToResource(quote, index)
-    );
-  } catch (error) {
-    console.error('Error searching resources:', error);
-    return [];
-  }
+  await delay(150);
+  const lowerQuery = query.toLowerCase();
+  
+  return ALL_RESOURCES.filter(resource =>
+    resource.title.toLowerCase().includes(lowerQuery) ||
+    resource.content.toLowerCase().includes(lowerQuery) ||
+    resource.tags?.some(tag => tag.toLowerCase().includes(lowerQuery))
+  );
 }
 
 /**
- * Get quote of the day
+ * Get quote of the day - date-based selection
  */
 export async function getQuoteOfTheDay(): Promise<Resource | null> {
-  try {
-    const response = await axios.get(`${ZENQUOTES_API}/today`);
-    if (response.data && response.data.length > 0) {
-      return transformToResource(response.data[0], 0);
-    }
-    return null;
-  } catch (error) {
-    console.error('Error fetching quote of the day:', error);
-    return null;
-  }
-}
-
-/**
- * Fallback resources if API fails
- */
-function getFallbackResources(): Resource[] {
-  return [
-    {
-      id: 'fallback-1',
-      title: 'Take a Deep Breath',
-      type: 'Affirmation',
-      duration: '2 mins',
-      category: 'stress',
-      content: 'You are doing better than you think. Take a moment to breathe and reset.',
-      image: '🧘‍♀️',
-      backgroundColor: '#E8F5E8'
-    },
-    {
-      id: 'fallback-2',
-      title: 'You Are Strong',
-      type: 'Affirmation',
-      duration: '2 mins',
-      category: 'anxiety',
-      content: 'Your strength is greater than any challenge. You have overcome before and will again.',
-      image: '💪',
-      backgroundColor: '#E3F2FD'
-    },
-    {
-      id: 'fallback-3',
-      title: 'Tomorrow is a New Day',
-      type: 'Affirmation',
-      duration: '2 mins',
-      category: 'depression',
-      content: 'Every sunrise brings new opportunities. Be gentle with yourself.',
-      image: '🌅',
-      backgroundColor: '#FFF3E0'
-    }
-  ];
+  await delay(100);
+  
+  // Use day of year for consistent daily quote
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - start.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+  
+  const quotes = ALL_RESOURCES.filter(r => r.type === 'Quote');
+  return quotes.length > 0 ? quotes[dayOfYear % quotes.length] ?? null : null;
 }
