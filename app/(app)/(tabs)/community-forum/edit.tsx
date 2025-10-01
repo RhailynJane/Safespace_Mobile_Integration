@@ -31,12 +31,20 @@ const CATEGORIES = [
 ];
 
 export default function EditPostScreen() {
-  const { id, title: initialTitle, content: initialContent, category: initialCategory, isDraft } = useLocalSearchParams();
+  const {
+    id,
+    title: initialTitle,
+    content: initialContent,
+    category: initialCategory,
+    isDraft,
+  } = useLocalSearchParams();
   const { user } = useUser();
-  
-  const [title, setTitle] = useState(initialTitle as string || "");
-  const [content, setContent] = useState(initialContent as string || "");
-  const [category, setCategory] = useState(initialCategory as string || "Support");
+
+  const [title, setTitle] = useState((initialTitle as string) || "");
+  const [content, setContent] = useState((initialContent as string) || "");
+  const [category, setCategory] = useState(
+    (initialCategory as string) || "Support"
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [activeTab, setActiveTab] = useState("community-forum");
@@ -72,7 +80,7 @@ export default function EditPostScreen() {
       } else {
         Alert.alert("Success", "Post updated successfully!");
       }
-      
+
       router.back();
     } catch (error) {
       console.error("Error updating post:", error);
@@ -96,7 +104,7 @@ export default function EditPostScreen() {
             try {
               await communityApi.deletePost(postId);
               Alert.alert("Success", "Post deleted successfully!");
-              router.replace("/community-forum");
+              router.replace("/community-forum.main");
             } catch (error) {
               console.error("Error deleting post:", error);
               Alert.alert("Error", "Failed to delete post");
@@ -130,20 +138,12 @@ export default function EditPostScreen() {
       <AppHeader title="Edit Post" showBack={true} />
 
       <View style={styles.scrollContainer}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.content}>
             <View style={styles.form}>
-              {/* Delete Button Section */}
-              <View style={styles.deleteSection}>
-                <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-                  <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
-                  <Text style={styles.deleteButtonText}>Delete Post</Text>
-                </TouchableOpacity>
-                <Text style={styles.deleteWarning}>
-                  This action cannot be undone
-                </Text>
-              </View>
-
               <Text style={styles.label}>Title</Text>
               <TextInput
                 style={styles.titleInput}
@@ -156,8 +156,8 @@ export default function EditPostScreen() {
               />
 
               <Text style={styles.label}>Category</Text>
-              <ScrollView 
-                horizontal 
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.categoriesScroll}
               >
@@ -202,6 +202,20 @@ export default function EditPostScreen() {
                 </Text>
               </View>
             </View>
+          </View>
+
+          {/* Delete Button Section */}
+          <View style={styles.deleteSection}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+              <Text style={styles.deleteButtonText}>Delete Post</Text>
+            </TouchableOpacity>
+            <Text style={styles.deleteWarning}>
+              This action cannot be undone
+            </Text>
           </View>
         </ScrollView>
       </View>
@@ -279,10 +293,8 @@ const styles = StyleSheet.create({
   deleteSection: {
     marginBottom: 24,
     padding: 16,
-    backgroundColor: "#FFF5F5",
+    backgroundColor: "transparent",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FED7D7",
     alignItems: "center",
   },
   deleteButton: {
@@ -382,20 +394,14 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: "absolute",
-    bottom: 80, // Above the bottom navigation
+    bottom: 140, // Above the bottom navigation
     left: 0,
     right: 0,
     flexDirection: "row",
     padding: 16,
     gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 5,
+    backgroundColor: "transparent",
+    justifyContent: "center",
   },
   button: {
     flex: 1,
