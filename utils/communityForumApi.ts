@@ -1,9 +1,7 @@
 import { Platform } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 
-const API_BASE_URL = Platform.OS === 'android' 
-  ? 'http://10.0.2.2:3001/api' 
-  : 'http://localhost:3001/api';
+const API_BASE_URL = 'http://192.168.1.100:3001/api';
 
 class CommunityForumApi {
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
