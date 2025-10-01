@@ -1,6 +1,4 @@
-/**
- * Resource Detail Screen - Display full resource content with bookmark
- */
+// app/(app)/resources/resource-detail-screen.tsx
 import { useState, useEffect } from "react";
 import {
   View,
@@ -18,7 +16,11 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
-import { apiService } from "../../../utils/api";
+import { 
+  isBookmarked as checkLocalBookmark, 
+  addBookmark as addLocalBookmark, 
+  removeBookmark as removeLocalBookmark 
+} from "../../../utils/resourcesApi";
 
 export default function ResourceDetailScreen() {
   const params = useLocalSearchParams();
@@ -29,7 +31,7 @@ export default function ResourceDetailScreen() {
 
   // Extract resource data from params
   const resource = {
-    id: parseInt(params.id as string),
+    id: params.id as string,
     title: params.title as string,
     content: params.content as string,
     author: params.author as string,
@@ -40,24 +42,19 @@ export default function ResourceDetailScreen() {
   };
 
   useEffect(() => {
-  const checkBookmarkStatus = async () => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
+    const checkBookmarkStatus = async () => {
+      try {
+        const isBooked = await checkLocalBookmark(resource.id);
+        setBookmarked(isBooked);
+      } catch (error) {
+        console.error("Error checking bookmark status:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    try {
-      const result = await apiService.isBookmarked(userId, resource.id);
-      setBookmarked(result.isBookmarked);
-    } catch (error) {
-      console.error("Error checking bookmark status:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  checkBookmarkStatus();
-}, [userId, resource.id]); // Add dependencies that the function uses
+    checkBookmarkStatus();
+  }, [resource.id]);
 
   // Handle share functionality
   const handleShare = async () => {
@@ -74,22 +71,13 @@ export default function ResourceDetailScreen() {
 
   // Handle bookmark toggle
   const handleBookmark = async () => {
-    if (!userId) {
-      Alert.alert(
-        "Sign In Required",
-        "Please sign in to bookmark resources.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
-
     try {
       if (bookmarked) {
-        await apiService.removeBookmark(userId, resource.id);
+        await removeLocalBookmark(resource.id);
         setBookmarked(false);
         Alert.alert("Removed", "Resource removed from your bookmarks");
       } else {
-        await apiService.addBookmark(userId, resource.id);
+        await addLocalBookmark(resource.id);
         setBookmarked(true);
         Alert.alert("Saved", "Resource saved to your bookmarks");
       }
