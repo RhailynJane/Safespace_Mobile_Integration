@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { Pool } from "pg";
-const API_BASE_URL = "http://192.168.1.100:3001/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
 const app = express();
 const PORT = 3001;

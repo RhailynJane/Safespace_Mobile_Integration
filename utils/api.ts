@@ -3,14 +3,13 @@ import { Platform } from "react-native";
 
 const getBaseURL = () => {
   if (__DEV__) {
-    // Replace with YOUR actual IP address
-    return "http://192.168.1.100:3001";
+    return "http://10.0.165.112:3001";
   } else {
     return "https://your-production-api.com";
   }
 };
 
-const API_BASE_URL = getBaseURL();
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
 export interface SyncUserData {
   clerkUserId: string;

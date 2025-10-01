@@ -1,7 +1,7 @@
 // journalApi.ts
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.100:3001/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
 export interface JournalEntry {
   id: string;
@@ -39,7 +39,7 @@ export const journalApi = {
   // Get templates
   getTemplates: async () => {
     try {
-      const response = await axios.get(`${API_URL}/journal/templates`);
+      const response = await axios.get(`${API_BASE_URL}/api/journal/templates`);
       return response.data;
     } catch (error: any) {
       console.error('Get templates error:', error.message);
@@ -50,7 +50,7 @@ export const journalApi = {
   // Create entry
   createEntry: async (data: CreateJournalData) => {
     try {
-      const response = await axios.post(`${API_URL}/journal`, data);
+      const response = await axios.post(`${API_BASE_URL}/api/journal`, data);
       return response.data;
     } catch (error: any) {
       console.error('Create entry error:', error.message);
@@ -64,7 +64,7 @@ export const journalApi = {
   // Get recent entries
   getRecentEntries: async (clerkUserId: string, limit: number = 10) => {
     try {
-      const response = await axios.get(`${API_URL}/journal/recent/${clerkUserId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/journal/recent/${clerkUserId}`, {
         params: { limit }
       });
       return response.data;
@@ -77,7 +77,7 @@ export const journalApi = {
   // Get entry by ID
   getEntry: async (entryId: string) => {
     try {
-      const response = await axios.get(`${API_URL}/journal/${entryId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/journal/${entryId}`);
       return response.data;
     } catch (error: any) {
       console.error('Get entry error:', error.message);
@@ -88,7 +88,7 @@ export const journalApi = {
   // Update entry
   updateEntry: async (entryId: string, data: Partial<CreateJournalData>) => {
     try {
-      const response = await axios.put(`${API_URL}/journal/${entryId}`, data);
+      const response = await axios.put(`${API_BASE_URL}/api/journal/${entryId}`, data);
       return response.data;
     } catch (error: any) {
       console.error('Update entry error:', error.message);
@@ -99,7 +99,7 @@ export const journalApi = {
   // Delete entry
   deleteEntry: async (entryId: string) => {
     try {
-      const response = await axios.delete(`${API_URL}/journal/${entryId}`);
+      const response = await axios.delete(`${API_BASE_URL}/api/journal/${entryId}`);
       return response.data;
     } catch (error: any) {
       console.error('Delete entry error:', error.message);
@@ -110,7 +110,7 @@ export const journalApi = {
   // Get history with filters
   getHistory: async (clerkUserId: string, filters?: any) => {
     try {
-      const response = await axios.get(`${API_URL}/journal/history/${clerkUserId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/journal/history/${clerkUserId}`, {
         params: filters
       });
       return response.data;
