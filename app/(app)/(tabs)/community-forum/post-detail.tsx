@@ -50,15 +50,40 @@ export default function PostDetailScreen() {
       setPost(postResponse.post);
       setRelatedPosts(relatedResponse.posts.filter((p: any) => p.id !== postId).slice(0, 2));
       
-      // Check if user has reacted (this would need additional backend endpoint)
-      // For now, we'll assume no reaction
-      setUserReaction(null);
+      // Load user's reaction to this post
+      if (user?.id) {
+        await loadUserReaction();
+        await checkIfBookmarked();
+      }
       
     } catch (error) {
       console.error('Error loading post:', error);
       Alert.alert("Error", "Failed to load post");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUserReaction = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await communityApi.getUserReaction(postId, user.id);
+      setUserReaction(response.userReaction);
+    } catch (error) {
+      console.error('Error loading user reaction:', error);
+    }
+  };
+
+  const checkIfBookmarked = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await communityApi.getBookmarkedPosts(user.id);
+      const isBookmarked = response.bookmarks?.some((bookmark: any) => bookmark.id === postId);
+      setBookmarked(isBookmarked);
+    } catch (error) {
+      console.error('Error checking bookmark:', error);
     }
   };
 
@@ -73,36 +98,20 @@ export default function PostDetailScreen() {
     try {
       setReacting(true);
       
-      if (userReaction === emoji) {
-        // Remove reaction
-        await communityApi.removeReaction(postId, user.id, emoji);
-        setUserReaction(null);
-        
-        // Update local post reactions
-        if (post && post.reactions) {
-          const updatedReactions = { ...post.reactions };
-          if (updatedReactions[emoji] > 0) {
-            updatedReactions[emoji]--;
-          }
-          setPost({ ...post, reactions: updatedReactions });
-        }
-      } else {
-        // Add new reaction
-        if (userReaction) {
-          // Remove previous reaction first
-          await communityApi.removeReaction(postId, user.id, userReaction);
-        }
-        
-        await communityApi.reactToPost(postId, user.id, emoji);
-        setUserReaction(emoji);
-        
-        // Update local post reactions
-        if (post && post.reactions) {
-          const updatedReactions = { ...post.reactions };
-          updatedReactions[emoji] = (updatedReactions[emoji] || 0) + 1;
-          setPost({ ...post, reactions: updatedReactions });
-        }
+      // Use the single endpoint that handles both add and remove
+      const response = await communityApi.reactToPost(postId, user.id, emoji);
+      
+      // Update the post with new reaction data
+      if (post) {
+        setPost({
+          ...post,
+          reactions: response.reactions,
+          reaction_count: Math.max(0, (post.reaction_count || 0) + response.reactionChange)
+        });
       }
+      
+      // Update user's current reaction
+      setUserReaction(response.userReaction);
       
       setReactionPickerVisible(false);
     } catch (error) {
@@ -144,6 +153,25 @@ export default function PostDetailScreen() {
     return date.toLocaleDateString();
   };
 
+  // Function to get all available reactions including zeros for missing ones
+  const getAllReactions = () => {
+    const baseReactions: { [key: string]: number } = {};
+    
+    // Initialize with all possible reactions at 0
+    EMOJI_REACTIONS.forEach(emoji => {
+      baseReactions[emoji] = 0;
+    });
+    
+    // Merge with actual reactions from post
+    if (post?.reactions) {
+      Object.entries(post.reactions).forEach(([emoji, count]) => {
+        baseReactions[emoji] = count as number;
+      });
+    }
+    
+    return baseReactions;
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -175,6 +203,8 @@ export default function PostDetailScreen() {
       </SafeAreaView>
     );
   }
+
+  const allReactions = getAllReactions();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -229,18 +259,24 @@ export default function PostDetailScreen() {
 
             {/* Reaction Stats */}
             <View style={styles.reactionStats}>
-              {post.reactions && Object.entries(post.reactions).map(([emoji, count]) => (
+              {Object.entries(allReactions).map(([emoji, count]) => (
                 <TouchableOpacity
                   key={emoji}
                   style={[
                     styles.reactionStat,
                     userReaction === emoji && styles.reactionStatActive,
+                    count === 0 && styles.reactionStatEmpty,
                   ]}
                   onPress={() => handleReactionPress(emoji)}
                   disabled={reacting}
                 >
                   <Text style={styles.reactionStatEmoji}>{emoji}</Text>
-                  <Text style={styles.reactionStatCount}>{count as number}</Text>
+                  <Text style={[
+                    styles.reactionStatCount,
+                    count === 0 && styles.reactionStatCountEmpty
+                  ]}>
+                    {count}
+                  </Text>
                 </TouchableOpacity>
               ))}
               
@@ -270,19 +306,22 @@ export default function PostDetailScreen() {
             {/* Reaction Picker */}
             {reactionPickerVisible && (
               <View style={styles.reactionPicker}>
-                {EMOJI_REACTIONS.map((emoji) => (
-                  <TouchableOpacity
-                    key={emoji}
-                    style={[
-                      styles.emojiButton,
-                      userReaction === emoji && styles.emojiButtonActive,
-                    ]}
-                    onPress={() => handleReactionPress(emoji)}
-                    disabled={reacting}
-                  >
-                    <Text style={styles.emojiText}>{emoji}</Text>
-                  </TouchableOpacity>
-                ))}
+                <Text style={styles.reactionPickerTitle}>Add Reaction</Text>
+                <View style={styles.reactionPickerEmojis}>
+                  {EMOJI_REACTIONS.map((emoji) => (
+                    <TouchableOpacity
+                      key={emoji}
+                      style={[
+                        styles.emojiButton,
+                        userReaction === emoji && styles.emojiButtonActive,
+                      ]}
+                      onPress={() => handleReactionPress(emoji)}
+                      disabled={reacting}
+                    >
+                      <Text style={styles.emojiText}>{emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             )}
           </View>
@@ -471,7 +510,7 @@ const styles = StyleSheet.create({
   reactionStats: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 8,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -487,19 +526,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 16,
     backgroundColor: "#F5F5F5",
+    minWidth: 60,
+    justifyContent: "center",
   },
   reactionStatActive: {
     backgroundColor: "#E8F5E9",
     borderWidth: 2,
     borderColor: "#4CAF50",
   },
+  reactionStatEmpty: {
+    opacity: 0.6,
+  },
   reactionStatEmoji: {
-    fontSize: 20,
+    fontSize: 16,
   },
   reactionStatCount: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     color: "#666",
+  },
+  reactionStatCountEmpty: {
+    color: "#999",
   },
   addMoreReactionButton: {
     paddingVertical: 6,
@@ -522,10 +569,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   reactionPicker: {
-    flexDirection: "row",
-    gap: 8,
     marginTop: 12,
-    padding: 12,
+    padding: 16,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     shadowColor: "#000",
@@ -537,9 +582,22 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  reactionPickerTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  reactionPickerEmojis: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   emojiButton: {
-    padding: 5,
-    borderRadius: 9,
+    padding: 8,
+    borderRadius: 12,
     backgroundColor: "#F5F5F5",
   },
   emojiButtonActive: {
@@ -547,7 +605,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.1 }],
   },
   emojiText: {
-    fontSize: 32,
+    fontSize: 28,
   },
   reactionOverlay: {
     ...StyleSheet.absoluteFillObject,
