@@ -39,6 +39,21 @@ export interface SubmitAssessmentData {
   assessmentType?: string;
 }
 
+export interface Resource {
+  id: number;
+  title: string;
+  type: string;
+  duration: string;
+  category: string;
+  content: string;
+  author?: string;
+  image_emoji: string;
+  background_color: string;
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 class ApiService {
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -110,6 +125,45 @@ class ApiService {
 
   async getLatestAssessment(clerkUserId: string) {
     return this.makeRequest(`/api/assessments/latest/${clerkUserId}`);
+  }
+
+  // Resources endpoints
+  async getResources(): Promise<Resource[]> {
+    return this.makeRequest('/api/resources');
+  }
+
+  async getResourcesByCategory(category: string): Promise<Resource[]> {
+    return this.makeRequest(`/api/resources/category/${category}`);
+  }
+
+  async searchResources(query: string): Promise<Resource[]> {
+    return this.makeRequest(`/api/resources/search?q=${encodeURIComponent(query)}`);
+  }
+
+  async getResource(id: number): Promise<Resource> {
+    return this.makeRequest(`/api/resources/${id}`);
+  }
+
+  // Bookmark methods
+  async getBookmarks(clerkUserId: string): Promise<Resource[]> {
+    return this.makeRequest(`/api/bookmarks/${clerkUserId}`);
+  }
+
+  async addBookmark(clerkUserId: string, resourceId: number) {
+    return this.makeRequest('/api/bookmarks', {
+      method: 'POST',
+      body: JSON.stringify({ clerkUserId, resourceId }),
+    });
+  }
+
+  async removeBookmark(clerkUserId: string, resourceId: number) {
+    return this.makeRequest(`/api/bookmarks/${clerkUserId}/${resourceId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async isBookmarked(clerkUserId: string, resourceId: number): Promise<{ isBookmarked: boolean }> {
+    return this.makeRequest(`/api/bookmarks/${clerkUserId}/check/${resourceId}`);
   }
 }
 
