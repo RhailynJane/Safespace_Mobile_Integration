@@ -1705,6 +1705,8 @@ app.post('/api/community/posts', async (req: Request<{}, {}, CreatePostRequest>,
 
 // React to post
 app.post('/api/community/posts/:id/reactions', async (req: Request<{id: string}, {}, PostReactionRequest>, res: Response) => {
+  const client = await pool.connect();
+  
   try {
     const { id } = req.params;
     const { clerkUserId, emoji } = req.body;
@@ -1715,30 +1717,112 @@ app.post('/api/community/posts/:id/reactions', async (req: Request<{id: string},
       });
     }
 
-    // Add reaction
-    await pool.query(
-      `INSERT INTO post_reactions (post_id, user_id, emoji) 
-       VALUES ($1, $2, $3) 
-       ON CONFLICT (post_id, user_id, emoji) DO NOTHING`,
+    await client.query('BEGIN');
+
+    // Check if user already reacted with this emoji
+    const existingReaction = await client.query(
+      'SELECT id FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3',
       [parseInt(id), clerkUserId, emoji]
     );
 
+    let reactionChange = 0;
+
+    if (existingReaction.rows.length > 0) {
+      // Remove existing reaction
+      await client.query(
+        'DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3',
+        [parseInt(id), clerkUserId, emoji]
+      );
+      reactionChange = -1;
+    } else {
+      // Remove any existing reaction from this user to this post
+      await client.query(
+        'DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2',
+        [parseInt(id), clerkUserId]
+      );
+      
+      // Add new reaction
+      await client.query(
+        'INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3)',
+        [parseInt(id), clerkUserId, emoji]
+      );
+      reactionChange = 1;
+    }
+
     // Update reaction count
-    await pool.query(
-      'UPDATE community_posts SET reaction_count = reaction_count + 1 WHERE id = $1',
+    await client.query(
+      'UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count + $1) WHERE id = $2',
+      [reactionChange, parseInt(id)]
+    );
+
+    // Get updated reaction counts by emoji
+    const reactionCounts = await client.query(
+      `SELECT emoji, COUNT(*) as count 
+       FROM post_reactions 
+       WHERE post_id = $1 
+       GROUP BY emoji`,
       [parseInt(id)]
     );
 
-    res.json({ success: true, message: 'Reaction added successfully' });
+    // Convert to object format
+    const reactions: { [key: string]: number } = {};
+    reactionCounts.rows.forEach((row: any) => {
+      reactions[row.emoji] = parseInt(row.count);
+    });
+
+    // Check if user has any reaction to this post
+    const userReactionResult = await client.query(
+      'SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2',
+      [parseInt(id), clerkUserId]
+    );
+
+    const userReaction = userReactionResult.rows.length > 0 ? userReactionResult.rows[0].emoji : null;
+
+    await client.query('COMMIT');
+
+    res.json({ 
+      success: true, 
+      message: reactionChange > 0 ? 'Reaction added' : 'Reaction removed',
+      reactions,
+      userReaction,
+      reactionChange
+    });
 
   } catch (error: any) {
+    await client.query('ROLLBACK');
     console.error('Error reacting to post:', error.message);
     res.status(500).json({ 
       error: 'Failed to react to post',
       details: error.message
     });
+  } finally {
+    client.release();
   }
 });
+
+// Get user reaction for a post
+app.get('/api/community/posts/:id/user-reaction/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { id, clerkUserId } = req.params;
+
+    const result = await pool.query(
+      'SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2',
+      [parseInt(id), clerkUserId]
+    );
+
+    res.json({ 
+      userReaction: result.rows.length > 0 ? result.rows[0].emoji : null 
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching user reaction:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to fetch user reaction',
+      details: error.message
+    });
+  }
+});
+
 
 // Remove reaction
 app.delete('/api/community/posts/:id/reactions/:emoji', async (req: Request, res: Response) => {
