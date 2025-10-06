@@ -1,3 +1,42 @@
+/**
+ * ResourcesScreen - React Native Component
+ * 
+ * Main resources hub providing access to mental health content including:
+ * - Categorized resources (Stress, Anxiety, Depression, Sleep, Motivation, Mindfulness)
+ * - Quick access to daily affirmations and random quotes
+ * - Search functionality across all resources
+ * - Featured content highlighting
+ * - External API integration for fresh content
+ * 
+ * Features:
+ * - Category-based filtering with visual indicators
+ * - Real-time search with debouncing
+ * - Pull-to-refresh for content updates
+ * - Featured resource spotlight
+ * - Quick action buttons for instant access
+ * - Responsive design with curved background
+ * 
+ * Content Types:
+ * - Articles, exercises, and educational materials
+ * - Daily affirmations for positive reinforcement
+ * - Inspirational quotes from external APIs
+ * - Categorized mental health resources
+ * 
+ * Navigation:
+ * - Bottom tab navigation for app sections
+ * - Resource detail screen for full content viewing
+ * - Category-based filtering within resources
+ * 
+ * Data Flow:
+ * - Loads resources from local database on mount
+ * - Integrates external APIs for quotes and affirmations
+ * - Filters content based on category selection
+ * - Searches across title, content, and categories
+ * 
+ * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
+ */
+
 // app/(app)/resources/index.tsx
 import { useState, useEffect } from "react";
 import {
@@ -26,64 +65,80 @@ import {
   getRandomQuote,
 } from "../../../utils/resourcesApi";
 
-// Category definitions - REMOVED 'saved' category
+/**
+ * Category interface defining the structure for resource categorization
+ * Used for filtering and organizing mental health resources
+ */
 interface Category {
   id: string;
   name: string;
-  icon: string;
-  color: string;
+  icon: string; // Emoji representation
+  color: string; // Background color for category cards
 }
 
+/**
+ * Predefined categories for mental health resources
+ * Each category has unique visual identity and purpose
+ */
 const CATEGORIES: Category[] = [
   {
     id: 'stress',
     name: 'Stress',
-    icon: '💧',
-    color: '#FF8A65',
+    icon: '💧', // Water drop symbolizing calmness
+    color: '#FF8A65', // Soft orange
   },
   {
     id: 'anxiety',
     name: 'Anxiety',
-    icon: '🧠',
-    color: '#81C784',
+    icon: '🧠', // Brain symbolizing mental processes
+    color: '#81C784', // Calming green
   },
   {
     id: 'depression',
     name: 'Depression',
-    icon: '👥',
-    color: '#64B5F6',
+    icon: '👥', // People symbolizing support
+    color: '#64B5F6', // Soothing blue
   },
   {
     id: 'sleep',
     name: 'Sleep',
-    icon: '🛏️',
-    color: '#4DD0E1',
+    icon: '🛏️', // Bed symbolizing rest
+    color: '#4DD0E1', // Tranquil teal
   },
   {
     id: 'motivation',
     name: 'Motivation',
-    icon: '⚡',
-    color: '#FFB74D',
+    icon: '⚡', // Lightning bolt symbolizing energy
+    color: '#FFB74D', // Energetic orange
   },
   {
     id: 'mindfulness',
     name: 'Mindfulness',
-    icon: '🧘',
-    color: '#BA68C8',
+    icon: '🧘', // Meditation symbol
+    color: '#BA68C8', // Spiritual purple
   }
 ];
 
+/**
+ * Main Resources Screen Component
+ * 
+ * Serves as the central hub for accessing mental health resources
+ * with advanced filtering, search, and quick access features
+ */
 export default function ResourcesScreen() {
-  // State management - REMOVED userId since we don't need auth for bookmarks
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState("resources");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [featuredResource, setFeaturedResource] = useState<Resource | null>(null);
+  // State management for UI and data
+  const [loading, setLoading] = useState(true); // Initial loading state
+  const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh state
+  const [activeTab, setActiveTab] = useState("resources"); // Bottom navigation active tab
+  const [searchQuery, setSearchQuery] = useState(""); // Search input value
+  const [selectedCategory, setSelectedCategory] = useState(""); // Currently selected category filter
+  const [resources, setResources] = useState<Resource[]>([]); // Resource data array
+  const [featuredResource, setFeaturedResource] = useState<Resource | null>(null); // Highlighted resource
 
-  // Navigation tabs configuration
+  /**
+   * Bottom navigation tabs configuration
+   * Provides navigation between main app sections
+   */
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -92,19 +147,25 @@ export default function ResourcesScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Load resources on component mount
+  /**
+   * Load resources on component mount
+   * Fetches initial data and sets up featured content
+   */
   useEffect(() => {
     loadResources();
   }, []);
 
-  // Load resources from local API with external integration
+  /**
+   * Load all resources including external content
+   * Sets featured resource and handles error states
+   */
   const loadResources = async () => {
     try {
       setLoading(true);
       const data = await fetchAllResourcesWithExternal();
       setResources(data);
       
-      // Set first quote/affirmation as featured
+      // Set first quote or affirmation as featured content
       const featured = data.find(r => r.type === 'Quote' || r.type === 'Affirmation');
       setFeaturedResource(featured || null);
     } catch (error) {
@@ -119,32 +180,47 @@ export default function ResourcesScreen() {
     }
   };
 
-  // Handle pull-to-refresh
+  /**
+   * Handle pull-to-refresh gesture
+   * Reloads all resources and resets refresh state
+   */
   const onRefresh = async () => {
     setRefreshing(true);
     await loadResources();
     setRefreshing(false);
   };
 
-  // Handle category filter - SIMPLIFIED (no saved category)
+  /**
+   * Handle category filter selection
+   * Toggles category on/off and fetches filtered resources
+   * 
+   * @param categoryId - The ID of the category to filter by
+   */
   const handleCategoryPress = (categoryId: string) => {
     const newCategory = selectedCategory === categoryId ? "" : categoryId;
     setSelectedCategory(newCategory);
 
     if (newCategory) {
+      // Fetch resources for selected category
       setLoading(true);
       fetchResourcesByCategory(newCategory)
         .then(setResources)
         .catch(console.error)
         .finally(() => setLoading(false));
     } else {
+      // Reset to show all resources
       loadResources();
     }
   };
 
-  // Handle search with debounce
+  /**
+   * Handle search functionality with debouncing
+   * Searches resources when query length exceeds 2 characters
+   * Resets to full list when search is cleared
+   */
   useEffect(() => {
     if (searchQuery.length > 2) {
+      // Debounce search to avoid excessive API calls
       const timeoutId = setTimeout(async () => {
         setLoading(true);
         try {
@@ -159,13 +235,19 @@ export default function ResourcesScreen() {
 
       return () => clearTimeout(timeoutId);
     } else if (searchQuery.length === 0 && selectedCategory === "") {
+      // Reset to all resources when search is cleared and no category selected
       loadResources();
     }
 
     return undefined;
   }, [searchQuery, selectedCategory]);
 
-  // Handle tab navigation
+  /**
+   * Handle bottom navigation tab press
+   * Navigates between different app sections
+   * 
+   * @param tabId - The ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -175,7 +257,12 @@ export default function ResourcesScreen() {
     }
   };
 
-  // Handle resource selection
+  /**
+   * Handle resource item press
+   * Navigates to resource detail screen with full content
+   * 
+   * @param resource - The resource object to display
+   */
   const handleResourcePress = (resource: Resource) => {
     router.push({
       pathname: "/(app)/resources/resource-detail-screen",
@@ -192,7 +279,10 @@ export default function ResourcesScreen() {
     });
   };
 
-  // Handle daily affirmation
+  /**
+   * Handle daily affirmation quick action
+   * Fetches and displays a random affirmation
+   */
   const handleDailyAffirmation = async () => {
     try {
       const affirmation = await getDailyAffirmation();
@@ -202,7 +292,10 @@ export default function ResourcesScreen() {
     }
   };
 
-  // Handle random quote
+  /**
+   * Handle random quote quick action
+   * Fetches and displays a random inspirational quote
+   */
   const handleRandomQuote = async () => {
     try {
       const quote = await getRandomQuote();
@@ -217,6 +310,7 @@ export default function ResourcesScreen() {
       <SafeAreaView style={styles.container}>
         <AppHeader title="Resources" showBack={true} />
 
+        {/* Main Scrollable Content Area */}
         <ScrollView
           style={styles.content}
           showsVerticalScrollIndicator={false}
@@ -229,7 +323,7 @@ export default function ResourcesScreen() {
             />
           }
         >
-          {/* Featured Resource Section */}
+          {/* Featured Resource Section - Only shows when no category filter is active */}
           {featuredResource && selectedCategory === "" && (
             <View style={styles.featuredContainer}>
               <View style={styles.featuredCard}>
@@ -242,7 +336,7 @@ export default function ResourcesScreen() {
             </View>
           )}
 
-          {/* Quick Actions */}
+          {/* Quick Actions Section - Instant access to popular features */}
           <View style={styles.quickActions}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.actionsRow}>
@@ -268,7 +362,7 @@ export default function ResourcesScreen() {
             </View>
           </View>
 
-          {/* Search Bar */}
+          {/* Search Bar Section - Global resource search */}
           <View style={styles.searchContainer}>
             <View style={styles.searchBar}>
               <Ionicons
@@ -284,6 +378,7 @@ export default function ResourcesScreen() {
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
+              {/* Clear search button - Only shows when there's text */}
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery("")}>
                   <Ionicons name="close-circle" size={20} color="#999" />
@@ -292,7 +387,7 @@ export default function ResourcesScreen() {
             </View>
           </View>
 
-          {/* Categories Section */}
+          {/* Categories Section - Horizontal scrolling category filters */}
           <View style={styles.categoriesSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Categories</Text>
@@ -325,7 +420,7 @@ export default function ResourcesScreen() {
             </ScrollView>
           </View>
 
-          {/* Resources List */}
+          {/* Resources List Section - Dynamic content based on filters */}
           <View style={styles.resourcesSection}>
             <Text style={styles.resourcesSectionTitle}>
               {selectedCategory
@@ -334,11 +429,13 @@ export default function ResourcesScreen() {
             </Text>
 
             {loading ? (
+              // Loading State
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#4CAF50" />
                 <Text style={styles.loadingText}>Loading resources...</Text>
               </View>
             ) : resources.length === 0 ? (
+              // Empty State
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>🔍</Text>
                 <Text style={styles.emptyText}>No resources found</Text>
@@ -347,6 +444,7 @@ export default function ResourcesScreen() {
                 </Text>
               </View>
             ) : (
+              // Resources List
               <View style={styles.resourcesList}>
                 {resources.map((resource) => (
                   <TouchableOpacity
@@ -355,6 +453,7 @@ export default function ResourcesScreen() {
                     onPress={() => handleResourcePress(resource)}
                     activeOpacity={0.7}
                   >
+                    {/* Resource Image/Emoji Container */}
                     <View
                       style={[
                         styles.resourceImageContainer,
@@ -364,6 +463,7 @@ export default function ResourcesScreen() {
                       <Text style={styles.resourceEmoji}>{resource.image_emoji}</Text>
                     </View>
 
+                    {/* Resource Content Details */}
                     <View style={styles.resourceContent}>
                       <Text style={styles.resourceTitle} numberOfLines={2}>
                         {resource.title}
@@ -382,6 +482,7 @@ export default function ResourcesScreen() {
                       )}
                     </View>
 
+                    {/* Navigation Chevron */}
                     <Ionicons
                       name="chevron-forward"
                       size={20}
@@ -395,7 +496,7 @@ export default function ResourcesScreen() {
           </View>
         </ScrollView>
 
-        {/* Bottom Navigation */}
+        {/* Bottom Navigation Component */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -406,6 +507,11 @@ export default function ResourcesScreen() {
   );
 }
 
+/**
+ * Stylesheet for ResourcesScreen component
+ * Organized by component sections with consistent theming
+ * Uses responsive design patterns and accessibility considerations
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -423,6 +529,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
   },
+  
+  // Featured Resource Section Styles
   featuredContainer: {
     paddingHorizontal: 20,
     paddingTop: 10,
@@ -438,7 +546,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
+    borderLeftColor: "#4CAF50", // Accent border for visual emphasis
   },
   featuredLabel: {
     fontSize: 12,
@@ -460,6 +568,8 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "right",
   },
+  
+  // Quick Actions Section Styles
   quickActions: {
     paddingHorizontal: 20,
     paddingVertical: 15,
@@ -497,6 +607,8 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
+  
+  // Search Bar Section Styles
   searchContainer: {
     paddingHorizontal: 20,
     paddingVertical: 15,
@@ -522,6 +634,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
+  
+  // Categories Section Styles
   categoriesSection: {
     paddingVertical: 13,
   },
@@ -555,7 +669,7 @@ const styles = StyleSheet.create({
   },
   selectedCategory: {
     borderWidth: 3,
-    borderColor: "#4CAF50",
+    borderColor: "#4CAF50", // Highlight selected category
   },
   categoryIcon: {
     fontSize: 28,
@@ -567,10 +681,12 @@ const styles = StyleSheet.create({
     color: "#333",
     textAlign: "center",
   },
+  
+  // Resources List Section Styles
   resourcesSection: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 100,
+    paddingBottom: 100, // Extra padding for bottom navigation
   },
   resourcesSectionTitle: {
     fontSize: 18,
@@ -642,6 +758,8 @@ const styles = StyleSheet.create({
   resourceChevron: {
     marginLeft: 8,
   },
+  
+  // Empty State Styles
   emptyContainer: {
     padding: 40,
     alignItems: "center",

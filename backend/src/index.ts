@@ -356,6 +356,371 @@ app.get(
   }
 );
 
+
+// =============================================
+// COMMUNITY FORUM ENDPOINTS - MOVE THESE UP
+// =============================================
+
+// Community Forum Interfaces
+interface CreatePostRequest {
+  clerkUserId: string;
+  title: string;
+  content: string;
+  category: string;
+  isPrivate?: boolean;
+  isDraft?: boolean;
+}
+
+interface PostReactionRequest {
+  clerkUserId: string;
+  emoji: string;
+}
+
+// Get all categories
+app.get("/api/community/categories", async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM community_categories ORDER BY name"
+    );
+
+    res.json({
+      categories: result.rows,
+      count: result.rows.length,
+    });
+  } catch (error: any) {
+    console.error("Error fetching categories:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch categories",
+      details: error.message,
+    });
+  }
+});
+
+// Get all posts with filters
+app.get("/api/community/posts", async (req: Request, res: Response) => {
+  try {
+    const { category, page = "1", limit = "20", authorId } = req.query as any;
+
+    let query = `
+      SELECT 
+        cp.*,
+        cc.name as category_name,
+        cp.author_name,
+        COUNT(DISTINCT pr.id) as reaction_count,
+        COUNT(DISTINCT pb.id) as bookmark_count,
+        COALESCE(
+          json_object_agg(
+            pr.emoji, 
+            reaction_counts.count
+          ) FILTER (WHERE pr.emoji IS NOT NULL),
+          '{}'
+        ) as reactions
+      FROM community_posts cp
+      LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      LEFT JOIN post_reactions pr ON cp.id = pr.post_id
+      LEFT JOIN post_bookmarks pb ON cp.id = pb.post_id
+      LEFT JOIN (
+        SELECT post_id, emoji, COUNT(*) as count
+        FROM post_reactions
+        GROUP BY post_id, emoji
+      ) reaction_counts ON cp.id = reaction_counts.post_id AND pr.emoji = reaction_counts.emoji
+      WHERE cp.is_draft = false
+    `;
+
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (category && category !== "Trending") {
+      params.push(category);
+      query += ` AND cc.name = $${paramIndex}`;
+      paramIndex++;
+    }
+
+    if (authorId) {
+      params.push(authorId);
+      query += ` AND cp.author_id = $${paramIndex}`;
+      paramIndex++;
+    }
+
+    query += ` GROUP BY cp.id, cc.name
+               ORDER BY cp.reaction_count DESC, cp.created_at DESC 
+               LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+
+    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
+
+    const result = await pool.query(query, params);
+
+    res.json({
+      posts: result.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.rows.length,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching community posts:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch community posts",
+      details: error.message,
+    });
+  }
+});
+
+// Get single post by ID
+app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `SELECT 
+        cp.*,
+        cc.name as category_name,
+        cp.author_name,
+        COALESCE(
+          json_object_agg(
+            pr.emoji, 
+            reaction_counts.count
+          ) FILTER (WHERE pr.emoji IS NOT NULL),
+          '{}'
+        ) as reactions
+      FROM community_posts cp
+      LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      LEFT JOIN post_reactions pr ON cp.id = pr.post_id
+      LEFT JOIN (
+        SELECT post_id, emoji, COUNT(*) as count
+        FROM post_reactions
+        GROUP BY post_id, emoji
+      ) reaction_counts ON cp.id = reaction_counts.post_id AND pr.emoji = reaction_counts.emoji
+      WHERE cp.id = $1
+      GROUP BY cp.id, cc.name`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    res.json({ post: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error fetching post:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch post",
+      details: error.message,
+    });
+  }
+});
+
+// Create new post
+app.post(
+  "/api/community/posts",
+  async (req: Request<{}, {}, CreatePostRequest>, res: Response) => {
+    try {
+      const {
+        clerkUserId,
+        title,
+        content,
+        category,
+        isPrivate = false,
+        isDraft = false,
+      } = req.body;
+
+      if (!clerkUserId || !title || !content || !category) {
+        return res.status(400).json({
+          error: "clerkUserId, title, content, and category are required",
+        });
+      }
+
+      // Get user info if available, otherwise use default
+      let authorName = "Anonymous User";
+      try {
+        const userResult = await pool.query(
+          "SELECT first_name, last_name FROM users WHERE clerk_user_id = $1",
+          [clerkUserId]
+        );
+
+        if (userResult.rows.length > 0) {
+          const user = userResult.rows[0];
+          authorName =
+            `${user.first_name} ${user.last_name}`.trim() || "Community Member";
+        }
+      } catch (userError) {
+        console.log("User not found in database, using default author name");
+      }
+
+      // Get category ID
+      const categoryResult = await pool.query(
+        "SELECT id FROM community_categories WHERE name = $1",
+        [category]
+      );
+
+      if (categoryResult.rows.length === 0) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+
+      const categoryId = categoryResult.rows[0].id;
+
+      // Create post
+      const result = await pool.query(
+        `INSERT INTO community_posts (title, content, category_id, author_id, author_name, is_private, is_draft) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+       RETURNING *`,
+        [
+          title,
+          content,
+          categoryId,
+          clerkUserId,
+          authorName,
+          isPrivate,
+          isDraft,
+        ]
+      );
+
+      res.status(201).json({
+        success: true,
+        message: isDraft ? "Post saved as draft" : "Post created successfully",
+        post: result.rows[0],
+      });
+    } catch (error: any) {
+      console.error("Error creating post:", error.message);
+      res.status(500).json({
+        error: "Failed to create post",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// React to post
+app.post(
+  "/api/community/posts/:id/reactions",
+  async (
+    req: Request<{ id: string }, {}, PostReactionRequest>,
+    res: Response
+  ) => {
+    const client = await pool.connect();
+
+    try {
+      const { id } = req.params;
+      const { clerkUserId, emoji } = req.body;
+
+      if (!clerkUserId || !emoji) {
+        return res.status(400).json({
+          error: "clerkUserId and emoji are required",
+        });
+      }
+
+      await client.query("BEGIN");
+
+      // Check if user already reacted with this emoji
+      const existingReaction = await client.query(
+        "SELECT id FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
+        [parseInt(id), clerkUserId, emoji]
+      );
+
+      let reactionChange = 0;
+
+      if (existingReaction.rows.length > 0) {
+        // Remove existing reaction
+        await client.query(
+          "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
+          [parseInt(id), clerkUserId, emoji]
+        );
+        reactionChange = -1;
+      } else {
+        // Remove any existing reaction from this user to this post
+        await client.query(
+          "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2",
+          [parseInt(id), clerkUserId]
+        );
+
+        // Add new reaction
+        await client.query(
+          "INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3)",
+          [parseInt(id), clerkUserId, emoji]
+        );
+        reactionChange = 1;
+      }
+
+      // Update reaction count
+      await client.query(
+        "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count + $1) WHERE id = $2",
+        [reactionChange, parseInt(id)]
+      );
+
+      // Get updated reaction counts by emoji
+      const reactionCounts = await client.query(
+        `SELECT emoji, COUNT(*) as count 
+       FROM post_reactions 
+       WHERE post_id = $1 
+       GROUP BY emoji`,
+        [parseInt(id)]
+      );
+
+      // Convert to object format
+      const reactions: { [key: string]: number } = {};
+      reactionCounts.rows.forEach((row: any) => {
+        reactions[row.emoji] = parseInt(row.count);
+      });
+
+      // Check if user has any reaction to this post
+      const userReactionResult = await client.query(
+        "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
+        [parseInt(id), clerkUserId]
+      );
+
+      const userReaction =
+        userReactionResult.rows.length > 0
+          ? userReactionResult.rows[0].emoji
+          : null;
+
+      await client.query("COMMIT");
+
+      res.json({
+        success: true,
+        message: reactionChange > 0 ? "Reaction added" : "Reaction removed",
+        reactions,
+        userReaction,
+        reactionChange,
+      });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("Error reacting to post:", error.message);
+      res.status(500).json({
+        error: "Failed to react to post",
+        details: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  }
+);
+
+// Get user reaction for a post
+app.get(
+  "/api/community/posts/:id/user-reaction/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { id, clerkUserId } = req.params;
+
+      const result = await pool.query(
+        "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
+        [parseInt(id), clerkUserId]
+      );
+
+      res.json({
+        userReaction: result.rows.length > 0 ? result.rows[0].emoji : null,
+      });
+    } catch (error: any) {
+      console.error("Error fetching user reaction:", error.message);
+      res.status(500).json({
+        error: "Failed to fetch user reaction",
+        details: error.message,
+      });
+    }
+  }
+)
+
 // Start server
 app.listen(PORT, "0.0.0.0", () => {
   console.log("\nSafeSpace Backend Server Started!");
@@ -389,6 +754,235 @@ interface MoodFilterParams {
   limit?: string;
   offset?: string;
 }
+
+// Update post
+app.put("/api/community/posts/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { title, content, isDraft, category } = req.body;
+
+    const result = await pool.query(
+      `UPDATE community_posts 
+       SET title = COALESCE($1, title),
+           content = COALESCE($2, content),
+           is_draft = COALESCE($3, is_draft),
+           category_id = COALESCE((SELECT id FROM community_categories WHERE name = $4), category_id),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5
+       RETURNING *`,
+      [title, content, isDraft, category, parseInt(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "Post updated successfully",
+      post: result.rows[0],
+    });
+  } catch (error: any) {
+    console.error("Error updating post:", error.message);
+    res.status(500).json({
+      error: "Failed to update post",
+      details: error.message,
+    });
+  }
+});
+
+// Delete post
+app.delete("/api/community/posts/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM community_posts WHERE id = $1 RETURNING id",
+      [parseInt(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "Post deleted successfully",
+    });
+  } catch (error: any) {
+    console.error("Error deleting post:", error.message);
+    res.status(500).json({
+      error: "Failed to delete post",
+      details: error.message,
+    });
+  }
+});
+
+// Remove reaction
+app.delete(
+  "/api/community/posts/:id/reactions/:emoji",
+  async (req: Request, res: Response) => {
+    try {
+      const { id, emoji } = req.params;
+      const { clerkUserId } = req.body;
+
+      if (!clerkUserId) {
+        return res.status(400).json({ error: "clerkUserId is required" });
+      }
+
+      const result = await pool.query(
+        "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
+        [parseInt(id), clerkUserId, emoji]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Reaction not found" });
+      }
+
+      // Update reaction count
+      await pool.query(
+        "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count - 1) WHERE id = $1",
+        [parseInt(id)]
+      );
+
+      res.json({ success: true, message: "Reaction removed successfully" });
+    } catch (error: any) {
+      console.error("Error removing reaction:", error.message);
+      res.status(500).json({
+        error: "Failed to remove reaction",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// Toggle bookmark
+app.post(
+  "/api/community/posts/:id/bookmark",
+  async (
+    req: Request<{ id: string }, {}, { clerkUserId: string }>,
+    res: Response
+  ) => {
+    try {
+      const { id } = req.params;
+      const { clerkUserId } = req.body;
+
+      if (!clerkUserId) {
+        return res.status(400).json({ error: "clerkUserId is required" });
+      }
+
+      // Check if already bookmarked
+      const existingBookmark = await pool.query(
+        "SELECT id FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
+        [parseInt(id), clerkUserId]
+      );
+
+      if (existingBookmark.rows.length > 0) {
+        // Remove bookmark
+        await pool.query(
+          "DELETE FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
+          [parseInt(id), clerkUserId]
+        );
+        res.json({ bookmarked: false, message: "Bookmark removed" });
+      } else {
+        // Add bookmark
+        await pool.query(
+          "INSERT INTO post_bookmarks (post_id, user_id) VALUES ($1, $2)",
+          [parseInt(id), clerkUserId]
+        );
+        res.json({ bookmarked: true, message: "Post bookmarked" });
+      }
+    } catch (error: any) {
+      console.error("Error toggling bookmark:", error.message);
+      res.status(500).json({
+        error: "Failed to toggle bookmark",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// Get user's bookmarked posts
+app.get(
+  "/api/community/bookmarks/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+      const { page = "1", limit = "20" } = req.query;
+
+      const result = await pool.query(
+        `SELECT 
+        cp.*,
+        cc.name as category_name,
+        cp.author_name,
+        pb.created_at as bookmarked_at
+      FROM community_posts cp
+      INNER JOIN post_bookmarks pb ON cp.id = pb.post_id
+      LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      WHERE pb.user_id = $1 AND cp.is_draft = false
+      ORDER BY pb.created_at DESC
+      LIMIT $2 OFFSET $3`,
+        [
+          clerkUserId,
+          parseInt(limit as string),
+          (parseInt(page as string) - 1) * parseInt(limit as string),
+        ]
+      );
+
+      res.json({
+        bookmarks: result.rows,
+        count: result.rows.length,
+      });
+    } catch (error: any) {
+      console.error("Error fetching bookmarks:", error.message);
+      res.status(500).json({
+        error: "Failed to fetch bookmarks",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// Get user's posts
+app.get(
+  "/api/community/my-posts/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+      const { includeDrafts = "false" } = req.query;
+
+      let query = `
+      SELECT 
+        cp.*,
+        cc.name as category_name
+      FROM community_posts cp
+      LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      WHERE cp.author_id = $1
+    `;
+
+      const params = [clerkUserId];
+
+      if (includeDrafts === "false") {
+        query += " AND cp.is_draft = false";
+      }
+
+      query += " ORDER BY cp.created_at DESC";
+
+      const result = await pool.query(query, params);
+
+      res.json({
+        posts: result.rows,
+        count: result.rows.length,
+      });
+    } catch (error: any) {
+      console.error("Error fetching user posts:", error.message);
+      res.status(500).json({
+        error: "Failed to fetch user posts",
+        details: error.message,
+      });
+    }
+  }
+);
 
 // =============================================
 // MOOD TRACKING ENDPOINTS
@@ -1554,690 +2148,3 @@ app.get("/api/external/affirmation", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch affirmation" });
   }
 });
-
-// =============================================
-// COMMUNITY FORUM ENDPOINTS
-// =============================================
-
-// Community Forum Interfaces
-interface CreatePostRequest {
-  clerkUserId: string;
-  title: string;
-  content: string;
-  category: string;
-  isPrivate?: boolean;
-  isDraft?: boolean;
-}
-
-interface PostReactionRequest {
-  clerkUserId: string;
-  emoji: string;
-}
-
-// Get all categories
-app.get("/api/community/categories", async (req: Request, res: Response) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM community_categories ORDER BY name"
-    );
-
-    res.json({
-      categories: result.rows,
-      count: result.rows.length,
-    });
-  } catch (error: any) {
-    console.error("Error fetching categories:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch categories",
-      details: error.message,
-    });
-  }
-});
-
-// Get all posts with filters
-app.get("/api/community/posts", async (req: Request, res: Response) => {
-  try {
-    const { category, page = "1", limit = "20", authorId } = req.query as any;
-
-    let query = `
-      SELECT 
-        cp.*,
-        cc.name as category_name,
-        cp.author_name,
-        COUNT(DISTINCT pr.id) as reaction_count,
-        COUNT(DISTINCT pb.id) as bookmark_count,
-        COALESCE(
-          json_object_agg(
-            pr.emoji, 
-            reaction_counts.count
-          ) FILTER (WHERE pr.emoji IS NOT NULL),
-          '{}'
-        ) as reactions
-      FROM community_posts cp
-      LEFT JOIN community_categories cc ON cp.category_id = cc.id
-      LEFT JOIN post_reactions pr ON cp.id = pr.post_id
-      LEFT JOIN post_bookmarks pb ON cp.id = pb.post_id
-      LEFT JOIN (
-        SELECT post_id, emoji, COUNT(*) as count
-        FROM post_reactions
-        GROUP BY post_id, emoji
-      ) reaction_counts ON cp.id = reaction_counts.post_id AND pr.emoji = reaction_counts.emoji
-      WHERE cp.is_draft = false
-    `;
-
-    const params: any[] = [];
-    let paramIndex = 1;
-
-    if (category && category !== "Trending") {
-      params.push(category);
-      query += ` AND cc.name = $${paramIndex}`;
-      paramIndex++;
-    }
-
-    if (authorId) {
-      params.push(authorId);
-      query += ` AND cp.author_id = $${paramIndex}`;
-      paramIndex++;
-    }
-
-    query += ` GROUP BY cp.id, cc.name
-               ORDER BY cp.reaction_count DESC, cp.created_at DESC 
-               LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-
-    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
-
-    const result = await pool.query(query, params);
-
-    res.json({
-      posts: result.rows,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: result.rows.length,
-      },
-    });
-  } catch (error: any) {
-    console.error("Error fetching community posts:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch community posts",
-      details: error.message,
-    });
-  }
-});
-
-// Update post
-app.put("/api/community/posts/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { isDraft, title, content } = req.body;
-
-    const result = await pool.query(
-      `UPDATE community_posts 
-       SET is_draft = COALESCE($1, is_draft),
-           title = COALESCE($2, title),
-           content = COALESCE($3, content),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
-       RETURNING *`,
-      [isDraft, title, content, parseInt(id)]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    res.json({
-      success: true,
-      message: "Post updated successfully",
-      post: result.rows[0],
-    });
-  } catch (error: any) {
-    console.error("Error updating post:", error.message);
-    res.status(500).json({
-      error: "Failed to update post",
-      details: error.message,
-    });
-  }
-});
-
-// Get single post by ID
-app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const result = await pool.query(
-      `SELECT 
-        cp.*,
-        cc.name as category_name,
-        cp.author_name,
-        COALESCE(
-          json_object_agg(
-            pr.emoji, 
-            reaction_counts.count
-          ) FILTER (WHERE pr.emoji IS NOT NULL),
-          '{}'
-        ) as reactions
-      FROM community_posts cp
-      LEFT JOIN community_categories cc ON cp.category_id = cc.id
-      LEFT JOIN post_reactions pr ON cp.id = pr.post_id
-      LEFT JOIN (
-        SELECT post_id, emoji, COUNT(*) as count
-        FROM post_reactions
-        GROUP BY post_id, emoji
-      ) reaction_counts ON cp.id = reaction_counts.post_id AND pr.emoji = reaction_counts.emoji
-      WHERE cp.id = $1
-      GROUP BY cp.id, cc.name`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    res.json({ post: result.rows[0] });
-  } catch (error: any) {
-    console.error("Error fetching post:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch post",
-      details: error.message,
-    });
-  }
-});
-
-// Create new post
-app.post(
-  "/api/community/posts",
-  async (req: Request<{}, {}, CreatePostRequest>, res: Response) => {
-    try {
-      const {
-        clerkUserId,
-        title,
-        content,
-        category,
-        isPrivate = false,
-        isDraft = false,
-      } = req.body;
-
-      if (!clerkUserId || !title || !content || !category) {
-        return res.status(400).json({
-          error: "clerkUserId, title, content, and category are required",
-        });
-      }
-
-      // Get user info if available, otherwise use default
-      let authorName = "Anonymous User";
-      try {
-        const userResult = await pool.query(
-          "SELECT first_name, last_name FROM users WHERE clerk_user_id = $1",
-          [clerkUserId]
-        );
-
-        if (userResult.rows.length > 0) {
-          const user = userResult.rows[0];
-          authorName =
-            `${user.first_name} ${user.last_name}`.trim() || "Community Member";
-        }
-      } catch (userError) {
-        console.log("User not found in database, using default author name");
-      }
-
-      // Get category ID
-      const categoryResult = await pool.query(
-        "SELECT id FROM community_categories WHERE name = $1",
-        [category]
-      );
-
-      if (categoryResult.rows.length === 0) {
-        return res.status(400).json({ error: "Invalid category" });
-      }
-
-      const categoryId = categoryResult.rows[0].id;
-
-      // Create post
-      const result = await pool.query(
-        `INSERT INTO community_posts (title, content, category_id, author_id, author_name, is_private, is_draft) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
-       RETURNING *`,
-        [
-          title,
-          content,
-          categoryId,
-          clerkUserId,
-          authorName,
-          isPrivate,
-          isDraft,
-        ]
-      );
-
-      res.status(201).json({
-        success: true,
-        message: isDraft ? "Post saved as draft" : "Post created successfully",
-        post: result.rows[0],
-      });
-    } catch (error: any) {
-      console.error("Error creating post:", error.message);
-      res.status(500).json({
-        error: "Failed to create post",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// React to post
-app.post(
-  "/api/community/posts/:id/reactions",
-  async (
-    req: Request<{ id: string }, {}, PostReactionRequest>,
-    res: Response
-  ) => {
-    const client = await pool.connect();
-
-    try {
-      const { id } = req.params;
-      const { clerkUserId, emoji } = req.body;
-
-      if (!clerkUserId || !emoji) {
-        return res.status(400).json({
-          error: "clerkUserId and emoji are required",
-        });
-      }
-
-      await client.query("BEGIN");
-
-      // Check if user already reacted with this emoji
-      const existingReaction = await client.query(
-        "SELECT id FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-        [parseInt(id), clerkUserId, emoji]
-      );
-
-      let reactionChange = 0;
-
-      if (existingReaction.rows.length > 0) {
-        // Remove existing reaction
-        await client.query(
-          "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-          [parseInt(id), clerkUserId, emoji]
-        );
-        reactionChange = -1;
-      } else {
-        // Remove any existing reaction from this user to this post
-        await client.query(
-          "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-          [parseInt(id), clerkUserId]
-        );
-
-        // Add new reaction
-        await client.query(
-          "INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3)",
-          [parseInt(id), clerkUserId, emoji]
-        );
-        reactionChange = 1;
-      }
-
-      // Update reaction count
-      await client.query(
-        "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count + $1) WHERE id = $2",
-        [reactionChange, parseInt(id)]
-      );
-
-      // Get updated reaction counts by emoji
-      const reactionCounts = await client.query(
-        `SELECT emoji, COUNT(*) as count 
-       FROM post_reactions 
-       WHERE post_id = $1 
-       GROUP BY emoji`,
-        [parseInt(id)]
-      );
-
-      // Convert to object format
-      const reactions: { [key: string]: number } = {};
-      reactionCounts.rows.forEach((row: any) => {
-        reactions[row.emoji] = parseInt(row.count);
-      });
-
-      // Check if user has any reaction to this post
-      const userReactionResult = await client.query(
-        "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
-      );
-
-      const userReaction =
-        userReactionResult.rows.length > 0
-          ? userReactionResult.rows[0].emoji
-          : null;
-
-      await client.query("COMMIT");
-
-      res.json({
-        success: true,
-        message: reactionChange > 0 ? "Reaction added" : "Reaction removed",
-        reactions,
-        userReaction,
-        reactionChange,
-      });
-    } catch (error: any) {
-      await client.query("ROLLBACK");
-      console.error("Error reacting to post:", error.message);
-      res.status(500).json({
-        error: "Failed to react to post",
-        details: error.message,
-      });
-    } finally {
-      client.release();
-    }
-  }
-);
-
-// Get user reaction for a post
-app.get(
-  "/api/community/posts/:id/user-reaction/:clerkUserId",
-  async (req: Request, res: Response) => {
-    try {
-      const { id, clerkUserId } = req.params;
-
-      const result = await pool.query(
-        "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
-      );
-
-      res.json({
-        userReaction: result.rows.length > 0 ? result.rows[0].emoji : null,
-      });
-    } catch (error: any) {
-      console.error("Error fetching user reaction:", error.message);
-      res.status(500).json({
-        error: "Failed to fetch user reaction",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Delete post
-app.delete("/api/community/posts/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const result = await pool.query(
-      "DELETE FROM community_posts WHERE id = $1 RETURNING id",
-      [parseInt(id)]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    res.json({
-      success: true,
-      message: "Post deleted successfully",
-    });
-  } catch (error: any) {
-    console.error("Error deleting post:", error.message);
-    res.status(500).json({
-      error: "Failed to delete post",
-      details: error.message,
-    });
-  }
-});
-
-// Remove reaction
-app.delete(
-  "/api/community/posts/:id/reactions/:emoji",
-  async (req: Request, res: Response) => {
-    try {
-      const { id, emoji } = req.params;
-      const { clerkUserId } = req.body;
-
-      if (!clerkUserId) {
-        return res.status(400).json({ error: "clerkUserId is required" });
-      }
-
-      const result = await pool.query(
-        "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-        [parseInt(id), clerkUserId, emoji]
-      );
-
-      if (result.rowCount === 0) {
-        return res.status(404).json({ error: "Reaction not found" });
-      }
-
-      // Update reaction count
-      await pool.query(
-        "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count - 1) WHERE id = $1",
-        [parseInt(id)]
-      );
-
-      res.json({ success: true, message: "Reaction removed successfully" });
-    } catch (error: any) {
-      console.error("Error removing reaction:", error.message);
-      res.status(500).json({
-        error: "Failed to remove reaction",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Toggle bookmark
-app.post(
-  "/api/community/posts/:id/bookmark",
-  async (
-    req: Request<{ id: string }, {}, { clerkUserId: string }>,
-    res: Response
-  ) => {
-    try {
-      const { id } = req.params;
-      const { clerkUserId } = req.body;
-
-      if (!clerkUserId) {
-        return res.status(400).json({ error: "clerkUserId is required" });
-      }
-
-      // Check if already bookmarked
-      const existingBookmark = await pool.query(
-        "SELECT id FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
-      );
-
-      if (existingBookmark.rows.length > 0) {
-        // Remove bookmark
-        await pool.query(
-          "DELETE FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
-          [parseInt(id), clerkUserId]
-        );
-        res.json({ bookmarked: false, message: "Bookmark removed" });
-      } else {
-        // Add bookmark
-        await pool.query(
-          "INSERT INTO post_bookmarks (post_id, user_id) VALUES ($1, $2)",
-          [parseInt(id), clerkUserId]
-        );
-        res.json({ bookmarked: true, message: "Post bookmarked" });
-      }
-    } catch (error: any) {
-      console.error("Error toggling bookmark:", error.message);
-      res.status(500).json({
-        error: "Failed to toggle bookmark",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Get user's bookmarked posts
-app.get(
-  "/api/community/bookmarks/:clerkUserId",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId } = req.params;
-      const { page = "1", limit = "20" } = req.query;
-
-      const result = await pool.query(
-        `SELECT 
-        cp.*,
-        cc.name as category_name,
-        cp.author_name,
-        pb.created_at as bookmarked_at
-      FROM community_posts cp
-      INNER JOIN post_bookmarks pb ON cp.id = pb.post_id
-      LEFT JOIN community_categories cc ON cp.category_id = cc.id
-      WHERE pb.user_id = $1 AND cp.is_draft = false
-      ORDER BY pb.created_at DESC
-      LIMIT $2 OFFSET $3`,
-        [
-          clerkUserId,
-          parseInt(limit as string),
-          (parseInt(page as string) - 1) * parseInt(limit as string),
-        ]
-      );
-
-      res.json({
-        bookmarks: result.rows,
-        count: result.rows.length,
-      });
-    } catch (error: any) {
-      console.error("Error fetching bookmarks:", error.message);
-      res.status(500).json({
-        error: "Failed to fetch bookmarks",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Get user's posts
-app.get(
-  "/api/community/my-posts/:clerkUserId",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId } = req.params;
-      const { includeDrafts = "false" } = req.query;
-
-      let query = `
-      SELECT 
-        cp.*,
-        cc.name as category_name
-      FROM community_posts cp
-      LEFT JOIN community_categories cc ON cp.category_id = cc.id
-      WHERE cp.author_id = $1
-    `;
-
-      const params = [clerkUserId];
-
-      if (includeDrafts === "false") {
-        query += " AND cp.is_draft = false";
-      }
-
-      query += " ORDER BY cp.created_at DESC";
-
-      const result = await pool.query(query, params);
-
-      res.json({
-        posts: result.rows,
-        count: result.rows.length,
-      });
-    } catch (error: any) {
-      console.error("Error fetching user posts:", error.message);
-      res.status(500).json({
-        error: "Failed to fetch user posts",
-        details: error.message,
-      });
-    }
-  }
-);
-
-class CommunityForumApi {
-  private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-    try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          "Content-Type": "application/json",
-          ...options.headers,
-        },
-        ...options,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("API request failed:", error);
-      throw error;
-    }
-  }
-
-  // Posts
-  async getPosts(filters?: {
-    category?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const params = new URLSearchParams();
-    if (filters?.category) params.append("category", filters.category);
-    if (filters?.page) params.append("page", filters.page.toString());
-    if (filters?.limit) params.append("limit", filters.limit.toString());
-
-    return this.fetchWithAuth(`/community/posts?${params.toString()}`);
-  }
-
-  async getPostById(id: number) {
-    return this.fetchWithAuth(`/community/posts/${id}`);
-  }
-
-  async createPost(postData: {
-    title: string;
-    content: string;
-    category: string;
-    isPrivate?: boolean;
-    isDraft?: boolean;
-  }) {
-    return this.fetchWithAuth("/community/posts", {
-      method: "POST",
-      body: JSON.stringify(postData),
-    });
-  }
-
-  // Reactions
-  async reactToPost(postId: number, emoji: string) {
-    return this.fetchWithAuth(`/community/posts/${postId}/reactions`, {
-      method: "POST",
-      body: JSON.stringify({ emoji }),
-    });
-  }
-
-  async removeReaction(postId: number, emoji: string) {
-    return this.fetchWithAuth(`/community/posts/${postId}/reactions/${emoji}`, {
-      method: "DELETE",
-      body: JSON.stringify({}),
-    });
-  }
-
-  // Bookmarks
-  async toggleBookmark(postId: number) {
-    return this.fetchWithAuth(`/community/posts/${postId}/bookmark`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-  }
-
-  async getBookmarkedPosts(clerkUserId: string) {
-    return this.fetchWithAuth(`/community/bookmarks/${clerkUserId}`);
-  }
-
-  // User posts
-  async getUserPosts(clerkUserId: string, includeDrafts = false) {
-    return this.fetchWithAuth(
-      `/community/my-posts/${clerkUserId}?includeDrafts=${includeDrafts}`
-    );
-  }
-
-  // Categories
-  async getCategories() {
-    return this.fetchWithAuth("/community/categories");
-  }
-}
-
-export const communityApi = new CommunityForumApi();

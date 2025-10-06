@@ -1,3 +1,42 @@
+/**
+ * EditPostScreen - React Native Component
+ * 
+ * Screen for editing existing community forum posts with support for:
+ * - Updating post title, content, and category
+ * - Saving as draft or publishing immediately
+ * - Post deletion with confirmation
+ * - Real-time character counting
+ * - Category selection with horizontal scrolling
+ * 
+ * Features:
+ * - Pre-populates form with existing post data
+ * - Dual action buttons: Save Draft and Publish
+ * - Input validation for required fields
+ * - Loading states during API operations
+ * - Destructive delete action with warning
+ * - Responsive design with curved background
+ * 
+ * State Management:
+ * - Tracks form field changes locally
+ * - Manages loading states for save/publish operations
+ * - Handles category selection state
+ * 
+ * User Flow:
+ * 1. Load existing post data into form fields
+ * 2. Make edits to title, content, or category
+ * 3. Choose to save as draft or publish immediately
+ * 4. Optionally delete the post with confirmation
+ * 5. Navigate back to community forum on success
+ * 
+ * Error Handling:
+ * - Validates required fields before submission
+ * - Handles API errors with user-friendly alerts
+ * - Manages authentication requirements
+ * 
+ * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
+ */
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -18,6 +57,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 
+// Available categories for post organization and filtering
 const CATEGORIES = [
   "Stress",
   "Support",
@@ -30,7 +70,14 @@ const CATEGORIES = [
   "Awareness",
 ];
 
+/**
+ * EditPostScreen Component
+ * 
+ * Provides a comprehensive interface for editing existing community posts
+ * with support for draft management and publishing workflows
+ */
 export default function EditPostScreen() {
+  // Extract post data from navigation parameters
   const {
     id,
     title: initialTitle,
@@ -38,59 +85,76 @@ export default function EditPostScreen() {
     category: initialCategory,
     isDraft,
   } = useLocalSearchParams();
+  
   const { user } = useUser();
 
-  const [title, setTitle] = useState((initialTitle as string) || "");
-  const [content, setContent] = useState((initialContent as string) || "");
-  const [category, setCategory] = useState(
-    (initialCategory as string) || "Support"
-  );
-  const [isSaving, setIsSaving] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [activeTab, setActiveTab] = useState("community-forum");
+  // Form state management
+  const [title, setTitle] = useState((initialTitle as string) || ""); // Post title
+  const [content, setContent] = useState((initialContent as string) || ""); // Post content
+  const [category, setCategory] = useState((initialCategory as string) || "Support"); // Selected category
+  const [isSaving, setIsSaving] = useState(false); // Save as draft loading state
+  const [isPublishing, setIsPublishing] = useState(false); // Publish loading state
+  const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
 
-  const postId = parseInt(id as string);
+  const postId = parseInt(id as string); // Convert post ID to number
 
+  /**
+   * Handle post save operation
+   * Supports both draft saving and publishing workflows
+   * 
+   * @param publish - Boolean indicating whether to publish the post
+   */
   const handleSave = async (publish: boolean = false) => {
+    // Validate required fields
     if (!title.trim() || !content.trim()) {
       Alert.alert("Error", "Please fill in both title and content");
       return;
     }
 
+    // Check user authentication
     if (!user?.id) {
       Alert.alert("Error", "Please sign in to edit posts");
       return;
     }
 
     try {
+      // Set appropriate loading state
       if (publish) {
         setIsPublishing(true);
       } else {
         setIsSaving(true);
       }
 
+      // Update post via API
       await communityApi.updatePost(postId, {
         title: title.trim(),
         content: content.trim(),
-        isDraft: !publish,
+        isDraft: !publish, // Set draft status based on publish flag
       });
 
+      // Show success message based on action
       if (publish) {
         Alert.alert("Success", "Post published successfully!");
       } else {
         Alert.alert("Success", "Post updated successfully!");
       }
 
+      // Navigate back to previous screen
       router.back();
     } catch (error) {
       console.error("Error updating post:", error);
       Alert.alert("Error", "Failed to update post");
     } finally {
+      // Reset loading states
       setIsSaving(false);
       setIsPublishing(false);
     }
   };
 
+  /**
+   * Handle post deletion with confirmation dialog
+   * Provides safety mechanism to prevent accidental deletion
+   */
   const handleDelete = () => {
     Alert.alert(
       "Delete Post",
@@ -104,6 +168,7 @@ export default function EditPostScreen() {
             try {
               await communityApi.deletePost(postId);
               Alert.alert("Success", "Post deleted successfully!");
+              // Navigate to community forum after successful deletion
               router.replace("/community-forum");
             } catch (error) {
               console.error("Error deleting post:", error);
@@ -115,6 +180,10 @@ export default function EditPostScreen() {
     );
   };
 
+  /**
+   * Handle bottom navigation tab press
+   * Navigates to different app sections
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -124,6 +193,7 @@ export default function EditPostScreen() {
     }
   };
 
+  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -137,6 +207,7 @@ export default function EditPostScreen() {
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Edit Post" showBack={true} />
 
+      {/* Main Content Area */}
       <View style={styles.scrollContainer}>
         <ScrollView
           style={styles.scrollView}
@@ -144,6 +215,7 @@ export default function EditPostScreen() {
         >
           <View style={styles.content}>
             <View style={styles.form}>
+              {/* Title Input Section */}
               <Text style={styles.label}>Title</Text>
               <TextInput
                 style={styles.titleInput}
@@ -155,6 +227,7 @@ export default function EditPostScreen() {
                 multiline
               />
 
+              {/* Category Selection Section */}
               <Text style={styles.label}>Category</Text>
               <ScrollView
                 horizontal
@@ -184,6 +257,7 @@ export default function EditPostScreen() {
                 </View>
               </ScrollView>
 
+              {/* Content Input Section */}
               <Text style={styles.label}>Content</Text>
               <TextInput
                 style={styles.contentInput}
@@ -196,6 +270,7 @@ export default function EditPostScreen() {
                 numberOfLines={10}
               />
 
+              {/* Character Count Display */}
               <View style={styles.characterCount}>
                 <Text style={styles.characterCountText}>
                   {content.length} characters
@@ -204,7 +279,7 @@ export default function EditPostScreen() {
             </View>
           </View>
 
-          {/* Delete Button Section */}
+          {/* Delete Button Section - Destructive action with warning */}
           <View style={styles.deleteSection}>
             <TouchableOpacity
               style={styles.deleteButton}
@@ -220,8 +295,9 @@ export default function EditPostScreen() {
         </ScrollView>
       </View>
 
-      {/* Action Buttons */}
+      {/* Action Buttons Footer */}
       <View style={styles.footer}>
+        {/* Save as Draft Button */}
         <TouchableOpacity
           style={[styles.button, styles.saveButton]}
           onPress={() => handleSave(false)}
@@ -237,6 +313,7 @@ export default function EditPostScreen() {
           )}
         </TouchableOpacity>
 
+        {/* Publish Button */}
         <TouchableOpacity
           style={[styles.button, styles.publishButton]}
           onPress={() => handleSave(true)}
@@ -263,6 +340,11 @@ export default function EditPostScreen() {
   );
 }
 
+/**
+ * Stylesheet for EditPostScreen component
+ * Organized by component sections with consistent theming
+ * Uses responsive design patterns and accessibility considerations
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -289,7 +371,8 @@ const styles = StyleSheet.create({
   form: {
     paddingVertical: 20,
   },
-  // Delete Section
+  
+  // Delete Section - Destructive action area
   deleteSection: {
     marginBottom: 24,
     padding: 16,
@@ -320,6 +403,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+  
+  // Form Labels
   label: {
     fontSize: 16,
     fontWeight: "600",
@@ -327,6 +412,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 16,
   },
+  
+  // Title Input - Larger font for prominence
   titleInput: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
@@ -342,6 +429,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  
+  // Content Input - Larger area for post body
   contentInput: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
@@ -356,6 +445,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  
+  // Categories Section - Horizontal scrolling
   categoriesScroll: {
     marginHorizontal: -16,
   },
@@ -384,6 +475,8 @@ const styles = StyleSheet.create({
   categoryTextActive: {
     color: "#FFFFFF",
   },
+  
+  // Character Count - Content length indicator
   characterCount: {
     alignItems: "flex-end",
     marginTop: 8,
@@ -392,6 +485,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
   },
+  
+  // Footer - Fixed action buttons
   footer: {
     position: "absolute",
     bottom: 140, // Above the bottom navigation
@@ -414,10 +509,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   saveButton: {
-    backgroundColor: "#666",
+    backgroundColor: "#666", // Neutral color for draft action
   },
   publishButton: {
-    backgroundColor: "#7CB9A9",
+    backgroundColor: "#7CB9A9", // Brand color for primary action
   },
   buttonText: {
     color: "#FFFFFF",
