@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+<<<<<<< HEAD
 // Use your local network IP that's working for assessments
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+=======
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+>>>>>>> backend/profile-branch
 
 export interface MoodEntry {
   id: string;

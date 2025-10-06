@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,34 +8,38 @@ import {
   ScrollView,
   Alert,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from "@clerk/clerk-expo"; // Import Clerk auth hook
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+interface ProfileData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  location?: string;
+  profileImageUrl?: string;
+}
+
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState("profile");
-  const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [profileData, setProfileData] = useState<{
-    firstName: string;
-    lastName: string;
-    location: string;
-  }>({
-    firstName: "Demo",
-    lastName: "User",
-    location: "Calgary, AB",
+  const [profileData, setProfileData] = useState<ProfileData>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    location: "",
   });
+  const [loading, setLoading] = useState(true);
 
-  // Use Clerk's useAuth hook to get signOut function
-  const { signOut, isSignedIn } = useAuth();
-
-  const MOCK_USER = {
-    email: "demo@gmail.com",
-    displayName: "Demo User"
-  };
+  const { signOut } = useAuth();
+  const { user } = useUser();
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -45,27 +49,145 @@ export default function ProfileScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  useEffect(() => {
-    loadProfileData();
-  }, []);
+  // Sync user data with backend
+  const syncUserWithBackend = async () => {
+    if (!user?.id) {
+      console.log('No user ID available');
+      return;
+    }
 
-  const loadProfileData = async () => {
     try {
-      const savedImage = await AsyncStorage.getItem('profileImage');
-      if (savedImage) {
-        setProfileImage(savedImage);
+      console.log('Attempting to sync user with backend...');
+      
+      const userData = {
+        clerkUserId: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumbers[0]?.phoneNumber,
+      };
+
+      console.log('Sending user data:', userData);
+
+      // Fixed URL - removed duplicate /api
+      const response = await fetch(`${API_URL}/sync-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response error:', errorText);
+        throw new Error(`Failed to sync user with backend: ${response.status} - ${errorText}`);
       }
 
-      const savedProfileData = await AsyncStorage.getItem('profileData');
-      if (savedProfileData) {
-        const parsedData = JSON.parse(savedProfileData);
-        setProfileData(parsedData);
-      }
+      const data = await response.json();
+      console.log('User synced successfully:', data);
+      return data;
     } catch (error) {
-      console.log('Error loading profile data:', error);
+      console.error('Error syncing user:', error);
+      // Don't throw the error here to prevent breaking the profile loading
     }
   };
 
+  // Fetch profile data from backend
+const fetchProfileData = useCallback(async () => {
+  if (!user?.id) return;
+
+  // Move syncUserWithBackend inside the callback
+  const syncUserWithBackend = async () => {
+    if (!user?.id) {
+      console.log('No user ID available');
+      return;
+    }
+
+    try {
+      console.log('Attempting to sync user with backend...');
+      
+      const userData = {
+        clerkUserId: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumbers[0]?.phoneNumber,
+      };
+
+      console.log('Sending user data:', userData);
+
+      const response = await fetch(`${API_URL}/sync-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response error:', errorText);
+        throw new Error(`Failed to sync user with backend: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('User synced successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error syncing user:', error);
+    }
+  };
+
+  try {
+    setLoading(true);
+    
+    // First sync user with backend (non-blocking)
+    try {
+      await syncUserWithBackend();
+    } catch (syncError) {
+      console.log('Sync failed, continuing with local data...');
+      // Continue loading profile even if sync fails
+    }
+    
+    // Load local storage for additional data
+    const savedProfileData = await AsyncStorage.getItem('profileData');
+    if (savedProfileData) {
+      const parsedData = JSON.parse(savedProfileData);
+      setProfileData(prev => ({
+        ...prev,
+        ...parsedData
+      }));
+    }
+
+    // Set data from Clerk user object
+    setProfileData(prev => ({
+      ...prev,
+      firstName: user.firstName || prev.firstName || "User",
+      lastName: user.lastName || prev.lastName || "",
+      email: user.emailAddresses[0]?.emailAddress || prev.email || "",
+      phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
+      profileImageUrl: user.imageUrl || prev.profileImageUrl,
+    }));
+
+  } catch (error) {
+    console.error('Error fetching profile data:', error);
+  } finally {
+    setLoading(false);
+  }
+}, [user]); // Only user is needed as dependency now
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
+
+  // ... rest of your component code remains the same
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -75,24 +197,18 @@ export default function ProfileScreen() {
     }
   };
 
-  /**
-   * Fixed signout function with Clerk integration
-   */
   const handleLogout = async () => {
     try {
       console.log('Signout initiated...');
       
-      // Sign out from Clerk
       if (signOut) {
         await signOut();
         console.log('Clerk signout successful');
       }
       
-      // Clear local storage
       await AsyncStorage.clear();
       console.log('AsyncStorage cleared');
       
-      // Navigate to auth screen - use absolute path
       router.replace("/(auth)/login");
       console.log('Navigation to login completed');
       
@@ -102,19 +218,11 @@ export default function ProfileScreen() {
     }
   };
 
-  const getGreetingName = () => {
-    return profileData.firstName || "User";
-  };
-
   const getFullName = () => {
     if (profileData.firstName && profileData.lastName) {
       return `${profileData.firstName} ${profileData.lastName}`.trim();
     }
-    return getGreetingName();
-  };
-
-  const getLocation = () => {
-    return profileData.location || "";
+    return profileData.firstName || "User";
   };
 
   const getInitials = () => {
@@ -130,27 +238,41 @@ export default function ProfileScreen() {
     return "U";
   };
 
+  if (loading) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
-        >
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Profile Information Section */}
           <View style={styles.profileSection}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            {profileData.profileImageUrl ? (
+              <Image 
+                source={{ uri: profileData.profileImageUrl }} 
+                style={styles.profileImage} 
+              />
             ) : (
               <View style={styles.profileInitials}>
                 <Text style={styles.initialsText}>{getInitials()}</Text>
               </View>
             )}
             <Text style={styles.name}>{getFullName()}</Text>
-            <Text style={styles.email}>{MOCK_USER.email}</Text>
-            {getLocation() && (
+            <Text style={styles.email}>{profileData.email}</Text>
+            {profileData.location && (
               <View style={styles.locationContainer}>
                 <Ionicons name="location-outline" size={14} color="#666" />
-                <Text style={styles.location}>{getLocation()}</Text>
+                <Text style={styles.location}>{profileData.location}</Text>
               </View>
             )}
           </View>
@@ -204,14 +326,24 @@ export default function ProfileScreen() {
   );
 }
 
-
+// Your styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingBottom: 80, // Space for bottom navigation
+    paddingBottom: 80,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
   profileSection: {
     alignItems: "center",
@@ -295,37 +427,5 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: "#FF6B6B",
-  },
-});
-
-const bottomNavStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  tab: {
-    alignItems: "center",
-    padding: 8,
-  },
-  tabText: {
-    fontSize: 12,
-    marginTop: 4,
   },
 });
