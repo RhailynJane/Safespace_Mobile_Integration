@@ -1,11 +1,7 @@
 // journalApi.ts
 import axios from 'axios';
 
-<<<<<<< HEAD
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
-=======
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
->>>>>>> backend/profile-branch
 
 export interface JournalEntry {
   id: string;
