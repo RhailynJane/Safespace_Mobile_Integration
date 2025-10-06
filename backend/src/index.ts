@@ -759,17 +759,18 @@ interface MoodFilterParams {
 app.put("/api/community/posts/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { isDraft, title, content } = req.body;
+    const { title, content, isDraft, category } = req.body;
 
     const result = await pool.query(
       `UPDATE community_posts 
-       SET is_draft = COALESCE($1, is_draft),
-           title = COALESCE($2, title),
-           content = COALESCE($3, content),
+       SET title = COALESCE($1, title),
+           content = COALESCE($2, content),
+           is_draft = COALESCE($3, is_draft),
+           category_id = COALESCE((SELECT id FROM community_categories WHERE name = $4), category_id),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $4
+       WHERE id = $5
        RETURNING *`,
-      [isDraft, title, content, parseInt(id)]
+      [title, content, isDraft, category, parseInt(id)]
     );
 
     if (result.rows.length === 0) {

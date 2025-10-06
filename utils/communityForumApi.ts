@@ -59,6 +59,27 @@ class CommunityForumApi {
     });
   }
 
+  async updatePost(
+    postId: number,
+    updates: {
+      title?: string;
+      content?: string;
+      category?: string;
+      isDraft?: boolean;
+    }
+  ) {
+    return this.fetchWithAuth(`/api/community/posts/${postId}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deletePost(postId: number) {
+    return this.fetchWithAuth(`/api/community/posts/${postId}`, {
+      method: "DELETE",
+    });
+  }
+
   // Reactions
   async reactToPost(postId: number, clerkUserId: string, emoji: string) {
     return this.fetchWithAuth(`/api/community/posts/${postId}/reactions`, {

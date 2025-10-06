@@ -1,3 +1,37 @@
+/**
+ * CommunityMainScreen - React Native Component
+ * 
+ * Main community forum screen that provides:
+ * - Newsfeed view with categorized posts
+ * - Personal posts management with draft support
+ * - Interactive reactions and bookmarking system
+ * - Category-based content filtering
+ * - User authentication and session management
+ * 
+ * Features:
+ * - Dual view mode: Newsfeed (community posts) and My Posts (personal content)
+ * - Real-time reactions and bookmark updates
+ * - Draft post management with publish functionality
+ * - Horizontal category scrolling with active state tracking
+ * - Pull-to-refresh for content updates
+ * - Side navigation menu with app-wide navigation
+ * - Responsive design with curved background
+ * 
+ * Authentication:
+ * - Requires user sign-in for personal features
+ * - Handles bookmarking and reaction tracking per user
+ * - Manages user sessions and logout functionality
+ * 
+ * Data Flow:
+ * - Loads categories and posts on component mount
+ * - Filters posts by selected category in newsfeed view
+ * - Manages personal posts with draft/published states
+ * - Updates UI optimistically for better user experience
+ * 
+ * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
+ */
+
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useRef } from "react";
 import {
@@ -27,6 +61,7 @@ import { communityApi } from "../../../../utils/communityForumApi";
 
 const { width, height } = Dimensions.get("window");
 
+// Available categories for post filtering and organization
 const CATEGORIES = [
   "Trending",
   "Stress",
@@ -38,34 +73,48 @@ const CATEGORIES = [
   "Therapy",
   "Affirmation",
   "Awareness",
-  "Bookmark",
+  "Bookmark", // Special category for user's bookmarked posts
 ];
 
-// Define the tab types
+// Define the tab types for view switching
 type ViewType = "newsfeed" | "my-posts";
 
+/**
+ * Main community forum component with dual-view functionality
+ * Handles newsfeed browsing and personal post management
+ */
 export default function CommunityMainScreen() {
-  const [selectedCategory, setSelectedCategory] = useState("Trending");
-  const [activeView, setActiveView] = useState<ViewType>("newsfeed");
-  const [activeTab, setActiveTab] = useState("community-forum");
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(
-    new Set()
-  );
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [posts, setPosts] = useState<any[]>([]);
-  const [myPosts, setMyPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [isSigningOut, setIsSigningOut] = useState(false);
+  // State management for UI and data
+  const [selectedCategory, setSelectedCategory] = useState("Trending"); // Currently selected category filter
+  const [activeView, setActiveView] = useState<ViewType>("newsfeed"); // Active view mode
+  const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set()); // Track user's bookmarked posts
+  const [sideMenuVisible, setSideMenuVisible] = useState(false); // Side navigation menu visibility
+  const [posts, setPosts] = useState<any[]>([]); // Community posts data
+  const [myPosts, setMyPosts] = useState<any[]>([]); // User's personal posts including drafts
+  const [loading, setLoading] = useState(true); // Main loading state
+  const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh state
+  const [categories, setCategories] = useState<any[]>([]); // Available categories from API
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Animation for side menu
+  const [isSigningOut, setIsSigningOut] = useState(false); // Sign-out process state
+
+  // Authentication and user context
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
 
+  /**
+   * Load initial data when component mounts
+   * Fetches categories and initial posts
+   */
   useEffect(() => {
     loadInitialData();
   }, []);
 
+  /**
+   * Load appropriate data when view or category changes
+   * Newsfeed: Load posts based on selected category
+   * My Posts: Load user's personal posts
+   */
   useEffect(() => {
     if (selectedCategory && activeView === "newsfeed") {
       loadPosts();
@@ -74,6 +123,10 @@ export default function CommunityMainScreen() {
     }
   }, [selectedCategory, activeView]);
 
+  /**
+   * Initial data loading sequence
+   * Fetches categories and posts in parallel
+   */
   const loadInitialData = async () => {
     try {
       await Promise.all([loadCategories(), loadPosts()]);
@@ -83,6 +136,10 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Fetch available categories from API
+   * Used for post categorization and filtering
+   */
   const loadCategories = async () => {
     try {
       const response = await communityApi.getCategories();
@@ -92,25 +149,29 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Load posts based on current category selection
+   * Handles special case for bookmarked posts
+   * Manages user-specific data like reactions and bookmarks
+   */
   const loadPosts = async () => {
     try {
       setLoading(true);
       let response;
+      
+      // Special handling for bookmark category
       if (selectedCategory === "Bookmark") {
         if (!user?.id) {
-          Alert.alert(
-            "Sign In Required",
-            "Please sign in to view bookmarked posts"
-          );
+          Alert.alert("Sign In Required", "Please sign in to view bookmarked posts");
           setPosts([]);
           return;
         }
         response = await communityApi.getBookmarkedPosts(user.id);
         response = { posts: response.bookmarks || [] };
       } else {
+        // Regular category-based post loading
         response = await communityApi.getPosts({
-          category:
-            selectedCategory === "Trending" ? undefined : selectedCategory,
+          category: selectedCategory === "Trending" ? undefined : selectedCategory,
           limit: 20,
         });
       }
@@ -118,6 +179,7 @@ export default function CommunityMainScreen() {
       const postsWithReactions = response.posts;
       setPosts(postsWithReactions);
 
+      // Load user-specific data if authenticated and not in bookmark view
       if (user?.id && selectedCategory !== "Bookmark") {
         await Promise.all([
           loadUserBookmarks(user.id),
@@ -133,6 +195,10 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Load user's personal posts including drafts
+   * Requires authentication
+   */
   const loadMyPosts = async () => {
     if (!user?.id) {
       Alert.alert("Sign In Required", "Please sign in to view your posts");
@@ -154,14 +220,15 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Fetch user's reactions for multiple posts
+   * Used to display user's current reaction state
+   */
   const loadUserReactions = async (clerkUserId: string, posts: any[]) => {
     try {
       const userReactions: { [postId: number]: string } = {};
       for (const post of posts) {
-        const response = await communityApi.getUserReaction(
-          post.id,
-          clerkUserId
-        );
+        const response = await communityApi.getUserReaction(post.id, clerkUserId);
         if (response.userReaction) {
           userReactions[post.id] = response.userReaction;
         }
@@ -173,6 +240,9 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Load user's bookmarked posts for visual indication
+   */
   const loadUserBookmarks = async (clerkUserId: string) => {
     try {
       const response = await communityApi.getBookmarkedPosts(clerkUserId);
@@ -185,6 +255,10 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Pull-to-refresh handler
+   * Reloads data based on current view
+   */
   const onRefresh = () => {
     setRefreshing(true);
     if (activeView === "newsfeed") {
@@ -194,6 +268,10 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Handle emoji reaction to a post
+   * Updates local state optimistically for better UX
+   */
   const handleReactionPress = async (postId: number, emoji: string) => {
     if (!user?.id) {
       Alert.alert("Error", "Please sign in to react to posts");
@@ -203,7 +281,7 @@ export default function CommunityMainScreen() {
     try {
       const response = await communityApi.reactToPost(postId, user.id, emoji);
 
-      // Update posts based on current view
+      // Update posts based on current view for immediate UI feedback
       if (activeView === "newsfeed") {
         setPosts((prevPosts) =>
           prevPosts.map((post) =>
@@ -211,8 +289,7 @@ export default function CommunityMainScreen() {
               ? {
                   ...post,
                   reactions: response.reactions,
-                  reaction_count:
-                    (post.reaction_count || 0) + response.reactionChange,
+                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
                 }
               : post
           )
@@ -224,8 +301,7 @@ export default function CommunityMainScreen() {
               ? {
                   ...post,
                   reactions: response.reactions,
-                  reaction_count:
-                    (post.reaction_count || 0) + response.reactionChange,
+                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
                 }
               : post
           )
@@ -237,6 +313,10 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Toggle bookmark status for a post
+   * Updates local state and refreshes bookmark view if active
+   */
   const handleBookmarkPress = async (postId: number) => {
     if (!user?.id) {
       Alert.alert("Error", "Please sign in to bookmark posts");
@@ -253,6 +333,7 @@ export default function CommunityMainScreen() {
       }
       setBookmarkedPosts(newBookmarkedPosts);
 
+      // Refresh posts if currently in bookmark view
       if (selectedCategory === "Bookmark" && activeView === "newsfeed") {
         loadPosts();
       }
@@ -262,8 +343,10 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Navigate to post edit screen with current post data
+   */
   const handleEditPost = (postId: number) => {
-    // Navigate to edit screen with post data
     const postToEdit = myPosts.find((post) => post.id === postId);
     if (postToEdit) {
       router.push({
@@ -279,19 +362,26 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Publish a draft post by updating its draft status
+   */
   const handlePublishDraft = async (postId: number) => {
     if (!user?.id) return;
 
     try {
       await communityApi.updatePost(postId, { isDraft: false });
       Alert.alert("Success", "Post published successfully!");
-      loadMyPosts(); // Refresh the list
+      loadMyPosts(); // Refresh the list to show updated state
     } catch (error) {
       console.error("Error publishing draft:", error);
       Alert.alert("Error", "Failed to publish post");
     }
   };
 
+  /**
+   * Delete a post with confirmation dialog
+   * Updates UI immediately after successful deletion
+   */
   const handleDeletePost = async (postId: number) => {
     Alert.alert(
       "Delete Post",
@@ -306,15 +396,11 @@ export default function CommunityMainScreen() {
               await communityApi.deletePost(postId);
               Alert.alert("Success", "Post deleted successfully!");
 
-              // Update the UI immediately
+              // Update the UI immediately for better UX
               if (activeView === "my-posts") {
-                setMyPosts((prevPosts) =>
-                  prevPosts.filter((post) => post.id !== postId)
-                );
+                setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
               } else {
-                setPosts((prevPosts) =>
-                  prevPosts.filter((post) => post.id !== postId)
-                );
+                setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
               }
             } catch (error) {
               console.error("Error deleting post:", error);
@@ -326,6 +412,10 @@ export default function CommunityMainScreen() {
     );
   };
 
+  /**
+   * Extract user's display name from Clerk user object
+   * Falls back to email username if no name available
+   */
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
     if (user?.fullName) return user.fullName.split(" ")[0];
@@ -335,6 +425,9 @@ export default function CommunityMainScreen() {
     return "User";
   };
 
+  /**
+   * Get user's email address from Clerk user object
+   */
   const getUserEmail = () => {
     return (
       user?.primaryEmailAddress?.emailAddress ||
@@ -343,6 +436,10 @@ export default function CommunityMainScreen() {
     );
   };
 
+  /**
+   * Handle user logout process
+   * Clears local storage and redirects to login
+   */
   const handleLogout = async () => {
     if (isSigningOut) return;
 
@@ -361,6 +458,9 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Confirm sign-out with alert dialog
+   */
   const confirmSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -368,12 +468,18 @@ export default function CommunityMainScreen() {
     ]);
   };
 
+  /**
+   * Generate user initials for avatar display
+   */
   const getInitials = () => {
     const firstName = getDisplayName()?.split(" ")[0] || "";
     const lastName = user?.lastName || "";
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "U";
   };
 
+  /**
+   * Show side navigation menu with animation
+   */
   const showSideMenu = () => {
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
@@ -383,6 +489,9 @@ export default function CommunityMainScreen() {
     }).start();
   };
 
+  /**
+   * Hide side navigation menu with animation
+   */
   const hideSideMenu = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -393,6 +502,9 @@ export default function CommunityMainScreen() {
     });
   };
 
+  /**
+   * Navigate to post detail screen
+   */
   const handlePostPress = (postId: number) => {
     router.push({
       pathname: "/community-forum/post-detail",
@@ -400,6 +512,9 @@ export default function CommunityMainScreen() {
     });
   };
 
+  /**
+   * Bottom navigation tabs configuration
+   */
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -408,6 +523,9 @@ export default function CommunityMainScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  /**
+   * Handle bottom navigation tab press
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -417,11 +535,17 @@ export default function CommunityMainScreen() {
     }
   };
 
+  /**
+   * Calculate total reactions count from reactions object
+   */
   const getTotalReactions = (reactions: { [key: string]: number }) => {
     if (!reactions) return 0;
     return Object.values(reactions).reduce((sum, count) => sum + count, 0);
   };
 
+  /**
+   * Side menu navigation items configuration
+   */
   const sideMenuItems = [
     {
       icon: "home",
@@ -536,7 +660,7 @@ export default function CommunityMainScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {/* View Tabs */}
+          {/* View Tabs - Switch between Newsfeed and My Posts */}
           <View style={styles.viewTabsContainer}>
             <TouchableOpacity
               style={[
@@ -583,7 +707,7 @@ export default function CommunityMainScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Categories Section - Only show in Newsfeed */}
+          {/* Categories Section - Only show in Newsfeed view */}
           {activeView === "newsfeed" && (
             <View style={styles.categoriesSection}>
               <TouchableOpacity
@@ -607,16 +731,14 @@ export default function CommunityMainScreen() {
                       key={category}
                       style={[
                         styles.categoryButton,
-                        selectedCategory === category &&
-                          styles.categoryButtonActive,
+                        selectedCategory === category && styles.categoryButtonActive,
                       ]}
                       onPress={() => setSelectedCategory(category)}
                     >
                       <Text
                         style={[
                           styles.categoryText,
-                          selectedCategory === category &&
-                            styles.categoryTextActive,
+                          selectedCategory === category && styles.categoryTextActive,
                         ]}
                       >
                         {category}
@@ -628,7 +750,7 @@ export default function CommunityMainScreen() {
             </View>
           )}
 
-          {/* My Posts Header */}
+          {/* My Posts Header - Only show in My Posts view */}
           {activeView === "my-posts" && (
             <View style={styles.myPostsHeader}>
               <View style={styles.myPostsHeaderContent}>
@@ -648,7 +770,7 @@ export default function CommunityMainScreen() {
             </View>
           )}
 
-          {/* Posts Section */}
+          {/* Posts Section - Dynamic content based on current view */}
           <View style={styles.postsSection}>
             {loading ? (
               <View style={styles.loadingContainer}>
@@ -703,7 +825,7 @@ export default function CommunityMainScreen() {
                     ]}
                     onPress={() => !post.is_draft && handlePostPress(post.id)}
                   >
-                    {/* Draft Badge */}
+                    {/* Draft Badge - Only show for draft posts */}
                     {post.is_draft && (
                       <View style={styles.draftBadge}>
                         <Ionicons name="time" size={12} color="#666" />
@@ -730,7 +852,7 @@ export default function CommunityMainScreen() {
                         </View>
                       </View>
 
-                      {/* My Posts Actions */}
+                      {/* My Posts Actions - Only show in My Posts view */}
                       {activeView === "my-posts" && (
                         <View style={styles.postActions}>
                           {post.is_draft ? (
@@ -739,21 +861,13 @@ export default function CommunityMainScreen() {
                                 style={styles.postActionButton}
                                 onPress={() => handleEditPost(post.id)}
                               >
-                                <Ionicons
-                                  name="create"
-                                  size={18}
-                                  color="#666"
-                                />
+                                <Ionicons name="create" size={18} color="#666" />
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={styles.postActionButton}
                                 onPress={() => handlePublishDraft(post.id)}
                               >
-                                <Ionicons
-                                  name="send"
-                                  size={18}
-                                  color="#4CAF50"
-                                />
+                                <Ionicons name="send" size={18} color="#4CAF50" />
                               </TouchableOpacity>
                             </>
                           ) : (
@@ -778,7 +892,7 @@ export default function CommunityMainScreen() {
                       {post.content}
                     </Text>
 
-                    {/* Reactions and Interactions */}
+                    {/* Reactions and Interactions - Only show for published posts */}
                     {!post.is_draft && (
                       <View style={styles.reactionsRow}>
                         <View style={styles.reactionsContainer}>
@@ -789,13 +903,9 @@ export default function CommunityMainScreen() {
                                 <TouchableOpacity
                                   key={emoji}
                                   style={styles.reactionPill}
-                                  onPress={() =>
-                                    handleReactionPress(post.id, emoji)
-                                  }
+                                  onPress={() => handleReactionPress(post.id, emoji)}
                                 >
-                                  <Text style={styles.reactionEmoji}>
-                                    {emoji}
-                                  </Text>
+                                  <Text style={styles.reactionEmoji}>{emoji}</Text>
                                   <Text style={styles.reactionCount}>
                                     {count as number}
                                   </Text>
@@ -809,7 +919,7 @@ export default function CommunityMainScreen() {
                             )}
                         </View>
 
-                        {/* Bookmark Button - Only in Newsfeed */}
+                        {/* Bookmark Button - Only in Newsfeed view */}
                         {activeView === "newsfeed" && (
                           <TouchableOpacity
                             onPress={() => handleBookmarkPress(post.id)}
@@ -822,17 +932,14 @@ export default function CommunityMainScreen() {
                                   : "bookmark-outline"
                               }
                               size={24}
-                              color={
-                                bookmarkedPosts.has(post.id)
-                                  ? "#FFA000"
-                                  : "#666"
-                              }
+                              color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"}
                             />
                           </TouchableOpacity>
                         )}
                       </View>
                     )}
 
+                    {/* Category Badge - Show post category */}
                     {post.category_name && (
                       <View style={styles.categoryBadge}>
                         <Text style={styles.categoryBadgeText}>
@@ -850,20 +957,15 @@ export default function CommunityMainScreen() {
         </ScrollView>
       </View>
 
-      {/* Side Menu Modal */}
+      {/* Side Menu Modal - App navigation overlay */}
       <Modal
         animationType="none"
         transparent={true}
         visible={sideMenuVisible}
         onRequestClose={hideSideMenu}
       >
-        <Animated.View
-          style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
-        >
-          <Pressable
-            style={StyleSheet.absoluteFillObject}
-            onPress={hideSideMenu}
-          />
+        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={hideSideMenu} />
           <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
             <View style={styles.sideMenuHeader}>
               <View style={styles.profileAvatar}>
@@ -905,7 +1007,7 @@ export default function CommunityMainScreen() {
         </Animated.View>
       </Modal>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation - Main app navigation */}
       <BottomNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -915,6 +1017,10 @@ export default function CommunityMainScreen() {
   );
 }
 
+/**
+ * Stylesheet for CommunityMainScreen component
+ * Organized by component sections with consistent theming
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -939,7 +1045,7 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
 
-  // View Tabs
+  // View Tabs - Newsfeed vs My Posts toggle
   viewTabsContainer: {
     flexDirection: "row",
     marginHorizontal: 16,
@@ -975,7 +1081,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  // Categories Section
+  // Categories Section - Horizontal scrolling categories
   categoriesSection: {
     paddingHorizontal: 16,
     marginBottom: 16,
@@ -1044,7 +1150,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  // My Posts Header
+  // My Posts Header - Personal posts management section
   myPostsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1067,7 +1173,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Posts Section
+  // Posts Section - Main content area
   postsSection: {
     paddingHorizontal: 16,
     gap: 12,
@@ -1101,7 +1207,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Post Cards
+  // Post Cards - Individual post containers
   postCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
@@ -1139,7 +1245,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // Post Header
+  // Post Header - Author info and actions
   postHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1180,7 +1286,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // Post Actions (My Posts)
+  // Post Actions - Edit, publish, delete buttons for My Posts
   postActions: {
     flexDirection: "row",
     gap: 8,
@@ -1191,7 +1297,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F9FA",
   },
 
-  // Post Content
+  // Post Content - Main post text
   postContent: {
     fontSize: 14,
     color: "#666",
@@ -1199,7 +1305,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // Reactions Row
+  // Reactions Row - Emoji reactions and bookmark button
   reactionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1239,7 +1345,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  // Category Badge
+  // Category Badge - Post category indicator
   categoryBadge: {
     alignSelf: "flex-start",
     backgroundColor: "#E8F5E9",
@@ -1254,7 +1360,7 @@ const styles = StyleSheet.create({
     color: "#4CAF50",
   },
 
-  // Create First Post Button
+  // Create First Post Button - Empty state action
   createFirstPostButton: {
     backgroundColor: "#7CB9A9",
     paddingHorizontal: 24,
@@ -1268,12 +1374,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Bottom Spacing
+  // Bottom Spacing - Scroll view padding
   bottomSpacing: {
     height: 30,
   },
 
-  // Side Menu Styles
+  // Side Menu Styles - Navigation overlay
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
