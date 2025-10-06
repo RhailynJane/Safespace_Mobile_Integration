@@ -1,3 +1,37 @@
+/**
+ * ResourceDetailScreen - React Native Component
+ * 
+ * Detailed view screen for individual mental health resources featuring:
+ * - Full resource content display with rich formatting
+ * - Social sharing capabilities
+ * - Category-based visual theming
+ * - Reflection prompts and next steps
+ * - Related action suggestions
+ * 
+ * Features:
+ * - Dynamic color theming based on resource category
+ * - Share functionality for quotes and affirmations
+ * - Large emoji visual representation
+ * - Reflection section for user engagement
+ * - Navigation suggestions for continued journey
+ * - Responsive design with curved background
+ * 
+ * Content Types Supported:
+ * - Inspirational quotes with author attribution
+ * - Daily affirmations for positive reinforcement
+ * - Educational articles and mental health resources
+ * - Mindfulness exercises and techniques
+ * 
+ * Data Flow:
+ * - Receives resource data via navigation parameters
+ * - Dynamically applies category-based styling
+ * - Handles social sharing with formatted messages
+ * - Provides contextual navigation options
+ * 
+ * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
+ */
+
 // app/(app)/resources/resource-detail-screen.tsx
 import { useState, useEffect } from "react";
 import {
@@ -15,12 +49,21 @@ import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 
+/**
+ * ResourceDetailScreen Component
+ * 
+ * Provides an immersive reading experience for individual mental health resources
+ * with enhanced visual presentation and user engagement features
+ */
 export default function ResourceDetailScreen() {
   const params = useLocalSearchParams();
   
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Loading state for future enhancements
 
-  // Extract resource data from params
+  /**
+   * Extract and structure resource data from navigation parameters
+   * Provides type safety for resource properties
+   */
   const resource = {
     id: params.id as string,
     title: params.title as string,
@@ -32,7 +75,10 @@ export default function ResourceDetailScreen() {
     backgroundColor: params.backgroundColor as string,
   };
 
-  // Handle share functionality
+  /**
+   * Handle social sharing of resource content
+   * Formats message with proper attribution for quotes
+   */
   const handleShare = async () => {
     try {
       const message = resource.author
@@ -45,19 +91,23 @@ export default function ResourceDetailScreen() {
     }
   };
 
-  // Get category color
+  /**
+   * Get category-specific color for visual theming
+   * Maps category names to consistent brand colors
+   */
   const getCategoryColor = () => {
     const colors: Record<string, string> = {
-      stress: "#FF8A65",
-      anxiety: "#81C784",
-      depression: "#64B5F6",
-      sleep: "#4DD0E1",
-      motivation: "#FFB74D",
-      mindfulness: "#BA68C8",
+      stress: "#FF8A65",      // Calming orange
+      anxiety: "#81C784",     // Soothing green
+      depression: "#64B5F6",  // Comforting blue
+      sleep: "#4DD0E1",       // Tranquil teal
+      motivation: "#FFB74D",  // Energetic orange
+      mindfulness: "#BA68C8", // Spiritual purple
     };
-    return colors[resource.category] || "#4CAF50";
+    return colors[resource.category] || "#4CAF50"; // Default brand green
   };
 
+  // Loading state UI - Currently minimal as data comes from params
   if (loading) {
     return (
       <CurvedBackground>
@@ -76,13 +126,15 @@ export default function ResourceDetailScreen() {
       <SafeAreaView style={styles.container}>
         <AppHeader title="Resource" showBack={true} />
 
+        {/* Main Content Scroll Area */}
         <ScrollView
           style={styles.content}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Resource Header */}
+          {/* Resource Header Section - Visual identity and metadata */}
           <View style={styles.header}>
+            {/* Category Badge - Visual category indicator */}
             <View
               style={[
                 styles.categoryBadge,
@@ -94,6 +146,7 @@ export default function ResourceDetailScreen() {
               </Text>
             </View>
 
+            {/* Title Row - Large emoji and visual representation */}
             <View style={styles.titleRow}>
               <View style={[
                 styles.emojiContainer,
@@ -103,12 +156,15 @@ export default function ResourceDetailScreen() {
               </View>
             </View>
 
+            {/* Resource Title - Primary content identifier */}
             <Text style={styles.title}>{resource.title}</Text>
 
+            {/* Author Attribution - For quotes and authored content */}
             {resource.author && resource.author !== "Unknown" && (
               <Text style={styles.author}>By {resource.author}</Text>
             )}
 
+            {/* Metadata - Resource type and additional info */}
             <View style={styles.meta}>
               <View style={styles.metaItem}>
                 <Ionicons name="document-text" size={16} color="#666" />
@@ -117,7 +173,7 @@ export default function ResourceDetailScreen() {
             </View>
           </View>
 
-          {/* Action Buttons - ONLY SHARE NOW */}
+          {/* Action Bar - User interactions with the resource */}
           <View style={styles.actionBar}>
             <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
               <Ionicons name="share-outline" size={24} color="#666" />
@@ -125,7 +181,7 @@ export default function ResourceDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Resource Content */}
+          {/* Resource Content Section - Main reading area */}
           <View style={styles.contentContainer}>
             <Text style={styles.contentTitle}>Content</Text>
             <View style={styles.contentCard}>
@@ -133,7 +189,7 @@ export default function ResourceDetailScreen() {
             </View>
           </View>
 
-          {/* Reflection Section */}
+          {/* Reflection Section - Prompts for user engagement */}
           <View style={styles.reflectionSection}>
             <Text style={styles.reflectionTitle}>💭 Take a Moment</Text>
             <Text style={styles.reflectionText}>
@@ -142,10 +198,11 @@ export default function ResourceDetailScreen() {
             </Text>
           </View>
 
-          {/* Related Actions */}
+          {/* Related Actions Section - Navigation suggestions */}
           <View style={styles.relatedActions}>
             <Text style={styles.relatedTitle}>What&apos;s Next?</Text>
             
+            {/* Return to Home Action */}
             <TouchableOpacity
               style={styles.relatedCard}
               onPress={() => router.push("/(app)/(tabs)/home")}
@@ -162,6 +219,7 @@ export default function ResourceDetailScreen() {
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
 
+            {/* Explore More Resources Action */}
             <TouchableOpacity
               style={styles.relatedCard}
               onPress={() => router.back()}
@@ -184,6 +242,11 @@ export default function ResourceDetailScreen() {
   );
 }
 
+/**
+ * Stylesheet for ResourceDetailScreen component
+ * Organized by content sections with consistent visual hierarchy
+ * Uses category-based theming and accessible design patterns
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -193,13 +256,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 40, // Extra padding for comfortable scrolling
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+  
+  // Header Section - Resource identity and metadata
   header: {
     paddingHorizontal: 20,
     paddingTop: 10,
@@ -216,7 +281,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#FFF",
-    letterSpacing: 1,
+    letterSpacing: 1, // Enhanced readability for uppercase
   },
   titleRow: {
     marginBottom: 15,
@@ -230,14 +295,14 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   emojiLarge: {
-    fontSize: 40,
+    fontSize: 40, // Large emoji for visual impact
   },
   title: {
     fontSize: 26,
     fontWeight: "700",
     color: "#333",
     marginBottom: 10,
-    lineHeight: 34,
+    lineHeight: 34, // Improved readability for longer titles
   },
   author: {
     fontSize: 16,
@@ -259,6 +324,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
   },
+  
+  // Action Bar - User interaction controls
   actionBar: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -267,7 +334,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: "#F0F0F0",
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#FAFAFA", // Subtle background for action area
     justifyContent: "center", // Center the single button
   },
   actionButton: {
@@ -290,6 +357,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#666",
   },
+  
+  // Content Section - Main reading area
   contentContainer: {
     paddingHorizontal: 20,
     paddingTop: 25,
@@ -310,27 +379,29 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
+    borderLeftColor: "#4CAF50", // Accent border for visual emphasis
   },
   contentText: {
     fontSize: 16,
-    lineHeight: 26,
+    lineHeight: 26, // Enhanced readability for longer content
     color: "#333",
-    letterSpacing: 0.3,
+    letterSpacing: 0.3, // Improved text rendering
   },
+  
+  // Reflection Section - User engagement prompts
   reflectionSection: {
     marginHorizontal: 20,
     marginTop: 25,
     padding: 20,
-    backgroundColor: "#FFF9E6",
+    backgroundColor: "#FFF9E6", // Warm yellow background for reflection
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: "#FFE082",
+    borderColor: "#FFE082", // Subtle border for definition
   },
   reflectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#F57C00",
+    color: "#F57C00", // Warm orange for attention
     marginBottom: 10,
   },
   reflectionText: {
@@ -338,6 +409,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: "#666",
   },
+  
+  // Related Actions Section - Navigation suggestions
   relatedActions: {
     paddingHorizontal: 20,
     paddingTop: 30,
