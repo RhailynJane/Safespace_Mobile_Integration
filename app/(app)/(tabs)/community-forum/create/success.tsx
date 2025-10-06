@@ -1,6 +1,8 @@
 /**
  * Enhanced Post Success Screen with Modern UI Design
  * Features improved visuals, better animations, and additional navigation options
+ * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
  */
 import { useState, useEffect } from "react";
 import {

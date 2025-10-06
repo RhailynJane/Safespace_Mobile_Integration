@@ -1,6 +1,8 @@
 /**
  * Enhanced Create Post Screen with Modern UI Design
  * Features improved typography, better spacing, and visual enhancements
+ *  * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
  */
 import { useState, useEffect } from "react";
 import {
