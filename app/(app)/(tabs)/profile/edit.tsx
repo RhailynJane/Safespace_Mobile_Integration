@@ -20,9 +20,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import profileAPI from '../../../../utils/profileApi'; 
 
 /**
  * EditProfileScreen Component
@@ -30,8 +32,6 @@ import BottomNavigation from "../../../../components/BottomNavigation";
  * Screen for editing user profile information including photo, name, email,
  * location, and notification preferences. Features image upload functionality
  * and location autocomplete suggestions.
- * 
- * This is a frontend-only implementation with all data stored locally.
  */
 export default function EditProfileScreen() {
   const [activeTab, setActiveTab] = useState("profile");
@@ -41,18 +41,15 @@ export default function EditProfileScreen() {
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Mock user data for frontend-only implementation
-  const MOCK_USER = {
-    email: "user@example.com",
-    displayName: "Demo User"
-  };
-
+  // Get user data from Clerk
+  const { user } = useUser();
+  
   // Form state
   const [formData, setFormData] = useState({
-    firstName: "Demo",
-    lastName: "User",
-    email: MOCK_USER.email,
-    location: "New York, NY",
+    firstName: "",
+    lastName: "",
+    email: "",
+    location: "",
     notifications: true,
   });
   
@@ -79,30 +76,71 @@ export default function EditProfileScreen() {
   }, []);
 
   /**
-   * Loads profile data from local storage
+   * Loads profile data from local storage and Clerk
    */
   const loadProfileData = async () => {
     try {
-      // Load profile image
+      // First, load from Clerk user object (primary source of truth)
+      if (user) {
+        setFormData({
+          firstName: user.firstName || "",
+          lastName: user.lastName || "",
+          email: user.emailAddresses[0]?.emailAddress || "",
+          location: formData.location, // Keep existing location
+          notifications: formData.notifications, // Keep existing notification setting
+        });
+        
+        // Also set profile image from Clerk if available
+        if (user.imageUrl) {
+          setProfileImage(user.imageUrl);
+        }
+      }
+      
+      // Then load any additional data from local storage (like custom profile image)
       const savedImage = await AsyncStorage.getItem('profileImage');
       if (savedImage) {
         setProfileImage(savedImage);
       }
-
-      // Load profile data
+      
+      // Load saved profile data for location and other custom fields
       const savedProfileData = await AsyncStorage.getItem('profileData');
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
         setFormData(prev => ({
           ...prev,
-          ...parsedData
+          location: parsedData.location || prev.location,
+          notifications: parsedData.notifications !== undefined ? parsedData.notifications : prev.notifications,
         }));
+        
         if (parsedData.location) {
           setLocationQuery(parsedData.location);
         }
       }
+
+      // Finally, try to fetch from backend API if available
+      try {
+        const profileData = await profileAPI.getClientProfile();
+        
+        if (profileData) {
+          setFormData(prev => ({
+            firstName: user?.firstName || profileData.firstName || prev.firstName,
+            lastName: user?.lastName || profileData.lastName || prev.lastName,
+            email: user?.emailAddresses[0]?.emailAddress || profileData.email || prev.email,
+            location: profileData.location || prev.location,
+            notifications: profileData.notifications !== false,
+          }));
+          
+          if (profileData.location) {
+            setLocationQuery(profileData.location);
+          }
+        }
+      } catch (apiError) {
+        console.log('API fetch failed, using local/Clerk data:', apiError);
+      }
+      
     } catch (error) {
       console.log('Error loading profile data:', error);
+      Alert.alert("Error", "Failed to load profile data");
     }
   };
 
@@ -120,23 +158,65 @@ export default function EditProfileScreen() {
   };
 
   /**
-   * Saves profile data to local storage
+   * Saves profile data to local storage as backup
    */
   const saveProfileDataToStorage = async () => {
     try {
-      const profileData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        location: formData.location,
-        email: formData.email,
-        notifications: formData.notifications
-      };
-      await AsyncStorage.setItem('profileData', JSON.stringify(profileData));
-      console.log('Profile data saved successfully');
-      return true;
+      await AsyncStorage.setItem('profileData', JSON.stringify(formData));
+      console.log('Profile data saved to storage');
     } catch (error) {
-      console.log('Error saving profile data:', error);
-      return false;
+      console.log('Error saving profile data to storage:', error);
+    }
+  };
+
+  /**
+   * Saves profile changes to backend API and local storage
+   */
+  const handleSaveChanges = async () => {
+    try {
+      // Validate required fields
+      if (!formData.firstName || !formData.email) {
+        Alert.alert("Error", "Please fill in all required fields");
+        return;
+      }
+
+      // Note: We don't update firstName, lastName, or email in Clerk
+      // Those should be updated through Clerk's user management
+      // We only save additional profile data like location and notifications
+      
+      // Save to backend API if available
+      try {
+        const result = await profileAPI.updateClientProfile({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          location: formData.location,
+          notifications: formData.notifications,
+          profileImage: profileImage || undefined,
+        });
+
+        if (result.success) {
+          // Also save to local storage as backup
+          await saveProfileDataToStorage();
+          
+          Alert.alert("Success", "Profile updated successfully!");
+          router.back();
+        } else {
+          // If API fails, still save to local storage
+          await saveProfileDataToStorage();
+          Alert.alert("Success", "Profile updated locally!");
+          router.back();
+        }
+      } catch (apiError) {
+        // If API is not available, just save to local storage
+        console.log('API update failed, saving locally:', apiError);
+        await saveProfileDataToStorage();
+        Alert.alert("Success", "Profile updated locally!");
+        router.back();
+      }
+    } catch (error) {
+      console.error('Error in handleSaveChanges:', error);
+      Alert.alert("Error", "Failed to update profile. Please try again.");
     }
   };
 
@@ -155,24 +235,6 @@ export default function EditProfileScreen() {
       router.push("/(app)/(tabs)/appointments");
     } else {
       router.push(`/(app)/(tabs)/${tabId}`);
-    }
-  };
-
-  /**
-   * Saves profile changes to local storage
-   */
-  const handleSaveChanges = async () => {
-    try {
-      const success = await saveProfileDataToStorage();
-      
-      if (success) {
-        Alert.alert("Success", "Profile updated successfully!");
-        router.back();
-      } else {
-        Alert.alert("Error", "Failed to update profile. Please try again.");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Failed to update profile. Please try again.");
     }
   };
 
@@ -285,9 +347,9 @@ export default function EditProfileScreen() {
   };
 
   return (
-  <CurvedBackground>
+    <CurvedBackground>
       <SafeAreaView style={styles.container}>
-          <AppHeader title="Edit Profile" showBack={true} />
+        <AppHeader title="Edit Profile" showBack={true} />
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Profile Photo Section */}
