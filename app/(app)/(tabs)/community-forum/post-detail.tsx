@@ -1,4 +1,24 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+/**
+ * PostDetailScreen - React Native Component
+ * 
+ * This screen displays detailed view of a community forum post with:
+ * - Post content, author info, and metadata
+ * - Interactive emoji reactions system
+ * - Bookmark functionality
+ * - Related posts suggestions
+ * - Real-time reaction updates
+ * 
+ * Features:
+ * - Gesture support for reaction picker
+ * - Loading states and error handling
+ * - Responsive design with curved background
+ * - Integration with community API
+ * - User authentication checks
+ * 
+ * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
+ */
+
 import {
   View,
   Text,
@@ -19,38 +39,51 @@ import { useState, useEffect } from "react";
 import { communityApi } from "../../../../utils/communityForumApi";
 import { useUser } from "@clerk/clerk-expo";
 
-// Available emoji reactions
+// Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
 
+/**
+ * Main component for displaying post details with interactive features
+ */
 export default function PostDetailScreen() {
+  // Extract post ID from navigation parameters
   const params = useLocalSearchParams();
   const postId = parseInt(params.id as string, 10);
   const { user } = useUser();
   
-  const [post, setPost] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [relatedPosts, setRelatedPosts] = useState<any[]>([]);
-  const [userReaction, setUserReaction] = useState<string | null>(null);
-  const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
-  const [reacting, setReacting] = useState(false);
+  // State management for post data and UI interactions
+  const [post, setPost] = useState<any>(null); // Current post data
+  const [loading, setLoading] = useState(true); // Loading state
+  const [relatedPosts, setRelatedPosts] = useState<any[]>([]); // Related posts suggestions
+  const [userReaction, setUserReaction] = useState<string | null>(null); // Current user's reaction
+  const [reactionPickerVisible, setReactionPickerVisible] = useState(false); // Reaction picker visibility
+  const [bookmarked, setBookmarked] = useState(false); // Bookmark status
+  const [reacting, setReacting] = useState(false); // Reaction update in progress
 
+  /**
+   * Load post data when component mounts or postId changes
+   */
   useEffect(() => {
     loadPostData();
   }, [postId]);
 
+  /**
+   * Fetches post details, related posts, and user-specific data
+   */
   const loadPostData = async () => {
     try {
       setLoading(true);
+      // Parallel API calls for better performance
       const [postResponse, relatedResponse] = await Promise.all([
         communityApi.getPostById(postId),
         communityApi.getPosts({ limit: 3 })
       ]);
       
       setPost(postResponse.post);
+      // Filter out current post and limit to 2 related posts
       setRelatedPosts(relatedResponse.posts.filter((p: any) => p.id !== postId).slice(0, 2));
       
-      // Load user's reaction to this post
+      // Load user-specific data if authenticated
       if (user?.id) {
         await loadUserReaction();
         await checkIfBookmarked();
@@ -64,6 +97,9 @@ export default function PostDetailScreen() {
     }
   };
 
+  /**
+   * Fetches the current user's reaction to this post
+   */
   const loadUserReaction = async () => {
     if (!user?.id) return;
     
@@ -75,6 +111,9 @@ export default function PostDetailScreen() {
     }
   };
 
+  /**
+   * Checks if the current user has bookmarked this post
+   */
   const checkIfBookmarked = async () => {
     if (!user?.id) return;
     
@@ -87,21 +126,25 @@ export default function PostDetailScreen() {
     }
   };
 
+  /**
+   * Handles emoji reaction selection and updates post reaction data
+   * @param emoji - The selected emoji reaction
+   */
   const handleReactionPress = async (emoji: string) => {
     if (!user?.id) {
       Alert.alert("Error", "Please sign in to react to posts");
       return;
     }
 
-    if (reacting) return;
+    if (reacting) return; // Prevent multiple simultaneous reactions
 
     try {
       setReacting(true);
       
-      // Use the single endpoint that handles both add and remove
+      // Single API call handles both adding and removing reactions
       const response = await communityApi.reactToPost(postId, user.id, emoji);
       
-      // Update the post with new reaction data
+      // Update local state with new reaction data
       if (post) {
         setPost({
           ...post,
@@ -110,7 +153,7 @@ export default function PostDetailScreen() {
         });
       }
       
-      // Update user's current reaction
+      // Update user's current reaction state
       setUserReaction(response.userReaction);
       
       setReactionPickerVisible(false);
@@ -122,6 +165,9 @@ export default function PostDetailScreen() {
     }
   };
 
+  /**
+   * Toggles bookmark status for the current post
+   */
   const handleBookmarkPress = async () => {
     if (!user?.id) {
       Alert.alert("Error", "Please sign in to bookmark posts");
@@ -137,11 +183,21 @@ export default function PostDetailScreen() {
     }
   };
 
+  /**
+   * Calculates total number of reactions across all emojis
+   * @param reactions - Object containing emoji:count pairs
+   * @returns Total reaction count
+   */
   const getTotalReactions = (reactions: { [key: string]: number }) => {
     if (!reactions) return 0;
     return Object.values(reactions).reduce((sum, count) => sum + count, 0);
   };
 
+  /**
+   * Formats timestamp into relative time string
+   * @param timestamp - ISO timestamp string
+   * @returns Human-readable time difference
+   */
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -153,16 +209,19 @@ export default function PostDetailScreen() {
     return date.toLocaleDateString();
   };
 
-  // Function to get all available reactions including zeros for missing ones
+  /**
+   * Gets all possible reactions including zero-count ones for consistent UI
+   * @returns Object with all emoji reactions and their counts
+   */
   const getAllReactions = () => {
     const baseReactions: { [key: string]: number } = {};
     
-    // Initialize with all possible reactions at 0
+    // Initialize with all possible reactions at 0 count
     EMOJI_REACTIONS.forEach(emoji => {
       baseReactions[emoji] = 0;
     });
     
-    // Merge with actual reactions from post
+    // Merge with actual reactions from post data
     if (post?.reactions) {
       Object.entries(post.reactions).forEach(([emoji, count]) => {
         baseReactions[emoji] = count as number;
@@ -172,6 +231,7 @@ export default function PostDetailScreen() {
     return baseReactions;
   };
 
+  // Loading state UI
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -185,6 +245,7 @@ export default function PostDetailScreen() {
     );
   }
 
+  // Error state UI for missing post
   if (!post) {
     return (
       <SafeAreaView style={styles.container}>
@@ -217,9 +278,9 @@ export default function PostDetailScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Post Card */}
+          {/* Main Post Card Container */}
           <View style={styles.postCard}>
-            {/* Post Header */}
+            {/* Post Header with Author Info */}
             <View style={styles.postHeader}>
               <View style={styles.avatarContainer}>
                 <Text style={styles.avatarText}>
@@ -254,10 +315,10 @@ export default function PostDetailScreen() {
             {/* Post Title */}
             <Text style={styles.postTitle}>{post.title}</Text>
 
-            {/* Post Content */}
+            {/* Post Content Body */}
             <Text style={styles.postContent}>{post.content}</Text>
 
-            {/* Reaction Stats */}
+            {/* Reaction Statistics Bar */}
             <View style={styles.reactionStats}>
               {Object.entries(allReactions).map(([emoji, count]) => (
                 <TouchableOpacity
@@ -294,7 +355,7 @@ export default function PostDetailScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* User Reaction Indicator */}
+            {/* User Reaction Status Indicator */}
             {userReaction && (
               <View style={styles.userReactionIndicator}>
                 <Text style={styles.userReactionText}>
@@ -303,7 +364,7 @@ export default function PostDetailScreen() {
               </View>
             )}
 
-            {/* Reaction Picker */}
+            {/* Expandable Reaction Picker */}
             {reactionPickerVisible && (
               <View style={styles.reactionPicker}>
                 <Text style={styles.reactionPickerTitle}>Add Reaction</Text>
@@ -360,11 +421,12 @@ export default function PostDetailScreen() {
             </View>
           )}
 
+          {/* Bottom spacing for scroll view */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </View>
 
-      {/* Overlay to close reaction picker */}
+      {/* Overlay to close reaction picker when tapping outside */}
       {reactionPickerVisible && (
         <Pressable
           style={styles.reactionOverlay}
@@ -375,6 +437,10 @@ export default function PostDetailScreen() {
   );
 }
 
+/**
+ * Stylesheet for PostDetailScreen component
+ * Uses consistent color scheme and responsive design patterns
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
