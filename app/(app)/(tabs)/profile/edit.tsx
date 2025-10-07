@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,9 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import profileAPI from '../../../../utils/profileApi'; 
+import * as Location from 'expo-location';
+import settingsApi from "../../../../utils/settingsApi";
+
 
 /**
  * EditProfileScreen Component
@@ -37,10 +40,23 @@ export default function EditProfileScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
-  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
+  const GOOGLE_PLACES_AUTOCOMPLETE_URL = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
+  const GOOGLE_PLACES_DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json';
+  const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+
+  // Sample cities for autocomplete
+  const sampleCities = [
+    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
+    "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
+    "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
+    "San Francisco, CA", "Indianapolis, IN", "Seattle, WA", "Denver, CO", "Boston, MA",
+    "Toronto, ON", "Vancouver, BC", "Montreal, QC", "Calgary, AB", "Ottawa, ON"
+  ];
+
   // Get user data from Clerk
   const { user } = useUser();
   
@@ -52,15 +68,122 @@ export default function EditProfileScreen() {
     location: "",
     notifications: true,
   });
-  
-  // Sample cities for autocomplete
-  const sampleCities = [
-    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
-    "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
-    "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
-    "San Francisco, CA", "Indianapolis, IN", "Seattle, WA", "Denver, CO", "Boston, MA",
-    "Toronto, ON", "Vancouver, BC", "Montreal, QC", "Calgary, AB", "Ottawa, ON"
-  ];
+
+    /**
+   * Fetches location suggestions from Google Places API
+   */
+    const fetchGooglePlacesSuggestions = async (input: string) => {
+      if (input.length < 2) {
+        setLocationSuggestions([]);
+        setShowLocationSuggestions(false);
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({
+          input: input,
+          key: GOOGLE_PLACES_API_KEY,
+          types: '(cities)', // Restrict to cities
+          language: 'en',
+        });
+
+        const response = await fetch(`${GOOGLE_PLACES_AUTOCOMPLETE_URL}?${params}`);
+        const data = await response.json();
+
+        if (data.status === 'OK' && data.predictions) {
+          const suggestions = data.predictions.map((prediction: any) => ({
+            description: prediction.description,
+            place_id: prediction.place_id,
+            main_text: prediction.structured_formatting?.main_text || '',
+            secondary_text: prediction.structured_formatting?.secondary_text || '',
+          }));
+          
+          setLocationSuggestions(suggestions);
+          setShowLocationSuggestions(true);
+        } else {
+          console.log('Google Places API error:', data.status);
+          setLocationSuggestions([]);
+        }
+      } catch (error) {
+        console.error('Error fetching places:', error);
+        // Fallback to your sample cities if API fails
+        const filtered = sampleCities.filter(city =>
+          city.toLowerCase().includes(input.toLowerCase())
+        ).slice(0, 5);
+        setLocationSuggestions(filtered.map(city => ({ description: city })));
+        setShowLocationSuggestions(filtered.length > 0);
+      }
+    };
+
+    /**
+   * Gets detailed place information including coordinates
+   */
+  const fetchPlaceDetails = async (placeId: string) => {
+    try {
+      const params = new URLSearchParams({
+        place_id: placeId,
+        key: GOOGLE_PLACES_API_KEY,
+        fields: 'geometry,formatted_address,address_components',
+      });
+
+      const response = await fetch(`${GOOGLE_PLACES_DETAILS_URL}?${params}`);
+      const data = await response.json();
+
+      if (data.status === 'OK' && data.result) {
+        return {
+          formatted_address: data.result.formatted_address,
+          lat: data.result.geometry.location.lat,
+          lng: data.result.geometry.location.lng,
+          address_components: data.result.address_components,
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching place details:', error);
+    }
+    return null;
+  };
+
+  // Update your handleLocationSearch function
+  const handleLocationSearch = (text: string) => {
+    setLocationQuery(text);
+    setFormData({ ...formData, location: text });
+    
+    // Cancel previous timeout if exists
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Debounce the API call
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchGooglePlacesSuggestions(text);
+    }, 300); // Wait 300ms after user stops typing
+  };
+
+  // Add a ref for debouncing
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Update your selectLocation function
+  const selectLocation = async (location: any) => {
+    if (typeof location === 'string') {
+      // Fallback for sample cities
+      setLocationQuery(location);
+      setFormData({ ...formData, location });
+    } else {
+      // Google Places result
+      setLocationQuery(location.description);
+      setFormData({ ...formData, location: location.description });
+      
+      // Optionally fetch more details
+      if (location.place_id) {
+        const details = await fetchPlaceDetails(location.place_id);
+        if (details) {
+          // You can store coordinates or other details if needed
+          console.log('Place details:', details);
+          // Store in formData or separate state as needed
+        }
+      }
+    }
+    setShowLocationSuggestions(false);
+  };
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -195,6 +318,12 @@ export default function EditProfileScreen() {
           profileImage: profileImage || undefined,
         });
 
+      // Save notification setting separately to SettingsAPI
+      const settingsResult = await settingsApi.saveSettings({
+        notificationsEnabled: formData.notifications,
+        // Keep other settings unchanged - only update notifications
+      });
+
         if (result.success) {
           // Also save to local storage as backup
           await saveProfileDataToStorage();
@@ -299,35 +428,6 @@ export default function EditProfileScreen() {
       setProfileImage(imageUri);
       await saveImageToStorage(imageUri);
     }
-  };
-
-  /**
-   * Handles location search with autocomplete suggestions
-   */
-  const handleLocationSearch = (text: string) => {
-    setLocationQuery(text);
-    setFormData({ ...formData, location: text });
-    
-    if (text.length > 0) {
-      // Filter cities based on input
-      const filtered = sampleCities.filter(city =>
-        city.toLowerCase().includes(text.toLowerCase())
-      ).slice(0, 5); // Show max 5 suggestions
-      
-      setLocationSuggestions(filtered);
-      setShowLocationSuggestions(true);
-    } else {
-      setShowLocationSuggestions(false);
-    }
-  };
-
-  /**
-   * Selects a location from suggestions
-   */
-  const selectLocation = (location: string) => {
-    setLocationQuery(location);
-    setFormData({ ...formData, location });
-    setShowLocationSuggestions(false);
   };
 
   /**
@@ -448,28 +548,29 @@ export default function EditProfileScreen() {
                   }}
                 />
               </View>
-              
               {/* Location Suggestions Dropdown */}
-              {showLocationSuggestions && locationSuggestions.length > 0 && (
-                <View style={styles.suggestionsContainer}>
-                  <FlatList
-                    data={locationSuggestions}
-                    keyExtractor={(item, index) => index.toString()}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.suggestionItem}
-                        onPress={() => selectLocation(item)}
-                      >
-                        <Ionicons name="location-outline" size={16} color="#666" />
-                        <Text style={styles.suggestionText}>{item}</Text>
-                      </TouchableOpacity>
-                    )}
-                    style={styles.suggestionsList}
-                    nestedScrollEnabled={true}
-                  />
-                </View>
-              )}
             </View>
+            {showLocationSuggestions && locationSuggestions.length > 0 && (
+            <View style={styles.suggestionsContainer}>
+              <FlatList
+                data={locationSuggestions}
+                keyExtractor={(item, index) => item.place_id || item.description || index.toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.suggestionItem}
+                    onPress={() => selectLocation(item)}
+                  >
+                    <Ionicons name="location-outline" size={16} color="#666" />
+                    <Text style={styles.suggestionText}>
+                      {item.description || item}  {/* Handle both objects and strings */}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                style={styles.suggestionsList}
+                nestedScrollEnabled={true}
+              />
+            </View>
+            )}
 
             {/* Save Changes Button */}
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
@@ -485,7 +586,7 @@ export default function EditProfileScreen() {
                 <View style={styles.notificationIcon}>
                   <Ionicons name="notifications-outline" size={16} color="#4CAF50" />
                 </View>
-                <Text style={styles.notificationText}>Sign up Notification</Text>
+                <Text style={styles.notificationText}>Sign up for Notifications</Text>
               </View>
               <Switch
                 value={formData.notifications}
