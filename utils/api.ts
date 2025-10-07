@@ -1,16 +1,15 @@
 // utils/api.ts
-import { Platform } from 'react-native';
+import { Platform } from "react-native";
 
 const getBaseURL = () => {
   if (__DEV__) {
-    // Replace with YOUR actual IP address
-    return 'http://192.168.1.100:3001'; 
+    return "http://10.0.165.112:3001";
   } else {
-    return 'https://your-production-api.com';
+    return "https://your-production-api.com";
   }
 };
 
-const API_BASE_URL = getBaseURL();
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
 export interface SyncUserData {
   clerkUserId: string;
@@ -39,13 +38,28 @@ export interface SubmitAssessmentData {
   assessmentType?: string;
 }
 
+export interface Resource {
+  id: number;
+  title: string;
+  type: "Affirmation" | "Quote" | "Article" | "Exercise" | "Guide";
+  duration: string;
+  category: string;
+  content: string;
+  author?: string;
+  image_emoji: string;
+  background_color: string;
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
 class ApiService {
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
-    
+
     const config: RequestInit = {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
       ...options,
@@ -54,7 +68,7 @@ class ApiService {
     try {
       console.log(`Making API request to: ${url}`);
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`API Error (${response.status}):`, errorText);
@@ -71,21 +85,21 @@ class ApiService {
   }
 
   async syncUser(userData: SyncUserData) {
-    return this.makeRequest('/api/sync-user', {
-      method: 'POST',
+    return this.makeRequest("/api/sync-user", {
+      method: "POST",
       body: JSON.stringify(userData),
     });
   }
 
   async createClient(clientData: CreateClientData) {
-    return this.makeRequest('/api/clients', {
-      method: 'POST',
+    return this.makeRequest("/api/clients", {
+      method: "POST",
       body: JSON.stringify(clientData),
     });
   }
 
   async getUsers() {
-    return this.makeRequest('/api/users');
+    return this.makeRequest("/api/users");
   }
 
   async getClient(userId: number) {
@@ -98,8 +112,8 @@ class ApiService {
   }
 
   async submitAssessment(assessmentData: SubmitAssessmentData) {
-    return this.makeRequest('/api/assessments/submit', {
-      method: 'POST',
+    return this.makeRequest("/api/assessments/submit", {
+      method: "POST",
       body: JSON.stringify(assessmentData),
     });
   }
@@ -110,6 +124,60 @@ class ApiService {
 
   async getLatestAssessment(clerkUserId: string) {
     return this.makeRequest(`/api/assessments/latest/${clerkUserId}`);
+  }
+
+  // Resources endpoints
+  async getResources(): Promise<Resource[]> {
+    return this.makeRequest("/api/resources");
+  }
+
+  async getResourcesByCategory(category: string): Promise<Resource[]> {
+    return this.makeRequest(`/api/resources/category/${category}`);
+  }
+
+  async searchResources(query: string): Promise<Resource[]> {
+    return this.makeRequest(
+      `/api/resources/search?q=${encodeURIComponent(query)}`
+    );
+  }
+
+  async getResource(id: number): Promise<Resource> {
+    return this.makeRequest(`/api/resources/${id}`);
+  }
+
+  // Bookmark methods
+  async getBookmarks(clerkUserId: string): Promise<Resource[]> {
+    return this.makeRequest(`/api/bookmarks/${clerkUserId}`);
+  }
+
+  async addBookmark(clerkUserId: string, resourceId: number) {
+    return this.makeRequest("/api/bookmarks", {
+      method: "POST",
+      body: JSON.stringify({ clerkUserId, resourceId }),
+    });
+  }
+
+  async removeBookmark(clerkUserId: string, resourceId: number) {
+    return this.makeRequest(`/api/bookmarks/${clerkUserId}/${resourceId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async isBookmarked(
+    clerkUserId: string,
+    resourceId: number
+  ): Promise<{ isBookmarked: boolean }> {
+    return this.makeRequest(
+      `/api/bookmarks/${clerkUserId}/check/${resourceId}`
+    );
+  }
+
+  async getExternalQuote(): Promise<{ quote: string; author: string }> {
+    return this.makeRequest("/api/external/quote");
+  }
+
+  async getExternalAffirmation(): Promise<{ affirmation: string }> {
+    return this.makeRequest("/api/external/affirmation");
   }
 }
 

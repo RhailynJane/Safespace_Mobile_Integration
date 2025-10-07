@@ -107,13 +107,13 @@ const MoodTrackingScreen = () => {
     },
   ]).current;
 
-  // Load recent moods from API
+  // Load recent moods from API - limited to 5 entries
   const loadRecentMoods = useCallback(async () => {
     if (!user?.id) return;
 
     try {
       setLoading(true);
-      const data = await moodApi.getRecentMoods(user.id, 5);
+      const data = await moodApi.getRecentMoods(user.id, 5); // Limit to 5 entries
       setRecentEntries(data.moods || []);
     } catch (error) {
       console.error("Error loading recent moods:", error);
@@ -209,7 +209,12 @@ const MoodTrackingScreen = () => {
         {/* Header with navigation controls */}
         <AppHeader title="Mood Tracker" showBack={true} />
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Main scrollable content */}
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Mood selection section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>How are you feeling?</Text>
@@ -227,41 +232,49 @@ const MoodTrackingScreen = () => {
             </View>
           </View>
 
-          {/* Recent moods section */}
+          {/* Recent moods section - Limited to 5 entries */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recent Moods</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recent Moods</Text>
+              <Text style={styles.entriesCount}>
+                {recentEntries.length}/5 entries
+              </Text>
+            </View>
 
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.loadingText}>Loading your moods...</Text>
               </View>
             ) : recentEntries.length > 0 ? (
-              recentEntries.map((entry, index) => (
-                <View key={entry.id || index} style={styles.moodCard}>
-                  <Text
-                    style={[
-                      styles.moodCardEmoji,
-                      {
-                        color: moodOptions.find((m) => m.id === entry.mood_type)
-                          ?.color,
-                      },
-                    ]}
-                  >
-                    {entry.mood_emoji}
-                  </Text>
-                  <View style={styles.moodCardContent}>
-                    <Text style={styles.moodCardTitle}>{entry.mood_label}</Text>
-                    <Text style={styles.moodCardDate}>
-                      {new Date(entry.created_at).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+              <View style={styles.recentMoodsContainer}>
+                {recentEntries.slice(0, 5).map((entry, index) => ( // Ensure max 5 entries
+                  <View key={entry.id || index} style={styles.moodCard}>
+                    <Text
+                      style={[
+                        styles.moodCardEmoji,
+                        {
+                          color: moodOptions.find((m) => m.id === entry.mood_type)
+                            ?.color,
+                        },
+                      ]}
+                    >
+                      {entry.mood_emoji}
                     </Text>
+                    <View style={styles.moodCardContent}>
+                      <Text style={styles.moodCardTitle}>{entry.mood_label}</Text>
+                      <Text style={styles.moodCardDate}>
+                        {new Date(entry.created_at).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              ))
+                ))}
+              </View>
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="happy-outline" size={48} color="#CCC" />
@@ -281,6 +294,9 @@ const MoodTrackingScreen = () => {
             <Text style={styles.historyLinkText}>View Mood History</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
           </TouchableOpacity>
+
+          {/* Extra bottom padding for better scrolling */}
+          <View style={styles.bottomPadding} />
         </ScrollView>
 
         {/* Bottom navigation bar */}
@@ -297,25 +313,39 @@ const MoodTrackingScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "Transparent",
+    backgroundColor: "transparent",
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContainer: {
+    flexGrow: 1,
     paddingBottom: Spacing.xl,
   },
   section: {
     paddingHorizontal: Spacing.lg,
     marginTop: Spacing.xl,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
   sectionTitle: {
     ...Typography.title,
     fontSize: 20,
     fontWeight: "600",
-    marginBottom: Spacing.xs,
   },
   sectionSubtitle: {
     ...Typography.body,
     color: Colors.textSecondary,
     marginBottom: Spacing.lg,
+  },
+  entriesCount: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontSize: 12,
   },
   moodGrid: {
     marginTop: Spacing.md,
@@ -344,6 +374,15 @@ const styles = StyleSheet.create({
   loadingContainer: {
     padding: Spacing.lg,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: Spacing.sm,
+  },
+  recentMoodsContainer: {
+    // Container for recent moods cards
   },
   moodCard: {
     backgroundColor: Colors.surface,
@@ -379,6 +418,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: Spacing.xl,
     alignItems: "center",
+    justifyContent: "center",
   },
   emptyStateText: {
     ...Typography.body,
@@ -398,14 +438,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: Spacing.md,
     marginHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.lg,
     backgroundColor: Colors.surface,
     borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
   historyLinkText: {
     ...Typography.body,
     fontWeight: "500",
     color: Colors.primary,
+  },
+  bottomPadding: {
+    height: 140, 
   },
 });
 

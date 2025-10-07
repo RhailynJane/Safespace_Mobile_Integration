@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+// Use your local network IP that's working for assessments
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
 export interface MoodEntry {
   id: string;
@@ -36,7 +37,7 @@ axios.defaults.headers.common['Content-Type'] = 'application/json';
 export const moodApi = {
   createMood: async (data: CreateMoodData) => {
     try {
-      const response = await axios.post(`${API_URL}/moods`, data);
+      const response = await axios.post(`${API_BASE_URL}/api/moods`, data);
       return response.data;
     } catch (error: any) {
       console.error('Create mood error:', error.message);
@@ -49,7 +50,7 @@ export const moodApi = {
 
   getRecentMoods: async (clerkUserId: string, limit: number = 10) => {
     try {
-      const response = await axios.get(`${API_URL}/moods/recent/${clerkUserId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/moods/recent/${clerkUserId}`, {
         params: { limit }
       });
       return response.data;
@@ -64,7 +65,7 @@ export const moodApi = {
 
   getMoodHistory: async (clerkUserId: string, filters?: MoodFilters) => {
     try {
-      const response = await axios.get(`${API_URL}/moods/history/${clerkUserId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/moods/history/${clerkUserId}`, {
         params: filters
       });
       return response.data;
@@ -79,7 +80,7 @@ export const moodApi = {
 
   getMoodStats: async (clerkUserId: string, days: number = 30) => {
     try {
-      const response = await axios.get(`${API_URL}/moods/stats/${clerkUserId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/moods/stats/${clerkUserId}`, {
         params: { days }
       });
       return response.data;
@@ -94,7 +95,7 @@ export const moodApi = {
 
   getFactors: async (clerkUserId: string) => {
     try {
-      const response = await axios.get(`${API_URL}/moods/factors/${clerkUserId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/moods/factors/${clerkUserId}`);
       return response.data;
     } catch (error: any) {
       console.error('Get factors error:', error.message);
@@ -107,7 +108,7 @@ export const moodApi = {
 
   updateMood: async (moodId: string, data: Partial<CreateMoodData>) => {
     try {
-      const response = await axios.put(`${API_URL}/moods/${moodId}`, data);
+      const response = await axios.put(`${API_BASE_URL}/api/moods/${moodId}`, data);
       return response.data;
     } catch (error: any) {
       console.error('Update mood error:', error.message);
@@ -120,7 +121,7 @@ export const moodApi = {
 
   deleteMood: async (moodId: string) => {
     try {
-      const response = await axios.delete(`${API_URL}/moods/${moodId}`);
+      const response = await axios.delete(`${API_BASE_URL}/api/moods/${moodId}`);
       return response.data;
     } catch (error: any) {
       console.error('Delete mood error:', error.message);

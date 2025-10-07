@@ -1,4 +1,6 @@
-// services/api.service.ts (for your React Native app)
+//claude prompt: how do I intgrate the existing backend index.ts with the settings page
+//claude prompt: can you explain each line of code to me 
+//services/api.service.ts (for your React Native app)
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

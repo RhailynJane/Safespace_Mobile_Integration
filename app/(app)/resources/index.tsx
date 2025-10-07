@@ -1,49 +1,144 @@
 /**
- * LLM Prompt: Add concise inline comments to this React Native component. 
+ * ResourcesScreen - React Native Component
+ * 
+ * Main resources hub providing access to mental health content including:
+ * - Categorized resources (Stress, Anxiety, Depression, Sleep, Motivation, Mindfulness)
+ * - Quick access to daily affirmations and random quotes
+ * - Search functionality across all resources
+ * - Featured content highlighting
+ * - External API integration for fresh content
+ * 
+ * Features:
+ * - Category-based filtering with visual indicators
+ * - Real-time search with debouncing
+ * - Pull-to-refresh for content updates
+ * - Featured resource spotlight
+ * - Quick action buttons for instant access
+ * - Responsive design with curved background
+ * 
+ * Content Types:
+ * - Articles, exercises, and educational materials
+ * - Daily affirmations for positive reinforcement
+ * - Inspirational quotes from external APIs
+ * - Categorized mental health resources
+ * 
+ * Navigation:
+ * - Bottom tab navigation for app sections
+ * - Resource detail screen for full content viewing
+ * - Category-based filtering within resources
+ * 
+ * Data Flow:
+ * - Loads resources from local database on mount
+ * - Integrates external APIs for quotes and affirmations
+ * - Filters content based on category selection
+ * - Searches across title, content, and categories
+ * 
+ * LLM Prompt: Add comprehensive comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+
+// app/(app)/resources/index.tsx
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
   TextInput,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import { 
+  Resource, 
+  fetchAllResourcesWithExternal,
+  fetchResourcesByCategory,
+  searchResources,
+  getDailyAffirmation,
+  getRandomQuote,
+} from "../../../utils/resourcesApi";
 
-const { width } = Dimensions.get("window");
+/**
+ * Category interface defining the structure for resource categorization
+ * Used for filtering and organizing mental health resources
+ */
+interface Category {
+  id: string;
+  name: string;
+  icon: string; // Emoji representation
+  color: string; // Background color for category cards
+}
 
+/**
+ * Predefined categories for mental health resources
+ * Each category has unique visual identity and purpose
+ */
+const CATEGORIES: Category[] = [
+  {
+    id: 'stress',
+    name: 'Stress',
+    icon: '💧', // Water drop symbolizing calmness
+    color: '#FF8A65', // Soft orange
+  },
+  {
+    id: 'anxiety',
+    name: 'Anxiety',
+    icon: '🧠', // Brain symbolizing mental processes
+    color: '#81C784', // Calming green
+  },
+  {
+    id: 'depression',
+    name: 'Depression',
+    icon: '👥', // People symbolizing support
+    color: '#64B5F6', // Soothing blue
+  },
+  {
+    id: 'sleep',
+    name: 'Sleep',
+    icon: '🛏️', // Bed symbolizing rest
+    color: '#4DD0E1', // Tranquil teal
+  },
+  {
+    id: 'motivation',
+    name: 'Motivation',
+    icon: '⚡', // Lightning bolt symbolizing energy
+    color: '#FFB74D', // Energetic orange
+  },
+  {
+    id: 'mindfulness',
+    name: 'Mindfulness',
+    icon: '🧘', // Meditation symbol
+    color: '#BA68C8', // Spiritual purple
+  }
+];
+
+/**
+ * Main Resources Screen Component
+ * 
+ * Serves as the central hub for accessing mental health resources
+ * with advanced filtering, search, and quick access features
+ */
 export default function ResourcesScreen() {
-  // State management for UI components
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("resources");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  // State management for UI and data
+  const [loading, setLoading] = useState(true); // Initial loading state
+  const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh state
+  const [activeTab, setActiveTab] = useState("resources"); // Bottom navigation active tab
+  const [searchQuery, setSearchQuery] = useState(""); // Search input value
+  const [selectedCategory, setSelectedCategory] = useState(""); // Currently selected category filter
+  const [resources, setResources] = useState<Resource[]>([]); // Resource data array
+  const [featuredResource, setFeaturedResource] = useState<Resource | null>(null); // Highlighted resource
 
-  // Mock user data for frontend demonstration
-  const mockUser = {
-    displayName: "Demo User",
-    email: "demo@gmail.com",
-  };
-
-  const mockProfile = {
-    firstName: "Demo",
-    lastName: "User",
-  };
-
-  // Navigation tabs configuration
+  /**
+   * Bottom navigation tabs configuration
+   * Provides navigation between main app sections
+   */
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -52,55 +147,107 @@ export default function ResourcesScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Resource categories with visual identifiers
-  const categories = [
-    { id: "stress", name: "Stress", icon: "💧", color: "#FF8A65" },
-    { id: "anxiety", name: "Anxiety", icon: "🧠", color: "#81C784" },
-    { id: "depression", name: "Depression", icon: "👥", color: "#64B5F6" },
-    { id: "sleep", name: "Sleep", icon: "🛏️", color: "#4DD0E1" },
-  ];
+  /**
+   * Load resources on component mount
+   * Fetches initial data and sets up featured content
+   */
+  useEffect(() => {
+    loadResources();
+  }, []);
 
-  // Sample resources data with metadata
-  const resources = [
-    {
-      id: 1,
-      title: "Breathing Exercises",
-      type: "Exercise",
-      duration: "5 mins",
-      category: "stress",
-      image: "🧘‍♀️",
-      backgroundColor: "#E8F5E8",
-    },
-    {
-      id: 2,
-      title: "Understanding Anxiety",
-      type: "Article",
-      duration: "10 mins",
-      category: "anxiety",
-      image: "🧠",
-      backgroundColor: "#E3F2FD",
-    },
-    {
-      id: 3,
-      title: "Mood Tracking Tips",
-      type: "Article",
-      duration: "10 mins",
-      category: "depression",
-      image: "📊",
-      backgroundColor: "#FFF3E0",
-    },
-    {
-      id: 4,
-      title: "Daily Routine Building",
-      type: "Guide",
-      duration: "15 mins",
-      category: "sleep",
-      image: "📅",
-      backgroundColor: "#F3E5F5",
-    },
-  ];
+  /**
+   * Load all resources including external content
+   * Sets featured resource and handles error states
+   */
+  const loadResources = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchAllResourcesWithExternal();
+      setResources(data);
+      
+      // Set first quote or affirmation as featured content
+      const featured = data.find(r => r.type === 'Quote' || r.type === 'Affirmation');
+      setFeaturedResource(featured || null);
+    } catch (error) {
+      console.error("Error loading resources:", error);
+      Alert.alert(
+        "Error",
+        "Could not load resources.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Handle tab navigation with proper routing
+  /**
+   * Handle pull-to-refresh gesture
+   * Reloads all resources and resets refresh state
+   */
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadResources();
+    setRefreshing(false);
+  };
+
+  /**
+   * Handle category filter selection
+   * Toggles category on/off and fetches filtered resources
+   * 
+   * @param categoryId - The ID of the category to filter by
+   */
+  const handleCategoryPress = (categoryId: string) => {
+    const newCategory = selectedCategory === categoryId ? "" : categoryId;
+    setSelectedCategory(newCategory);
+
+    if (newCategory) {
+      // Fetch resources for selected category
+      setLoading(true);
+      fetchResourcesByCategory(newCategory)
+        .then(setResources)
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    } else {
+      // Reset to show all resources
+      loadResources();
+    }
+  };
+
+  /**
+   * Handle search functionality with debouncing
+   * Searches resources when query length exceeds 2 characters
+   * Resets to full list when search is cleared
+   */
+  useEffect(() => {
+    if (searchQuery.length > 2) {
+      // Debounce search to avoid excessive API calls
+      const timeoutId = setTimeout(async () => {
+        setLoading(true);
+        try {
+          const searchResults = await searchResources(searchQuery);
+          setResources(searchResults);
+        } catch (error) {
+          console.error("Error searching resources:", error);
+        } finally {
+          setLoading(false);
+        }
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    } else if (searchQuery.length === 0 && selectedCategory === "") {
+      // Reset to all resources when search is cleared and no category selected
+      loadResources();
+    }
+
+    return undefined;
+  }, [searchQuery, selectedCategory]);
+
+  /**
+   * Handle bottom navigation tab press
+   * Navigates between different app sections
+   * 
+   * @param tabId - The ID of the tab to navigate to
+   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -110,40 +257,112 @@ export default function ResourcesScreen() {
     }
   };
 
-  // Helper function to get display name from mock user data
-  const getDisplayName = () => {
-    if (mockProfile?.firstName) return mockProfile.firstName;
-    if (mockUser?.displayName) return mockUser.displayName.split(" ")[0];
-    if (mockUser?.email) return mockUser.email.split("@")[0];
-    return "User";
+  /**
+   * Handle resource item press
+   * Navigates to resource detail screen with full content
+   * 
+   * @param resource - The resource object to display
+   */
+  const handleResourcePress = (resource: Resource) => {
+    router.push({
+      pathname: "/(app)/resources/resource-detail-screen",
+      params: {
+        id: resource.id,
+        title: resource.title,
+        content: resource.content,
+        author: resource.author || "Unknown",
+        type: resource.type,
+        category: resource.category,
+        imageEmoji: resource.image_emoji,
+        backgroundColor: resource.backgroundColor,
+      },
+    });
   };
 
-  // Filter resources based on search query and selected category
-  const filteredResources = resources.filter((resource) => {
-    const matchesSearch = resource.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "" || resource.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  /**
+   * Handle daily affirmation quick action
+   * Fetches and displays a random affirmation
+   */
+  const handleDailyAffirmation = async () => {
+    try {
+      const affirmation = await getDailyAffirmation();
+      handleResourcePress(affirmation);
+    } catch (error) {
+      console.error("Error getting daily affirmation:", error);
+    }
+  };
 
-  // Show loading indicator while data is being fetched
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
-  }
+  /**
+   * Handle random quote quick action
+   * Fetches and displays a random inspirational quote
+   */
+  const handleRandomQuote = async () => {
+    try {
+      const quote = await getRandomQuote();
+      handleResourcePress(quote);
+    } catch (error) {
+      console.error("Error getting random quote:", error);
+    }
+  };
 
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
         <AppHeader title="Resources" showBack={true} />
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Search bar for filtering resources */}
+        {/* Main Scrollable Content Area */}
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={["#4CAF50"]}
+              tintColor="#4CAF50"
+            />
+          }
+        >
+          {/* Featured Resource Section - Only shows when no category filter is active */}
+          {featuredResource && selectedCategory === "" && (
+            <View style={styles.featuredContainer}>
+              <View style={styles.featuredCard}>
+                <Text style={styles.featuredLabel}>✨ Featured</Text>
+                <Text style={styles.featuredText}>&quot;{featuredResource.content}&quot;</Text>
+                {featuredResource.author && (
+                  <Text style={styles.featuredAuthor}>— {featuredResource.author}</Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Quick Actions Section - Instant access to popular features */}
+          <View style={styles.quickActions}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={handleDailyAffirmation}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#E8F5E8' }]}>
+                  <Text style={styles.actionEmoji}>🌟</Text>
+                </View>
+                <Text style={styles.actionText}>Daily Affirmation</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.quickAction}
+                onPress={handleRandomQuote}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#FFF3E0' }]}>
+                  <Text style={styles.actionEmoji}>💭</Text>
+                </View>
+                <Text style={styles.actionText}>Random Quote</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Search Bar Section - Global resource search */}
           <View style={styles.searchContainer}>
             <View style={styles.searchBar}>
               <Ionicons
@@ -154,29 +373,37 @@ export default function ResourcesScreen() {
               />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search resources"
+                placeholder="Search resources..."
                 placeholderTextColor="#999"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
+              {/* Clear search button - Only shows when there's text */}
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          {/* Category selection section with horizontal scrolling */}
+          {/* Categories Section - Horizontal scrolling category filters */}
           <View style={styles.categoriesSection}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Suggested Category</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
+              <Text style={styles.sectionTitle}>Categories</Text>
+              <TouchableOpacity onPress={() => setSelectedCategory("")}>
+                <Text style={styles.seeAllButton}>
+                  {selectedCategory ? "Clear" : "All"}
+                </Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView
-              horizontal={true}
+              horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesScrollContainer}
             >
-              {categories.map((category) => (
+              {CATEGORIES.map((category) => (
                 <TouchableOpacity
                   key={category.id}
                   style={[
@@ -184,11 +411,7 @@ export default function ResourcesScreen() {
                     { backgroundColor: category.color },
                     selectedCategory === category.id && styles.selectedCategory,
                   ]}
-                  onPress={() =>
-                    setSelectedCategory(
-                      selectedCategory === category.id ? "" : category.id
-                    )
-                  }
+                  onPress={() => handleCategoryPress(category.id)}
                 >
                   <Text style={styles.categoryIcon}>{category.icon}</Text>
                   <Text style={styles.categoryName}>{category.name}</Text>
@@ -197,51 +420,83 @@ export default function ResourcesScreen() {
             </ScrollView>
           </View>
 
-          {/* Main resources listing section */}
+          {/* Resources List Section - Dynamic content based on filters */}
           <View style={styles.resourcesSection}>
-            <Text style={styles.resourcesSectionTitle}>All Resources</Text>
+            <Text style={styles.resourcesSectionTitle}>
+              {selectedCategory
+                ? `${CATEGORIES.find((c) => c.id === selectedCategory)?.name} Resources`
+                : "All Resources"}
+            </Text>
 
-            <View style={styles.resourcesList}>
-              {filteredResources.map((resource) => (
-                <TouchableOpacity
-                  key={resource.id}
-                  style={styles.resourceCard}
-                  onPress={() => {
-                    // Handle resource selection based on the resource
-                    if (resource.title === "Understanding Anxiety") {
-                      router.push("../resources/understanding-anxiety");
-                    } else {
-                      console.log("Selected resource:", resource.title);
-                      // Add navigation for other resources as needed
-                    }
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.resourceImageContainer,
-                      { backgroundColor: resource.backgroundColor },
-                    ]}
+            {loading ? (
+              // Loading State
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4CAF50" />
+                <Text style={styles.loadingText}>Loading resources...</Text>
+              </View>
+            ) : resources.length === 0 ? (
+              // Empty State
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>🔍</Text>
+                <Text style={styles.emptyText}>No resources found</Text>
+                <Text style={styles.emptySubtext}>
+                  Try adjusting your search or filters
+                </Text>
+              </View>
+            ) : (
+              // Resources List
+              <View style={styles.resourcesList}>
+                {resources.map((resource) => (
+                  <TouchableOpacity
+                    key={resource.id}
+                    style={styles.resourceCard}
+                    onPress={() => handleResourcePress(resource)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.resourceEmoji}>{resource.image}</Text>
-                  </View>
-
-                  <View style={styles.resourceContent}>
-                    <Text style={styles.resourceTitle}>{resource.title}</Text>
-                    <View style={styles.resourceMeta}>
-                      <Text style={styles.resourceType}>{resource.type}</Text>
-                      <View style={styles.resourceDot} />
-                      <Text style={styles.resourceDuration}>
-                        {resource.duration}
-                      </Text>
+                    {/* Resource Image/Emoji Container */}
+                    <View
+                      style={[
+                        styles.resourceImageContainer,
+                        { backgroundColor: resource.backgroundColor },
+                      ]}
+                    >
+                      <Text style={styles.resourceEmoji}>{resource.image_emoji}</Text>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+
+                    {/* Resource Content Details */}
+                    <View style={styles.resourceContent}>
+                      <Text style={styles.resourceTitle} numberOfLines={2}>
+                        {resource.title}
+                      </Text>
+                      <View style={styles.resourceMeta}>
+                        <Text style={styles.resourceType}>{resource.type}</Text>
+                        <View style={styles.resourceDot} />
+                        <Text style={styles.resourceDuration}>
+                          {resource.duration}
+                        </Text>
+                      </View>
+                      {resource.author && (
+                        <Text style={styles.resourceAuthor} numberOfLines={1}>
+                          By {resource.author}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Navigation Chevron */}
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color="#999"
+                      style={styles.resourceChevron}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
 
-        {/* Bottom navigation component for main app navigation */}
+        {/* Bottom Navigation Component */}
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -252,56 +507,111 @@ export default function ResourcesScreen() {
   );
 }
 
+/**
+ * Stylesheet for ResourcesScreen component
+ * Organized by component sections with consistent theming
+ * Uses responsive design patterns and accessibility considerations
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#F8F9FA",
-  },
-  headerTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 15,
-  },
-  notificationButton: {
-    position: "relative",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -2,
-    right: -2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#FF5722",
-  },
   content: {
     flex: 1,
   },
+  loadingContainer: {
+    padding: 40,
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#666",
+  },
+  
+  // Featured Resource Section Styles
+  featuredContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 5,
+  },
+  featuredCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50", // Accent border for visual emphasis
+  },
+  featuredLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4CAF50",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  featuredText: {
+    fontSize: 16,
+    fontStyle: "italic",
+    color: "#333",
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  featuredAuthor: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "right",
+  },
+  
+  // Quick Actions Section Styles
+  quickActions: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  actionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  actionEmoji: {
+    fontSize: 24,
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+  },
+  
+  // Search Bar Section Styles
   searchContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 15,
   },
   searchBar: {
     flexDirection: "row",
@@ -311,10 +621,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
@@ -327,8 +634,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
+  
+  // Categories Section Styles
   categoriesSection: {
-    paddingVertical: 15,
+    paddingVertical: 13,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -344,12 +653,12 @@ const styles = StyleSheet.create({
   },
   seeAllButton: {
     fontSize: 14,
-    color: "#FF5722",
-    fontWeight: "500",
+    color: "#4CAF50",
+    fontWeight: "600",
   },
   categoriesScrollContainer: {
     paddingHorizontal: 20,
-    gap: 15,
+    gap: 12,
   },
   categoryButton: {
     width: 80,
@@ -357,33 +666,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
   },
   selectedCategory: {
-    borderWidth: 2,
-    borderColor: "#4CAF50",
+    borderWidth: 3,
+    borderColor: "#4CAF50", // Highlight selected category
   },
   categoryIcon: {
-    fontSize: 24,
+    fontSize: 28,
     marginBottom: 5,
   },
   categoryName: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: 11,
+    fontWeight: "600",
     color: "#333",
     textAlign: "center",
   },
+  
+  // Resources List Section Styles
   resourcesSection: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 100,
+    paddingBottom: 100, // Extra padding for bottom navigation
   },
   resourcesSectionTitle: {
     fontSize: 18,
@@ -392,7 +695,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   resourcesList: {
-    gap: 15,
+    gap: 12,
   },
   resourceCard: {
     flexDirection: "row",
@@ -400,13 +703,11 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 15,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
+    alignItems: "center",
   },
   resourceImageContainer: {
     width: 60,
@@ -424,73 +725,58 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   resourceTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  resourceMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  resourceType: {
+    fontSize: 13,
+    color: "#666",
+  },
+  resourceDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "#666",
+    marginHorizontal: 6,
+  },
+  resourceDuration: {
+    fontSize: 13,
+    color: "#666",
+  },
+  resourceAuthor: {
+    fontSize: 12,
+    color: "#999",
+    fontStyle: "italic",
+  },
+  resourceChevron: {
+    marginLeft: 8,
+  },
+  
+  // Empty State Styles
+  emptyContainer: {
+    padding: 40,
+    alignItems: "center",
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 10,
+  },
+  emptyText: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
   },
-  resourceMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  resourceType: {
+  emptySubtext: {
     fontSize: 14,
     color: "#666",
-  },
-  resourceDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#666",
-    marginHorizontal: 8,
-  },
-  resourceDuration: {
-    fontSize: 14,
-    color: "#666",
-  },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
+    textAlign: "center",
   },
 });

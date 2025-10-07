@@ -87,7 +87,7 @@ export const AppHeader = ({
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
-    
+
     try {
       setIsSigningOut(true);
       hideSideMenu();
@@ -95,19 +95,19 @@ export const AppHeader = ({
       await signOut();
       router.replace("/(auth)/login");
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error("Sign out error:", error);
       Alert.alert(
         "Sign Out Error",
         "There was an issue signing out. Please try again.",
         [
-          { 
-            text: "Try Again", 
-            onPress: () => router.replace("/(auth)/login")
+          {
+            text: "Try Again",
+            onPress: () => router.replace("/(auth)/login"),
           },
-          { 
+          {
             text: "Cancel",
-            onPress: () => setIsSigningOut(false)
-          }
+            onPress: () => setIsSigningOut(false),
+          },
         ]
       );
     } finally {
@@ -116,21 +116,17 @@ export const AppHeader = ({
   };
 
   const confirmSignOut = () => {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: handleSignOut
-        }
-      ]
-    );
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: handleSignOut,
+      },
+    ]);
   };
 
   const loadProfileImage = useCallback(async () => {
@@ -155,15 +151,32 @@ export const AppHeader = ({
   }, [user?.id, loadProfileImage]);
 
   const getInitials = () => {
+    console.log("User data:", {
+      firstName: user?.firstName,
+      lastName: user?.lastName,
+      fullName: user?.fullName,
+      email: user?.primaryEmailAddress?.emailAddress,
+    });
+
     if (user?.firstName && user?.lastName) {
-      return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+      const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(
+        0
+      )}`.toUpperCase();
+      console.log("Using first+last name initials:", initials);
+      return initials;
     }
     if (user?.fullName) {
       const names = user.fullName.split(" ");
-      return names.length > 1
-        ? `${names[0]?.charAt(0) ?? ""}${names[names.length - 1]?.charAt(0) ?? ""}`.toUpperCase()
-        : (names[0]?.charAt(0) ?? "").toUpperCase();
+      const initials =
+        names.length > 1
+          ? `${names[0]?.charAt(0) ?? ""}${
+              names[names.length - 1]?.charAt(0) ?? ""
+            }`.toUpperCase()
+          : (names[0]?.charAt(0) ?? "").toUpperCase();
+      console.log("Using full name initials:", initials);
+      return initials;
     }
+    console.log("Using fallback 'U'");
     return "U";
   };
 
@@ -304,7 +317,7 @@ export const AppHeader = ({
   ];
 
   // Filter menu items based on show property
-  const sideMenuItems = baseMenuItems.filter(item => item.show);
+  const sideMenuItems = baseMenuItems.filter((item) => item.show);
 
   if (!user && isSignedIn) {
     return (
@@ -330,9 +343,15 @@ export const AppHeader = ({
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile/edit")}>
             <View style={styles.profileImageContainer}>
               {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.profileImage}
+                />
               ) : user?.imageUrl ? (
-                <Image source={{ uri: user.imageUrl }} style={styles.profileImage} />
+                <Image
+                  source={{ uri: user.imageUrl }}
+                  style={styles.profileImage}
+                />
               ) : (
                 <Text style={styles.initialsText}>{getInitials()}</Text>
               )}
@@ -373,14 +392,37 @@ export const AppHeader = ({
         onRequestClose={hideSideMenu}
         statusBarTranslucent={true}
       >
-        <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
+        <Animated.View
+          style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}
+        >
           <Pressable
             style={StyleSheet.absoluteFillObject}
             onPress={hideSideMenu}
           />
 
           <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+            {/* FIXED: Added avatar with initials to side menu header */}
             <View style={styles.sideMenuHeader}>
+              <View
+                style={[
+                  styles.profileAvatar,
+                  { borderWidth: 2, borderColor: "red" },
+                ]}
+              >
+                {profileImage ? (
+                  <Image
+                    source={{ uri: profileImage }}
+                    style={styles.profileAvatarImage}
+                  />
+                ) : user?.imageUrl ? (
+                  <Image
+                    source={{ uri: user.imageUrl }}
+                    style={styles.profileAvatarImage}
+                  />
+                ) : (
+                  <Text style={styles.profileAvatarText}>{getInitials()}</Text>
+                )}
+              </View>
               <Text style={styles.profileName}>{getGreetingName()}</Text>
               <Text style={styles.profileEmail}>{getUserEmail()}</Text>
             </View>
@@ -509,11 +551,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     height: "100%",
   },
+  // FIXED: Updated sideMenuHeader to include avatar
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
     alignItems: "center",
+  },
+  // NEW: Styles for the profile avatar in side menu
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#7CB9A9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  profileAvatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  profileAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "bold",
   },
   profileName: {
     fontSize: 18,

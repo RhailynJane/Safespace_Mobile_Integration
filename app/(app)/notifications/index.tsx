@@ -202,7 +202,7 @@ export default function NotificationsScreen() {
               />
               <Text style={styles.emptyStateText}>No notifications yet</Text>
               <Text style={styles.emptyStateSubtext}>
-                You'll see important updates here
+                You&apos;ll see important updates here
               </Text>
             </View>
           ) : (

@@ -1,3 +1,25 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/**
+ * PostDetailScreen - React Native Component
+ * 
+ * This screen displays detailed view of a community forum post with:
+ * - Post content, author info, and metadata
+ * - Interactive emoji reactions system
+ * - Bookmark functionality
+ * - Related posts suggestions
+ * - Real-time reaction updates
+ * 
+ * Features:
+ * - Gesture support for reaction picker
+ * - Loading states and error handling
+ * - Responsive design with curved background
+ * - Integration with community API
+ * - User authentication checks
+ * 
+ * LLM Prompt: Add comprehensive comments to this React Native component.
+ * Reference: chat.deepseek.com
+ */
+
 import {
   View,
   Text,
@@ -7,70 +29,224 @@ import {
   ScrollView,
   Image,
   Pressable,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { communityApi } from "../../../../utils/communityForumApi";
+import { useUser } from "@clerk/clerk-expo";
 
-// Available emoji reactions
+// Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
 
-const POSTS = [
-  {
-    id: 1,
-    title: "Struggling with Sleep Due to Stress?",
-    content:
-      "Lately, stress has really been affecting my sleep – either I can't fall asleep or I wake up feeling exhausted.\n\nJust wondering... how do you all cope with this?\nAny tips or routines that help you sleep better during stressful times?\n\nWould love to hear what works for you. 😊",
-    reactions: { "❤️": 12, "👍": 8, "😊": 15, "😢": 3, "😮": 2, "🔥": 5 },
-    category: "Stress",
-    user: {
-      name: "Sarah M.",
-      posts: 24,
-      avatar: "https://randomuser.me/api/portraits/women/12.jpg",
-    },
-    timestamp: "2 hours ago",
-  },
-  {
-    id: 2,
-    title: "Dealing with Anxiety Lately?",
-    content:
-      "I've been feeling more anxious than usual – overthinking, tight chest, hard to focus. It sneaks in even when things seem okay. 😊\n\nJust checking in... how do you manage your anxiety day-to-day?\nBreathing exercises, journaling, talking to someone?\n\nOpen to any ideas or even just sharing how you feel.\nYou're not alone. 😊",
-    reactions: { "❤️": 20, "👍": 15, "😊": 18, "😢": 8, "😮": 1, "🔥": 3 },
-    category: "Support",
-    user: {
-      name: "Michael T.",
-      posts: 12,
-      avatar: "https://randomuser.me/api/portraits/men/22.jpg",
-    },
-    timestamp: "4 hours ago",
-  },
-  {
-    id: 3,
-    title: "Little Wins & Mental Health Tips",
-    content:
-      "Hey everyone! Just wanted to share a few small things that helped my mental health lately:\n- Taking a short walk without my phone 🟧\n- Saying no without feeling guilty\n- Writing down 3 things I'm grateful for before bed\n\nFeel free to drop your own tips or wins-big or small.",
-    reactions: { "❤️": 45, "👍": 32, "😊": 28, "😢": 2, "😮": 5, "🔥": 38 },
-    category: "Stories",
-    user: {
-      name: "John L.",
-      posts: 7,
-      avatar: "https://randomuser.me/api/portraits/men/33.jpg",
-    },
-    timestamp: "1 day ago",
-  },
-];
-
+/**
+ * Main component for displaying post details with interactive features
+ */
 export default function PostDetailScreen() {
+  // Extract post ID from navigation parameters
   const params = useLocalSearchParams();
   const postId = parseInt(params.id as string, 10);
-  const post = POSTS.find((p) => p.id === postId);
+  const { user } = useUser();
+  
+  // State management for post data and UI interactions
+  const [post, setPost] = useState<any>(null); // Current post data
+  const [loading, setLoading] = useState(true); // Loading state
+  const [relatedPosts, setRelatedPosts] = useState<any[]>([]); // Related posts suggestions
+  const [userReaction, setUserReaction] = useState<string | null>(null); // Current user's reaction
+  const [reactionPickerVisible, setReactionPickerVisible] = useState(false); // Reaction picker visibility
+  const [bookmarked, setBookmarked] = useState(false); // Bookmark status
+  const [reacting, setReacting] = useState(false); // Reaction update in progress
 
-  const [userReaction, setUserReaction] = useState<string | null>(null);
-  const [reactionPickerVisible, setReactionPickerVisible] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
+  /**
+   * Load post data when component mounts or postId changes
+   */
+  useEffect(() => {
+    loadPostData();
+  }, [postId]);
 
+  /**
+   * Fetches post details, related posts, and user-specific data
+   */
+  const loadPostData = async () => {
+    try {
+      setLoading(true);
+      // Parallel API calls for better performance
+      const [postResponse, relatedResponse] = await Promise.all([
+        communityApi.getPostById(postId),
+        communityApi.getPosts({ limit: 3 })
+      ]);
+      
+      setPost(postResponse.post);
+      // Filter out current post and limit to 2 related posts
+      setRelatedPosts(relatedResponse.posts.filter((p: any) => p.id !== postId).slice(0, 2));
+      
+      // Load user-specific data if authenticated
+      if (user?.id) {
+        await loadUserReaction();
+        await checkIfBookmarked();
+      }
+      
+    } catch (error) {
+      console.error('Error loading post:', error);
+      Alert.alert("Error", "Failed to load post");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Fetches the current user's reaction to this post
+   */
+  const loadUserReaction = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await communityApi.getUserReaction(postId, user.id);
+      setUserReaction(response.userReaction);
+    } catch (error) {
+      console.error('Error loading user reaction:', error);
+    }
+  };
+
+  /**
+   * Checks if the current user has bookmarked this post
+   */
+  const checkIfBookmarked = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await communityApi.getBookmarkedPosts(user.id);
+      const isBookmarked = response.bookmarks?.some((bookmark: any) => bookmark.id === postId);
+      setBookmarked(isBookmarked);
+    } catch (error) {
+      console.error('Error checking bookmark:', error);
+    }
+  };
+
+  /**
+   * Handles emoji reaction selection and updates post reaction data
+   * @param emoji - The selected emoji reaction
+   */
+  const handleReactionPress = async (emoji: string) => {
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to react to posts");
+      return;
+    }
+
+    if (reacting) return; // Prevent multiple simultaneous reactions
+
+    try {
+      setReacting(true);
+      
+      // Single API call handles both adding and removing reactions
+      const response = await communityApi.reactToPost(postId, user.id, emoji);
+      
+      // Update local state with new reaction data
+      if (post) {
+        setPost({
+          ...post,
+          reactions: response.reactions,
+          reaction_count: Math.max(0, (post.reaction_count || 0) + response.reactionChange)
+        });
+      }
+      
+      // Update user's current reaction state
+      setUserReaction(response.userReaction);
+      
+      setReactionPickerVisible(false);
+    } catch (error) {
+      console.error('Error updating reaction:', error);
+      Alert.alert("Error", "Failed to update reaction");
+    } finally {
+      setReacting(false);
+    }
+  };
+
+  /**
+   * Toggles bookmark status for the current post
+   */
+  const handleBookmarkPress = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "Please sign in to bookmark posts");
+      return;
+    }
+
+    try {
+      const response = await communityApi.toggleBookmark(postId, user.id);
+      setBookmarked(response.bookmarked);
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      Alert.alert("Error", "Failed to update bookmark");
+    }
+  };
+
+  /**
+   * Calculates total number of reactions across all emojis
+   * @param reactions - Object containing emoji:count pairs
+   * @returns Total reaction count
+   */
+  const getTotalReactions = (reactions: { [key: string]: number }) => {
+    if (!reactions) return 0;
+    return Object.values(reactions).reduce((sum, count) => sum + count, 0);
+  };
+
+  /**
+   * Formats timestamp into relative time string
+   * @param timestamp - ISO timestamp string
+   * @returns Human-readable time difference
+   */
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return "Just now";
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  /**
+   * Gets all possible reactions including zero-count ones for consistent UI
+   * @returns Object with all emoji reactions and their counts
+   */
+  const getAllReactions = () => {
+    const baseReactions: { [key: string]: number } = {};
+    
+    // Initialize with all possible reactions at 0 count
+    EMOJI_REACTIONS.forEach(emoji => {
+      baseReactions[emoji] = 0;
+    });
+    
+    // Merge with actual reactions from post data
+    if (post?.reactions) {
+      Object.entries(post.reactions).forEach(([emoji, count]) => {
+        baseReactions[emoji] = count as number;
+      });
+    }
+    
+    return baseReactions;
+  };
+
+  // Loading state UI
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <CurvedBackground style={styles.curvedBackground} />
+        <AppHeader title="Post Detail" showBack={true} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#7CB9A9" />
+          <Text style={styles.loadingText}>Loading post...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Error state UI for missing post
   if (!post) {
     return (
       <SafeAreaView style={styles.container}>
@@ -90,22 +266,7 @@ export default function PostDetailScreen() {
     );
   }
 
-  const handleReactionPress = (emoji: string) => {
-    if (userReaction === emoji) {
-      setUserReaction(null);
-    } else {
-      setUserReaction(emoji);
-    }
-    setReactionPickerVisible(false);
-  };
-
-  const getTotalReactions = (reactions: { [key: string]: number }) => {
-    return Object.values(reactions).reduce((sum, count) => sum + count, 0);
-  };
-
-  const handleBookmarkPress = () => {
-    setBookmarked(!bookmarked);
-  };
+  const allReactions = getAllReactions();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -118,43 +279,66 @@ export default function PostDetailScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Post Card */}
+          {/* Main Post Card Container */}
           <View style={styles.postCard}>
-            {/* Post Header */}
+            {/* Post Header with Author Info */}
             <View style={styles.postHeader}>
-              <Image source={{ uri: post.user.avatar }} style={styles.avatar} />
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{post.user.name}</Text>
-                <Text style={styles.postMeta}>
-                  {post.user.posts} posts • {post.timestamp}
+              <View style={styles.avatarContainer}>
+                <Text style={styles.avatarText}>
+                  {post.author_name?.charAt(0) || 'U'}
                 </Text>
               </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{post.author_name || 'Anonymous User'}</Text>
+                <Text style={styles.postMeta}>
+                  {formatTimestamp(post.created_at)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.bookmarkButton}
+                onPress={handleBookmarkPress}
+              >
+                <Ionicons
+                  name={bookmarked ? "bookmark" : "bookmark-outline"}
+                  size={24}
+                  color={bookmarked ? "#FFA000" : "#666"}
+                />
+              </TouchableOpacity>
             </View>
 
             {/* Category Badge */}
-            <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{post.category}</Text>
-            </View>
+            {post.category_name && (
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>{post.category_name}</Text>
+              </View>
+            )}
 
             {/* Post Title */}
             <Text style={styles.postTitle}>{post.title}</Text>
 
-            {/* Post Content */}
+            {/* Post Content Body */}
             <Text style={styles.postContent}>{post.content}</Text>
 
-            {/* Reaction Stats - Now Tappable */}
+            {/* Reaction Statistics Bar */}
             <View style={styles.reactionStats}>
-              {Object.entries(post.reactions).map(([emoji, count]) => (
+              {Object.entries(allReactions).map(([emoji, count]) => (
                 <TouchableOpacity
                   key={emoji}
                   style={[
                     styles.reactionStat,
                     userReaction === emoji && styles.reactionStatActive,
+                    count === 0 && styles.reactionStatEmpty,
                   ]}
                   onPress={() => handleReactionPress(emoji)}
+                  disabled={reacting}
                 >
                   <Text style={styles.reactionStatEmoji}>{emoji}</Text>
-                  <Text style={styles.reactionStatCount}>{count}</Text>
+                  <Text style={[
+                    styles.reactionStatCount,
+                    count === 0 && styles.reactionStatCountEmpty
+                  ]}>
+                    {count}
+                  </Text>
                 </TouchableOpacity>
               ))}
               
@@ -162,12 +346,17 @@ export default function PostDetailScreen() {
               <TouchableOpacity
                 style={styles.addMoreReactionButton}
                 onPress={() => setReactionPickerVisible(!reactionPickerVisible)}
+                disabled={reacting}
               >
-                <Ionicons name="add-circle" size={20} color="#4CAF50" />
+                <Ionicons 
+                  name="add-circle" 
+                  size={20} 
+                  color={reacting ? "#CCC" : "#4CAF50"} 
+                />
               </TouchableOpacity>
             </View>
 
-            {/* Action Buttons - Removed, reactions now in stats section */}
+            {/* User Reaction Status Indicator */}
             {userReaction && (
               <View style={styles.userReactionIndicator}>
                 <Text style={styles.userReactionText}>
@@ -176,31 +365,34 @@ export default function PostDetailScreen() {
               </View>
             )}
 
-            {/* Reaction Picker */}
+            {/* Expandable Reaction Picker */}
             {reactionPickerVisible && (
               <View style={styles.reactionPicker}>
-                {EMOJI_REACTIONS.map((emoji) => (
-                  <TouchableOpacity
-                    key={emoji}
-                    style={[
-                      styles.emojiButton,
-                      userReaction === emoji && styles.emojiButtonActive,
-                    ]}
-                    onPress={() => handleReactionPress(emoji)}
-                  >
-                    <Text style={styles.emojiText}>{emoji}</Text>
-                  </TouchableOpacity>
-                ))}
+                <Text style={styles.reactionPickerTitle}>Add Reaction</Text>
+                <View style={styles.reactionPickerEmojis}>
+                  {EMOJI_REACTIONS.map((emoji) => (
+                    <TouchableOpacity
+                      key={emoji}
+                      style={[
+                        styles.emojiButton,
+                        userReaction === emoji && styles.emojiButtonActive,
+                      ]}
+                      onPress={() => handleReactionPress(emoji)}
+                      disabled={reacting}
+                    >
+                      <Text style={styles.emojiText}>{emoji}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             )}
           </View>
 
           {/* Related Posts Section */}
-          <View style={styles.relatedSection}>
-            <Text style={styles.relatedTitle}>Related Posts</Text>
-            {POSTS.filter((p) => p.id !== postId && p.category === post.category)
-              .slice(0, 2)
-              .map((relatedPost) => (
+          {relatedPosts.length > 0 && (
+            <View style={styles.relatedSection}>
+              <Text style={styles.relatedTitle}>Related Posts</Text>
+              {relatedPosts.map((relatedPost) => (
                 <TouchableOpacity
                   key={relatedPost.id}
                   style={styles.relatedPost}
@@ -211,29 +403,31 @@ export default function PostDetailScreen() {
                     })
                   }
                 >
-                  <Image
-                    source={{ uri: relatedPost.user.avatar }}
-                    style={styles.relatedAvatar}
-                  />
+                  <View style={styles.relatedAvatar}>
+                    <Text style={styles.relatedAvatarText}>
+                      {relatedPost.author_name?.charAt(0) || 'U'}
+                    </Text>
+                  </View>
                   <View style={styles.relatedContent}>
                     <Text style={styles.relatedPostTitle} numberOfLines={2}>
                       {relatedPost.title}
                     </Text>
                     <Text style={styles.relatedPostMeta}>
-                      by {relatedPost.user.name} •{" "}
-                      {getTotalReactions(relatedPost.reactions)} reactions
+                      by {relatedPost.author_name} • {getTotalReactions(relatedPost.reactions)} reactions
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color="#999" />
                 </TouchableOpacity>
               ))}
-          </View>
+            </View>
+          )}
 
+          {/* Bottom spacing for scroll view */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </View>
 
-      {/* Overlay to close reaction picker */}
+      {/* Overlay to close reaction picker when tapping outside */}
       {reactionPickerVisible && (
         <Pressable
           style={styles.reactionOverlay}
@@ -244,6 +438,10 @@ export default function PostDetailScreen() {
   );
 }
 
+/**
+ * Stylesheet for PostDetailScreen component
+ * Uses consistent color scheme and responsive design patterns
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -266,6 +464,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 30,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#666",
+    marginTop: 12,
   },
   errorContainer: {
     flex: 1,
@@ -292,7 +501,7 @@ const styles = StyleSheet.create({
   },
   postCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     shadowColor: "grey",
@@ -309,11 +518,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  avatar: {
+  avatarContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: "#7CB9A9",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
+  },
+  avatarText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   userInfo: {
     flex: 1,
@@ -328,14 +545,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#757575",
   },
-  moreButton: {
+  bookmarkButton: {
     padding: 4,
   },
   categoryBadge: {
     alignSelf: "flex-start",
     backgroundColor: "#E8F5E9",
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
     marginBottom: 12,
   },
@@ -360,7 +577,7 @@ const styles = StyleSheet.create({
   reactionStats: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 8,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -376,19 +593,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 16,
     backgroundColor: "#F5F5F5",
+    minWidth: 60,
+    justifyContent: "center",
   },
   reactionStatActive: {
     backgroundColor: "#E8F5E9",
     borderWidth: 2,
     borderColor: "#4CAF50",
   },
+  reactionStatEmpty: {
+    opacity: 0.6,
+  },
   reactionStatEmoji: {
-    fontSize: 20,
+    fontSize: 16,
   },
   reactionStatCount: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
     color: "#666",
+  },
+  reactionStatCountEmpty: {
+    color: "#999",
   },
   addMoreReactionButton: {
     paddingVertical: 6,
@@ -410,29 +635,9 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
     fontWeight: "600",
   },
-  bookmarkSection: {
-    marginBottom: 16,
-  },
-  bookmarkButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: "#F5F5F5",
-  },
-  bookmarkButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-  },
   reactionPicker: {
-    flexDirection: "row",
-    gap: 8,
     marginTop: 12,
-    padding: 12,
+    padding: 16,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     shadowColor: "#000",
@@ -444,9 +649,22 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  reactionPickerTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#212121",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  reactionPickerEmojis: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   emojiButton: {
-    padding: 5,
-    borderRadius: 9,
+    padding: 8,
+    borderRadius: 12,
     backgroundColor: "#F5F5F5",
   },
   emojiButtonActive: {
@@ -454,7 +672,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.1 }],
   },
   emojiText: {
-    fontSize: 32,
+    fontSize: 28,
   },
   reactionOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -490,7 +708,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: "#7CB9A9",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
+  },
+  relatedAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "bold",
   },
   relatedContent: {
     flex: 1,

@@ -7,7 +7,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "dev": "nodemon src/index.ts"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
@@ -29,7 +30,6 @@
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "expo": "~53.0.23",
     "expo-blur": "~14.1.5",
     "expo-image-picker": "~16.1.4",
     "expo-linear-gradient": "~14.1.5",
@@ -71,6 +71,7 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-native": "^5.0.0",
+    "expo": "^54.0.12",
     "nodemon": "^3.1.10",
     "typescript": "~5.8.3"
   },
