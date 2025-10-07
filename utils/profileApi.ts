@@ -33,8 +33,9 @@ export interface ClientProfileData {
   
   // Local storage only (not in current database)
   location?: string;
-  profileImage?: string;
   notifications?: boolean;
+  shareWithSupportWorker?: boolean;
+  profileImage?: string;
 }
 
 class ProfileAPI {
@@ -93,6 +94,10 @@ class ProfileAPI {
         lastName: currentClient.last_name || '',
         email: currentClient.email || '',
         phoneNumber: currentClient.phone_number || '',
+        location: '',
+        notifications: false,
+        shareWithSupportWorker: false,
+        profileImage: ''
       };
       
       // Step 2: The clients table data would need a GET endpoint
@@ -124,6 +129,12 @@ class ProfileAPI {
       const savedNotifications = await AsyncStorage.getItem('notificationsEnabled');
       if (savedNotifications) {
         profileData.notifications = JSON.parse(savedNotifications);
+      }
+      
+      // Get shareWithSupportWorker preference from local storage
+      const savedSharePreference = await AsyncStorage.getItem('shareWithSupportWorker');
+      if (savedSharePreference) {
+        profileData.shareWithSupportWorker = JSON.parse(savedSharePreference);
       }
       
       return profileData;
@@ -210,6 +221,11 @@ class ProfileAPI {
       // Step 5: Save notification preference locally
       if (profileData.notifications !== undefined) {
         await AsyncStorage.setItem('notificationsEnabled', JSON.stringify(profileData.notifications));
+      }
+      
+      // Step 6: Save shareWithSupportWorker preference locally
+      if (profileData.shareWithSupportWorker !== undefined) {
+        await AsyncStorage.setItem('shareWithSupportWorker', JSON.stringify(profileData.shareWithSupportWorker));
       }
       
       return { success: true, message: 'Client profile updated successfully' };

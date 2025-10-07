@@ -67,6 +67,7 @@ export default function EditProfileScreen() {
     email: "",
     location: "",
     notifications: true,
+    shareWithSupportWorker: false, // NEW FIELD
   });
 
     /**
@@ -209,8 +210,9 @@ export default function EditProfileScreen() {
           firstName: user.firstName || "",
           lastName: user.lastName || "",
           email: user.emailAddresses[0]?.emailAddress || "",
-          location: formData.location, // Keep existing location
-          notifications: formData.notifications, // Keep existing notification setting
+          location: formData.location,
+          notifications: formData.notifications,
+          shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
         });
         
         // Also set profile image from Clerk if available
@@ -233,6 +235,7 @@ export default function EditProfileScreen() {
           ...prev,
           location: parsedData.location || prev.location,
           notifications: parsedData.notifications !== undefined ? parsedData.notifications : prev.notifications,
+          shareWithSupportWorker: parsedData.shareWithSupportWorker !== undefined ? parsedData.shareWithSupportWorker : prev.shareWithSupportWorker, // NEW
         }));
         
         if (parsedData.location) {
@@ -251,6 +254,7 @@ export default function EditProfileScreen() {
             email: user?.emailAddresses[0]?.emailAddress || profileData.email || prev.email,
             location: profileData.location || prev.location,
             notifications: profileData.notifications !== false,
+            shareWithSupportWorker: profileData.shareWithSupportWorker !== undefined ? profileData.shareWithSupportWorker : prev.shareWithSupportWorker, // NEW
           }));
           
           if (profileData.location) {
@@ -315,13 +319,14 @@ export default function EditProfileScreen() {
           email: formData.email,
           location: formData.location,
           notifications: formData.notifications,
+          shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
           profileImage: profileImage || undefined,
         });
 
       // Save notification setting separately to SettingsAPI
       const settingsResult = await settingsApi.saveSettings({
         notificationsEnabled: formData.notifications,
-        // Keep other settings unchanged - only update notifications
+        shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
       });
 
         if (result.success) {
@@ -591,6 +596,25 @@ export default function EditProfileScreen() {
               <Switch
                 value={formData.notifications}
                 onValueChange={(value) => setFormData({ ...formData, notifications: value })}
+                trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          </View>
+
+          {/* Privacy Settings Section - NEW */}
+          <View style={styles.notificationSection}>
+            <Text style={styles.sectionTitle}>Privacy Settings</Text>
+            <View style={styles.notificationItem}>
+              <View style={styles.notificationLeft}>
+                <View style={styles.notificationIcon}>
+                  <Ionicons name="shield-outline" size={16} color="#4CAF50" />
+                </View>
+                <Text style={styles.notificationText}>Share info with support worker</Text>
+              </View>
+              <Switch
+                value={formData.shareWithSupportWorker}
+                onValueChange={(value) => setFormData({ ...formData, shareWithSupportWorker: value })}
                 trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
                 thumbColor="#FFFFFF"
               />
