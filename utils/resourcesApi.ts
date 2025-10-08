@@ -489,10 +489,9 @@ class ExternalApiService {
   // Simple caching using AsyncStorage
   private async getCachedQuote(date: string): Promise<Resource | null> {
     try {
-      // If you have AsyncStorage or similar
       // const cached = await AsyncStorage.getItem(`quote-${date}`);
       // return cached ? JSON.parse(cached) : null;
-      return null; // Implement based on your storage solution
+      return null; 
     // eslint-disable-next-line no-unreachable
     } catch (error) {
       return null;
