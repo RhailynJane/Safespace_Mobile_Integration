@@ -2120,7 +2120,6 @@ class ExternalApiService {
 
 const externalApiService = new ExternalApiService();
 
-// Add these endpoints to your backend
 app.get("/api/external/quote", async (req, res) => {
   try {
     const quote = await externalApiService.getRandomQuote();
