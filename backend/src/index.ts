@@ -2194,7 +2194,7 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
 
-    // Get user's internal ID
+    // Get user's internal ID 
     const userResult = await pool.query(
       "SELECT id FROM users WHERE clerk_user_id = $1",
       [clerkUserId]
