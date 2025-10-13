@@ -502,7 +502,7 @@ class ExternalApiService {
     try {
       // await AsyncStorage.setItem(`quote-${date}`, JSON.stringify(quote));
     } catch (error) {
-      console.error('Error caching quote:', error);
+      console.error('Error caching quote:', error);             
     }
   }
 }
