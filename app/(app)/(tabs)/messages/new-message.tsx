@@ -9,8 +9,6 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   ScrollView,
   ActivityIndicator,
   Dimensions,
@@ -19,7 +17,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 

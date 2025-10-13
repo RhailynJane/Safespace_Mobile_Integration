@@ -2474,3 +2474,506 @@ app.get("/api/settings/:clerkUserId/export", async (req: Request, res: Response)
     });
   }
 });
+
+// =============================================
+// MESSAGING ENDPOINTS
+// =============================================
+
+interface CreateConversationRequest {
+  clerkUserId: string;
+  participantIds: string[];
+  title?: string;
+  conversationType?: 'direct' | 'group';
+}
+
+interface SendMessageRequest {
+  clerkUserId: string;
+  messageText: string;
+  messageType?: 'text' | 'image' | 'file';
+}
+
+// Get all conversations for a user
+app.get('/api/messages/conversations/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    
+    console.log('Fetching conversations for user:', clerkUserId);
+
+    const result = await pool.query(`
+      SELECT 
+        c.id,
+        c.title,
+        c.conversation_type,
+        c.updated_at,
+        (
+          SELECT message_text 
+          FROM messages 
+          WHERE conversation_id = c.id 
+          ORDER BY created_at DESC 
+          LIMIT 1
+        ) as last_message,
+        (
+          SELECT created_at 
+          FROM messages 
+          WHERE conversation_id = c.id 
+          ORDER BY created_at DESC 
+          LIMIT 1
+        ) as last_message_time,
+        (
+          SELECT COUNT(*) 
+          FROM messages m
+          LEFT JOIN message_read_status mrs ON m.id = mrs.message_id AND mrs.user_id = u.id
+          WHERE m.conversation_id = c.id 
+          AND m.sender_id != u.id 
+          AND mrs.id IS NULL
+        ) as unread_count,
+        json_agg(
+          DISTINCT json_build_object(
+            'id', u2.id,
+            'clerk_user_id', u2.clerk_user_id,
+            'first_name', u2.first_name,
+            'last_name', u2.last_name,
+            'email', u2.email,
+            'profile_image_url', u2.profile_image_url,
+            'online', EXISTS(
+              SELECT 1 FROM user_sessions us 
+              WHERE us.user_id = u2.id AND us.last_seen > NOW() - INTERVAL '5 minutes'
+            )
+          )
+        ) as participants
+      FROM conversations c
+      JOIN conversation_participants cp ON c.id = cp.conversation_id
+      JOIN users u ON cp.user_id = u.id
+      JOIN users u2 ON cp.user_id = u2.id
+      WHERE u.clerk_user_id = $1
+        AND u2.clerk_user_id != $1
+      GROUP BY c.id, c.title, c.conversation_type, c.updated_at
+      ORDER BY c.updated_at DESC
+    `, [clerkUserId]);
+
+    console.log(`Found ${result.rows.length} conversations for user ${clerkUserId}`);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error: any) {
+    console.error('Get conversations error:', error.message);
+    // Return empty array instead of error for frontend
+    res.json({
+      success: true,
+      data: []
+    });
+  }
+});
+
+// Get messages for a conversation
+app.get('/api/messages/conversations/:conversationId/messages', async (req: Request, res: Response) => {
+  try {
+    const { conversationId } = req.params;
+    const { clerkUserId, page = '1', limit = '50' } = req.query;
+    
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    console.log(`Fetching messages for conversation ${conversationId}, user ${clerkUserId}`);
+
+    // Verify user is participant
+    const participantCheck = await pool.query(`
+      SELECT 1 FROM conversation_participants cp
+      JOIN users u ON cp.user_id = u.id
+      WHERE cp.conversation_id = $1 AND u.clerk_user_id = $2
+    `, [conversationId, clerkUserId]);
+
+    if (participantCheck.rows.length === 0) {
+      console.log(`User ${clerkUserId} is not a participant of conversation ${conversationId}`);
+      return res.json({
+        success: true,
+        data: [],
+        pagination: { page: pageNum, limit: limitNum, hasMore: false }
+      });
+    }
+
+    // Get messages
+    const messagesResult = await pool.query(`
+      SELECT 
+        m.id,
+        m.message_text,
+        m.message_type,
+        m.created_at,
+        json_build_object(
+          'id', u.id,
+          'clerk_user_id', u.clerk_user_id,
+          'first_name', u.first_name,
+          'last_name', u.last_name,
+          'profile_image_url', u.profile_image_url
+        ) as sender
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.conversation_id = $1
+      ORDER BY m.created_at DESC
+      LIMIT $2 OFFSET $3
+    `, [conversationId, limitNum, offset]);
+
+    console.log(`Found ${messagesResult.rows.length} messages for conversation ${conversationId}`);
+
+    // Mark messages as read
+    try {
+      await pool.query(`
+        INSERT INTO message_read_status (message_id, user_id)
+        SELECT m.id, u.id
+        FROM messages m
+        JOIN users u ON u.clerk_user_id = $1
+        WHERE m.conversation_id = $2 
+          AND m.sender_id != u.id
+          AND NOT EXISTS (
+            SELECT 1 FROM message_read_status mrs 
+            WHERE mrs.message_id = m.id AND mrs.user_id = u.id
+          )
+      `, [clerkUserId, conversationId]);
+    } catch (readError) {
+      console.log('Error marking messages as read:', readError);
+      // Continue even if read status fails
+    }
+
+    res.json({
+      success: true,
+      data: messagesResult.rows.reverse(),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        hasMore: messagesResult.rows.length === limitNum
+      }
+    });
+  } catch (error: any) {
+    console.error('Get messages error:', error.message);
+    // Return empty array instead of error
+    res.json({
+      success: true,
+      data: [],
+      pagination: { page: 1, limit: 50, hasMore: false }
+    });
+  }
+});
+
+// Send a message
+app.post('/api/messages/conversations/:conversationId/messages', async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { conversationId } = req.params;
+    const { clerkUserId, messageText, messageType = 'text' } = req.body;
+
+    await client.query('BEGIN');
+
+    // Get user ID
+    const userResult = await client.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Verify user is participant
+    const participantCheck = await client.query(
+      'SELECT 1 FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2',
+      [conversationId, userId]
+    );
+
+    if (participantCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied to this conversation'
+      });
+    }
+
+    // Insert message
+    const messageResult = await client.query(`
+      INSERT INTO messages (conversation_id, sender_id, message_text, message_type)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [conversationId, userId, messageText, messageType]);
+
+    // Update conversation timestamp
+    await client.query(`
+      UPDATE conversations 
+      SET updated_at = CURRENT_TIMESTAMP 
+      WHERE id = $1
+    `, [conversationId]);
+
+    await client.query('COMMIT');
+
+    // Get complete message with sender info
+    const completeMessage = await client.query(`
+      SELECT 
+        m.id,
+        m.message_text,
+        m.message_type,
+        m.created_at,
+        json_build_object(
+          'id', u.id,
+          'clerk_user_id', u.clerk_user_id,
+          'first_name', u.first_name,
+          'last_name', u.last_name,
+          'profile_image_url', u.profile_image_url
+        ) as sender
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.id = $1
+    `, [messageResult.rows[0].id]);
+
+    res.json({
+      success: true,
+      message: 'Message sent successfully',
+      data: completeMessage.rows[0]
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Send message error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send message'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Create new conversation
+app.post('/api/messages/conversations', async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { clerkUserId, participantIds, title, conversationType = 'direct' } = req.body;
+
+    if (!participantIds || participantIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one participant is required'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Get creator user ID
+    const creatorResult = await client.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (creatorResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const creatorId = creatorResult.rows[0].id;
+
+    // Get participant user IDs
+    const participantUserIds = [creatorId];
+    for (const participantClerkId of participantIds) {
+      const participantResult = await client.query(
+        'SELECT id FROM users WHERE clerk_user_id = $1',
+        [participantClerkId]
+      );
+      
+      if (participantResult.rows.length > 0) {
+        participantUserIds.push(participantResult.rows[0].id);
+      }
+    }
+
+    if (participantUserIds.length < 2) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Valid participants not found'
+      });
+    }
+
+    // Create conversation
+    const conversationResult = await client.query(`
+      INSERT INTO conversations (title, conversation_type, created_by)
+      VALUES ($1, $2, $3)
+      RETURNING *
+    `, [title || null, conversationType, creatorId]);
+
+    const conversation = conversationResult.rows[0];
+
+    // Add participants
+    for (const participantId of participantUserIds) {
+      await client.query(`
+        INSERT INTO conversation_participants (conversation_id, user_id)
+        VALUES ($1, $2)
+      `, [conversation.id, participantId]);
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      message: 'Conversation created successfully',
+      data: conversation
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Create conversation error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create conversation'
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Get available contacts for messaging
+app.get('/api/messages/contacts/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    console.log('Fetching contacts for user:', clerkUserId);
+
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        u.clerk_user_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.profile_image_url,
+        u.role,
+        EXISTS(
+          SELECT 1 FROM user_sessions us 
+          WHERE us.user_id = u.id AND us.last_seen > NOW() - INTERVAL '5 minutes'
+        ) as online,
+        (
+          SELECT COUNT(*) 
+          FROM conversations c
+          JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+          JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
+          WHERE cp1.user_id = u_main.id 
+            AND cp2.user_id = u.id 
+            AND c.conversation_type = 'direct'
+        ) > 0 as has_existing_conversation
+      FROM users u
+      CROSS JOIN (SELECT id FROM users WHERE clerk_user_id = $1) u_main
+      WHERE u.clerk_user_id != $1
+        AND u.status = 'active'
+      ORDER BY u.first_name, u.last_name
+    `, [clerkUserId]);
+
+    console.log(`Found ${result.rows.length} contacts for user ${clerkUserId}`);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error: any) {
+    console.error('Get contacts error:', error.message);
+    // Return empty array instead of error for frontend
+    res.json({
+      success: true,
+      data: []
+    });
+  }
+});
+
+// Search users by name or email
+app.get('/api/messages/search-users/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { q: searchQuery } = req.query;
+
+    if (!searchQuery || searchQuery.toString().trim() === '') {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
+    console.log(`Searching users for query: "${String(searchQuery)}" by user: ${clerkUserId}`);
+
+    const searchTerm = `%${String(searchQuery)}%`.toLowerCase();
+    const exactSearchTerm = String(searchQuery).toLowerCase();
+
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        u.clerk_user_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        u.profile_image_url,
+        u.role,
+        u.city,
+        u.state,
+        EXISTS(
+          SELECT 1 FROM user_sessions us 
+          WHERE us.user_id = u.id AND us.last_seen > NOW() - INTERVAL '5 minutes'
+        ) as online,
+        (
+          SELECT COUNT(*) 
+          FROM conversations c
+          JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+          JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
+          WHERE cp1.user_id = u_main.id 
+            AND cp2.user_id = u.id 
+            AND c.conversation_type = 'direct'
+        ) > 0 as has_existing_conversation,
+        -- Relevance scoring
+        CASE 
+          WHEN LOWER(u.email) = $2 THEN 100
+          WHEN LOWER(CONCAT(u.first_name, ' ', u.last_name)) = $2 THEN 95
+          WHEN LOWER(u.first_name) = $2 THEN 90
+          WHEN LOWER(u.last_name) = $2 THEN 85
+          WHEN LOWER(u.email) LIKE $3 THEN 80
+          WHEN LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE $3 THEN 70
+          WHEN LOWER(u.first_name) LIKE $3 THEN 60
+          WHEN LOWER(u.last_name) LIKE $3 THEN 50
+          ELSE 40
+        END as relevance_score
+      FROM users u
+      CROSS JOIN (SELECT id FROM users WHERE clerk_user_id = $1) u_main
+      WHERE u.clerk_user_id != $1
+        AND u.status = 'active'
+        AND (
+          LOWER(u.first_name) LIKE $3 
+          OR LOWER(u.last_name) LIKE $3 
+          OR LOWER(u.email) LIKE $3
+          OR LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE $3
+        )
+      ORDER BY 
+        relevance_score DESC,
+        u.first_name, u.last_name
+      LIMIT 50
+    `, [clerkUserId, exactSearchTerm, searchTerm]);
+
+    console.log(`Found ${result.rows.length} users matching "${searchQuery}"`);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error: any) {
+    console.error('Search users error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to search users',
+      data: []
+    });
+  }
+});

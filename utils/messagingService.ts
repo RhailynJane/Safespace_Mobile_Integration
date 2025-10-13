@@ -68,7 +68,7 @@ export interface Contact {
 
 class MessagingService {
   // Use consistent conversation IDs
-  private mockConversations: Conversation[] = [
+  private readonly mockConversations: Conversation[] = [
     {
       id: '1', // Simple numeric ID that matches the mock messages
       title: 'Eric Young',
@@ -140,7 +140,7 @@ class MessagingService {
     }
   ];
 
-  private mockContacts: Contact[] = [
+  private readonly mockContacts: Contact[] = [
     {
       id: 'contact_1',
       clerk_user_id: 'user_2',
@@ -199,7 +199,7 @@ class MessagingService {
   ];
 
   // Updated mock messages with consistent IDs (1, 2, 3)
-  private mockMessages: { [conversationId: string]: Message[] } = {
+  private readonly mockMessages: { [conversationId: string]: Message[] } = {
     '1': [ // Matches conversation ID '1'
       {
         id: 'msg_1_1',
@@ -414,9 +414,7 @@ class MessagingService {
     };
 
     // Add to mock messages
-    if (!this.mockMessages[conversationId]) {
-      this.mockMessages[conversationId] = [];
-    }
+    this.mockMessages[conversationId] ??= [];
     this.mockMessages[conversationId].push(newMessage);
 
     // Update conversation last message
