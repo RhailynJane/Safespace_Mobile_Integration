@@ -1,21 +1,15 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
   TextInput,
   Image,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -23,13 +17,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import { messagingService, Conversation, Participant } from "../../../../utils/matrixService";
 
-const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [matrixStatus, setMatrixStatus] = useState<string>("Initializing...");
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -38,6 +34,53 @@ export default function MessagesScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  const initializeMessaging = useCallback(async () => {
+    try {
+      // Replace with actual user ID and token from your auth system
+      const userId = "current_user";
+      const accessToken = process.env.EXPO_PUBLIC_MATRIX_ACCESS_TOKEN;
+      
+      const matrixInitialized = await messagingService.initializeMatrix(userId, accessToken);
+      setMatrixStatus(matrixInitialized ? "Matrix Connected" : "Matrix Not Available");
+      
+      if (matrixInitialized) {
+        await loadConversations();
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error("Failed to initialize messaging:", error);
+      setMatrixStatus("Connection Failed");
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    initializeMessaging();
+  }, [initializeMessaging]);
+
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      const result = await messagingService.getConversations("current_user");
+      if (result.success) {
+        setConversations(result.data);
+      } else {
+        console.log("Failed to load conversations");
+      }
+    } catch (error) {
+      console.error("Failed to load conversations:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadConversations();
+  };
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -48,67 +91,60 @@ export default function MessagesScreen() {
     }
   };
 
+  const getAvatarUrl = (participants: Participant[]) => {
+    const firstParticipant = participants[0];
+    if (firstParticipant?.profile_image_url) {
+      return firstParticipant.profile_image_url;
+    }
+    return "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60";
+  };
 
-  const getDisplayName = () => {
-    return "User";
+  const getDisplayName = (conversation: Conversation) => {
+    if (conversation.title && conversation.title !== `Room ${conversation.id}`) {
+      return conversation.title;
+    }
+    if (conversation.participants.length > 0) {
+      const participant = conversation.participants[0];
+      return `${participant?.first_name ?? ""} ${participant?.last_name ?? ""}`.trim() || participant?.id || "Unknown Participant";
+    }
+    return "Unknown";
+  };
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    
+    if (diff < 24 * 60 * 60 * 1000) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Loading messages...</Text>
+        <Text style={styles.statusText}>{matrixStatus}</Text>
       </View>
     );
   }
 
-  // Sample conversations data
-  const conversations = [
-    {
-      id: 1,
-      name: "Eric Young",
-      lastMessage: "I'm glad you're feeling okay now.",
-      time: "30m ago",
-      unread: 0,
-      online: true,
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    },
-    {
-      id: 2,
-      name: "Support Group",
-      lastMessage: "Jenny: I found this article really helpful...",
-      time: "2d ago",
-      unread: 5,
-      online: false,
-      avatar: "https://randomuser.me/api/portraits/women/4.jpg",
-    },
-    {
-      id: 3,
-      name: "Dr. Sarah Johnson",
-      lastMessage: "Let's schedule our next appointment.",
-      time: "1d ago",
-      unread: 1,
-      online: false,
-      avatar: "https://randomuser.me/api/portraits/women/32.jpg",
-    },
-    {
-      id: 4,
-      name: "Therapist Group",
-      lastMessage: "Mark: Has anyone tried the new technique?",
-      time: "3d ago",
-      unread: 0,
-      online: false,
-      avatar: "https://randomuser.me/api/portraits/men/22.jpg",
-    },
-  ];
-
   return (
     <SafeAreaView style={styles.container}>
       <CurvedBackground>
-        {/* Header */}
-          <AppHeader 
-            title="Messages" 
-            showBack={true}
-          />
+        {/* Fixed AppHeader usage - remove subtitle if not supported */}
+        <AppHeader 
+          title="Messages" 
+          showBack={true}
+        />
+
+        {/* Status display as separate component */}
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusSubtitle}>{matrixStatus}</Text>
+        </View>
 
         {/* New Message Button */}
         <View>
@@ -142,46 +178,116 @@ export default function MessagesScreen() {
           />
         </View>
 
+        {/* Connection Status */}
+        <View style={[
+          styles.statusIndicator,
+          { 
+            backgroundColor: messagingService.isMatrixEnabled() ? '#4CAF50' : '#FF9800',
+            display: messagingService.isMatrixEnabled() ? 'none' : 'flex'
+          }
+        ]}>
+          <Ionicons 
+            name={messagingService.isMatrixEnabled() ? "checkmark-circle" : "warning"} 
+            size={16} 
+            color="#FFF" 
+          />
+          <Text style={styles.statusIndicatorText}>
+            {matrixStatus}
+          </Text>
+        </View>
+
         {/* Conversation List */}
         <View style={styles.conversationContainer}>
-          <ScrollView style={styles.conversationList}>
-            {conversations.map((conversation) => (
-              <TouchableOpacity
-                key={conversation.id}
-                style={styles.conversationItem}
-                onPress={() => router.replace(`../messages/message-chat-screen?id=${conversation.id}`)}
-              >
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: conversation.avatar }}
-                    style={styles.avatar}
-                  />
-                  {conversation.online && <View style={styles.onlineIndicator} />}
-                </View>
-
-                <View style={styles.conversationContent}>
-                  <View style={styles.conversationHeader}>
-                    <Text style={styles.conversationName}>{conversation.name}</Text>
-                    <Text style={styles.conversationTime}>{conversation.time}</Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.conversationMessage,
-                      conversation.unread > 0 && styles.unreadMessage,
-                    ]}
-                    numberOfLines={1}
+          <ScrollView 
+            style={styles.conversationList}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={['#4CAF50']}
+              />
+            }
+          >
+            {conversations.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
+                <Text style={styles.emptyStateText}>
+                  {messagingService.isMatrixEnabled() ? "No conversations yet" : "Matrix Not Connected"}
+                </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  {messagingService.isMatrixEnabled() 
+                    ? "Start a new conversation to begin messaging" 
+                    : "Check your Matrix configuration to enable messaging"
+                  }
+                </Text>
+                {!messagingService.isMatrixEnabled() && (
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={initializeMessaging}
                   >
-                    {conversation.lastMessage}
-                  </Text>
-                </View>
-
-                {conversation.unread > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadCount}>{conversation.unread}</Text>
-                  </View>
+                    <Text style={styles.retryButtonText}>Retry Connection</Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            ))}
+              </View>
+            ) : (
+              conversations.map((conversation) => (
+                <TouchableOpacity
+                  key={conversation.id}
+                  style={styles.conversationItem}
+                  onPress={() => router.push({
+                    pathname: "../messages/message-chat-screen",
+                    params: { 
+                      id: conversation.id,
+                      title: getDisplayName(conversation)
+                    }
+                  })}
+                >
+                  <View style={styles.avatarContainer}>
+                    <Image
+                      source={{ uri: getAvatarUrl(conversation.participants) }}
+                      style={styles.avatar}
+                    />
+                    {conversation.participants.some(p => p.online) && (
+                      <View style={styles.onlineIndicator} />
+                    )}
+                  </View>
+
+                  <View style={styles.conversationContent}>
+                    <View style={styles.conversationHeader}>
+                      <Text style={styles.conversationName}>
+                        {getDisplayName(conversation)}
+                      </Text>
+                      <Text style={styles.conversationTime}>
+                        {formatTime(conversation.updated_at)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.conversationMessage,
+                        conversation.unread_count > 0 && styles.unreadMessage,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {conversation.last_message || "No messages yet"}
+                    </Text>
+                    <Text style={styles.participantsText}>
+                      {conversation.participants.length === 1 
+                        ? conversation.participants[0]?.email ?? "Unknown Email"
+                        : `${conversation.participants.length} participants`
+                      }
+                    </Text>
+                  </View>
+
+                  {conversation.unread_count > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadCount}>
+                        {conversation.unread_count}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
         </View>
 
@@ -205,12 +311,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
   },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
+  statusContainer: {
+    alignItems: "center",
+    marginTop: 5,
+  },
+  statusSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  statusText: {
+    marginTop: 5,
+    fontSize: 14,
+    color: "#999",
+  },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius:30,
+    borderRadius: 30,
     backgroundColor: "#fff",
-    marginTop: -1,
+    marginTop: 10,
     margin: 15,
     paddingHorizontal: 15,
     height: 50,
@@ -224,7 +349,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchIcon: {
-    marginRight: .5,
+    marginRight: 5,
   },
   searchInput: {
     flex: 1,
@@ -232,81 +357,20 @@ const styles = StyleSheet.create({
     color: "#333",
     fontStyle: "italic",
   },
-
-  content: {
-    flex: 1,
+  statusIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 15,
+    padding: 8,
+    borderRadius: 20,
     justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    backgroundColor:"transparent",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
-  },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
     marginBottom: 10,
+    gap: 8,
   },
-  profileName: {
-    fontSize: 18,
+  statusIndicatorText: {
+    color: "#FFF",
+    fontSize: 12,
     fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: "#757575",
-  },
-  sideMenuContent: {
-    padding: 10,
-  },
-  sideMenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
-  },
-  conversationList: {
-    flex: 1,
-    paddingHorizontal: 5,
   },
   conversationContainer: {
     flex: 1,
@@ -324,10 +388,43 @@ const styles = StyleSheet.create({
     marginBottom: 100,
     marginTop: 5,
   },
+  conversationList: {
+    flex: 1,
+    paddingHorizontal: 5,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: "#666",
+    marginTop: 16,
+    fontWeight: "600",
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
+    textAlign: "center",
+    marginHorizontal: 20,
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: "#4CAF50",
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+  },
   conversationItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 12,
     paddingBottom: 10,
     paddingTop: 3,
     borderBottomWidth: 1,
@@ -361,7 +458,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    marginBottom: 10,
+    marginBottom: 4,
   },
   conversationName: {
     fontSize: 13,
@@ -376,10 +473,15 @@ const styles = StyleSheet.create({
   conversationMessage: {
     fontSize: 14,
     color: "#757575",
+    marginBottom: 2,
   },
   unreadMessage: {
     color: "#333",
     fontWeight: "500",
+  },
+  participantsText: {
+    fontSize: 12,
+    color: "#999",
   },
   unreadBadge: {
     backgroundColor: "#4CAF50",
@@ -396,9 +498,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   newMessageButton: {
-    marginHorizontal:40,
-    marginTop:10,
-    marginBottom:15,
+    marginHorizontal: 40,
+    marginTop: 10,
+    marginBottom: 15,
     shadowColor: "grey",
     shadowOffset: {
       width: 2,

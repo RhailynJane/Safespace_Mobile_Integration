@@ -356,7 +356,6 @@ app.get(
   }
 );
 
-
 // =============================================
 // COMMUNITY FORUM ENDPOINTS - MOVE THESE UP
 // =============================================
@@ -545,7 +544,8 @@ app.post(
             `${user.first_name} ${user.last_name}`.trim() || "Community Member";
         }
       } catch (userError) {
-        console.log("User not found in database, using default author name");
+        console.error("User not found in database:", userError);
+        authorName = "Anonymous User";
       }
 
       // Get category ID
@@ -719,7 +719,7 @@ app.get(
       });
     }
   }
-)
+);
 
 // Start server
 app.listen(PORT, "0.0.0.0", () => {
@@ -1229,6 +1229,9 @@ app.get(
       const { clerkUserId } = req.params;
       const { days = "30" } = req.query;
 
+      // Convert days to string explicitly
+      const daysString = String(days);
+
       const result = await pool.query(
         `SELECT 
         mood_type,
@@ -1238,7 +1241,7 @@ app.get(
         get_mood_label(mood_type) as label
       FROM mood_entries
       WHERE clerk_user_id = $1
-        AND created_at >= NOW() - INTERVAL '${parseInt(days as string)} days'
+        AND created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
       GROUP BY mood_type
       ORDER BY count DESC`,
         [clerkUserId]
@@ -1250,7 +1253,7 @@ app.get(
       FROM mood_factors mf
       JOIN mood_entries me ON mf.mood_entry_id = me.id
       WHERE me.clerk_user_id = $1
-        AND me.created_at >= NOW() - INTERVAL '${parseInt(days as string)} days'
+        AND me.created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
       GROUP BY mf.factor
       ORDER BY count DESC
       LIMIT 10`,
@@ -1912,6 +1915,8 @@ app.get("/api/resources/search", async (req, res) => {
   try {
     const { q } = req.query;
 
+    const searchQuery = String(q || "");
+
     const result = await pool.query(
       `
       SELECT * FROM resources 
@@ -1920,12 +1925,12 @@ app.get("/api/resources/search", async (req, res) => {
          OR $2 = ANY(tags)
       ORDER BY created_at DESC
     `,
-      [`%${q}%`, q]
+      [`%${searchQuery}%`, searchQuery]
     );
 
     res.json(result.rows);
-  } catch (error) {
-    console.error("Error searching resources:", error);
+  } catch (error: any) {
+    console.error("Error searching resources:", error.message);
     res.status(500).json({ error: "Failed to search resources" });
   }
 });
@@ -2159,22 +2164,22 @@ interface UserSettings {
   textSize: string;
   highContrast: boolean;
   reduceMotion: boolean;
-  
+
   // Privacy & Security
   biometricLock: boolean;
   autoLockTimer: string;
-  
+
   // Notifications
   notificationsEnabled: boolean;
   quietHoursEnabled: boolean;
   quietStartTime: string;
   quietEndTime: string;
   reminderFrequency: string;
-  
+
   // Contacts
   crisisContact: string;
   therapistContact: string;
-  
+
   // Wellbeing
   safeMode: boolean;
   breakReminders: boolean;
@@ -2193,7 +2198,7 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
 
-    // Get user's internal ID 
+    // Get user's internal ID
     const userResult = await pool.query(
       "SELECT id FROM users WHERE clerk_user_id = $1",
       [clerkUserId]
@@ -2233,7 +2238,7 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           breathingDuration: "5 minutes",
           breathingStyle: "4-7-8 Technique",
           offlineMode: false,
-        }
+        },
       });
     }
 
@@ -2250,7 +2255,14 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
 // Update user settings
 app.put(
   "/api/settings/:clerkUserId",
-  async (req: Request<{ clerkUserId: string }, {}, { settings: Partial<UserSettings> }>, res: Response) => {
+  async (
+    req: Request<
+      { clerkUserId: string },
+      {},
+      { settings: Partial<UserSettings> }
+    >,
+    res: Response
+  ) => {
     try {
       const { clerkUserId } = req.params;
       const { settings } = req.body;
@@ -2351,7 +2363,13 @@ app.patch(
       const updates = req.body;
 
       // Validate category
-      const validCategories = ['display', 'privacy', 'notifications', 'contacts', 'wellbeing'];
+      const validCategories = [
+        "display",
+        "privacy",
+        "notifications",
+        "contacts",
+        "wellbeing",
+      ];
       if (!validCategories.includes(category)) {
         return res.status(400).json({ error: "Invalid settings category" });
       }
@@ -2374,7 +2392,7 @@ app.patch(
       let paramIndex = 2;
 
       Object.keys(updates).forEach((key) => {
-        const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+        const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
         updateFields.push(`${snakeKey} = $${paramIndex}`);
         updateValues.push(updates[key]);
         paramIndex++;
@@ -2386,7 +2404,7 @@ app.patch(
 
       const query = `
         UPDATE user_settings 
-        SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+        SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
         WHERE user_id = $1
         RETURNING *
       `;
@@ -2409,71 +2427,79 @@ app.patch(
 );
 
 // Reset settings to default
-app.post("/api/settings/:clerkUserId/reset", async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
+app.post(
+  "/api/settings/:clerkUserId/reset",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
 
-    // Get user's internal ID
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
 
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Delete existing settings (will trigger default values on next fetch)
+      await pool.query("DELETE FROM user_settings WHERE user_id = $1", [
+        userId,
+      ]);
+
+      res.json({
+        success: true,
+        message: "Settings reset to defaults successfully",
+      });
+    } catch (error: any) {
+      console.error("Error resetting settings:", error.message);
+      res.status(500).json({
+        error: "Failed to reset settings",
+        details: error.message,
+      });
     }
-
-    const userId = userResult.rows[0].id;
-
-    // Delete existing settings (will trigger default values on next fetch)
-    await pool.query("DELETE FROM user_settings WHERE user_id = $1", [userId]);
-
-    res.json({
-      success: true,
-      message: "Settings reset to defaults successfully",
-    });
-  } catch (error: any) {
-    console.error("Error resetting settings:", error.message);
-    res.status(500).json({
-      error: "Failed to reset settings",
-      details: error.message,
-    });
   }
-});
+);
 
 // Export settings (for backup/migration)
-app.get("/api/settings/:clerkUserId/export", async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
+app.get(
+  "/api/settings/:clerkUserId/export",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
 
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
 
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      const result = await pool.query(
+        "SELECT * FROM user_settings WHERE user_id = $1",
+        [userId]
+      );
+
+      res.json({
+        exportDate: new Date().toISOString(),
+        settings: result.rows[0] || {},
+      });
+    } catch (error: any) {
+      console.error("Error exporting settings:", error.message);
+      res.status(500).json({
+        error: "Failed to export settings",
+        details: error.message,
+      });
     }
-
-    const userId = userResult.rows[0].id;
-
-    const result = await pool.query(
-      "SELECT * FROM user_settings WHERE user_id = $1",
-      [userId]
-    );
-
-    res.json({
-      exportDate: new Date().toISOString(),
-      settings: result.rows[0] || {},
-    });
-  } catch (error: any) {
-    console.error("Error exporting settings:", error.message);
-    res.status(500).json({
-      error: "Failed to export settings",
-      details: error.message,
-    });
   }
-});
+);
 
 // =============================================
 // MESSAGING ENDPOINTS
@@ -2483,23 +2509,26 @@ interface CreateConversationRequest {
   clerkUserId: string;
   participantIds: string[];
   title?: string;
-  conversationType?: 'direct' | 'group';
+  conversationType?: "direct" | "group";
 }
 
 interface SendMessageRequest {
   clerkUserId: string;
   messageText: string;
-  messageType?: 'text' | 'image' | 'file';
+  messageType?: "text" | "image" | "file";
 }
 
 // Get all conversations for a user
-app.get('/api/messages/conversations/:clerkUserId', async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
-    
-    console.log('Fetching conversations for user:', clerkUserId);
+app.get(
+  "/api/messages/conversations/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
 
-    const result = await pool.query(`
+      console.log("Fetching conversations for user:", clerkUserId);
+
+      const result = await pool.query(
+        `
       SELECT 
         c.id,
         c.title,
@@ -2549,54 +2578,71 @@ app.get('/api/messages/conversations/:clerkUserId', async (req: Request, res: Re
         AND u2.clerk_user_id != $1
       GROUP BY c.id, c.title, c.conversation_type, c.updated_at
       ORDER BY c.updated_at DESC
-    `, [clerkUserId]);
+    `,
+        [clerkUserId]
+      );
 
-    console.log(`Found ${result.rows.length} conversations for user ${clerkUserId}`);
+      console.log(
+        `Found ${result.rows.length} conversations for user ${clerkUserId}`
+      );
 
-    res.json({
-      success: true,
-      data: result.rows
-    });
-  } catch (error: any) {
-    console.error('Get conversations error:', error.message);
-    // Return empty array instead of error for frontend
-    res.json({
-      success: true,
-      data: []
-    });
+      res.json({
+        success: true,
+        data: result.rows,
+      });
+    } catch (error: any) {
+      console.error("Get conversations error:", error.message);
+      // Return empty array instead of error for frontend
+      res.json({
+        success: true,
+        data: [],
+      });
+    }
   }
-});
+);
 
 // Get messages for a conversation
-app.get('/api/messages/conversations/:conversationId/messages', async (req: Request, res: Response) => {
-  try {
-    const { conversationId } = req.params;
-    const { clerkUserId, page = '1', limit = '50' } = req.query;
-    
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const offset = (pageNum - 1) * limitNum;
+app.get(
+  "/api/messages/conversations/:conversationId/messages",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId, page = "1", limit = "50" } = req.query;
 
-    console.log(`Fetching messages for conversation ${conversationId}, user ${clerkUserId}`);
+      const pageNum = parseInt(String(page));
+      const limitNum = parseInt(String(limit));
+      const offset = (pageNum - 1) * limitNum;
 
-    // Verify user is participant
-    const participantCheck = await pool.query(`
+      console.log(
+        `Fetching messages for conversation ${conversationId}, user ${clerkUserId}`
+      );
+
+      // Verify user is participant
+      const participantCheck = await pool.query(
+        `
       SELECT 1 FROM conversation_participants cp
       JOIN users u ON cp.user_id = u.id
       WHERE cp.conversation_id = $1 AND u.clerk_user_id = $2
-    `, [conversationId, clerkUserId]);
+    `,
+        [conversationId, String(clerkUserId)]
+      );
 
-    if (participantCheck.rows.length === 0) {
-      console.log(`User ${clerkUserId} is not a participant of conversation ${conversationId}`);
-      return res.json({
-        success: true,
-        data: [],
-        pagination: { page: pageNum, limit: limitNum, hasMore: false }
-      });
-    }
+      if (participantCheck.rows.length === 0) {
+        console.log(
+          `User ${String(
+            clerkUserId
+          )} is not a participant of conversation ${conversationId}`
+        );
+        return res.json({
+          success: true,
+          data: [],
+          pagination: { page: pageNum, limit: limitNum, hasMore: false },
+        });
+      }
 
-    // Get messages
-    const messagesResult = await pool.query(`
+      // Get messages
+      const messagesResult = await pool.query(
+        `
       SELECT 
         m.id,
         m.message_text,
@@ -2614,13 +2660,18 @@ app.get('/api/messages/conversations/:conversationId/messages', async (req: Requ
       WHERE m.conversation_id = $1
       ORDER BY m.created_at DESC
       LIMIT $2 OFFSET $3
-    `, [conversationId, limitNum, offset]);
+    `,
+        [conversationId, limitNum, offset]
+      );
 
-    console.log(`Found ${messagesResult.rows.length} messages for conversation ${conversationId}`);
+      console.log(
+        `Found ${messagesResult.rows.length} messages for conversation ${conversationId}`
+      );
 
-    // Mark messages as read
-    try {
-      await pool.query(`
+      // Mark messages as read
+      try {
+        await pool.query(
+          `
         INSERT INTO message_read_status (message_id, user_id)
         SELECT m.id, u.id
         FROM messages m
@@ -2631,90 +2682,105 @@ app.get('/api/messages/conversations/:conversationId/messages', async (req: Requ
             SELECT 1 FROM message_read_status mrs 
             WHERE mrs.message_id = m.id AND mrs.user_id = u.id
           )
-      `, [clerkUserId, conversationId]);
-    } catch (readError) {
-      console.log('Error marking messages as read:', readError);
-      // Continue even if read status fails
-    }
-
-    res.json({
-      success: true,
-      data: messagesResult.rows.reverse(),
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        hasMore: messagesResult.rows.length === limitNum
+      `,
+          [String(clerkUserId), conversationId]
+        );
+      } catch (readError: any) {
+        console.log("Error marking messages as read:", readError.message);
+        // Continue even if read status fails
       }
-    });
-  } catch (error: any) {
-    console.error('Get messages error:', error.message);
-    // Return empty array instead of error
-    res.json({
-      success: true,
-      data: [],
-      pagination: { page: 1, limit: 50, hasMore: false }
-    });
+
+      // Use toReversed instead of reverse() to avoid mutation
+      const reversedMessages = messagesResult.rows.slice().reverse();
+
+      res.json({
+        success: true,
+        data: reversedMessages,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          hasMore: messagesResult.rows.length === limitNum,
+        },
+      });
+    } catch (error: any) {
+      console.error("Get messages error:", error.message);
+      // Return empty array instead of error
+      res.json({
+        success: true,
+        data: [],
+        pagination: { page: 1, limit: 50, hasMore: false },
+      });
+    }
   }
-});
+);
 
 // Send a message
-app.post('/api/messages/conversations/:conversationId/messages', async (req: Request, res: Response) => {
-  const client = await pool.connect();
-  
-  try {
-    const { conversationId } = req.params;
-    const { clerkUserId, messageText, messageType = 'text' } = req.body;
+app.post(
+  "/api/messages/conversations/:conversationId/messages",
+  async (req: Request, res: Response) => {
+    const client = await pool.connect();
 
-    await client.query('BEGIN');
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId, messageText, messageType = "text" } = req.body;
 
-    // Get user ID
-    const userResult = await client.query(
-      'SELECT id FROM users WHERE clerk_user_id = $1',
-      [clerkUserId]
-    );
+      await client.query("BEGIN");
 
-    if (userResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
+      // Get user ID
+      const userResult = await client.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
 
-    const userId = userResult.rows[0].id;
+      if (userResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
 
-    // Verify user is participant
-    const participantCheck = await client.query(
-      'SELECT 1 FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2',
-      [conversationId, userId]
-    );
+      const userId = userResult.rows[0].id;
 
-    if (participantCheck.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied to this conversation'
-      });
-    }
+      // Verify user is participant
+      const participantCheck = await client.query(
+        "SELECT 1 FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2",
+        [conversationId, userId]
+      );
 
-    // Insert message
-    const messageResult = await client.query(`
+      if (participantCheck.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this conversation",
+        });
+      }
+
+      // Insert message
+      const messageResult = await client.query(
+        `
       INSERT INTO messages (conversation_id, sender_id, message_text, message_type)
       VALUES ($1, $2, $3, $4)
       RETURNING *
-    `, [conversationId, userId, messageText, messageType]);
+    `,
+        [conversationId, userId, messageText, messageType]
+      );
 
-    // Update conversation timestamp
-    await client.query(`
+      // Update conversation timestamp
+      await client.query(
+        `
       UPDATE conversations 
       SET updated_at = CURRENT_TIMESTAMP 
       WHERE id = $1
-    `, [conversationId]);
+    `,
+        [conversationId]
+      );
 
-    await client.query('COMMIT');
+      await client.query("COMMIT");
 
-    // Get complete message with sender info
-    const completeMessage = await client.query(`
+      // Get complete message with sender info
+      const completeMessage = await client.query(
+        `
       SELECT 
         m.id,
         m.message_text,
@@ -2730,53 +2796,60 @@ app.post('/api/messages/conversations/:conversationId/messages', async (req: Req
       FROM messages m
       JOIN users u ON m.sender_id = u.id
       WHERE m.id = $1
-    `, [messageResult.rows[0].id]);
+    `,
+        [messageResult.rows[0].id]
+      );
 
-    res.json({
-      success: true,
-      message: 'Message sent successfully',
-      data: completeMessage.rows[0]
-    });
-
-  } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Send message error:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send message'
-    });
-  } finally {
-    client.release();
+      res.json({
+        success: true,
+        message: "Message sent successfully",
+        data: completeMessage.rows[0],
+      });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("Send message error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to send message",
+      });
+    } finally {
+      client.release();
+    }
   }
-});
+);
 
 // Create new conversation
-app.post('/api/messages/conversations', async (req: Request, res: Response) => {
+app.post("/api/messages/conversations", async (req: Request, res: Response) => {
   const client = await pool.connect();
-  
+
   try {
-    const { clerkUserId, participantIds, title, conversationType = 'direct' } = req.body;
+    const {
+      clerkUserId,
+      participantIds,
+      title,
+      conversationType = "direct",
+    } = req.body;
 
     if (!participantIds || participantIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'At least one participant is required'
+        message: "At least one participant is required",
       });
     }
 
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     // Get creator user ID
     const creatorResult = await client.query(
-      'SELECT id FROM users WHERE clerk_user_id = $1',
+      "SELECT id FROM users WHERE clerk_user_id = $1",
       [clerkUserId]
     );
 
     if (creatorResult.rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
@@ -2786,54 +2859,59 @@ app.post('/api/messages/conversations', async (req: Request, res: Response) => {
     const participantUserIds = [creatorId];
     for (const participantClerkId of participantIds) {
       const participantResult = await client.query(
-        'SELECT id FROM users WHERE clerk_user_id = $1',
+        "SELECT id FROM users WHERE clerk_user_id = $1",
         [participantClerkId]
       );
-      
+
       if (participantResult.rows.length > 0) {
         participantUserIds.push(participantResult.rows[0].id);
       }
     }
 
     if (participantUserIds.length < 2) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: 'Valid participants not found'
+        message: "Valid participants not found",
       });
     }
 
     // Create conversation
-    const conversationResult = await client.query(`
+    const conversationResult = await client.query(
+      `
       INSERT INTO conversations (title, conversation_type, created_by)
       VALUES ($1, $2, $3)
       RETURNING *
-    `, [title || null, conversationType, creatorId]);
+    `,
+      [title || null, conversationType, creatorId]
+    );
 
     const conversation = conversationResult.rows[0];
 
     // Add participants
     for (const participantId of participantUserIds) {
-      await client.query(`
+      await client.query(
+        `
         INSERT INTO conversation_participants (conversation_id, user_id)
         VALUES ($1, $2)
-      `, [conversation.id, participantId]);
+      `,
+        [conversation.id, participantId]
+      );
     }
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     res.status(201).json({
       success: true,
-      message: 'Conversation created successfully',
-      data: conversation
+      message: "Conversation created successfully",
+      data: conversation,
     });
-
   } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Create conversation error:', error.message);
+    await client.query("ROLLBACK");
+    console.error("Create conversation error:", error.message);
     res.status(500).json({
       success: false,
-      message: 'Failed to create conversation'
+      message: "Failed to create conversation",
     });
   } finally {
     client.release();
@@ -2841,13 +2919,16 @@ app.post('/api/messages/conversations', async (req: Request, res: Response) => {
 });
 
 // Get available contacts for messaging
-app.get('/api/messages/contacts/:clerkUserId', async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
+app.get(
+  "/api/messages/contacts/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
 
-    console.log('Fetching contacts for user:', clerkUserId);
+      console.log("Fetching contacts for user:", clerkUserId);
 
-    const result = await pool.query(`
+      const result = await pool.query(
+        `
       SELECT 
         u.id,
         u.clerk_user_id,
@@ -2874,43 +2955,55 @@ app.get('/api/messages/contacts/:clerkUserId', async (req: Request, res: Respons
       WHERE u.clerk_user_id != $1
         AND u.status = 'active'
       ORDER BY u.first_name, u.last_name
-    `, [clerkUserId]);
+    `,
+        [clerkUserId]
+      );
 
-    console.log(`Found ${result.rows.length} contacts for user ${clerkUserId}`);
+      console.log(
+        `Found ${result.rows.length} contacts for user ${clerkUserId}`
+      );
 
-    res.json({
-      success: true,
-      data: result.rows
-    });
-  } catch (error: any) {
-    console.error('Get contacts error:', error.message);
-    // Return empty array instead of error for frontend
-    res.json({
-      success: true,
-      data: []
-    });
-  }
-});
-
-// Search users by name or email
-app.get('/api/messages/search-users/:clerkUserId', async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
-    const { q: searchQuery } = req.query;
-
-    if (!searchQuery || searchQuery.toString().trim() === '') {
-      return res.json({
+      res.json({
         success: true,
-        data: []
+        data: result.rows,
+      });
+    } catch (error: any) {
+      console.error("Get contacts error:", error.message);
+      // Return empty array instead of error for frontend
+      res.json({
+        success: true,
+        data: [],
       });
     }
+  }
+);
 
-    console.log(`Searching users for query: "${String(searchQuery)}" by user: ${clerkUserId}`);
+// Search users by name or email
+app.get(
+  "/api/messages/search-users/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+      const { q: searchQuery } = req.query;
 
-    const searchTerm = `%${String(searchQuery)}%`.toLowerCase();
-    const exactSearchTerm = String(searchQuery).toLowerCase();
+      // Ensure searchQuery is a string and not empty
+      if (typeof searchQuery !== "string" || searchQuery.trim() === "") {
+        return res.json({
+          success: true,
+          data: [],
+        });
+      }
 
-    const result = await pool.query(`
+      const searchQueryString = searchQuery.trim();
+      console.log(
+        `Searching users for query: "${searchQueryString}" by user: ${clerkUserId}`
+      );
+
+      const searchTerm = `%${searchQueryString}%`.toLowerCase();
+      const exactSearchTerm = searchQueryString.toLowerCase();
+
+      const result = await pool.query(
+        `
       SELECT 
         u.id,
         u.clerk_user_id,
@@ -2960,20 +3053,25 @@ app.get('/api/messages/search-users/:clerkUserId', async (req: Request, res: Res
         relevance_score DESC,
         u.first_name, u.last_name
       LIMIT 50
-    `, [clerkUserId, exactSearchTerm, searchTerm]);
+    `,
+        [clerkUserId, exactSearchTerm, searchTerm]
+      );
 
-    console.log(`Found ${result.rows.length} users matching "${searchQuery}"`);
+      console.log(
+        `Found ${result.rows.length} users matching "${searchQueryString}"`
+      );
 
-    res.json({
-      success: true,
-      data: result.rows
-    });
-  } catch (error: any) {
-    console.error('Search users error:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to search users',
-      data: []
-    });
+      res.json({
+        success: true,
+        data: result.rows,
+      });
+    } catch (error: any) {
+      console.error("Search users error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to search users",
+        data: [],
+      });
+    }
   }
-});
+);
