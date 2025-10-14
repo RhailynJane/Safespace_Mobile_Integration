@@ -1,8 +1,4 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,106 +10,53 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { AppHeader } from "../../../../components/AppHeader";
-
-// Sample messages data for each conversation
-const conversationMessages: {
-  [key: string]: { id: number; text: string; time: string; sender: string }[];
-} = {
-  "1": [
-    {
-      id: 1,
-      text: "Hi Eric I scheduled an appointment to you for this month.",
-      time: "Today 9:41 am",
-      sender: "me",
-    },
-    {
-      id: 2,
-      text: "Hi John. Yes, I saw it. Lets talk then.",
-      time: "Today 9:42 am",
-      sender: "other",
-    },
-    {
-      id: 3,
-      text: "I'm glad you're feeling okay now.",
-      time: "30m ago",
-      sender: "other",
-    },
-  ],
-  "2": [
-    {
-      id: 1,
-      text: "Jenny: I found this article really helpful for managing anxiety during stressful times.",
-      time: "2d ago",
-      sender: "other",
-    },
-    {
-      id: 2,
-      text: "Mike: Thanks for sharing Jenny! This was exactly what I needed to read today.",
-      time: "1d ago",
-      sender: "other",
-    },
-    {
-      id: 3,
-      text: "Sarah: Has anyone tried the breathing techniques mentioned in the article?",
-      time: "1d ago",
-      sender: "other",
-    },
-    {
-      id: 4,
-      text: "Yes, I've been practicing them daily and they really help!",
-      time: "12h ago",
-      sender: "me",
-    },
-  ],
-};
-
-// Sample contacts data
-type Contact = {
-  id: number;
-  name: string;
-  avatar: string;
-  online: boolean;
-};
-
-const contacts: { [key: string]: Contact } = {
-  "1": {
-    id: 1,
-    name: "Eric Young",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    online: true,
-  },
-  "2": {
-    id: 2,
-    name: "Support Group",
-    avatar: "https://randomuser.me/api/portraits/women/4.jpg",
-    online: false,
-  },
-  "3": {
-    id: 3,
-    name: "Sophia Lee",
-    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
-    online: true,
-  },
-};
+import { messagingService, Message, Participant } from "../../../../utils/sendbirdService";
 
 // User avatar for sent messages
 const userAvatar = "https://randomuser.me/api/portraits/women/17.jpg";
 
 export default function ChatScreen() {
   const params = useLocalSearchParams();
-  const contactId = params.id as string;
-  const contact = contacts[contactId];
+  const conversationId = params.id as string;
+  const conversationTitle = params.title as string;
 
-  const [messages, setMessages] = useState(
-    conversationMessages[contactId] || []
-  );
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [contact, setContact] = useState<Participant | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const loadMessages = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await messagingService.getMessages(conversationId, "current_user");
+      if (result.success) {
+        setMessages(result.data);
+        
+        // Extract contact info from messages
+        if (result.data.length > 0) {
+          const otherParticipant = result.data.find(msg => msg.sender.id !== "current_user")?.sender;
+          if (otherParticipant) {
+            setContact(otherParticipant);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load messages:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -124,42 +67,50 @@ export default function ChatScreen() {
     }, 100);
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() === "") return;
+  const handleSendMessage = async () => {
+    if (newMessage.trim() === "" || sending) return;
 
-    const newMsg = {
-      id: messages.length + 1,
-      text: newMessage,
-      time: "Just now",
-      sender: "me",
-    };
+    try {
+      setSending(true);
+      const result = await messagingService.sendMessage(conversationId, "current_user", {
+        messageText: newMessage,
+        messageType: 'text'
+      });
 
-    setMessages([...messages, newMsg]);
-    setNewMessage("");
-
-    if (contactId === "1") {
-      setTimeout(() => {
-        const reply = {
-          id: messages.length + 2,
-          text: "Thanks for your message. I'll get back to you soon.",
-          time: "Just now",
-          sender: "other",
-        };
-        setMessages((prev: typeof messages) => [...prev, reply]);
-      }, 1500);
+      if (result.success) {
+        setMessages(prev => [...prev, result.data]);
+        setNewMessage("");
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    } finally {
+      setSending(false);
     }
   };
 
-  if (!contact) {
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    
+    if (diff < 60 * 1000) {
+      return 'Just now';
+    } else if (diff < 60 * 60 * 1000) {
+      const minutes = Math.floor(diff / (60 * 1000));
+      return `${minutes}m ago`;
+    } else if (diff < 24 * 60 * 60 * 1000) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+  };
+
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-          <View style={styles.contactInfo}>
-            <Text style={styles.contactName}>Contact not found</Text>
-          </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Loading messages...</Text>
         </View>
       </SafeAreaView>
     );
@@ -176,14 +127,16 @@ export default function ChatScreen() {
             </TouchableOpacity>
 
             <View style={styles.contactInfo}>
-              <Image
-                source={{ uri: contact.avatar }}
-                style={styles.headerAvatar}
-              />
+              {contact?.profile_image_url && (
+                <Image
+                  source={{ uri: contact.profile_image_url }}
+                  style={styles.headerAvatar}
+                />
+              )}
               <View>
-                <Text style={styles.contactName}>{contact.name}</Text>
+                <Text style={styles.contactName}>{conversationTitle}</Text>
                 <Text style={styles.contactStatus}>
-                  {contact.online ? "Online" : "Offline"}
+                  {contact?.online ? "Online" : "Offline"}
                 </Text>
               </View>
             </View>
@@ -200,52 +153,64 @@ export default function ChatScreen() {
           ref={scrollViewRef}
           contentContainerStyle={styles.messagesContent}
         >
-          {messages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                styles.messageContainer,
-                message.sender === "me"
-                  ? styles.myMessageContainer
-                  : styles.theirMessageContainer,
-              ]}
-            >
-              {message.sender === "other" && (
-                <Image
-                  source={{ uri: contact.avatar }}
-                  style={styles.messageAvatar}
-                />
-              )}
-
+          {messages.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
+              <Text style={styles.emptyStateText}>No messages yet</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Start the conversation by sending a message
+              </Text>
+            </View>
+          ) : (
+            messages.map((message) => (
               <View
+                key={message.id}
                 style={[
-                  styles.messageBubble,
-                  message.sender === "me"
-                    ? styles.myMessage
-                    : styles.theirMessage,
+                  styles.messageContainer,
+                  message.sender.id === "current_user" || message.sender.first_name === "You"
+                    ? styles.myMessageContainer
+                    : styles.theirMessageContainer,
                 ]}
               >
-                <Text
+                {(message.sender.id !== "current_user" && message.sender.first_name !== "You") && (
+                  <Image
+                    source={{ uri: message.sender.profile_image_url || userAvatar }}
+                    style={styles.messageAvatar}
+                  />
+                )}
+
+                <View
                   style={[
-                    styles.messageText,
-                    message.sender === "me"
-                      ? styles.myMessageText
-                      : styles.theirMessageText,
+                    styles.messageBubble,
+                    (message.sender.id === "current_user" || message.sender.first_name === "You")
+                      ? styles.myMessage
+                      : styles.theirMessage,
                   ]}
                 >
-                  {message.text}
-                </Text>
-                <Text style={styles.messageTime}>{message.time}</Text>
-              </View>
+                  <Text
+                    style={[
+                      styles.messageText,
+                      (message.sender.id === "current_user" || message.sender.first_name === "You")
+                        ? styles.myMessageText
+                        : styles.theirMessageText,
+                    ]}
+                  >
+                    {message.message_text}
+                  </Text>
+                  <Text style={styles.messageTime}>
+                    {formatTime(message.created_at)}
+                  </Text>
+                </View>
 
-              {message.sender === "me" && (
-                <Image
-                  source={{ uri: userAvatar }}
-                  style={styles.messageAvatar}
-                />
-              )}
-            </View>
-          ))}
+                {(message.sender.id === "current_user" || message.sender.first_name === "You") && (
+                  <Image
+                    source={{ uri: userAvatar }}
+                    style={styles.messageAvatar}
+                  />
+                )}
+              </View>
+            ))
+          )}
         </ScrollView>
 
         {/* Message Input */}
@@ -265,21 +230,26 @@ export default function ChatScreen() {
               onChangeText={setNewMessage}
               multiline
               maxLength={500}
+              editable={!sending}
             />
 
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                newMessage.trim() === "" && styles.sendButtonDisabled,
+                (newMessage.trim() === "" || sending) && styles.sendButtonDisabled,
               ]}
               onPress={handleSendMessage}
-              disabled={newMessage.trim() === ""}
+              disabled={newMessage.trim() === "" || sending}
             >
-              <Ionicons
-                name="send"
-                size={24}
-                color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
-              />
+              {sending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons
+                  name="send"
+                  size={24}
+                  color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
+                />
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -292,6 +262,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
   // Wrapper to handle safe area properly
   headerWrapper: {
@@ -336,6 +317,23 @@ const styles = StyleSheet.create({
   messagesContent: {
     padding: 15,
     paddingBottom: 10,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: "#666",
+    marginTop: 16,
+    fontWeight: "600",
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
+    textAlign: "center",
   },
   messageBubble: {
     maxWidth: "80%",
