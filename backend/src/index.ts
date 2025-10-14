@@ -3173,6 +3173,40 @@ app.post("/api/sync-sendbird-user", async (req: Request, res: Response) => {
   }
 });
 
+// Add this debug endpoint to check SendBird status
+app.get("/api/debug/sendbird-status", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.query;
+    
+    // Check if environment variables are set
+    const appId = process.env.EXPO_PUBLIC_SENDBIRD_APP_ID;
+    const apiToken = process.env.EXPO_PUBLIC_SENDBIRD_API_TOKEN;
+    
+    const status = {
+      sendbirdConfigured: !!(appId && apiToken),
+      appId: appId ? `${appId.substring(0, 10)}...` : 'Not set',
+      apiToken: apiToken ? `${apiToken.substring(0, 10)}...` : 'Not set',
+      userId: userId || 'Not provided'
+    };
+    
+    console.log("🔧 SendBird Debug Status:", status);
+    
+    res.json({
+      success: true,
+      sendbirdStatus: status,
+      message: status.sendbirdConfigured ? 
+        "SendBird is configured" : 
+        "SendBird is NOT properly configured"
+    });
+  } catch (error: any) {
+    console.error("SendBird debug error:", error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, "0.0.0.0", () => {
   console.log("\nSafeSpace Backend Server Started!");
