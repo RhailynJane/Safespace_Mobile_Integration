@@ -17,7 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-import { messagingService, Conversation, Participant } from "../../../../utils/matrixService";
+import { messagingService, Conversation, Participant } from "../../../../utils/sendbirdService";
 
 export default function MessagesScreen() {
   const [loading, setLoading] = useState(true);
@@ -25,7 +25,7 @@ export default function MessagesScreen() {
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [matrixStatus, setMatrixStatus] = useState<string>("Initializing...");
+  const [sendbirdStatus, setSendbirdStatus] = useState<string>("Initializing...");
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -37,21 +37,21 @@ export default function MessagesScreen() {
 
   const initializeMessaging = useCallback(async () => {
     try {
-      // Replace with actual user ID and token from your auth system
-      const userId = "current_user";
-      const accessToken = process.env.EXPO_PUBLIC_MATRIX_ACCESS_TOKEN;
+      // Replace with actual user ID from your auth system
+      const userId = "current_user"; // This should come from Clerk or your auth
+      const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
       
-      const matrixInitialized = await messagingService.initializeMatrix(userId, accessToken);
-      setMatrixStatus(matrixInitialized ? "Matrix Connected" : "Matrix Not Available");
+      const sendbirdInitialized = await messagingService.initializeSendBird(userId, accessToken);
+      setSendbirdStatus(sendbirdInitialized ? "SendBird Connected" : "SendBird Not Available");
       
-      if (matrixInitialized) {
+      if (sendbirdInitialized) {
         await loadConversations();
       } else {
         setLoading(false);
       }
     } catch (error) {
       console.error("Failed to initialize messaging:", error);
-      setMatrixStatus("Connection Failed");
+      setSendbirdStatus("Connection Failed");
       setLoading(false);
     }
   }, []);
@@ -100,12 +100,14 @@ export default function MessagesScreen() {
   };
 
   const getDisplayName = (conversation: Conversation) => {
-    if (conversation.title && conversation.title !== `Room ${conversation.id}`) {
+    if (conversation.title && !conversation.title.startsWith('Chat ')) {
       return conversation.title;
     }
     if (conversation.participants.length > 0) {
-      const participant = conversation.participants[0];
-      return `${participant?.first_name ?? ""} ${participant?.last_name ?? ""}`.trim() || participant?.id || "Unknown Participant";
+      const otherParticipants = conversation.participants.filter(p => p.id !== "current_user");
+      if (otherParticipants.length > 0) {
+        return otherParticipants.map(p => p.first_name).join(', ');
+      }
     }
     return "Unknown";
   };
@@ -127,7 +129,7 @@ export default function MessagesScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={styles.loadingText}>Loading messages...</Text>
-        <Text style={styles.statusText}>{matrixStatus}</Text>
+        <Text style={styles.statusText}>{sendbirdStatus}</Text>
       </View>
     );
   }
@@ -135,15 +137,14 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <CurvedBackground>
-        {/* Fixed AppHeader usage - remove subtitle if not supported */}
         <AppHeader 
           title="Messages" 
           showBack={true}
         />
 
-        {/* Status display as separate component */}
+        {/* Status display */}
         <View style={styles.statusContainer}>
-          <Text style={styles.statusSubtitle}>{matrixStatus}</Text>
+          <Text style={styles.statusSubtitle}>{sendbirdStatus}</Text>
         </View>
 
         {/* New Message Button */}
@@ -182,17 +183,17 @@ export default function MessagesScreen() {
         <View style={[
           styles.statusIndicator,
           { 
-            backgroundColor: messagingService.isMatrixEnabled() ? '#4CAF50' : '#FF9800',
-            display: messagingService.isMatrixEnabled() ? 'none' : 'flex'
+            backgroundColor: messagingService.isSendBirdEnabled() ? '#4CAF50' : '#FF9800',
+            display: messagingService.isSendBirdEnabled() ? 'none' : 'flex'
           }
         ]}>
           <Ionicons 
-            name={messagingService.isMatrixEnabled() ? "checkmark-circle" : "warning"} 
+            name={messagingService.isSendBirdEnabled() ? "checkmark-circle" : "warning"} 
             size={16} 
             color="#FFF" 
           />
           <Text style={styles.statusIndicatorText}>
-            {matrixStatus}
+            {sendbirdStatus}
           </Text>
         </View>
 
@@ -212,15 +213,15 @@ export default function MessagesScreen() {
               <View style={styles.emptyState}>
                 <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
                 <Text style={styles.emptyStateText}>
-                  {messagingService.isMatrixEnabled() ? "No conversations yet" : "Matrix Not Connected"}
+                  {messagingService.isSendBirdEnabled() ? "No conversations yet" : "SendBird Not Connected"}
                 </Text>
                 <Text style={styles.emptyStateSubtext}>
-                  {messagingService.isMatrixEnabled() 
+                  {messagingService.isSendBirdEnabled() 
                     ? "Start a new conversation to begin messaging" 
-                    : "Check your Matrix configuration to enable messaging"
+                    : "Check your SendBird configuration to enable messaging"
                   }
                 </Text>
-                {!messagingService.isMatrixEnabled() && (
+                {!messagingService.isSendBirdEnabled() && (
                   <TouchableOpacity
                     style={styles.retryButton}
                     onPress={initializeMessaging}
