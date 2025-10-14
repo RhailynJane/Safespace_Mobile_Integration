@@ -404,7 +404,7 @@ class SendBirdService {
   private createErrorResponse(message: string): Message {
     return {
       id: 'error',
-      message_text: message,
+      message_text: `MessagingService Error: ${message}`,
       message_type: 'text',
       created_at: new Date().toISOString(),
       sender: {
