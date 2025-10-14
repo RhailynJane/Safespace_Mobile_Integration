@@ -2,11 +2,13 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { Pool } from "pg";
 
-
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 const app = express();
 const PORT = 3001;
 const axios = require("axios");
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 // Middleware
 app.use(cors());
@@ -92,24 +94,35 @@ app.post(
         });
       }
 
-      const result = await pool.query(
-        `INSERT INTO users (clerk_user_id, first_name, last_name, email, phone_number, role, status) 
-       VALUES ($1, $2, $3, $4, $5, 'client', 'active')
-       ON CONFLICT (clerk_user_id) 
-       DO UPDATE SET 
-         first_name = EXCLUDED.first_name,
-         last_name = EXCLUDED.last_name,
-         email = EXCLUDED.email,
-         phone_number = EXCLUDED.phone_number,
-         updated_at = CURRENT_TIMESTAMP
-       RETURNING id, clerk_user_id, email`,
-        [clerkUserId, firstName, lastName, email, phoneNumber]
-      );
+      const result = await prisma.user.upsert({
+        where: {
+          clerk_user_id: clerkUserId,
+        },
+        update: {
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          phone_number: phoneNumber,
+          updated_at: new Date(), // Explicitly set updated_at
+        },
+        create: {
+          clerk_user_id: clerkUserId,
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          phone_number: phoneNumber,
+          role: 'client',
+          status: 'active',
+          email_verified: true,
+          created_at: new Date(),
+          updated_at: new Date(), // Explicitly set for create too
+        },
+      });
 
       res.json({
         success: true,
         message: "User synced successfully",
-        user: result.rows[0],
+        user: result,
       });
     } catch (error: any) {
       console.error("Error syncing user:", error.message);
@@ -148,39 +161,43 @@ app.post("/api/users/sync", async (req: Request, res: Response) => {
       });
     }
 
-    const result = await pool.query(
-      `INSERT INTO users (clerk_user_id, first_name, last_name, email, phone_number, profile_image_url, email_verified, role, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'client', 'active')
-       ON CONFLICT (clerk_user_id) 
-       DO UPDATE SET 
-         first_name = EXCLUDED.first_name,
-         last_name = EXCLUDED.last_name,
-         email = EXCLUDED.email,
-         phone_number = EXCLUDED.phone_number,
-         profile_image_url = EXCLUDED.profile_image_url,
-         email_verified = EXCLUDED.email_verified,
-         updated_at = CURRENT_TIMESTAMP
-       RETURNING id, clerk_user_id, email, first_name, last_name`,
-      [
-        clerk_user_id,
-        first_name,
-        last_name,
-        email,
-        phone_number,
-        profile_image_url,
-        email_verified || false,
-      ]
-    );
+    const result = await prisma.user.upsert({
+      where: {
+        clerk_user_id: clerk_user_id,
+      },
+      update: {
+        first_name: first_name,
+        last_name: last_name,
+        email: email,
+        phone_number: phone_number,
+        profile_image_url: profile_image_url,
+        email_verified: email_verified || false,
+        updated_at: new Date(), // Explicitly set updated_at
+      },
+      create: {
+        clerk_user_id: clerk_user_id,
+        first_name: first_name,
+        last_name: last_name,
+        email: email,
+        phone_number: phone_number,
+        profile_image_url: profile_image_url,
+        email_verified: email_verified || false,
+        role: 'client',
+        status: 'active',
+        created_at: new Date(created_at),
+        updated_at: new Date(), // Explicitly set for create too
+      },
+    });
 
     console.log(
       "User synced successfully via /api/users/sync:",
-      result.rows[0].id
+      result.id
     );
 
     res.status(200).json({
       success: true,
       message: "User synced successfully",
-      user: result.rows[0],
+      user: result,
     });
   } catch (error: any) {
     console.error("Database sync error in /api/users/sync:", error.message);
@@ -2573,8 +2590,9 @@ app.get(
   }
 );
 
+
 // =============================================
-// MESSAGING ENDPOINTS - COMPLETE FIX
+// MESSAGING ENDPOINTS - PRISMA VERSION
 // =============================================
 
 // Get all conversations for a user
@@ -2586,68 +2604,97 @@ app.get(
 
       console.log("💬 Fetching conversations for user:", clerkUserId);
 
-      const result = await pool.query(
-        `
-        SELECT 
-          c.id,
-          c.title,
-          c.conversation_type,
-          c.updated_at,
-          c.created_at,
-          (
-            SELECT message_text 
-            FROM messages 
-            WHERE conversation_id = c.id 
-            ORDER BY created_at DESC 
-            LIMIT 1
-          ) as last_message,
-          (
-            SELECT created_at 
-            FROM messages 
-            WHERE conversation_id = c.id 
-            ORDER BY created_at DESC 
-            LIMIT 1
-          ) as last_message_time,
-          (
-            SELECT COUNT(*) 
-            FROM messages m
-            WHERE m.conversation_id = c.id 
-            AND m.sender_id != u.id 
-            AND NOT EXISTS (
-              SELECT 1 FROM message_read_status mrs 
-              WHERE mrs.message_id = m.id AND mrs.user_id = u.id
-            )
-          ) as unread_count,
-          (
-            SELECT json_agg(
-              json_build_object(
-                'id', p.id,
-                'clerk_user_id', p.clerk_user_id,
-                'first_name', p.first_name,
-                'last_name', p.last_name,
-                'email', p.email,
-                'profile_image_url', p.profile_image_url,
-                'online', false
-              )
-            )
-            FROM users p
-            JOIN conversation_participants cp ON p.id = cp.user_id
-            WHERE cp.conversation_id = c.id AND p.clerk_user_id != $1
-          ) as participants
-        FROM conversations c
-        JOIN conversation_participants cp ON c.id = cp.conversation_id
-        JOIN users u ON cp.user_id = u.id
-        WHERE u.clerk_user_id = $1
-        ORDER BY c.updated_at DESC
-        `,
-        [clerkUserId]
-      );
+      const conversations = await prisma.conversation.findMany({
+        where: {
+          participants: {
+            some: {
+              user: {
+                clerk_user_id: clerkUserId
+              }
+            }
+          }
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  clerk_user_id: true,
+                  first_name: true,
+                  last_name: true,
+                  email: true,
+                  profile_image_url: true
+                }
+              }
+            }
+          },
+          messages: {
+            orderBy: {
+              created_at: 'desc'
+            },
+            take: 1
+          },
+          _count: {
+            select: {
+              messages: {
+                where: {
+                  NOT: {
+                    read_status: {
+                      some: {
+                        user: {
+                          clerk_user_id: clerkUserId
+                        }
+                      }
+                    }
+                  },
+                  sender: {
+                    clerk_user_id: {
+                      not: clerkUserId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          updated_at: 'desc'
+        }
+      });
 
-      console.log(`💬 Found ${result.rows.length} conversations for user ${clerkUserId}`);
+      const formattedConversations = conversations.map(conversation => {
+        const lastMessage = conversation.messages[0];
+        const otherParticipants = conversation.participants.filter(
+          p => p.user.clerk_user_id !== clerkUserId
+        );
+
+        return {
+          id: conversation.id.toString(),
+          title: conversation.title,
+          conversation_type: conversation.conversation_type,
+          updated_at: conversation.updated_at.toISOString(),
+          created_at: conversation.created_at.toISOString(),
+          last_message: lastMessage?.message_text || '',
+          last_message_time: lastMessage?.created_at.toISOString(),
+          unread_count: conversation._count.messages,
+          participants: otherParticipants.map(p => ({
+            id: p.user.id,
+            clerk_user_id: p.user.clerk_user_id,
+            first_name: p.user.first_name,
+            last_name: p.user.last_name,
+            email: p.user.email,
+            profile_image_url: p.user.profile_image_url,
+            online: false
+          }))
+        };
+      });
+
+      console.log(`💬 Found ${formattedConversations.length} conversations for user ${clerkUserId}`);
 
       res.json({
         success: true,
-        data: result.rows,
+        data: formattedConversations,
       });
     } catch (error: any) {
       console.error("💬 Get conversations error:", error.message);
@@ -2672,19 +2719,19 @@ app.get(
 
       const pageNum = parseInt(page as string) || 1;
       const limitNum = parseInt(limit as string) || 50;
-      const offset = (pageNum - 1) * limitNum;
+      const skip = (pageNum - 1) * limitNum;
 
       // Verify user is participant
-      const participantCheck = await pool.query(
-        `
-        SELECT 1 FROM conversation_participants cp
-        JOIN users u ON cp.user_id = u.id
-        WHERE cp.conversation_id = $1 AND u.clerk_user_id = $2
-        `,
-        [parseInt(conversationId), clerkUserId]
-      );
+      const participant = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversation_id: parseInt(conversationId),
+          user: {
+            clerk_user_id: clerkUserId as string
+          }
+        }
+      });
 
-      if (participantCheck.rows.length === 0) {
+      if (!participant) {
         console.log(`💬 User ${clerkUserId} is not a participant of conversation ${conversationId}`);
         return res.status(403).json({
           success: false,
@@ -2693,66 +2740,76 @@ app.get(
       }
 
       // Get messages
-      const messagesResult = await pool.query(
-        `
-        SELECT 
-          m.id,
-          m.message_text,
-          m.message_type,
-          m.created_at,
-          json_build_object(
-            'id', u.id,
-            'clerk_user_id', u.clerk_user_id,
-            'first_name', u.first_name,
-            'last_name', u.last_name,
-            'profile_image_url', u.profile_image_url,
-            'online', false
-          ) as sender
-        FROM messages m
-        JOIN users u ON m.sender_id = u.id
-        WHERE m.conversation_id = $1
-        ORDER BY m.created_at ASC
-        LIMIT $2 OFFSET $3
-        `,
-        [parseInt(conversationId), limitNum, offset]
-      );
+      const messages = await prisma.message.findMany({
+        where: {
+          conversation_id: parseInt(conversationId)
+        },
+        include: {
+          sender: {
+            select: {
+              id: true,
+              clerk_user_id: true,
+              first_name: true,
+              last_name: true,
+              profile_image_url: true
+            }
+          }
+        },
+        orderBy: {
+          created_at: 'asc'
+        },
+        skip,
+        take: limitNum
+      });
 
-      console.log(`💬 Found ${messagesResult.rows.length} messages`);
+      console.log(`💬 Found ${messages.length} messages`);
 
       // Mark messages as read for this user
-      if (clerkUserId && messagesResult.rows.length > 0) {
+      if (clerkUserId && messages.length > 0) {
         try {
-          const userResult = await pool.query(
-            "SELECT id FROM users WHERE clerk_user_id = $1",
-            [clerkUserId]
-          );
-          
-          if (userResult.rows.length > 0) {
-            const userId = userResult.rows[0].id;
-            const messageIds = messagesResult.rows.map((msg: any) => msg.id);
+          const user = await prisma.user.findUnique({
+            where: { clerk_user_id: clerkUserId as string }
+          });
+
+          if (user) {
+            const messageIds = messages.map(msg => msg.id);
             
-            // Insert read status for unread messages
-            await pool.query(
-              `
-              INSERT INTO message_read_status (message_id, user_id)
-              SELECT unnest($1::int[]), $2
-              ON CONFLICT (message_id, user_id) DO NOTHING
-              `,
-              [messageIds, userId]
-            );
+            // Create read status for unread messages
+            await prisma.messageReadStatus.createMany({
+              data: messageIds.map(messageId => ({
+                message_id: messageId,
+                user_id: user.id
+              })),
+              skipDuplicates: true
+            });
           }
         } catch (readError) {
           console.error("Error marking messages as read:", readError);
         }
       }
 
+      const formattedMessages = messages.map(message => ({
+        id: message.id.toString(),
+        message_text: message.message_text,
+        message_type: message.message_type,
+        created_at: message.created_at.toISOString(),
+        sender: {
+          id: message.sender.id,
+          clerk_user_id: message.sender.clerk_user_id,
+          first_name: message.sender.first_name,
+          last_name: message.sender.last_name,
+          profile_image_url: message.sender.profile_image_url,
+          online: false
+        }
+      }));
+
       res.json({
         success: true,
-        data: messagesResult.rows,
+        data: formattedMessages,
         pagination: {
           page: pageNum,
           limit: limitNum,
-          hasMore: messagesResult.rows.length === limitNum,
+          hasMore: messages.length === limitNum,
         },
       });
     } catch (error: any) {
@@ -2770,8 +2827,6 @@ app.get(
 app.post(
   "/api/messages/conversations/:conversationId/messages",
   async (req: Request, res: Response) => {
-    const client = await pool.connect();
-
     try {
       const { conversationId } = req.params;
       const { clerkUserId, messageText, messageType = "text" } = req.body;
@@ -2785,114 +2840,93 @@ app.post(
         });
       }
 
-      await client.query("BEGIN");
-
-      // Get user ID
-      const userResult = await client.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(404).json({
-          success: false,
-          message: "User not found",
+      // Get user and verify participation in transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // Get user and verify they're a participant
+        const user = await tx.user.findUnique({
+          where: { clerk_user_id: clerkUserId }
         });
-      }
 
-      const userId = userResult.rows[0].id;
+        if (!user) {
+          throw new Error("User not found");
+        }
 
-      // Verify user is participant and get conversation details
-      const conversationCheck = await client.query(
-        `
-        SELECT c.id, c.title 
-        FROM conversations c
-        JOIN conversation_participants cp ON c.id = cp.conversation_id
-        JOIN users u ON cp.user_id = u.id
-        WHERE c.id = $1 AND u.clerk_user_id = $2
-        `,
-        [parseInt(conversationId), clerkUserId]
-      );
-
-      if (conversationCheck.rows.length === 0) {
-        await client.query("ROLLBACK");
-        return res.status(403).json({
-          success: false,
-          message: "Access denied to this conversation",
+        const participant = await tx.conversationParticipant.findFirst({
+          where: {
+            conversation_id: parseInt(conversationId),
+            user_id: user.id
+          }
         });
-      }
 
-      // Insert message
-      const messageResult = await client.query(
-        `
-        INSERT INTO messages (conversation_id, sender_id, message_text, message_type)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, message_text, message_type, created_at
-        `,
-        [parseInt(conversationId), userId, messageText.trim(), messageType]
-      );
+        if (!participant) {
+          throw new Error("Access denied to this conversation");
+        }
 
-      // Update conversation timestamp
-      await client.query(
-        `
-        UPDATE conversations 
-        SET updated_at = CURRENT_TIMESTAMP 
-        WHERE id = $1
-        `,
-        [parseInt(conversationId)]
-      );
+        // Create message
+        const message = await tx.message.create({
+          data: {
+            conversation_id: parseInt(conversationId),
+            sender_id: user.id,
+            message_text: messageText.trim(),
+            message_type: messageType
+          },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                clerk_user_id: true,
+                first_name: true,
+                last_name: true,
+                profile_image_url: true
+              }
+            }
+          }
+        });
 
-      await client.query("COMMIT");
+        // Update conversation timestamp
+        await tx.conversation.update({
+          where: { id: parseInt(conversationId) },
+          data: { updated_at: new Date() }
+        });
 
-      // Get complete message with sender info
-      const completeMessage = await client.query(
-        `
-        SELECT 
-          m.id,
-          m.message_text,
-          m.message_type,
-          m.created_at,
-          json_build_object(
-            'id', u.id,
-            'clerk_user_id', u.clerk_user_id,
-            'first_name', u.first_name,
-            'last_name', u.last_name,
-            'profile_image_url', u.profile_image_url,
-            'online', false
-          ) as sender
-        FROM messages m
-        JOIN users u ON m.sender_id = u.id
-        WHERE m.id = $1
-        `,
-        [messageResult.rows[0].id]
-      );
+        return message;
+      });
 
-      console.log(`💬 Message sent successfully: ${messageResult.rows[0].id}`);
+      console.log(`💬 Message sent successfully: ${result.id}`);
+
+      const formattedMessage = {
+        id: result.id.toString(),
+        message_text: result.message_text,
+        message_type: result.message_type,
+        created_at: result.created_at.toISOString(),
+        sender: {
+          id: result.sender.id,
+          clerk_user_id: result.sender.clerk_user_id,
+          first_name: result.sender.first_name,
+          last_name: result.sender.last_name,
+          profile_image_url: result.sender.profile_image_url,
+          online: false
+        }
+      };
 
       res.json({
         success: true,
         message: "Message sent successfully",
-        data: completeMessage.rows[0],
+        data: formattedMessage,
       });
     } catch (error: any) {
-      await client.query("ROLLBACK");
       console.error("💬 Send message error:", error.message);
       res.status(500).json({
         success: false,
         message: "Failed to send message",
         error: error.message,
       });
-    } finally {
-      client.release();
     }
   }
 );
 
 // Create new conversation
 app.post("/api/messages/conversations", async (req: Request, res: Response) => {
-  const client = await pool.connect();
-
   try {
     const {
       clerkUserId,
@@ -2910,119 +2944,74 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       });
     }
 
-    await client.query("BEGIN");
-
-    // Get creator user info
-    const creatorResult = await client.query(
-      "SELECT id, first_name, last_name FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
-
-    if (creatorResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
+    const result = await prisma.$transaction(async (tx) => {
+      // Get creator user
+      const creator = await tx.user.findUnique({
+        where: { clerk_user_id: clerkUserId }
       });
-    }
 
-    const creatorId = creatorResult.rows[0].id;
-    const creatorName = `${creatorResult.rows[0].first_name} ${creatorResult.rows[0].last_name}`;
-
-    // Get participant user IDs and names
-    const participantUserIds = [creatorId];
-    
-    for (const participantClerkId of participantIds) {
-      if (participantClerkId === clerkUserId) continue; // Skip self
-      
-      const participantResult = await client.query(
-        "SELECT id, first_name, last_name FROM users WHERE clerk_user_id = $1",
-        [participantClerkId]
-      );
-
-      if (participantResult.rows.length > 0) {
-        participantUserIds.push(participantResult.rows[0].id);
-      } else {
-        console.log(`⚠️ Participant not found: ${participantClerkId}`);
+      if (!creator) {
+        throw new Error("User not found");
       }
-    }
 
-    // Check if we have at least 2 participants (creator + at least one other)
-    if (participantUserIds.length < 2) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        success: false,
-        message: "At least one other valid participant is required",
+      // Get participant users
+      const participants = await tx.user.findMany({
+        where: {
+          clerk_user_id: {
+            in: [clerkUserId, ...participantIds]
+          }
+        }
       });
-    }
 
-    // Generate conversation title if not provided
-    let conversationTitle = title;
-    if (!conversationTitle) {
-      // Get participant names for title
-      const participantNamesResult = await client.query(
-        `
-        SELECT first_name, last_name FROM users 
-        WHERE id = ANY($1) AND id != $2
-        `,
-        [participantUserIds, creatorId]
-      );
-      
-      const names = participantNamesResult.rows.map(row => 
-        `${row.first_name} ${row.last_name}`.trim()
-      );
-      conversationTitle = names.join(', ');
-    }
+      if (participants.length < 2) {
+        throw new Error("At least one other valid participant is required");
+      }
 
-    // Create conversation
-    const conversationResult = await client.query(
-      `
-      INSERT INTO conversations (title, conversation_type, created_by)
-      VALUES ($1, $2, $3)
-      RETURNING *
-      `,
-      [conversationTitle, conversationType, creatorId]
-    );
+      // Generate conversation title if not provided
+      let conversationTitle = title;
+      if (!conversationTitle) {
+        const otherParticipants = participants.filter(p => p.clerk_user_id !== clerkUserId);
+        const names = otherParticipants.map(p => `${p.first_name} ${p.last_name}`.trim());
+        conversationTitle = names.join(', ');
+      }
 
-    const conversation = conversationResult.rows[0];
+      // Create conversation
+      const conversation = await tx.conversation.create({
+        data: {
+          title: conversationTitle,
+          conversation_type: conversationType,
+          created_by: creator.id,
+          participants: {
+            create: participants.map(participant => ({
+              user_id: participant.id
+            }))
+          }
+        }
+      });
 
-    // Add all participants
-    for (const participantId of participantUserIds) {
-      await client.query(
-        `
-        INSERT INTO conversation_participants (conversation_id, user_id)
-        VALUES ($1, $2)
-        ON CONFLICT (conversation_id, user_id) DO NOTHING
-        `,
-        [conversation.id, participantId]
-      );
-    }
+      return conversation;
+    });
 
-    await client.query("COMMIT");
-
-    console.log(`💬 Conversation created successfully: ${conversation.id}`);
+    console.log(`💬 Conversation created successfully: ${result.id}`);
 
     res.status(201).json({
       success: true,
       message: "Conversation created successfully",
       data: {
-        id: conversation.id,
-        title: conversation.title,
-        conversation_type: conversation.conversation_type,
-        created_at: conversation.created_at,
-        updated_at: conversation.updated_at
+        id: result.id.toString(),
+        title: result.title,
+        conversation_type: result.conversation_type,
+        created_at: result.created_at.toISOString(),
+        updated_at: result.updated_at.toISOString()
       },
     });
   } catch (error: any) {
-    await client.query("ROLLBACK");
     console.error("💬 Create conversation error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to create conversation",
       error: error.message,
     });
-  } finally {
-    client.release();
   }
 });
 
@@ -3035,41 +3024,72 @@ app.get(
 
       console.log("👥 Fetching contacts for user:", clerkUserId);
 
-      const result = await pool.query(
-        `
-        SELECT 
-          u.id,
-          u.clerk_user_id,
-          u.first_name,
-          u.last_name,
-          u.email,
-          u.profile_image_url,
-          u.role,
-          false as online,
-          (
-            SELECT COUNT(*) > 0
-            FROM conversations c
-            JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
-            JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
-            JOIN users u1 ON cp1.user_id = u1.id
-            JOIN users u2 ON cp2.user_id = u2.id
-            WHERE u1.clerk_user_id = $1 
-              AND u2.clerk_user_id = u.clerk_user_id
-              AND c.conversation_type = 'direct'
-          ) as has_existing_conversation
-        FROM users u
-        WHERE u.clerk_user_id != $1
-          AND u.status = 'active'
-        ORDER BY u.first_name, u.last_name
-        `,
-        [clerkUserId]
+      const contacts = await prisma.user.findMany({
+        where: {
+          clerk_user_id: {
+            not: clerkUserId
+          },
+          status: 'active'
+        },
+        select: {
+          id: true,
+          clerk_user_id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          profile_image_url: true,
+          role: true
+        },
+        orderBy: [
+          { first_name: 'asc' },
+          { last_name: 'asc' }
+        ]
+      });
+
+      // Check for existing conversations
+      const contactsWithConversations = await Promise.all(
+        contacts.map(async (contact) => {
+          const existingConversation = await prisma.conversation.findFirst({
+            where: {
+              AND: [
+                {
+                  participants: {
+                    some: {
+                      user: {
+                        clerk_user_id: clerkUserId
+                      }
+                    }
+                  }
+                },
+                {
+                  participants: {
+                    some: {
+                      user: {
+                        clerk_user_id: contact.clerk_user_id
+                      }
+                    }
+                  }
+                },
+                {
+                  conversation_type: 'direct'
+                }
+              ]
+            }
+          });
+
+          return {
+            ...contact,
+            online: false,
+            has_existing_conversation: !!existingConversation
+          };
+        })
       );
 
-      console.log(`👥 Found ${result.rows.length} contacts for user ${clerkUserId}`);
+      console.log(`👥 Found ${contactsWithConversations.length} contacts for user ${clerkUserId}`);
 
       res.json({
         success: true,
-        data: result.rows,
+        data: contactsWithConversations,
       });
     } catch (error: any) {
       console.error("👥 Get contacts error:", error.message);
@@ -3101,44 +3121,45 @@ app.get(
 
       const searchTerm = `%${searchQuery.trim()}%`;
 
-      const result = await pool.query(
-        `
-        SELECT 
-          u.id,
-          u.clerk_user_id,
-          u.first_name,
-          u.last_name,
-          u.email,
-          u.profile_image_url,
-          u.role,
-          false as online,
-          false as has_existing_conversation
-        FROM users u
-        WHERE u.clerk_user_id != $1
-          AND u.status = 'active'
-          AND (
-            LOWER(u.first_name) LIKE LOWER($2) 
-            OR LOWER(u.last_name) LIKE LOWER($2) 
-            OR LOWER(u.email) LIKE LOWER($2)
-            OR LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE LOWER($2)
-          )
-        ORDER BY 
-          CASE 
-            WHEN LOWER(u.first_name) LIKE LOWER($2) THEN 1
-            WHEN LOWER(u.last_name) LIKE LOWER($2) THEN 2
-            WHEN LOWER(u.email) LIKE LOWER($2) THEN 3
-            ELSE 4
-          END
-        LIMIT 20
-        `,
-        [clerkUserId, searchTerm]
-      );
+      const users = await prisma.user.findMany({
+        where: {
+          clerk_user_id: {
+            not: clerkUserId
+          },
+          status: 'active',
+          OR: [
+            { first_name: { contains: searchTerm, mode: 'insensitive' } },
+            { last_name: { contains: searchTerm, mode: 'insensitive' } },
+            { email: { contains: searchTerm, mode: 'insensitive' } }
+          ]
+        },
+        select: {
+          id: true,
+          clerk_user_id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          profile_image_url: true,
+          role: true
+        },
+        orderBy: [
+          { first_name: 'asc' },
+          { last_name: 'asc' }
+        ],
+        take: 20
+      });
 
-      console.log(`🔍 Found ${result.rows.length} users matching "${searchQuery}"`);
+      const formattedUsers = users.map(user => ({
+        ...user,
+        online: false,
+        has_existing_conversation: false
+      }));
+
+      console.log(`🔍 Found ${formattedUsers.length} users matching "${searchQuery}"`);
 
       res.json({
         success: true,
-        data: result.rows,
+        data: formattedUsers,
       });
     } catch (error: any) {
       console.error("🔍 Search users error:", error.message);
@@ -3150,75 +3171,3 @@ app.get(
     }
   }
 );
-
-// Webhook endpoint for SendBird events
-app.post("/api/sync-sendbird-user", async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId, firstName, lastName, profileImageUrl } = req.body;
-
-    // For now, just acknowledge the request without SendBird integration
-    console.log("SendBird sync requested for user:", clerkUserId);
-    
-    res.json({
-      success: true,
-      message: "SendBird sync endpoint received (integration pending)",
-      userId: clerkUserId,
-    });
-  } catch (error: any) {
-    console.error("Sync SendBird user error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Failed to process SendBird sync request",
-    });
-  }
-});
-
-// Add this debug endpoint to check SendBird status
-app.get("/api/debug/sendbird-status", async (req: Request, res: Response) => {
-  try {
-    const { userId } = req.query;
-    
-    // Check if environment variables are set
-    const appId = process.env.EXPO_PUBLIC_SENDBIRD_APP_ID;
-    const apiToken = process.env.EXPO_PUBLIC_SENDBIRD_API_TOKEN;
-    
-    const status = {
-      sendbirdConfigured: !!(appId && apiToken),
-      appId: appId ? `${appId.substring(0, 10)}...` : 'Not set',
-      apiToken: apiToken ? `${apiToken.substring(0, 10)}...` : 'Not set',
-      userId: userId || 'Not provided'
-    };
-    
-    console.log("🔧 SendBird Debug Status:", status);
-    
-    res.json({
-      success: true,
-      sendbirdStatus: status,
-      message: status.sendbirdConfigured ? 
-        "SendBird is configured" : 
-        "SendBird is NOT properly configured"
-    });
-  } catch (error: any) {
-    console.error("SendBird debug error:", error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// Start server
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("\nSafeSpace Backend Server Started!");
-  console.log(`Server running on: http://localhost:${PORT}`);
-  console.log(`Android emulator URL: http://10.0.2.2:${PORT}`);
-  console.log(`Test in browser: http://localhost:${PORT}/api/users`);
-  console.log("Server logs will appear below...\n");
-});
-
-// Handle server shutdown gracefully
-process.on("SIGINT", async () => {
-  console.log("\nShutting down server...");
-  await pool.end();
-  process.exit(0);
-});

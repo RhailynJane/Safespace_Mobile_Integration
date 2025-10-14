@@ -20,7 +20,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-import { messagingService, Conversation, Participant } from "../../../../utils/sendbirdService";
+import {
+  messagingService,
+  Conversation,
+  Participant,
+} from "../../../../utils/sendbirdService";
 import { useFocusEffect } from "@react-navigation/native";
 
 export default function MessagesScreen() {
@@ -30,7 +34,10 @@ export default function MessagesScreen() {
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [sendbirdStatus, setSendbirdStatus] = useState<string>("Initializing...");
+  const [sendbirdStatus, setSendbirdStatus] =
+    useState<string>("Initializing...");
+  const API_BASE_URL =
+    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -50,10 +57,15 @@ export default function MessagesScreen() {
 
     try {
       const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
-      
-      const sendbirdInitialized = await messagingService.initializeSendBird(userId, accessToken);
-      setSendbirdStatus(sendbirdInitialized ? "SendBird Connected" : "Using Backend API");
-      
+
+      const sendbirdInitialized = await messagingService.initializeSendBird(
+        userId,
+        accessToken
+      );
+      setSendbirdStatus(
+        sendbirdInitialized ? "SendBird Connected" : "Using Backend API"
+      );
+
       // Always load conversations, even if SendBird fails
       await loadConversations();
     } catch (error) {
@@ -75,34 +87,37 @@ export default function MessagesScreen() {
   );
 
   const loadConversations = async () => {
-    if (!userId) {
-      console.log("❌ No user ID available for loading conversations");
-      setConversations([]);
-      setLoading(false);
-      return;
-    }
+  if (!userId) {
+    console.log("❌ No user ID available for loading conversations");
+    setConversations([]);
+    setLoading(false);
+    return;
+  }
 
-    try {
-      setLoading(true);
-      console.log(`💬 Loading conversations for user: ${userId}`);
-      
-      const result = await messagingService.getConversations(userId);
-      
-      if (result.success) {
-        console.log(`💬 Setting ${result.data.length} conversations`);
-        setConversations(result.data);
-      } else {
-        console.log("💬 Failed to load conversations from backend");
-        setConversations([]);
-      }
-    } catch (error) {
-      console.error("💬 Error loading conversations:", error);
+  try {
+    setLoading(true);
+    console.log(`💬 Loading conversations for user: ${userId}`);
+    
+    const response = await fetch(
+      `${API_BASE_URL}/api/messages/conversations/${userId}`
+    );
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`💬 Setting ${result.data.length} conversations`);
+      setConversations(result.data);
+    } else {
+      console.log("💬 Failed to load conversations from backend");
       setConversations([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  } catch (error) {
+    console.error("💬 Error loading conversations:", error);
+    setConversations([]);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -127,30 +142,35 @@ export default function MessagesScreen() {
   };
 
   const getDisplayName = (conversation: Conversation) => {
-    if (conversation.title && !conversation.title.startsWith('Chat ')) {
+    if (conversation.title && !conversation.title.startsWith("Chat ")) {
       return conversation.title;
     }
     if (conversation.participants.length > 0) {
       // Filter out current user from participants list for display
-      const otherParticipants = conversation.participants.filter(p => p.clerk_user_id !== userId);
+      const otherParticipants = conversation.participants.filter(
+        (p) => p.clerk_user_id !== userId
+      );
       if (otherParticipants.length > 0) {
-        return otherParticipants.map(p => p.first_name).join(', ');
+        return otherParticipants.map((p) => p.first_name).join(", ");
       }
     }
     return "Unknown";
   };
 
   const formatTime = (timestamp: string) => {
-    if (!timestamp) return '';
-    
+    if (!timestamp) return "";
+
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    
+
     if (diff < 24 * 60 * 60 * 1000) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
     }
   };
 
@@ -167,10 +187,7 @@ export default function MessagesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <CurvedBackground>
-        <AppHeader 
-          title="Messages" 
-          showBack={true}
-        />
+        <AppHeader title="Messages" showBack={true} />
 
         {/* Status display */}
         <View style={styles.statusContainer}>
@@ -190,14 +207,14 @@ export default function MessagesScreen() {
             }}
           >
             <LinearGradient
-              colors={['#5296EA', '#489EEA', '#459EEA', '#4896EA']}
+              colors={["#5296EA", "#489EEA", "#459EEA", "#4896EA"]}
               style={styles.newMessageButtonGradient}
             >
               <Text style={styles.newMessageButtonText}>+ New Message</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
-        
+
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <TextInput
@@ -216,40 +233,44 @@ export default function MessagesScreen() {
         </View>
 
         {/* Connection Status */}
-        <View style={[
-          styles.statusIndicator,
-          { 
-            backgroundColor: messagingService.isSendBirdEnabled() ? '#4CAF50' : '#FF9800',
-          }
-        ]}>
-          <Ionicons 
-            name={messagingService.isSendBirdEnabled() ? "checkmark-circle" : "warning"} 
-            size={16} 
-            color="#FFF" 
+        <View
+          style={[
+            styles.statusIndicator,
+            {
+              backgroundColor: messagingService.isSendBirdEnabled()
+                ? "#4CAF50"
+                : "#FF9800",
+            },
+          ]}
+        >
+          <Ionicons
+            name={
+              messagingService.isSendBirdEnabled()
+                ? "checkmark-circle"
+                : "warning"
+            }
+            size={16}
+            color="#FFF"
           />
-          <Text style={styles.statusIndicatorText}>
-            {sendbirdStatus}
-          </Text>
+          <Text style={styles.statusIndicatorText}>{sendbirdStatus}</Text>
         </View>
 
         {/* Conversation List */}
         <View style={styles.conversationContainer}>
-          <ScrollView 
+          <ScrollView
             style={styles.conversationList}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                colors={['#4CAF50']}
+                colors={["#4CAF50"]}
               />
             }
           >
             {conversations.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
-                <Text style={styles.emptyStateText}>
-                  No conversations yet
-                </Text>
+                <Text style={styles.emptyStateText}>No conversations yet</Text>
                 <Text style={styles.emptyStateSubtext}>
                   Start a new conversation to begin messaging
                 </Text>
@@ -272,10 +293,10 @@ export default function MessagesScreen() {
                     }
                     router.push({
                       pathname: "../messages/message-chat-screen",
-                      params: { 
+                      params: {
                         id: conversation.id,
-                        title: getDisplayName(conversation)
-                      }
+                        title: getDisplayName(conversation),
+                      },
                     });
                   }}
                 >
@@ -284,7 +305,7 @@ export default function MessagesScreen() {
                       source={{ uri: getAvatarUrl(conversation.participants) }}
                       style={styles.avatar}
                     />
-                    {conversation.participants.some(p => p.online) && (
+                    {conversation.participants.some((p) => p.online) && (
                       <View style={styles.onlineIndicator} />
                     )}
                   </View>
@@ -308,17 +329,18 @@ export default function MessagesScreen() {
                       {conversation.last_message || "No messages yet"}
                     </Text>
                     <Text style={styles.participantsText}>
-                      {conversation.participants.length === 1 
+                      {conversation.participants.length === 1
                         ? conversation.participants[0]?.email ?? "Unknown Email"
-                        : `${conversation.participants.length} participants`
-                      }
+                        : `${conversation.participants.length} participants`}
                     </Text>
                   </View>
 
                   {conversation.unread_count > 0 && (
                     <View style={styles.unreadBadge}>
                       <Text style={styles.unreadCount}>
-                        {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
+                        {conversation.unread_count > 99
+                          ? "99+"
+                          : conversation.unread_count}
                       </Text>
                     </View>
                   )}
@@ -411,7 +433,7 @@ const styles = StyleSheet.create({
   },
   conversationContainer: {
     flex: 1,
-    backgroundColor: "rgba(250, 250, 250, 0.8)", 
+    backgroundColor: "rgba(250, 250, 250, 0.8)",
     borderWidth: 1,
     margin: 15,
     padding: 10,
