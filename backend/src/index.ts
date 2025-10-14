@@ -1,8 +1,9 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { Pool } from "pg";
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 const app = express();
 const PORT = 3001;
 const axios = require("axios");
@@ -3149,3 +3150,41 @@ app.get(
     }
   }
 );
+
+// Webhook endpoint for SendBird events
+app.post("/api/sync-sendbird-user", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, firstName, lastName, profileImageUrl } = req.body;
+
+    // For now, just acknowledge the request without SendBird integration
+    console.log("SendBird sync requested for user:", clerkUserId);
+    
+    res.json({
+      success: true,
+      message: "SendBird sync endpoint received (integration pending)",
+      userId: clerkUserId,
+    });
+  } catch (error: any) {
+    console.error("Sync SendBird user error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process SendBird sync request",
+    });
+  }
+});
+
+// Start server
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("\nSafeSpace Backend Server Started!");
+  console.log(`Server running on: http://localhost:${PORT}`);
+  console.log(`Android emulator URL: http://10.0.2.2:${PORT}`);
+  console.log(`Test in browser: http://localhost:${PORT}/api/users`);
+  console.log("Server logs will appear below...\n");
+});
+
+// Handle server shutdown gracefully
+process.on("SIGINT", async () => {
+  console.log("\nShutting down server...");
+  await pool.end();
+  process.exit(0);
+});
