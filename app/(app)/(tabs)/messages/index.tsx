@@ -48,33 +48,33 @@ export default function MessagesScreen() {
   ];
 
   const initializeMessaging = useCallback(async () => {
-  if (!userId) {
-    console.log("❌ No user ID available");
-    setSendbirdStatus("User not authenticated");
-    setLoading(false);
-    return;
-  }
+    if (!userId) {
+      console.log("❌ No user ID available");
+      setSendbirdStatus("User not authenticated");
+      setLoading(false);
+      return;
+    }
 
-  try {
-    const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
+    try {
+      const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
 
-    // Add default profile URL to avoid SendBird error
-    const sendbirdInitialized = await messagingService.initializeSendBird(
-      userId,
-      accessToken,
-      "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
-    );
-    setSendbirdStatus(
-      sendbirdInitialized ? "SendBird Connected" : "Using Backend API"
-    );
+      // Add default profile URL to avoid SendBird error
+      const sendbirdInitialized = await messagingService.initializeSendBird(
+        userId,
+        accessToken,
+        "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
+      );
+      setSendbirdStatus(
+        sendbirdInitialized ? "SendBird Connected" : "Using Backend API"
+      );
 
-    await loadConversations();
-  } catch (error) {
-    console.log("Failed to initialize messaging");
-    setSendbirdStatus("Using Backend API");
-    await loadConversations();
-  }
-}, [userId]);
+      await loadConversations();
+    } catch (error) {
+      console.log("Failed to initialize messaging");
+      setSendbirdStatus("Using Backend API");
+      await loadConversations();
+    }
+  }, [userId]);
 
   useEffect(() => {
     initializeMessaging();
@@ -88,37 +88,37 @@ export default function MessagesScreen() {
   );
 
   const loadConversations = async () => {
-  if (!userId) {
-    console.log("❌ No user ID available for loading conversations");
-    setConversations([]);
-    setLoading(false);
-    return;
-  }
-
-  try {
-    setLoading(true);
-    console.log(`💬 Loading conversations for user: ${userId}`);
-    
-    const response = await fetch(
-      `${API_BASE_URL}/api/messages/conversations/${userId}`
-    );
-    
-    if (response.ok) {
-      const result = await response.json();
-      console.log(`💬 Setting ${result.data.length} conversations`);
-      setConversations(result.data);
-    } else {
-      console.log("💬 Failed to load conversations from backend");
+    if (!userId) {
+      console.log("❌ No user ID available for loading conversations");
       setConversations([]);
+      setLoading(false);
+      return;
     }
-  } catch (error) {
-    console.error("💬 Error loading conversations:", error);
-    setConversations([]);
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+
+    try {
+      setLoading(true);
+      console.log(`💬 Loading conversations for user: ${userId}`);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${userId}`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`💬 Setting ${result.data.length} conversations`);
+        setConversations(result.data);
+      } else {
+        console.log("💬 Failed to load conversations from backend");
+        setConversations([]);
+      }
+    } catch (error) {
+      console.error("💬 Error loading conversations:", error);
+      setConversations([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -135,57 +135,71 @@ export default function MessagesScreen() {
   };
 
   const getDisplayName = (conversation: Conversation) => {
-  console.log('🔍 getDisplayName - Current userId:', userId);
-  console.log('🔍 getDisplayName - All participants:', conversation.participants);
-  console.log('🔍 getDisplayName - Conversation title:', conversation.title);
-  
-  // ⚠️ IGNORE the conversation title - always use participant names
-  // Filter out current user from participants list
-  const otherParticipants = conversation.participants.filter(
-    (p) => p.clerk_user_id !== userId
-  );
-  
-  console.log('🔍 getDisplayName - Other participants:', otherParticipants);
-  
-  // If there are other participants, show their FULL names
-  if (otherParticipants.length > 0) {
-    const fullNames = otherParticipants.map((p) => 
-      `${p.first_name} ${p.last_name}`.trim()
-    ).join(", ");
-    console.log('🔍 getDisplayName - Final display name:', fullNames);
-    return fullNames;
-  }
-  
-  // If no other participants found, fallback to conversation title
-  if (conversation.title) {
-    console.log('🔍 getDisplayName - Using conversation title as fallback:', conversation.title);
-    return conversation.title;
-  }
-  
-  return "Unknown User";
-};
+    console.log("🔍 getDisplayName - Current userId:", userId);
+    console.log(
+      "🔍 getDisplayName - All participants:",
+      conversation.participants
+    );
+    console.log("🔍 getDisplayName - Conversation title:", conversation.title);
 
-const getAvatarUrl = (participants: Participant[]) => {
-  console.log('🖼️ getAvatarUrl - Current userId:', userId);
-  console.log('🖼️ getAvatarUrl - All participants:', participants);
-  
-  // Get other participants (not current user)
-  const otherParticipants = participants.filter(
-    (p) => p.clerk_user_id !== userId
-  );
-  
-  console.log('🖼️ getAvatarUrl - Other participants:', otherParticipants);
-  
-  // Use the first other participant's avatar, or fallback
-  const displayParticipant = otherParticipants.length > 0 
-    ? otherParticipants[0] 
-    : participants[0]; // Fallback to first participant if no others
-  
-  const avatarUrl = displayParticipant?.profile_image_url || "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60";
-  console.log('🖼️ getAvatarUrl - Final avatar URL:', avatarUrl);
-  
-  return avatarUrl;
-};
+    // ⚠️ IGNORE the conversation title - always use participant names
+    // Filter out current user from participants list
+    const otherParticipants = conversation.participants.filter(
+      (p) => p.clerk_user_id !== userId
+    );
+
+    console.log("🔍 getDisplayName - Other participants:", otherParticipants);
+
+    // If there are other participants, show their FULL names
+    if (otherParticipants.length > 0) {
+      const fullNames = otherParticipants
+        .map((p) => `${p.first_name} ${p.last_name}`.trim())
+        .join(", ");
+      console.log("🔍 getDisplayName - Final display name:", fullNames);
+      return fullNames;
+    }
+
+    // If no other participants found, fallback to conversation title
+    if (conversation.title) {
+      console.log(
+        "🔍 getDisplayName - Using conversation title as fallback:",
+        conversation.title
+      );
+      return conversation.title;
+    }
+
+    return "Unknown User";
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = (firstName?: string, lastName?: string) => {
+    const first = firstName?.charAt(0) || "";
+    const last = lastName?.charAt(0) || "";
+    return `${first}${last}`.toUpperCase() || "U";
+  };
+
+  // Get avatar display (text for initials or URL for image)
+  const getAvatarDisplay = (participants: Participant[]) => {
+    // Get other participants (not current user)
+    const otherParticipants = participants.filter(
+      (p) => p.clerk_user_id !== userId
+    );
+
+    const displayParticipant =
+      otherParticipants.length > 0 ? otherParticipants[0] : participants[0];
+
+    // If profile image exists, return URL
+    if (displayParticipant?.profile_image_url) {
+      return { type: "image", value: displayParticipant.profile_image_url };
+    }
+
+    // Otherwise return initials for text display
+    const initials = getUserInitials(
+      displayParticipant?.first_name,
+      displayParticipant?.last_name
+    );
+    return { type: "text", value: initials };
+  };
 
   const formatTime = (timestamp: string) => {
     if (!timestamp) return "";
@@ -218,11 +232,6 @@ const getAvatarUrl = (participants: Participant[]) => {
     <SafeAreaView style={styles.container}>
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
-
-        {/* Status display */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusSubtitle}>{sendbirdStatus}</Text>
-        </View>
 
         {/* New Message Button */}
         <View>
@@ -331,15 +340,33 @@ const getAvatarUrl = (participants: Participant[]) => {
                   }}
                 >
                   <View style={styles.avatarContainer}>
-                    <Image
-                      source={{ uri: getAvatarUrl(conversation.participants) }}
-                      style={styles.avatar}
-                    />
+                    {(() => {
+                      const avatar = getAvatarDisplay(
+                        conversation.participants
+                      );
+                      if (avatar.type === "image") {
+                        return (
+                          <Image
+                            source={{ uri: avatar.value }}
+                            style={styles.avatar}
+                          />
+                        );
+                      } else {
+                        return (
+                          <View style={styles.initialsAvatar}>
+                            <Text style={styles.initialsText}>
+                              {avatar.value}
+                            </Text>
+                          </View>
+                        );
+                      }
+                    })()}
                     {conversation.participants.some((p) => p.online) && (
                       <View style={styles.onlineIndicator} />
                     )}
                   </View>
 
+                  {/* ADD THIS BACK - Conversation content was missing! */}
                   <View style={styles.conversationContent}>
                     <View style={styles.conversationHeader}>
                       <Text style={styles.conversationName}>
@@ -611,5 +638,18 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 16,
     fontWeight: "800",
+  },
+  initialsAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 60,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  initialsText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
   },
 });
