@@ -546,37 +546,50 @@ class MessagingService {
     }
   }
 
-  private async getMessagesFromBackend(
-    conversationId: string,
-    userId: string,
-    page = 1
-  ): Promise<{
-    success: boolean;
-    data: Message[];
-    pagination: { page: number; limit: number; hasMore: boolean };
-  }> {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&page=${page}&limit=50`
-      );
+private async getMessagesFromBackend(
+  conversationId: string,
+  userId: string,
+  page = 1
+): Promise<{
+  success: boolean;
+  data: Message[];
+  pagination: { page: number; limit: number; hasMore: boolean };
+}> {
+  try {
+    console.log(`📨 Getting messages from backend for conversation ${conversationId}`);
+    
+    const response = await fetch(
+      `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&page=${page}&limit=50`
+    );
 
-      if (!response.ok) throw new Error("Backend request failed");
-
-      const result = await response.json();
-      return {
-        success: true,
-        data: result.data || [],
-        pagination: result.pagination || { page, limit: 50, hasMore: false },
-      };
-    } catch (error) {
-      console.log("Backend fallback failed for getMessages");
-      return {
-        success: true,
-        data: [],
-        pagination: { page, limit: 50, hasMore: false },
-      };
+    if (!response.ok) {
+      console.log(`📨 Backend request failed: ${response.status}`);
+      throw new Error(`Backend request failed: ${response.status}`);
     }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      console.log(`📨 Backend returned error: ${result.message}`);
+      throw new Error(result.message);
+    }
+    
+    console.log(`📨 Successfully loaded ${result.data?.length || 0} messages from backend`);
+    
+    return {
+      success: true,
+      data: result.data || [],
+      pagination: result.pagination || { page, limit: 50, hasMore: false },
+    };
+  } catch (error) {
+    console.log("📨 Backend fallback failed for getMessages:", error);
+    return {
+      success: false,
+      data: [],
+      pagination: { page, limit: 50, hasMore: false },
+    };
   }
+}
 
   private async sendMessageToBackend(
     conversationId: string,
