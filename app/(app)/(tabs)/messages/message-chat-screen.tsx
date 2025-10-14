@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   // Wrapper to handle safe area properly
   headerWrapper: {
     backgroundColor: "transparent",
-    paddingTop: Platform.OS === 'ios' ? 0 : 25, // Adjust for Android status bar
+    paddingTop: Platform.OS === 'ios' ? 0 : 40, // Adjust for Android status bar
   },
   header: {
     flexDirection: "row",
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
   },
   inputContainer: {
-    padding: 15,
+    padding: 30,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#E0E0E0",
@@ -399,8 +399,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F5F5F5",
-    borderRadius: 24,
-    paddingHorizontal: 10,
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 1,
   },
   attachmentButton: {
     padding: 8,

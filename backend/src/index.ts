@@ -1230,7 +1230,7 @@ app.get(
       const { days = "30" } = req.query;
 
       // Convert days to string explicitly
-      const daysString = String(days);
+      const daysString = String(parseInt(days as string, 10) || 30);
 
       const result = await pool.query(
         `SELECT 
@@ -1263,7 +1263,7 @@ app.get(
       res.json({
         moodDistribution: result.rows,
         topFactors: factorsResult.rows,
-        period: `${days} days`,
+        period: `${Number(days)} days`,
       });
     } catch (error: any) {
       console.error("Error fetching mood stats:", error.message);
@@ -1915,7 +1915,7 @@ app.get("/api/resources/search", async (req, res) => {
   try {
     const { q } = req.query;
 
-    const searchQuery = String(q || "");
+    const searchQuery = typeof q === "string" ? q : "";
 
     const result = await pool.query(
       `
@@ -2100,7 +2100,7 @@ class ExternalApiService {
   async getRandomQuote() {
     try {
       const response = await axios.get("https://zenquotes.io/api/random");
-      if (response.data && response.data[0]) {
+      if (response.data?.[0]) {
         return {
           quote: response.data[0].q,
           author: response.data[0].a,
@@ -2609,12 +2609,12 @@ app.get(
       const { conversationId } = req.params;
       const { clerkUserId, page = "1", limit = "50" } = req.query;
 
-      const pageNum = parseInt(String(page));
-      const limitNum = parseInt(String(limit));
+      const pageNum = parseInt(typeof page === "string" && page.trim() !== "" ? page : "1", 10);
+      const limitNum = parseInt(typeof limit === "string" && limit.trim() !== "" ? limit : "50", 10);
       const offset = (pageNum - 1) * limitNum;
 
       console.log(
-        `Fetching messages for conversation ${conversationId}, user ${clerkUserId}`
+        `Fetching messages for conversation ${conversationId}, user ${String(clerkUserId)}`
       );
 
       // Verify user is participant
@@ -2683,7 +2683,7 @@ app.get(
             WHERE mrs.message_id = m.id AND mrs.user_id = u.id
           )
       `,
-          [String(clerkUserId), conversationId]
+          [String(clerkUserId) || '', conversationId]
         );
       } catch (readError: any) {
         console.log("Error marking messages as read:", readError.message);

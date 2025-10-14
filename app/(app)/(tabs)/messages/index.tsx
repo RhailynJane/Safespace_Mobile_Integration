@@ -38,7 +38,7 @@ export default function MessagesScreen() {
   const initializeMessaging = useCallback(async () => {
     try {
       // Replace with actual user ID from your auth system
-      const userId = "current_user"; // This should come from Clerk or your auth
+      const userId = "current_user";
       const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
       
       const sendbirdInitialized = await messagingService.initializeSendBird(userId, accessToken);
@@ -50,7 +50,7 @@ export default function MessagesScreen() {
         setLoading(false);
       }
     } catch (error) {
-      console.error("Failed to initialize messaging:", error);
+      console.log("Failed to initialize messaging");
       setSendbirdStatus("Connection Failed");
       setLoading(false);
     }
@@ -66,11 +66,10 @@ export default function MessagesScreen() {
       const result = await messagingService.getConversations("current_user");
       if (result.success) {
         setConversations(result.data);
-      } else {
-        console.log("Failed to load conversations");
       }
     } catch (error) {
-      console.error("Failed to load conversations:", error);
+      console.log("Failed to load conversations");
+      setConversations([]); // Set empty array on error
     } finally {
       setLoading(false);
       setRefreshing(false);
