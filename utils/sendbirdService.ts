@@ -734,7 +734,6 @@ class MessagingService {
   async getConversationsFromBackend(
     userId: string
   ): Promise<{ success: boolean; data: Conversation[] }> {
-    // Use your own backend API instead of SendBird
     try {
       console.log(`💬 Loading conversations for user: ${userId}`);
 

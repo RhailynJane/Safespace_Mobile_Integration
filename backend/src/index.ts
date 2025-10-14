@@ -2596,65 +2596,62 @@ app.get(
     try {
       const { clerkUserId } = req.params;
 
-      console.log("Fetching conversations for user:", clerkUserId);
+      console.log("💬 Fetching conversations for user:", clerkUserId);
 
       const result = await pool.query(
         `
-      SELECT 
-        c.id,
-        c.title,
-        c.conversation_type,
-        c.updated_at,
-        (
-          SELECT message_text 
-          FROM messages 
-          WHERE conversation_id = c.id 
-          ORDER BY created_at DESC 
-          LIMIT 1
-        ) as last_message,
-        (
-          SELECT created_at 
-          FROM messages 
-          WHERE conversation_id = c.id 
-          ORDER BY created_at DESC 
-          LIMIT 1
-        ) as last_message_time,
-        (
-          SELECT COUNT(*) 
-          FROM messages m
-          LEFT JOIN message_read_status mrs ON m.id = mrs.message_id AND mrs.user_id = u.id
-          WHERE m.conversation_id = c.id 
-          AND m.sender_id != u.id 
-          AND mrs.id IS NULL
-        ) as unread_count,
-        json_agg(
-          DISTINCT json_build_object(
-            'id', u2.id,
-            'clerk_user_id', u2.clerk_user_id,
-            'first_name', u2.first_name,
-            'last_name', u2.last_name,
-            'email', u2.email,
-            'profile_image_url', u2.profile_image_url,
-            'online', EXISTS(
-              SELECT 1 FROM user_sessions us 
-              WHERE us.user_id = u2.id AND us.last_seen > NOW() - INTERVAL '5 minutes'
+        SELECT DISTINCT 
+          c.id,
+          c.title,
+          c.conversation_type,
+          c.updated_at,
+          c.created_at,
+          (
+            SELECT message_text 
+            FROM messages 
+            WHERE conversation_id = c.id 
+            ORDER BY created_at DESC 
+            LIMIT 1
+          ) as last_message,
+          (
+            SELECT created_at 
+            FROM messages 
+            WHERE conversation_id = c.id 
+            ORDER BY created_at DESC 
+            LIMIT 1
+          ) as last_message_time,
+          (
+            SELECT COUNT(*) 
+            FROM messages m
+            LEFT JOIN message_read_status mrs ON m.id = mrs.message_id AND mrs.user_id = u.id
+            WHERE m.conversation_id = c.id 
+            AND m.sender_id != u.id 
+            AND mrs.id IS NULL
+          ) as unread_count,
+          json_agg(
+            DISTINCT json_build_object(
+              'id', u2.id,
+              'clerk_user_id', u2.clerk_user_id,
+              'first_name', u2.first_name,
+              'last_name', u2.last_name,
+              'email', u2.email,
+              'profile_image_url', u2.profile_image_url,
+              'online', false
             )
-          )
-        ) as participants
-      FROM conversations c
-      JOIN conversation_participants cp ON c.id = cp.conversation_id
-      JOIN users u ON cp.user_id = u.id
-      JOIN users u2 ON cp.user_id = u2.id
-      WHERE u.clerk_user_id = $1
-        AND u2.clerk_user_id != $1
-      GROUP BY c.id, c.title, c.conversation_type, c.updated_at
-      ORDER BY c.updated_at DESC
-    `,
+          ) as participants
+        FROM conversations c
+        JOIN conversation_participants cp ON c.id = cp.conversation_id
+        JOIN users u ON cp.user_id = u.id
+        JOIN users u2 ON cp.user_id = u2.id
+        WHERE u.clerk_user_id = $1
+        GROUP BY c.id, c.title, c.conversation_type, c.updated_at, c.created_at
+        ORDER BY c.updated_at DESC
+        `,
         [clerkUserId]
       );
 
       console.log(
-        `Found ${result.rows.length} conversations for user ${clerkUserId}`
+        `💬 Found ${result.rows.length} conversations for user ${clerkUserId}`
       );
 
       res.json({
@@ -2662,8 +2659,7 @@ app.get(
         data: result.rows,
       });
     } catch (error: any) {
-      console.error("Get conversations error:", error.message);
-      // Return empty array instead of error for frontend
+      console.error("💬 Get conversations error:", error.message);
       res.json({
         success: true,
         data: [],
