@@ -23,6 +23,7 @@ export default function ChatScreen() {
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -30,6 +31,34 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [contact, setContact] = useState<Participant | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Update user activity
+  const updateUserActivity = async () => {
+    if (!userId) return;
+    
+    try {
+      await fetch(`${API_BASE_URL}/api/users/${userId}/activity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.error("Error updating user activity:", error);
+    }
+  };
+
+  // Get last seen text
+  const getLastSeenText = (lastActiveAt: string | null) => {
+    if (!lastActiveAt) return "Never active";
+    
+    const lastActive = new Date(lastActiveAt);
+    const now = new Date();
+    const diffMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
+    
+    if (diffMinutes < 1) return "Online now";
+    if (diffMinutes < 60) return `Active ${diffMinutes}m ago`;
+    if (diffMinutes < 1440) return `Active ${Math.floor(diffMinutes / 60)}h ago`;
+    return `Active ${Math.floor(diffMinutes / 1440)}d ago`;
+  };
 
   // Load messages
   const loadMessages = useCallback(async () => {
@@ -40,6 +69,9 @@ export default function ChatScreen() {
     }
 
     try {
+      // Update user's activity
+      await updateUserActivity();
+
       console.log(`💬 Loading messages for conversation ${conversationId}, user ${userId}`);
       
       const result = await messagingService.getMessages(conversationId, userId);
@@ -47,14 +79,29 @@ export default function ChatScreen() {
         console.log(`💬 Loaded ${result.data.length} messages`);
         setMessages(result.data);
         
-        // Extract contact info from messages
-        if (result.data.length > 0) {
-          const otherParticipant = result.data.find(msg => msg.sender.clerk_user_id !== userId)?.sender;
-          if (otherParticipant) {
-            setContact(otherParticipant);
+        // Get conversation details to find the other participant with online status
+        const conversationsResponse = await fetch(
+          `${API_BASE_URL}/api/messages/conversations/${userId}`
+        );
+        
+        if (conversationsResponse.ok) {
+          const conversationsResult = await conversationsResponse.json();
+          const currentConversation = conversationsResult.data.find(
+            (conv: any) => conv.id === conversationId
+          );
+          
+          if (currentConversation) {
+            const otherParticipant = currentConversation.participants.find(
+              (p: Participant) => p.clerk_user_id !== userId
+            );
+            if (otherParticipant) {
+              setContact(otherParticipant);
+            }
           }
-        } else {
-          // If no messages, set contact from conversation title
+        }
+
+        // Fallback if no contact found
+        if (!contact) {
           setContact({
             id: 'unknown',
             clerk_user_id: 'unknown', 
@@ -62,7 +109,8 @@ export default function ChatScreen() {
             last_name: conversationTitle?.split(' ').slice(1).join(' ') || '',
             email: '',
             profile_image_url: undefined,
-            online: false
+            online: false,
+            last_active_at: null
           });
         }
       } else {
@@ -75,7 +123,7 @@ export default function ChatScreen() {
     } finally {
       setLoading(false);
     }
-  }, [conversationId, userId, conversationTitle]);
+  }, [conversationId, userId, conversationTitle, API_BASE_URL, contact, updateUserActivity]);
 
   // Poll for new messages every 3 seconds
   useEffect(() => {
@@ -106,6 +154,9 @@ export default function ChatScreen() {
     try {
       setSending(true);
       console.log(`💬 Sending message: "${newMessage}"`);
+      
+      // Update activity when sending message
+      await updateUserActivity();
       
       const result = await messagingService.sendMessage(conversationId, userId, {
         messageText: newMessage,
@@ -175,153 +226,157 @@ export default function ChatScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
-        {/* Fixed Header with proper safe area padding */}
-        <View style={styles.headerWrapper}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-            </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <SafeAreaView style={styles.container}>
+          {/* Fixed Header with proper safe area padding */}
+          <View style={styles.headerWrapper}>
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+              </TouchableOpacity>
 
-            <View style={styles.contactInfo}>
-              <View style={styles.headerAvatar}>
-                <Text style={styles.headerAvatarText}>
-                  {getUserInitials(contact?.first_name, contact?.last_name)}
-                </Text>
+              <View style={styles.contactInfo}>
+                <View style={styles.headerAvatar}>
+                  <Text style={styles.headerAvatarText}>
+                    {getUserInitials(contact?.first_name, contact?.last_name)}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={styles.contactName}>{conversationTitle}</Text>
+                  <Text style={styles.contactStatus}>
+                    {contact ? getLastSeenText(contact.last_active_at) : "Away"}
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text style={styles.contactName}>{conversationTitle}</Text>
-                <Text style={styles.contactStatus}>
-                  {contact?.online ? "Online" : "Offline"}
-                </Text>
-              </View>
+
+              <TouchableOpacity onPress={() => router.push("../appointments/book")}>
+                <Ionicons name="call-outline" size={24} color="#2E7D32" />
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity onPress={() => router.push("../appointments/book")}>
-              <Ionicons name="call-outline" size={24} color="#2E7D32" />
-            </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Chat Messages */}
-        <ScrollView
-          style={styles.messagesContainer}
-          ref={scrollViewRef}
-          contentContainerStyle={styles.messagesContent}
-        >
-          {messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
-              <Text style={styles.emptyStateText}>No messages yet</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Start the conversation by sending a message
-              </Text>
-            </View>
-          ) : (
-            messages.map((message) => {
-              const myMessage = isMyMessage(message);
-              
-              return (
-                <View
-                  key={message.id}
-                  style={[
-                    styles.messageContainer,
-                    myMessage ? styles.myMessageContainer : styles.theirMessageContainer,
-                  ]}
-                >
-                  {/* Other user's avatar (left side) */}
-                  {!myMessage && (
-                    <View style={styles.avatarContainer}>
-                      <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>
-                          {getUserInitials(message.sender.first_name, message.sender.last_name)}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Message bubble */}
+          {/* Chat Messages */}
+          <ScrollView
+            style={styles.messagesContainer}
+            ref={scrollViewRef}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {messages.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
+                <Text style={styles.emptyStateText}>No messages yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Start the conversation by sending a message
+                </Text>
+              </View>
+            ) : (
+              messages.map((message) => {
+                const myMessage = isMyMessage(message);
+                
+                return (
                   <View
+                    key={message.id}
                     style={[
-                      styles.messageBubble,
-                      myMessage ? styles.myMessage : styles.theirMessage,
+                      styles.messageContainer,
+                      myMessage ? styles.myMessageContainer : styles.theirMessageContainer,
                     ]}
                   >
-                    <Text
+                    {/* Other user's avatar (left side) */}
+                    {!myMessage && (
+                      <View style={styles.avatarContainer}>
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>
+                            {getUserInitials(message.sender.first_name, message.sender.last_name)}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Message bubble */}
+                    <View
                       style={[
-                        styles.messageText,
-                        myMessage ? styles.myMessageText : styles.theirMessageText,
+                        styles.messageBubble,
+                        myMessage ? styles.myMessage : styles.theirMessage,
                       ]}
                     >
-                      {message.message_text}
-                    </Text>
-                    <Text style={[
-                      styles.messageTime,
-                      myMessage ? styles.myMessageTime : styles.theirMessageTime
-                    ]}>
-                      {formatTime(message.created_at)}
-                    </Text>
-                  </View>
-
-                  {/* My avatar (right side) */}
-                  {myMessage && (
-                    <View style={styles.avatarContainer}>
-                      <View style={[styles.avatar, styles.myAvatar]}>
-                        <Text style={styles.avatarText}>
-                          {getUserInitials(message.sender.first_name, message.sender.last_name)}
-                        </Text>
-                      </View>
+                      <Text
+                        style={[
+                          styles.messageText,
+                          myMessage ? styles.myMessageText : styles.theirMessageText,
+                        ]}
+                      >
+                        {message.message_text}
+                      </Text>
+                      <Text style={[
+                        styles.messageTime,
+                        myMessage ? styles.myMessageTime : styles.theirMessageTime
+                      ]}>
+                        {formatTime(message.created_at)}
+                      </Text>
                     </View>
-                  )}
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
 
-        {/* Message Input */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.inputContainer}
-        >
-          <View style={styles.inputWrapper}>
-            <TouchableOpacity style={styles.attachmentButton}>
-              <Ionicons name="attach" size={24} color="#4CAF50" />
-            </TouchableOpacity>
+                    {/* My avatar (right side) */}
+                    {myMessage && (
+                      <View style={styles.avatarContainer}>
+                        <View style={[styles.avatar, styles.myAvatar]}>
+                          <Text style={styles.avatarText}>
+                            {getUserInitials(message.sender.first_name, message.sender.last_name)}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
 
-            <TextInput
-              style={styles.textInput}
-              placeholder="Type a message..."
-              value={newMessage}
-              onChangeText={setNewMessage}
-              multiline
-              maxLength={500}
-              editable={!sending}
-              onSubmitEditing={handleSendMessage}
-              returnKeyType="send"
-            />
+          {/* Message Input */}
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <TouchableOpacity style={styles.attachmentButton}>
+                <Ionicons name="attach" size={24} color="#4CAF50" />
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                (newMessage.trim() === "" || sending) && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSendMessage}
-              disabled={newMessage.trim() === "" || sending || !userId}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons
-                  name="send"
-                  size={24}
-                  color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
-                />
-              )}
-            </TouchableOpacity>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Type a message..."
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+                maxLength={500}
+                editable={!sending}
+                onSubmitEditing={handleSendMessage}
+                returnKeyType="send"
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  (newMessage.trim() === "" || sending) && styles.sendButtonDisabled,
+                ]}
+                onPress={handleSendMessage}
+                disabled={newMessage.trim() === "" || sending || !userId}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons
+                    name="send"
+                    size={24}
+                    color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </CurvedBackground>
   );
 }
@@ -345,15 +400,16 @@ const styles = StyleSheet.create({
   // Wrapper to handle safe area properly
   headerWrapper: {
     backgroundColor: "transparent",
-    paddingTop: Platform.OS === 'ios' ? 0 : 40, // Adjust for Android status bar
+    paddingTop: Platform.OS === 'ios' ? 0 : 25,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: "transparent",
+    minHeight: 60,
   },
   contactInfo: {
     flexDirection: "row",
@@ -365,7 +421,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#2196F3",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -433,10 +489,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   myAvatar: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#2196F3",
   },
   avatarText: {
-    color: "#666",
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
   },

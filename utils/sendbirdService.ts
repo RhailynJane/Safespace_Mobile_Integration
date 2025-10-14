@@ -47,6 +47,7 @@ export interface Participant {
   email: string;
   profile_image_url?: string;
   online: boolean;
+  last_active_at: string | null;
 }
 
 export interface Message {
@@ -471,6 +472,7 @@ class MessagingService {
             email: `${userId}@sendbird.com`,
             profile_image_url: undefined,
             online: false,
+            last_active_at: null, // Add the missing property
           },
           message_id: result.data.message_id,
         };
@@ -720,6 +722,7 @@ class MessagingService {
         email: "system@sendbird.com",
         profile_image_url: undefined,
         online: false,
+        last_active_at: null
       },
     };
   }
