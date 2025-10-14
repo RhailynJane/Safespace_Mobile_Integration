@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -10,16 +11,20 @@ import {
   TextInput,
   Image,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { messagingService, Conversation, Participant } from "../../../../utils/sendbirdService";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function MessagesScreen() {
+  const { userId } = useAuth(); // Get actual Clerk user ID
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
@@ -36,40 +41,63 @@ export default function MessagesScreen() {
   ];
 
   const initializeMessaging = useCallback(async () => {
+    if (!userId) {
+      console.log("❌ No user ID available");
+      setSendbirdStatus("User not authenticated");
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Replace with actual user ID from your auth system
-      const userId = "current_user";
       const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
       
       const sendbirdInitialized = await messagingService.initializeSendBird(userId, accessToken);
-      setSendbirdStatus(sendbirdInitialized ? "SendBird Connected" : "SendBird Not Available");
+      setSendbirdStatus(sendbirdInitialized ? "SendBird Connected" : "Using Backend API");
       
-      if (sendbirdInitialized) {
-        await loadConversations();
-      } else {
-        setLoading(false);
-      }
+      // Always load conversations, even if SendBird fails
+      await loadConversations();
     } catch (error) {
       console.log("Failed to initialize messaging");
-      setSendbirdStatus("Connection Failed");
-      setLoading(false);
+      setSendbirdStatus("Using Backend API");
+      await loadConversations(); // Still try to load conversations
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     initializeMessaging();
   }, [initializeMessaging]);
 
+  useFocusEffect(
+    useCallback(() => {
+      console.log("💬 MessagesScreen focused, refreshing conversations");
+      loadConversations();
+    }, [userId])
+  );
+
   const loadConversations = async () => {
+    if (!userId) {
+      console.log("❌ No user ID available for loading conversations");
+      setConversations([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const result = await messagingService.getConversations("current_user");
+      console.log(`💬 Loading conversations for user: ${userId}`);
+      
+      const result = await messagingService.getConversations(userId);
+      
       if (result.success) {
+        console.log(`💬 Setting ${result.data.length} conversations`);
         setConversations(result.data);
+      } else {
+        console.log("💬 Failed to load conversations from backend");
+        setConversations([]);
       }
     } catch (error) {
-      console.log("Failed to load conversations");
-      setConversations([]); // Set empty array on error
+      console.error("💬 Error loading conversations:", error);
+      setConversations([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -103,7 +131,8 @@ export default function MessagesScreen() {
       return conversation.title;
     }
     if (conversation.participants.length > 0) {
-      const otherParticipants = conversation.participants.filter(p => p.id !== "current_user");
+      // Filter out current user from participants list for display
+      const otherParticipants = conversation.participants.filter(p => p.clerk_user_id !== userId);
       if (otherParticipants.length > 0) {
         return otherParticipants.map(p => p.first_name).join(', ');
       }
@@ -112,6 +141,8 @@ export default function MessagesScreen() {
   };
 
   const formatTime = (timestamp: string) => {
+    if (!timestamp) return '';
+    
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -150,7 +181,13 @@ export default function MessagesScreen() {
         <View>
           <TouchableOpacity
             style={styles.newMessageButton}
-            onPress={() => router.push("../messages/new-message")}
+            onPress={() => {
+              if (!userId) {
+                Alert.alert("Error", "Please sign in to send messages");
+                return;
+              }
+              router.push("../messages/new-message");
+            }}
           >
             <LinearGradient
               colors={['#5296EA', '#489EEA', '#459EEA', '#4896EA']}
@@ -183,7 +220,6 @@ export default function MessagesScreen() {
           styles.statusIndicator,
           { 
             backgroundColor: messagingService.isSendBirdEnabled() ? '#4CAF50' : '#FF9800',
-            display: messagingService.isSendBirdEnabled() ? 'none' : 'flex'
           }
         ]}>
           <Ionicons 
@@ -212,35 +248,36 @@ export default function MessagesScreen() {
               <View style={styles.emptyState}>
                 <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
                 <Text style={styles.emptyStateText}>
-                  {messagingService.isSendBirdEnabled() ? "No conversations yet" : "SendBird Not Connected"}
+                  No conversations yet
                 </Text>
                 <Text style={styles.emptyStateSubtext}>
-                  {messagingService.isSendBirdEnabled() 
-                    ? "Start a new conversation to begin messaging" 
-                    : "Check your SendBird configuration to enable messaging"
-                  }
+                  Start a new conversation to begin messaging
                 </Text>
-                {!messagingService.isSendBirdEnabled() && (
-                  <TouchableOpacity
-                    style={styles.retryButton}
-                    onPress={initializeMessaging}
-                  >
-                    <Text style={styles.retryButtonText}>Retry Connection</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={loadConversations}
+                >
+                  <Text style={styles.retryButtonText}>Refresh</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               conversations.map((conversation) => (
                 <TouchableOpacity
                   key={conversation.id}
                   style={styles.conversationItem}
-                  onPress={() => router.push({
-                    pathname: "../messages/message-chat-screen",
-                    params: { 
-                      id: conversation.id,
-                      title: getDisplayName(conversation)
+                  onPress={() => {
+                    if (!userId) {
+                      Alert.alert("Error", "Please sign in to view messages");
+                      return;
                     }
-                  })}
+                    router.push({
+                      pathname: "../messages/message-chat-screen",
+                      params: { 
+                        id: conversation.id,
+                        title: getDisplayName(conversation)
+                      }
+                    });
+                  }}
                 >
                   <View style={styles.avatarContainer}>
                     <Image
@@ -281,7 +318,7 @@ export default function MessagesScreen() {
                   {conversation.unread_count > 0 && (
                     <View style={styles.unreadBadge}>
                       <Text style={styles.unreadCount}>
-                        {conversation.unread_count}
+                        {conversation.unread_count > 99 ? '99+' : conversation.unread_count}
                       </Text>
                     </View>
                   )}
@@ -485,12 +522,13 @@ const styles = StyleSheet.create({
   },
   unreadBadge: {
     backgroundColor: "#4CAF50",
-    width: 20,
+    minWidth: 20,
     height: 20,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 10,
+    paddingHorizontal: 6,
   },
   unreadCount: {
     color: "#FFF",

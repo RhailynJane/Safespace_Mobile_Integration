@@ -123,7 +123,7 @@ export default function MessagesScreen() {
     try {
       setLoading(true);
       const result = await messagingService.createConversation(userId, {
-        participantIds: [contact.clerk_user_id],
+        participantIds: [contact.clerk_user_id], // Use actual participant ID
         conversationType: 'direct',
         title: `${contact.first_name} ${contact.last_name}`.trim()
       });

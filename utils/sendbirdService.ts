@@ -131,56 +131,6 @@ class SendBirdService {
     }
   }
 
-  async getConversations(): Promise<{
-    success: boolean;
-    data: Conversation[];
-  }> {
-    if (!this.userId) {
-      return { success: false, data: [] };
-    }
-
-    try {
-      // Get user's group channels
-      const response = await this.sendbirdApiRequest(
-        `/users/${this.userId}/my_group_channels?limit=100`
-      );
-
-      if (!response.channels || response.channels.length === 0) {
-        return { success: true, data: [] };
-      }
-
-      const conversationsPromises = response.channels.map(
-        async (channel: any) => ({
-          id: channel.channel_url,
-          title: channel.name || this.getChannelTitle(channel),
-          conversation_type: channel.member_count > 2 ? "group" : "direct",
-          updated_at: new Date(
-            channel.last_message?.created_at || channel.created_at
-          ).toISOString(),
-          last_message: channel.last_message?.message || "No messages yet",
-          last_message_time: new Date(
-            channel.last_message?.created_at || channel.created_at
-          ).toISOString(),
-          unread_count: channel.unread_message_count || 0,
-          participants: await this.getChannelParticipants(channel),
-          channel_url: channel.channel_url,
-        })
-      );
-
-      const conversations = await Promise.all(conversationsPromises);
-
-      return {
-        success: true,
-        data: conversations,
-      };
-    } catch (error) {
-      console.log(
-        "Get conversations - no conversations found or network issue"
-      );
-      return { success: true, data: [] }; // Return empty array instead of error
-    }
-  }
-
   private getChannelTitle(channel: any): string {
     if (channel.name) return channel.name;
 
@@ -374,6 +324,38 @@ class SendBirdService {
     }
   }
 
+  async getConversations(): Promise<{
+    success: boolean;
+    data: Conversation[];
+  }> {
+    if (!this.userId) {
+      return { success: false, data: [] };
+    }
+
+    try {
+      const response = await this.sendbirdApiRequest("/group_channels", {
+        method: "GET",
+      });
+
+      const conversations = response.channels.map((channel: any) => ({
+        id: channel.channel_url,
+        title: this.getChannelTitle(channel),
+        conversation_type: channel.is_distinct ? "direct" : "group",
+        updated_at: channel.last_message?.created_at || channel.created_at,
+        last_message: channel.last_message?.message || "",
+        last_message_time: channel.last_message?.created_at || "",
+        unread_count: channel.unread_message_count || 0,
+        participants: this.getChannelParticipants(channel),
+        channel_url: channel.channel_url,
+      }));
+
+      return { success: true, data: conversations };
+    } catch (error) {
+      console.log("Get conversations failed:", error);
+      return { success: false, data: [] };
+    }
+  }
+
   async searchUsers(query: string): Promise<{ success: boolean; data: any[] }> {
     if (!this.userId) {
       return { success: false, data: [] };
@@ -497,7 +479,7 @@ class MessagingService {
     }
   }
 
-  async getConversations(
+  async getConversationsFromSendBird(
     userId: string
   ): Promise<{ success: boolean; data: Conversation[] }> {
     if (!this.sendbirdInitialized) {
@@ -762,6 +744,14 @@ class MessagingService {
       console.log("💬 Get conversations failed - using fallback");
       return { success: true, data: [] };
     }
+  }
+
+  // In your getConversations method
+  async getConversations(
+    userId: string
+  ): Promise<{ success: boolean; data: Conversation[] }> {
+    // Delegate to getConversationsFromBackend to avoid duplication
+    return this.getConversationsFromBackend(userId);
   }
 }
 

@@ -7,18 +7,22 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { messagingService, Message, Participant } from "../../../../utils/sendbirdService";
+import { useAuth } from "@clerk/clerk-expo";
+
+// User avatar for sent messages
+const userAvatar = "https://randomuser.me/api/portraits/women/17.jpg";
 
 export default function ChatScreen() {
-  const { userId } = useAuth();
+  const { userId } = useAuth(); // Get the actual user ID
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
@@ -30,20 +34,9 @@ export default function ChatScreen() {
   const [contact, setContact] = useState<Participant | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Poll for new messages every 3 seconds
-  useEffect(() => {
-    if (!conversationId) return;
-
-    loadMessages(); // Load immediately
-    const pollInterval = setInterval(() => {
-      loadMessages();
-    }, 3000); // Check every 3 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [conversationId, userId]);
-
   const loadMessages = useCallback(async () => {
     try {
+      setLoading(true);
       const result = await messagingService.getMessages(conversationId, userId || 'current_user');
       if (result.success) {
         setMessages(result.data);
@@ -75,6 +68,10 @@ export default function ChatScreen() {
   }, [conversationId, userId, conversationTitle]);
 
   useEffect(() => {
+    loadMessages();
+  }, [loadMessages]);
+
+  useEffect(() => {
     // Scroll to bottom when messages change
     setTimeout(() => {
       if (scrollViewRef.current) {
@@ -88,7 +85,7 @@ export default function ChatScreen() {
 
     try {
       setSending(true);
-      const result = await messagingService.sendMessage(conversationId, userId || 'current_user', {
+      const result = await messagingService.sendMessage(conversationId, "current_user", {
         messageText: newMessage,
         messageType: 'text'
       });
@@ -96,8 +93,6 @@ export default function ChatScreen() {
       if (result.success) {
         setMessages(prev => [...prev, result.data]);
         setNewMessage("");
-      } else {
-        console.error("Failed to send message:", result);
       }
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -123,18 +118,6 @@ export default function ChatScreen() {
     }
   };
 
-  // Get user initials for avatar
-  const getUserInitials = (firstName?: string, lastName?: string) => {
-    const first = firstName?.charAt(0) || '';
-    const last = lastName?.charAt(0) || '';
-    return `${first}${last}`.toUpperCase() || 'U';
-  };
-
-  // Check if message is from current user
-  const isMyMessage = (message: Message) => {
-    return message.sender.clerk_user_id === userId;
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -157,11 +140,12 @@ export default function ChatScreen() {
             </TouchableOpacity>
 
             <View style={styles.contactInfo}>
-              <View style={styles.headerAvatar}>
-                <Text style={styles.headerAvatarText}>
-                  {getUserInitials(contact?.first_name, contact?.last_name)}
-                </Text>
-              </View>
+              {contact?.profile_image_url && (
+                <Image
+                  source={{ uri: contact.profile_image_url }}
+                  style={styles.headerAvatar}
+                />
+              )}
               <View>
                 <Text style={styles.contactName}>{conversationTitle}</Text>
                 <Text style={styles.contactStatus}>
@@ -191,64 +175,54 @@ export default function ChatScreen() {
               </Text>
             </View>
           ) : (
-            messages.map((message) => {
-              const myMessage = isMyMessage(message);
-              
-              return (
+            messages.map((message) => (
+              <View
+                key={message.id}
+                style={[
+                  styles.messageContainer,
+                  message.sender.id === "current_user" || message.sender.first_name === "You"
+                    ? styles.myMessageContainer
+                    : styles.theirMessageContainer,
+                ]}
+              >
+                {(message.sender.id !== "current_user" && message.sender.first_name !== "You") && (
+                  <Image
+                    source={{ uri: message.sender.profile_image_url || userAvatar }}
+                    style={styles.messageAvatar}
+                  />
+                )}
+
                 <View
-                  key={message.id}
                   style={[
-                    styles.messageContainer,
-                    myMessage ? styles.myMessageContainer : styles.theirMessageContainer,
+                    styles.messageBubble,
+                    (message.sender.id === "current_user" || message.sender.first_name === "You")
+                      ? styles.myMessage
+                      : styles.theirMessage,
                   ]}
                 >
-                  {/* Other user's avatar (left side) */}
-                  {!myMessage && (
-                    <View style={styles.avatarContainer}>
-                      <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>
-                          {getUserInitials(message.sender.first_name, message.sender.last_name)}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Message bubble */}
-                  <View
+                  <Text
                     style={[
-                      styles.messageBubble,
-                      myMessage ? styles.myMessage : styles.theirMessage,
+                      styles.messageText,
+                      (message.sender.id === "current_user" || message.sender.first_name === "You")
+                        ? styles.myMessageText
+                        : styles.theirMessageText,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.messageText,
-                        myMessage ? styles.myMessageText : styles.theirMessageText,
-                      ]}
-                    >
-                      {message.message_text}
-                    </Text>
-                    <Text style={[
-                      styles.messageTime,
-                      myMessage ? styles.myMessageTime : styles.theirMessageTime
-                    ]}>
-                      {formatTime(message.created_at)}
-                    </Text>
-                  </View>
-
-                  {/* My avatar (right side) */}
-                  {myMessage && (
-                    <View style={styles.avatarContainer}>
-                      <View style={[styles.avatar, styles.myAvatar]}>
-                        <Text style={styles.avatarText}>
-                          {getUserInitials(message.sender.first_name, message.sender.last_name)}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
+                    {message.message_text}
+                  </Text>
+                  <Text style={styles.messageTime}>
+                    {formatTime(message.created_at)}
+                  </Text>
                 </View>
-              );
-            })
+
+                {(message.sender.id === "current_user" || message.sender.first_name === "You") && (
+                  <Image
+                    source={{ uri: userAvatar }}
+                    style={styles.messageAvatar}
+                  />
+                )}
+              </View>
+            ))
           )}
         </ScrollView>
 
@@ -336,15 +310,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#4CAF50",
-    justifyContent: "center",
-    alignItems: "center",
     marginRight: 10,
-  },
-  headerAvatarText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
   },
   contactName: {
     fontSize: 16,
@@ -353,7 +319,9 @@ const styles = StyleSheet.create({
   },
   contactStatus: {
     fontSize: 12,
-    color: "#666",
+    color: "#000000",
+    flexDirection: "row",
+    alignItems: "center",
   },
   messagesContainer: {
     flex: 1,
@@ -380,10 +348,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+  messageBubble: {
+    maxWidth: "80%",
+    padding: 12,
+    borderRadius: 18,
+    marginBottom: 10,
+  },
   messageContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    marginBottom: 15,
+    marginBottom: 10,
     maxWidth: "100%",
   },
   myMessageContainer: {
@@ -392,37 +366,20 @@ const styles = StyleSheet.create({
   theirMessageContainer: {
     justifyContent: "flex-start",
   },
-  avatarContainer: {
-    marginHorizontal: 8,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#E0E0E0",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  myAvatar: {
-    backgroundColor: "#4CAF50",
-  },
-  avatarText: {
-    color: "#666",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  messageBubble: {
-    maxWidth: "70%",
-    padding: 12,
-    borderRadius: 18,
-    marginBottom: 4,
+  messageAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginHorizontal: 5,
   },
   myMessage: {
+    alignSelf: "flex-end",
     backgroundColor: "#DCF8C6",
     borderTopRightRadius: 4,
   },
   theirMessage: {
-    backgroundColor: "#FFFFFF",
+    alignSelf: "flex-start",
+    backgroundColor: "#cfe2f3",
     borderTopLeftRadius: 4,
     elevation: 1,
     shadowColor: "#000",
@@ -432,7 +389,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 5,
   },
   myMessageText: {
     color: "#000000",
@@ -441,17 +398,12 @@ const styles = StyleSheet.create({
     color: "#000000",
   },
   messageTime: {
-    fontSize: 11,
+    fontSize: 12,
+    color: "#9E9E9E",
     alignSelf: "flex-end",
   },
-  myMessageTime: {
-    color: "#666",
-  },
-  theirMessageTime: {
-    color: "#999",
-  },
   inputContainer: {
-    padding: 15,
+    padding: 30,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "#E0E0E0",
@@ -460,29 +412,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F5F5F5",
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 1,
   },
   attachmentButton: {
-    padding: 4,
+    padding: 8,
   },
   textInput: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 5,
     maxHeight: 100,
     fontSize: 16,
-    color: "#333",
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#4CAF50",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 8,
+    marginLeft: 5,
   },
   sendButtonDisabled: {
     backgroundColor: "#E0E0E0",

@@ -2573,21 +2573,8 @@ app.get(
 );
 
 // =============================================
-// MESSAGING ENDPOINTS
+// MESSAGING ENDPOINTS - COMPLETE FIX
 // =============================================
-
-interface CreateConversationRequest {
-  clerkUserId: string;
-  participantIds: string[];
-  title?: string;
-  conversationType?: "direct" | "group";
-}
-
-interface SendMessageRequest {
-  clerkUserId: string;
-  messageText: string;
-  messageType?: "text" | "image" | "file";
-}
 
 // Get all conversations for a user
 app.get(
@@ -2600,7 +2587,7 @@ app.get(
 
       const result = await pool.query(
         `
-        SELECT DISTINCT 
+        SELECT 
           c.id,
           c.title,
           c.conversation_type,
@@ -2623,36 +2610,39 @@ app.get(
           (
             SELECT COUNT(*) 
             FROM messages m
-            LEFT JOIN message_read_status mrs ON m.id = mrs.message_id AND mrs.user_id = u.id
             WHERE m.conversation_id = c.id 
             AND m.sender_id != u.id 
-            AND mrs.id IS NULL
-          ) as unread_count,
-          json_agg(
-            DISTINCT json_build_object(
-              'id', u2.id,
-              'clerk_user_id', u2.clerk_user_id,
-              'first_name', u2.first_name,
-              'last_name', u2.last_name,
-              'email', u2.email,
-              'profile_image_url', u2.profile_image_url,
-              'online', false
+            AND NOT EXISTS (
+              SELECT 1 FROM message_read_status mrs 
+              WHERE mrs.message_id = m.id AND mrs.user_id = u.id
             )
+          ) as unread_count,
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', p.id,
+                'clerk_user_id', p.clerk_user_id,
+                'first_name', p.first_name,
+                'last_name', p.last_name,
+                'email', p.email,
+                'profile_image_url', p.profile_image_url,
+                'online', false
+              )
+            )
+            FROM users p
+            JOIN conversation_participants cp ON p.id = cp.user_id
+            WHERE cp.conversation_id = c.id AND p.clerk_user_id != $1
           ) as participants
         FROM conversations c
         JOIN conversation_participants cp ON c.id = cp.conversation_id
         JOIN users u ON cp.user_id = u.id
-        JOIN users u2 ON cp.user_id = u2.id
         WHERE u.clerk_user_id = $1
-        GROUP BY c.id, c.title, c.conversation_type, c.updated_at, c.created_at
         ORDER BY c.updated_at DESC
         `,
         [clerkUserId]
       );
 
-      console.log(
-        `💬 Found ${result.rows.length} conversations for user ${clerkUserId}`
-      );
+      console.log(`💬 Found ${result.rows.length} conversations for user ${clerkUserId}`);
 
       res.json({
         success: true,
@@ -2660,9 +2650,10 @@ app.get(
       });
     } catch (error: any) {
       console.error("💬 Get conversations error:", error.message);
-      res.json({
-        success: true,
-        data: [],
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch conversations",
+        error: error.message,
       });
     }
   }
@@ -2676,9 +2667,7 @@ app.get(
       const { conversationId } = req.params;
       const { clerkUserId, page = "1", limit = "50" } = req.query;
 
-      console.log(
-        `💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`
-      );
+      console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
 
       const pageNum = parseInt(page as string) || 1;
       const limitNum = parseInt(limit as string) || 50;
@@ -2691,17 +2680,14 @@ app.get(
         JOIN users u ON cp.user_id = u.id
         WHERE cp.conversation_id = $1 AND u.clerk_user_id = $2
         `,
-        [conversationId, clerkUserId]
+        [parseInt(conversationId), clerkUserId]
       );
 
       if (participantCheck.rows.length === 0) {
-        console.log(
-          `💬 User ${clerkUserId} is not a participant of conversation ${conversationId}`
-        );
-        return res.json({
-          success: true,
-          data: [],
-          pagination: { page: pageNum, limit: limitNum, hasMore: false },
+        console.log(`💬 User ${clerkUserId} is not a participant of conversation ${conversationId}`);
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this conversation",
         });
       }
 
@@ -2727,10 +2713,37 @@ app.get(
         ORDER BY m.created_at ASC
         LIMIT $2 OFFSET $3
         `,
-        [conversationId, limitNum, offset]
+        [parseInt(conversationId), limitNum, offset]
       );
 
       console.log(`💬 Found ${messagesResult.rows.length} messages`);
+
+      // Mark messages as read for this user
+      if (clerkUserId && messagesResult.rows.length > 0) {
+        try {
+          const userResult = await pool.query(
+            "SELECT id FROM users WHERE clerk_user_id = $1",
+            [clerkUserId]
+          );
+          
+          if (userResult.rows.length > 0) {
+            const userId = userResult.rows[0].id;
+            const messageIds = messagesResult.rows.map((msg: any) => msg.id);
+            
+            // Insert read status for unread messages
+            await pool.query(
+              `
+              INSERT INTO message_read_status (message_id, user_id)
+              SELECT unnest($1::int[]), $2
+              ON CONFLICT (message_id, user_id) DO NOTHING
+              `,
+              [messageIds, userId]
+            );
+          }
+        } catch (readError) {
+          console.error("Error marking messages as read:", readError);
+        }
+      }
 
       res.json({
         success: true,
@@ -2743,10 +2756,10 @@ app.get(
       });
     } catch (error: any) {
       console.error("💬 Get messages error:", error.message);
-      res.json({
-        success: true,
-        data: [],
-        pagination: { page: 1, limit: 50, hasMore: false },
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch messages",
+        error: error.message,
       });
     }
   }
@@ -2762,9 +2775,14 @@ app.post(
       const { conversationId } = req.params;
       const { clerkUserId, messageText, messageType = "text" } = req.body;
 
-      console.log(
-        `💬 Sending message to conversation ${conversationId}: "${messageText}"`
-      );
+      console.log(`💬 Sending message to conversation ${conversationId}: "${messageText}" from user ${clerkUserId}`);
+
+      if (!clerkUserId || !messageText?.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "clerkUserId and messageText are required",
+        });
+      }
 
       await client.query("BEGIN");
 
@@ -2784,13 +2802,19 @@ app.post(
 
       const userId = userResult.rows[0].id;
 
-      // Verify user is participant
-      const participantCheck = await client.query(
-        "SELECT 1 FROM conversation_participants WHERE conversation_id = $1 AND user_id = $2",
-        [conversationId, userId]
+      // Verify user is participant and get conversation details
+      const conversationCheck = await client.query(
+        `
+        SELECT c.id, c.title 
+        FROM conversations c
+        JOIN conversation_participants cp ON c.id = cp.conversation_id
+        JOIN users u ON cp.user_id = u.id
+        WHERE c.id = $1 AND u.clerk_user_id = $2
+        `,
+        [parseInt(conversationId), clerkUserId]
       );
 
-      if (participantCheck.rows.length === 0) {
+      if (conversationCheck.rows.length === 0) {
         await client.query("ROLLBACK");
         return res.status(403).json({
           success: false,
@@ -2805,7 +2829,7 @@ app.post(
         VALUES ($1, $2, $3, $4)
         RETURNING id, message_text, message_type, created_at
         `,
-        [conversationId, userId, messageText, messageType]
+        [parseInt(conversationId), userId, messageText.trim(), messageType]
       );
 
       // Update conversation timestamp
@@ -2815,7 +2839,7 @@ app.post(
         SET updated_at = CURRENT_TIMESTAMP 
         WHERE id = $1
         `,
-        [conversationId]
+        [parseInt(conversationId)]
       );
 
       await client.query("COMMIT");
@@ -2876,18 +2900,20 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       conversationType = "direct",
     } = req.body;
 
-    if (!participantIds || participantIds.length === 0) {
+    console.log("💬 Creating conversation:", { clerkUserId, participantIds, title });
+
+    if (!clerkUserId || !participantIds || participantIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "At least one participant is required",
+        message: "clerkUserId and participantIds are required",
       });
     }
 
     await client.query("BEGIN");
 
-    // Get creator user ID
+    // Get creator user info
     const creatorResult = await client.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
+      "SELECT id, first_name, last_name FROM users WHERE clerk_user_id = $1",
       [clerkUserId]
     );
 
@@ -2900,26 +2926,51 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
     }
 
     const creatorId = creatorResult.rows[0].id;
+    const creatorName = `${creatorResult.rows[0].first_name} ${creatorResult.rows[0].last_name}`;
 
-    // Get participant user IDs
+    // Get participant user IDs and names
     const participantUserIds = [creatorId];
+    
     for (const participantClerkId of participantIds) {
+      if (participantClerkId === clerkUserId) continue; // Skip self
+      
       const participantResult = await client.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
+        "SELECT id, first_name, last_name FROM users WHERE clerk_user_id = $1",
         [participantClerkId]
       );
 
       if (participantResult.rows.length > 0) {
         participantUserIds.push(participantResult.rows[0].id);
+      } else {
+        console.log(`⚠️ Participant not found: ${participantClerkId}`);
       }
     }
 
+    // Check if we have at least 2 participants (creator + at least one other)
     if (participantUserIds.length < 2) {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: "Valid participants not found",
+        message: "At least one other valid participant is required",
       });
+    }
+
+    // Generate conversation title if not provided
+    let conversationTitle = title;
+    if (!conversationTitle) {
+      // Get participant names for title
+      const participantNamesResult = await client.query(
+        `
+        SELECT first_name, last_name FROM users 
+        WHERE id = ANY($1) AND id != $2
+        `,
+        [participantUserIds, creatorId]
+      );
+      
+      const names = participantNamesResult.rows.map(row => 
+        `${row.first_name} ${row.last_name}`.trim()
+      );
+      conversationTitle = names.join(', ');
     }
 
     // Create conversation
@@ -2928,36 +2979,46 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       INSERT INTO conversations (title, conversation_type, created_by)
       VALUES ($1, $2, $3)
       RETURNING *
-    `,
-      [title || null, conversationType, creatorId]
+      `,
+      [conversationTitle, conversationType, creatorId]
     );
 
     const conversation = conversationResult.rows[0];
 
-    // Add participants
+    // Add all participants
     for (const participantId of participantUserIds) {
       await client.query(
         `
         INSERT INTO conversation_participants (conversation_id, user_id)
         VALUES ($1, $2)
-      `,
+        ON CONFLICT (conversation_id, user_id) DO NOTHING
+        `,
         [conversation.id, participantId]
       );
     }
 
     await client.query("COMMIT");
 
+    console.log(`💬 Conversation created successfully: ${conversation.id}`);
+
     res.status(201).json({
       success: true,
       message: "Conversation created successfully",
-      data: conversation,
+      data: {
+        id: conversation.id,
+        title: conversation.title,
+        conversation_type: conversation.conversation_type,
+        created_at: conversation.created_at,
+        updated_at: conversation.updated_at
+      },
     });
   } catch (error: any) {
     await client.query("ROLLBACK");
-    console.error("Create conversation error:", error.message);
+    console.error("💬 Create conversation error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to create conversation",
+      error: error.message,
     });
   } finally {
     client.release();
@@ -2971,54 +3032,50 @@ app.get(
     try {
       const { clerkUserId } = req.params;
 
-      console.log("Fetching contacts for user:", clerkUserId);
+      console.log("👥 Fetching contacts for user:", clerkUserId);
 
       const result = await pool.query(
         `
-      SELECT 
-        u.id,
-        u.clerk_user_id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        u.profile_image_url,
-        u.role,
-        EXISTS(
-          SELECT 1 FROM user_sessions us 
-          WHERE us.user_id = u.id AND us.last_seen > NOW() - INTERVAL '5 minutes'
-        ) as online,
-        (
-          SELECT COUNT(*) 
-          FROM conversations c
-          JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
-          JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
-          WHERE cp1.user_id = u_main.id 
-            AND cp2.user_id = u.id 
-            AND c.conversation_type = 'direct'
-        ) > 0 as has_existing_conversation
-      FROM users u
-      CROSS JOIN (SELECT id FROM users WHERE clerk_user_id = $1) u_main
-      WHERE u.clerk_user_id != $1
-        AND u.status = 'active'
-      ORDER BY u.first_name, u.last_name
-    `,
+        SELECT 
+          u.id,
+          u.clerk_user_id,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.profile_image_url,
+          u.role,
+          false as online,
+          (
+            SELECT COUNT(*) > 0
+            FROM conversations c
+            JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+            JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
+            JOIN users u1 ON cp1.user_id = u1.id
+            JOIN users u2 ON cp2.user_id = u2.id
+            WHERE u1.clerk_user_id = $1 
+              AND u2.clerk_user_id = u.clerk_user_id
+              AND c.conversation_type = 'direct'
+          ) as has_existing_conversation
+        FROM users u
+        WHERE u.clerk_user_id != $1
+          AND u.status = 'active'
+        ORDER BY u.first_name, u.last_name
+        `,
         [clerkUserId]
       );
 
-      console.log(
-        `Found ${result.rows.length} contacts for user ${clerkUserId}`
-      );
+      console.log(`👥 Found ${result.rows.length} contacts for user ${clerkUserId}`);
 
       res.json({
         success: true,
         data: result.rows,
       });
     } catch (error: any) {
-      console.error("Get contacts error:", error.message);
-      // Return empty array instead of error for frontend
-      res.json({
-        success: true,
-        data: [],
+      console.error("👥 Get contacts error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch contacts",
+        error: error.message,
       });
     }
   }
@@ -3032,87 +3089,62 @@ app.get(
       const { clerkUserId } = req.params;
       const { q: searchQuery } = req.query;
 
-      console.log(
-        `🔍 DEBUG: Search request received - clerkUserId: ${clerkUserId}, query: "${searchQuery}"`
-      );
+      console.log(`🔍 Searching users for ${clerkUserId}, query: "${searchQuery}"`);
 
-      // Ensure searchQuery is a string and not empty
-      if (typeof searchQuery !== "string" || searchQuery.trim() === "") {
-        console.log("🔍 DEBUG: Empty search query, returning empty results");
+      if (!searchQuery || typeof searchQuery !== "string" || searchQuery.trim() === "") {
         return res.json({
           success: true,
           data: [],
         });
       }
 
-      const searchQueryString = searchQuery.trim();
-      console.log(`🔍 DEBUG: Processing search for: "${searchQueryString}"`);
-
-      const searchTerm = `%${searchQueryString}%`.toLowerCase();
-      const exactSearchTerm = searchQueryString.toLowerCase();
-
-      console.log(
-        `🔍 DEBUG: Search term: ${searchTerm}, exact: ${exactSearchTerm}`
-      );
-
-      // Test database connection first
-      try {
-        const testResult = await pool.query("SELECT 1 as test");
-        console.log("🔍 DEBUG: Database connection OK");
-      } catch (dbError) {
-        console.error("🔍 DEBUG: Database connection failed:", dbError);
-        return res.status(500).json({
-          success: false,
-          message: "Database connection failed",
-          error: (dbError as Error).message,
-        });
-      }
+      const searchTerm = `%${searchQuery.trim()}%`;
 
       const result = await pool.query(
         `
-      SELECT 
-        u.id,
-        u.clerk_user_id,
-        u.first_name,
-        u.last_name,
-        u.email,
-        u.profile_image_url,
-        u.role,
-        u.city,
-        u.state,
-        false as online, -- Temporary fix for online status
-        false as has_existing_conversation -- Temporary fix for conversation check
-      FROM users u
-      WHERE u.clerk_user_id != $1
-        AND u.status = 'active'
-        AND (
-          LOWER(u.first_name) LIKE $2 
-          OR LOWER(u.last_name) LIKE $2 
-          OR LOWER(u.email) LIKE $2
-          OR LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE $2
-        )
-      ORDER BY u.first_name, u.last_name
-      LIMIT 50
-    `,
+        SELECT 
+          u.id,
+          u.clerk_user_id,
+          u.first_name,
+          u.last_name,
+          u.email,
+          u.profile_image_url,
+          u.role,
+          false as online,
+          false as has_existing_conversation
+        FROM users u
+        WHERE u.clerk_user_id != $1
+          AND u.status = 'active'
+          AND (
+            LOWER(u.first_name) LIKE LOWER($2) 
+            OR LOWER(u.last_name) LIKE LOWER($2) 
+            OR LOWER(u.email) LIKE LOWER($2)
+            OR LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE LOWER($2)
+          )
+        ORDER BY 
+          CASE 
+            WHEN LOWER(u.first_name) LIKE LOWER($2) THEN 1
+            WHEN LOWER(u.last_name) LIKE LOWER($2) THEN 2
+            WHEN LOWER(u.email) LIKE LOWER($2) THEN 3
+            ELSE 4
+          END
+        LIMIT 20
+        `,
         [clerkUserId, searchTerm]
       );
 
-      console.log(
-        `🔍 DEBUG: Found ${result.rows.length} users matching "${searchQueryString}"`
-      );
+      console.log(`🔍 Found ${result.rows.length} users matching "${searchQuery}"`);
 
       res.json({
         success: true,
         data: result.rows,
       });
     } catch (error: any) {
-      console.error("🔍 DEBUG: Search users error:", error.message);
-      console.error("🔍 DEBUG: Full error stack:", error.stack);
+      console.error("🔍 Search users error:", error.message);
       res.status(500).json({
         success: false,
         message: "Failed to search users",
         error: error.message,
-        data: [],
       });
     }
   }
