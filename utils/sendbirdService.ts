@@ -631,7 +631,7 @@ class MessagingService {
       // Fallback: Create a mock conversation ID
       const mockConversationId = `conv_${Date.now()}_${Math.random()
         .toString(36)
-        .substr(2, 9)}`;
+        .slice(2, 11)}`;
 
       return {
         success: true,
