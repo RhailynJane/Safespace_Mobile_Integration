@@ -2663,11 +2663,23 @@ app.get(
         }
       });
 
+      console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
+
       const formattedConversations = conversations.map(conversation => {
         const lastMessage = conversation.messages[0];
-        const otherParticipants = conversation.participants.filter(
-          p => p.user.clerk_user_id !== clerkUserId
-        );
+        
+        // Get ALL participants (not filtering here - let frontend handle it)
+        const allParticipants = conversation.participants.map(p => ({
+          id: p.user.id,
+          clerk_user_id: p.user.clerk_user_id,
+          first_name: p.user.first_name,
+          last_name: p.user.last_name,
+          email: p.user.email,
+          profile_image_url: p.user.profile_image_url,
+          online: false
+        }));
+
+        console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
 
         return {
           id: conversation.id.toString(),
@@ -2678,15 +2690,7 @@ app.get(
           last_message: lastMessage?.message_text || '',
           last_message_time: lastMessage?.created_at.toISOString(),
           unread_count: conversation._count.messages,
-          participants: otherParticipants.map(p => ({
-            id: p.user.id,
-            clerk_user_id: p.user.clerk_user_id,
-            first_name: p.user.first_name,
-            last_name: p.user.last_name,
-            email: p.user.email,
-            profile_image_url: p.user.profile_image_url,
-            online: false
-          }))
+          participants: allParticipants  // Send ALL participants
         };
       });
 

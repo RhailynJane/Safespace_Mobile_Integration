@@ -161,7 +161,11 @@ class SendBirdService {
   }
 
   // Create group channel (conversation)
-  async createGroupChannel(userIds: string[], name?: string, isDistinct: boolean = true): Promise<{ success: boolean; data?: any }> {
+  async createGroupChannel(
+    userIds: string[],
+    name?: string,
+    isDistinct: boolean = true
+  ): Promise<{ success: boolean; data?: any }> {
     try {
       const result = await this.sendbirdApiRequest("/group_channels", {
         method: "POST",
@@ -206,7 +210,9 @@ class SendBirdService {
   }
 
   // List user's group channels
-  async listUserChannels(userId: string): Promise<{ success: boolean; data?: any }> {
+  async listUserChannels(
+    userId: string
+  ): Promise<{ success: boolean; data?: any }> {
     try {
       const result = await this.sendbirdApiRequest(
         `/users/${userId}/my_group_channels?limit=100`
@@ -237,7 +243,10 @@ class SendBirdService {
   }
 
   // Mark messages as read
-  async markAsRead(channelUrl: string, userId: string): Promise<{ success: boolean }> {
+  async markAsRead(
+    channelUrl: string,
+    userId: string
+  ): Promise<{ success: boolean }> {
     try {
       await this.sendbirdApiRequest(
         `/group_channels/${channelUrl}/messages/mark_as_read`,
@@ -257,7 +266,9 @@ class SendBirdService {
   }
 
   // Search users in SendBird
-  async searchSendBirdUsers(query: string): Promise<{ success: boolean; data?: any }> {
+  async searchSendBirdUsers(
+    query: string
+  ): Promise<{ success: boolean; data?: any }> {
     try {
       const result = await this.sendbirdApiRequest(
         `/users?nickname=${encodeURIComponent(query)}&limit=50`
@@ -279,15 +290,20 @@ class MessagingService {
 
   constructor() {
     this.sendbirdService = new SendBirdService();
-    this.useSendBird = !!process.env.EXPO_PUBLIC_SENDBIRD_APP_ID && !!process.env.EXPO_PUBLIC_SENDBIRD_API_TOKEN;
+    this.useSendBird =
+      !!process.env.EXPO_PUBLIC_SENDBIRD_APP_ID &&
+      !!process.env.EXPO_PUBLIC_SENDBIRD_API_TOKEN;
   }
 
   async initializeSendBird(
     userId: string,
-    accessToken?: string
+    accessToken?: string,
+    profileUrl?: string
   ): Promise<boolean> {
     if (!this.useSendBird) {
-      console.log("SendBird not configured - set EXPO_PUBLIC_SENDBIRD_APP_ID and EXPO_PUBLIC_SENDBIRD_API_TOKEN");
+      console.log(
+        "SendBird not configured - set EXPO_PUBLIC_SENDBIRD_APP_ID and EXPO_PUBLIC_SENDBIRD_API_TOKEN"
+      );
       return false;
     }
 
@@ -296,7 +312,7 @@ class MessagingService {
         userId,
         accessToken
       );
-      
+
       if (this.sendbirdInitialized) {
         // Create/update user in SendBird
         await this.sendbirdService.createOrUpdateUser({
@@ -304,7 +320,7 @@ class MessagingService {
           nickname: `User ${userId}`, // You can customize this
         });
       }
-      
+
       console.log(
         "SendBird initialization:",
         this.sendbirdInitialized ? "success" : "failed"
@@ -317,7 +333,9 @@ class MessagingService {
     }
   }
 
-  async getConversations(userId: string): Promise<{ success: boolean; data: Conversation[] }> {
+  async getConversations(
+    userId: string
+  ): Promise<{ success: boolean; data: Conversation[] }> {
     if (!this.sendbirdInitialized) {
       // Fallback to your backend
       return this.getConversationsFromBackend(userId);
@@ -325,31 +343,37 @@ class MessagingService {
 
     try {
       const result = await this.sendbirdService.listUserChannels(userId);
-      
+
       if (result.success && result.data) {
-        const conversations: Conversation[] = result.data.channels.map((channel: any) => ({
-          id: channel.channel_url,
-          title: channel.name || `Chat with ${channel.member_count - 1} users`,
-          conversation_type: "group",
-          updated_at: new Date(channel.created_at * 1000).toISOString(),
-          last_message: channel.last_message?.message || "",
-          last_message_time: channel.last_message?.created_at ? new Date(channel.last_message.created_at * 1000).toISOString() : "",
-          unread_count: channel.unread_message_count || 0,
-          participants: channel.members?.map((member: any) => ({
-            id: member.user_id,
-            clerk_user_id: member.user_id,
-            first_name: member.nickname || member.user_id,
-            last_name: "",
-            email: `${member.user_id}@sendbird.com`,
-            profile_image_url: member.profile_url,
-            online: member.is_online || false,
-          })) || [],
-          channel_url: channel.channel_url,
-        }));
+        const conversations: Conversation[] = result.data.channels.map(
+          (channel: any) => ({
+            id: channel.channel_url,
+            title:
+              channel.name || `Chat with ${channel.member_count - 1} users`,
+            conversation_type: "group",
+            updated_at: new Date(channel.created_at * 1000).toISOString(),
+            last_message: channel.last_message?.message || "",
+            last_message_time: channel.last_message?.created_at
+              ? new Date(channel.last_message.created_at * 1000).toISOString()
+              : "",
+            unread_count: channel.unread_message_count || 0,
+            participants:
+              channel.members?.map((member: any) => ({
+                id: member.user_id,
+                clerk_user_id: member.user_id,
+                first_name: member.nickname || member.user_id,
+                last_name: "",
+                email: `${member.user_id}@sendbird.com`,
+                profile_image_url: member.profile_url,
+                online: member.is_online || false,
+              })) || [],
+            channel_url: channel.channel_url,
+          })
+        );
 
         return { success: true, data: conversations };
       }
-      
+
       // Fallback to backend if SendBird fails
       return this.getConversationsFromBackend(userId);
     } catch (error) {
@@ -372,8 +396,10 @@ class MessagingService {
     }
 
     try {
-      const result = await this.sendbirdService.listChannelMessages(conversationId);
-      
+      const result = await this.sendbirdService.listChannelMessages(
+        conversationId
+      );
+
       if (result.success && result.data) {
         const messages: Message[] = result.data.messages.map((msg: any) => ({
           id: msg.message_id.toString(),
@@ -401,7 +427,7 @@ class MessagingService {
           pagination: { page, limit: 100, hasMore: false },
         };
       }
-      
+
       return this.getMessagesFromBackend(conversationId, userId, page);
     } catch (error) {
       console.log("Get messages from SendBird failed, using backend");
@@ -474,7 +500,7 @@ class MessagingService {
     try {
       // Include current user in participants
       const allUserIds = [userId, ...data.participantIds];
-      
+
       const result = await this.sendbirdService.createGroupChannel(
         allUserIds,
         data.title,
@@ -500,7 +526,9 @@ class MessagingService {
   }
 
   // Backend fallback methods
-  private async getConversationsFromBackend(userId: string): Promise<{ success: boolean; data: Conversation[] }> {
+  private async getConversationsFromBackend(
+    userId: string
+  ): Promise<{ success: boolean; data: Conversation[] }> {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations/${userId}`
@@ -619,7 +647,9 @@ class MessagingService {
     }
   }
 
-  async getContacts(userId: string): Promise<{ success: boolean; data: Contact[] }> {
+  async getContacts(
+    userId: string
+  ): Promise<{ success: boolean; data: Contact[] }> {
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/contacts/${userId}`
@@ -635,10 +665,15 @@ class MessagingService {
     }
   }
 
-  async searchUsers(userId: string, query: string): Promise<{ success: boolean; data: Contact[] }> {
+  async searchUsers(
+    userId: string,
+    query: string
+  ): Promise<{ success: boolean; data: Contact[] }> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/search-users/${userId}?q=${encodeURIComponent(query)}`
+        `${API_BASE_URL}/api/messages/search-users/${userId}?q=${encodeURIComponent(
+          query
+        )}`
       );
 
       if (!response.ok) throw new Error("Backend request failed");
@@ -657,7 +692,10 @@ class MessagingService {
     }
 
     try {
-  return await this.sendbirdService.markAsRead(conversationId, this.sendbirdService.getUserId() || "");
+      return await this.sendbirdService.markAsRead(
+        conversationId,
+        this.sendbirdService.getUserId() || ""
+      );
     } catch (error) {
       console.log("Mark as read failed");
       return { success: false };

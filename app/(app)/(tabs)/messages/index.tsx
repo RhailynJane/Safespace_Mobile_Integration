@@ -48,32 +48,33 @@ export default function MessagesScreen() {
   ];
 
   const initializeMessaging = useCallback(async () => {
-    if (!userId) {
-      console.log("❌ No user ID available");
-      setSendbirdStatus("User not authenticated");
-      setLoading(false);
-      return;
-    }
+  if (!userId) {
+    console.log("❌ No user ID available");
+    setSendbirdStatus("User not authenticated");
+    setLoading(false);
+    return;
+  }
 
-    try {
-      const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
+  try {
+    const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
 
-      const sendbirdInitialized = await messagingService.initializeSendBird(
-        userId,
-        accessToken
-      );
-      setSendbirdStatus(
-        sendbirdInitialized ? "SendBird Connected" : "Using Backend API"
-      );
+    // Add default profile URL to avoid SendBird error
+    const sendbirdInitialized = await messagingService.initializeSendBird(
+      userId,
+      accessToken,
+      "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
+    );
+    setSendbirdStatus(
+      sendbirdInitialized ? "SendBird Connected" : "Using Backend API"
+    );
 
-      // Always load conversations, even if SendBird fails
-      await loadConversations();
-    } catch (error) {
-      console.log("Failed to initialize messaging");
-      setSendbirdStatus("Using Backend API");
-      await loadConversations(); // Still try to load conversations
-    }
-  }, [userId]);
+    await loadConversations();
+  } catch (error) {
+    console.log("Failed to initialize messaging");
+    setSendbirdStatus("Using Backend API");
+    await loadConversations();
+  }
+}, [userId]);
 
   useEffect(() => {
     initializeMessaging();
@@ -133,29 +134,58 @@ export default function MessagesScreen() {
     }
   };
 
-  const getAvatarUrl = (participants: Participant[]) => {
-    const firstParticipant = participants[0];
-    if (firstParticipant?.profile_image_url) {
-      return firstParticipant.profile_image_url;
-    }
-    return "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60";
-  };
-
   const getDisplayName = (conversation: Conversation) => {
-    if (conversation.title && !conversation.title.startsWith("Chat ")) {
-      return conversation.title;
-    }
-    if (conversation.participants.length > 0) {
-      // Filter out current user from participants list for display
-      const otherParticipants = conversation.participants.filter(
-        (p) => p.clerk_user_id !== userId
-      );
-      if (otherParticipants.length > 0) {
-        return otherParticipants.map((p) => p.first_name).join(", ");
-      }
-    }
-    return "Unknown";
-  };
+  console.log('🔍 getDisplayName - Current userId:', userId);
+  console.log('🔍 getDisplayName - All participants:', conversation.participants);
+  console.log('🔍 getDisplayName - Conversation title:', conversation.title);
+  
+  // ⚠️ IGNORE the conversation title - always use participant names
+  // Filter out current user from participants list
+  const otherParticipants = conversation.participants.filter(
+    (p) => p.clerk_user_id !== userId
+  );
+  
+  console.log('🔍 getDisplayName - Other participants:', otherParticipants);
+  
+  // If there are other participants, show their FULL names
+  if (otherParticipants.length > 0) {
+    const fullNames = otherParticipants.map((p) => 
+      `${p.first_name} ${p.last_name}`.trim()
+    ).join(", ");
+    console.log('🔍 getDisplayName - Final display name:', fullNames);
+    return fullNames;
+  }
+  
+  // If no other participants found, fallback to conversation title
+  if (conversation.title) {
+    console.log('🔍 getDisplayName - Using conversation title as fallback:', conversation.title);
+    return conversation.title;
+  }
+  
+  return "Unknown User";
+};
+
+const getAvatarUrl = (participants: Participant[]) => {
+  console.log('🖼️ getAvatarUrl - Current userId:', userId);
+  console.log('🖼️ getAvatarUrl - All participants:', participants);
+  
+  // Get other participants (not current user)
+  const otherParticipants = participants.filter(
+    (p) => p.clerk_user_id !== userId
+  );
+  
+  console.log('🖼️ getAvatarUrl - Other participants:', otherParticipants);
+  
+  // Use the first other participant's avatar, or fallback
+  const displayParticipant = otherParticipants.length > 0 
+    ? otherParticipants[0] 
+    : participants[0]; // Fallback to first participant if no others
+  
+  const avatarUrl = displayParticipant?.profile_image_url || "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60";
+  console.log('🖼️ getAvatarUrl - Final avatar URL:', avatarUrl);
+  
+  return avatarUrl;
+};
 
   const formatTime = (timestamp: string) => {
     if (!timestamp) return "";
