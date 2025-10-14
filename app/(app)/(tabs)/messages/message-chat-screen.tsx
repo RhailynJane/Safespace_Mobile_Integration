@@ -16,14 +16,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { messagingService, Message, Participant } from "../../../../utils/sendbirdService";
+import {
+  messagingService,
+  Message,
+  Participant,
+} from "../../../../utils/sendbirdService";
 
 export default function ChatScreen() {
   const { userId } = useAuth(); // Get actual Clerk user ID
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
-  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+  const API_BASE_URL =
+    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -33,33 +38,36 @@ export default function ChatScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Update user activity
-  const updateUserActivity = async () => {
+  const updateUserActivity = useCallback(async () => {
     if (!userId) return;
-    
+
     try {
       await fetch(`${API_BASE_URL}/api/users/${userId}/activity`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
       console.error("Error updating user activity:", error);
     }
-  };
-
-  
+  }, [userId, API_BASE_URL]);
 
   // Get last seen text
-  const getLastSeenText = (lastActiveAt: string | null) => {
-    if (!lastActiveAt) return "Never active";
-    
+  const getLastSeenText = (lastActiveAt: string | null, isOnline: boolean) => {
+    if (isOnline) return "Online now";
+
+    if (!lastActiveAt) return "Offline";
+
     const lastActive = new Date(lastActiveAt);
     const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
-    
+    const diffMinutes = Math.floor(
+      (now.getTime() - lastActive.getTime()) / (1000 * 60)
+    );
+
     if (diffMinutes < 1) return "Online now";
-    if (diffMinutes < 60) return `Active ${diffMinutes}m ago`;
-    if (diffMinutes < 1440) return `Active ${Math.floor(diffMinutes / 60)}h ago`;
-    return `Active ${Math.floor(diffMinutes / 1440)}d ago`;
+    if (diffMinutes < 60) return `Offline - ${diffMinutes}m ago`;
+    if (diffMinutes < 1440)
+      return `Offline - ${Math.floor(diffMinutes / 60)}h ago`;
+    return `Offline - ${Math.floor(diffMinutes / 1440)}d ago`;
   };
 
   // Load messages
@@ -74,24 +82,26 @@ export default function ChatScreen() {
       // Update user's activity
       await updateUserActivity();
 
-      console.log(`💬 Loading messages for conversation ${conversationId}, user ${userId}`);
-      
+      console.log(
+        `💬 Loading messages for conversation ${conversationId}, user ${userId}`
+      );
+
       const result = await messagingService.getMessages(conversationId, userId);
       if (result.success) {
         console.log(`💬 Loaded ${result.data.length} messages`);
         setMessages(result.data);
-        
+
         // Get conversation details to find the other participant with online status
         const conversationsResponse = await fetch(
           `${API_BASE_URL}/api/messages/conversations/${userId}`
         );
-        
+
         if (conversationsResponse.ok) {
           const conversationsResult = await conversationsResponse.json();
           const currentConversation = conversationsResult.data.find(
             (conv: any) => conv.id === conversationId
           );
-          
+
           if (currentConversation) {
             const otherParticipant = currentConversation.participants.find(
               (p: Participant) => p.clerk_user_id !== userId
@@ -105,14 +115,14 @@ export default function ChatScreen() {
         // Fallback if no contact found
         if (!contact) {
           setContact({
-            id: 'unknown',
-            clerk_user_id: 'unknown', 
-            first_name: conversationTitle?.split(' ')[0] || 'User',
-            last_name: conversationTitle?.split(' ').slice(1).join(' ') || '',
-            email: '',
+            id: "unknown",
+            clerk_user_id: "unknown",
+            first_name: conversationTitle?.split(" ")[0] || "User",
+            last_name: conversationTitle?.split(" ").slice(1).join(" ") || "",
+            email: "",
             profile_image_url: undefined,
             online: false,
-            last_active_at: null
+            last_active_at: null,
           });
         }
       } else {
@@ -125,7 +135,14 @@ export default function ChatScreen() {
     } finally {
       setLoading(false);
     }
-  }, [conversationId, userId, conversationTitle, API_BASE_URL, contact, updateUserActivity]);
+  }, [
+    conversationId,
+    userId,
+    conversationTitle,
+    API_BASE_URL,
+    contact,
+    updateUserActivity,
+  ]);
 
   // Poll for new messages every 3 seconds
   useEffect(() => {
@@ -156,20 +173,24 @@ export default function ChatScreen() {
     try {
       setSending(true);
       console.log(`💬 Sending message: "${newMessage}"`);
-      
+
       // Update activity when sending message
       await updateUserActivity();
-      
-      const result = await messagingService.sendMessage(conversationId, userId, {
-        messageText: newMessage,
-        messageType: 'text'
-      });
+
+      const result = await messagingService.sendMessage(
+        conversationId,
+        userId,
+        {
+          messageText: newMessage,
+          messageType: "text",
+        }
+      );
 
       if (result.success) {
         console.log("💬 Message sent successfully");
-        setMessages(prev => [...prev, result.data]);
+        setMessages((prev) => [...prev, result.data]);
         setNewMessage("");
-        
+
         // Reload messages to ensure both parties see the same
         setTimeout(() => loadMessages(), 500);
       } else {
@@ -185,29 +206,32 @@ export default function ChatScreen() {
   };
 
   const formatTime = (timestamp: string) => {
-    if (!timestamp) return 'Just now';
-    
+    if (!timestamp) return "Just now";
+
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    
+
     if (diff < 60 * 1000) {
-      return 'Just now';
+      return "Just now";
     } else if (diff < 60 * 60 * 1000) {
       const minutes = Math.floor(diff / (60 * 1000));
       return `${minutes}m ago`;
     } else if (diff < 24 * 60 * 60 * 1000) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
     }
   };
 
   // Get user initials for avatar
   const getUserInitials = (firstName?: string, lastName?: string) => {
-    const first = firstName?.charAt(0) || '';
-    const last = lastName?.charAt(0) || '';
-    return `${first}${last}`.toUpperCase() || 'U';
+    const first = firstName?.charAt(0) || "";
+    const last = lastName?.charAt(0) || "";
+    return `${first}${last}`.toUpperCase() || "U";
   };
 
   // Check if message is from current user
@@ -250,12 +274,16 @@ export default function ChatScreen() {
                 <View>
                   <Text style={styles.contactName}>{conversationTitle}</Text>
                   <Text style={styles.contactStatus}>
-                    {contact ? getLastSeenText(contact.last_active_at) : "Away"}
+                    {contact
+                      ? getLastSeenText(contact.last_active_at, contact.online)
+                      : "Offline"}
                   </Text>
                 </View>
               </View>
 
-              <TouchableOpacity onPress={() => router.push("../appointments/book")}>
+              <TouchableOpacity
+                onPress={() => router.push("../appointments/book")}
+              >
                 <Ionicons name="call-outline" size={24} color="#2E7D32" />
               </TouchableOpacity>
             </View>
@@ -279,13 +307,15 @@ export default function ChatScreen() {
             ) : (
               messages.map((message) => {
                 const myMessage = isMyMessage(message);
-                
+
                 return (
                   <View
                     key={message.id}
                     style={[
                       styles.messageContainer,
-                      myMessage ? styles.myMessageContainer : styles.theirMessageContainer,
+                      myMessage
+                        ? styles.myMessageContainer
+                        : styles.theirMessageContainer,
                     ]}
                   >
                     {/* Other user's avatar (left side) */}
@@ -293,7 +323,10 @@ export default function ChatScreen() {
                       <View style={styles.avatarContainer}>
                         <View style={styles.avatar}>
                           <Text style={styles.avatarText}>
-                            {getUserInitials(message.sender.first_name, message.sender.last_name)}
+                            {getUserInitials(
+                              message.sender.first_name,
+                              message.sender.last_name
+                            )}
                           </Text>
                         </View>
                       </View>
@@ -309,15 +342,21 @@ export default function ChatScreen() {
                       <Text
                         style={[
                           styles.messageText,
-                          myMessage ? styles.myMessageText : styles.theirMessageText,
+                          myMessage
+                            ? styles.myMessageText
+                            : styles.theirMessageText,
                         ]}
                       >
                         {message.message_text}
                       </Text>
-                      <Text style={[
-                        styles.messageTime,
-                        myMessage ? styles.myMessageTime : styles.theirMessageTime
-                      ]}>
+                      <Text
+                        style={[
+                          styles.messageTime,
+                          myMessage
+                            ? styles.myMessageTime
+                            : styles.theirMessageTime,
+                        ]}
+                      >
                         {formatTime(message.created_at)}
                       </Text>
                     </View>
@@ -327,7 +366,10 @@ export default function ChatScreen() {
                       <View style={styles.avatarContainer}>
                         <View style={[styles.avatar, styles.myAvatar]}>
                           <Text style={styles.avatarText}>
-                            {getUserInitials(message.sender.first_name, message.sender.last_name)}
+                            {getUserInitials(
+                              message.sender.first_name,
+                              message.sender.last_name
+                            )}
                           </Text>
                         </View>
                       </View>
@@ -360,7 +402,8 @@ export default function ChatScreen() {
               <TouchableOpacity
                 style={[
                   styles.sendButton,
-                  (newMessage.trim() === "" || sending) && styles.sendButtonDisabled,
+                  (newMessage.trim() === "" || sending) &&
+                    styles.sendButtonDisabled,
                 ]}
                 onPress={handleSendMessage}
                 disabled={newMessage.trim() === "" || sending || !userId}
@@ -402,7 +445,7 @@ const styles = StyleSheet.create({
   // Wrapper to handle safe area properly
   headerWrapper: {
     backgroundColor: "transparent",
-    paddingTop: Platform.OS === 'ios' ? 0 : 25,
+    paddingTop: Platform.OS === "ios" ? 0 : 25,
   },
   header: {
     flexDirection: "row",
@@ -574,4 +617,15 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: "#E0E0E0",
   },
+  offlineIndicator: {
+  position: "absolute",
+  bottom: 0,
+  right: 0,
+  width: 12,
+  height: 12,
+  borderRadius: 6,
+  backgroundColor: "#9E9E9E", // Gray color
+  borderWidth: 2,
+  borderColor: "#FFF",
+},
 });

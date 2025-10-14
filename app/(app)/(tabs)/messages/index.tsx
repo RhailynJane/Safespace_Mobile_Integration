@@ -88,48 +88,51 @@ export default function MessagesScreen() {
   );
 
   const loadConversations = async () => {
-  if (!userId) {
-    console.log("❌ No user ID available for loading conversations");
-    setConversations([]);
-    setLoading(false);
-    return;
-  }
-
-  try {
-    setLoading(true);
-    console.log(`💬 Loading conversations for user: ${userId}`);
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/messages/conversations/${userId}`
-    );
-
-    if (response.ok) {
-      const result = await response.json();
-      console.log(`💬 Setting ${result.data.length} conversations`);
-      
-      // DEBUG: Check what online status is being returned
-      console.log("🔍 Online status debug:", result.data.map((conv: any) => ({
-        id: conv.id,
-        participants: conv.participants.map((p: any) => ({
-          name: `${p.first_name} ${p.last_name}`,
-          online: p.online,
-          last_active_at: p.last_active_at
-        }))
-      })));
-      
-      setConversations(result.data);
-    } else {
-      console.log("💬 Failed to load conversations from backend");
+    if (!userId) {
+      console.log("❌ No user ID available for loading conversations");
       setConversations([]);
+      setLoading(false);
+      return;
     }
-  } catch (error) {
-    console.error("💬 Error loading conversations:", error);
-    setConversations([]);
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+
+    try {
+      setLoading(true);
+      console.log(`💬 Loading conversations for user: ${userId}`);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${userId}`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`💬 Setting ${result.data.length} conversations`);
+
+        // DEBUG: Check what online status is being returned
+        console.log(
+          "🔍 Online status debug:",
+          result.data.map((conv: any) => ({
+            id: conv.id,
+            participants: conv.participants.map((p: any) => ({
+              name: `${p.first_name} ${p.last_name}`,
+              online: p.online,
+              last_active_at: p.last_active_at,
+            })),
+          }))
+        );
+
+        setConversations(result.data);
+      } else {
+        console.log("💬 Failed to load conversations from backend");
+        setConversations([]);
+      }
+    } catch (error) {
+      console.error("💬 Error loading conversations:", error);
+      setConversations([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -350,6 +353,7 @@ export default function MessagesScreen() {
                     });
                   }}
                 >
+                  {/* In your MessagesScreen, update the avatar container section: */}
                   <View style={styles.avatarContainer}>
                     {(() => {
                       const avatar = getAvatarDisplay(
@@ -372,12 +376,29 @@ export default function MessagesScreen() {
                         );
                       }
                     })()}
-                    {conversation.participants.some((p) => p.online) && (
-                      <View style={styles.onlineIndicator} />
-                    )}
-                  </View>
 
-                  {/* ADD THIS BACK - Conversation content was missing! */}
+                    {/* Show green dot if online, gray dot if offline */}
+                    {(() => {
+                      const otherParticipants =
+                        conversation.participants.filter(
+                          (p) => p.clerk_user_id !== userId
+                        );
+                      const isOnline = otherParticipants.some(
+                        (p) => p.online === true
+                      );
+
+                      return (
+                        <View
+                          style={[
+                            styles.onlineIndicator,
+                            isOnline
+                              ? styles.onlineIndicator
+                              : styles.offlineIndicator,
+                          ]}
+                        />
+                      );
+                    })()}
+                  </View>
                   <View style={styles.conversationContent}>
                     <View style={styles.conversationHeader}>
                       <Text style={styles.conversationName}>
@@ -402,7 +423,6 @@ export default function MessagesScreen() {
                         : `${conversation.participants.length} participants`}
                     </Text>
                   </View>
-
                   {conversation.unread_count > 0 && (
                     <View style={styles.unreadBadge}>
                       <Text style={styles.unreadCount}>
@@ -662,5 +682,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "600",
+  },
+  offlineIndicator: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#9E9E9E", // Gray color
+    borderWidth: 2,
+    borderColor: "#FFF",
   },
 });
