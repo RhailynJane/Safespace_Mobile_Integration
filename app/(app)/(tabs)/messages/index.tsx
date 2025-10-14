@@ -88,37 +88,48 @@ export default function MessagesScreen() {
   );
 
   const loadConversations = async () => {
-    if (!userId) {
-      console.log("❌ No user ID available for loading conversations");
+  if (!userId) {
+    console.log("❌ No user ID available for loading conversations");
+    setConversations([]);
+    setLoading(false);
+    return;
+  }
+
+  try {
+    setLoading(true);
+    console.log(`💬 Loading conversations for user: ${userId}`);
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/messages/conversations/${userId}`
+    );
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`💬 Setting ${result.data.length} conversations`);
+      
+      // DEBUG: Check what online status is being returned
+      console.log("🔍 Online status debug:", result.data.map((conv: any) => ({
+        id: conv.id,
+        participants: conv.participants.map((p: any) => ({
+          name: `${p.first_name} ${p.last_name}`,
+          online: p.online,
+          last_active_at: p.last_active_at
+        }))
+      })));
+      
+      setConversations(result.data);
+    } else {
+      console.log("💬 Failed to load conversations from backend");
       setConversations([]);
-      setLoading(false);
-      return;
     }
-
-    try {
-      setLoading(true);
-      console.log(`💬 Loading conversations for user: ${userId}`);
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${userId}`
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log(`💬 Setting ${result.data.length} conversations`);
-        setConversations(result.data);
-      } else {
-        console.log("💬 Failed to load conversations from backend");
-        setConversations([]);
-      }
-    } catch (error) {
-      console.error("💬 Error loading conversations:", error);
-      setConversations([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  } catch (error) {
+    console.error("💬 Error loading conversations:", error);
+    setConversations([]);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   const onRefresh = () => {
     setRefreshing(true);

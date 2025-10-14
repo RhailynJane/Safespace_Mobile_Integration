@@ -46,6 +46,8 @@ export default function ChatScreen() {
     }
   };
 
+  
+
   // Get last seen text
   const getLastSeenText = (lastActiveAt: string | null) => {
     if (!lastActiveAt) return "Never active";

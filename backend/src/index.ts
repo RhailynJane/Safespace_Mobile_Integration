@@ -2596,6 +2596,7 @@ app.get(
 // =============================================
 
 // Get all conversations for a user
+// Replace the existing conversations endpoint with this updated version
 app.get(
   "/api/messages/conversations/:clerkUserId",
   async (req: Request, res: Response) => {
@@ -2624,7 +2625,8 @@ app.get(
                   first_name: true,
                   last_name: true,
                   email: true,
-                  profile_image_url: true
+                  profile_image_url: true,
+                  last_active_at: true,
                 }
               }
             }
@@ -2663,42 +2665,47 @@ app.get(
         }
       });
 
-      console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
+      // Get online status for all participants
+      const conversationsWithOnlineStatus = await Promise.all(
+        conversations.map(async (conversation) => {
+          const lastMessage = conversation.messages[0];
+          
+          // Get participants with real online status
+          const participantsWithStatus = await Promise.all(
+            conversation.participants.map(async (p) => {
+              const online = await getUserOnlineStatus(p.user.clerk_user_id);
+              return {
+                id: p.user.id,
+                clerk_user_id: p.user.clerk_user_id,
+                first_name: p.user.first_name,
+                last_name: p.user.last_name,
+                email: p.user.email,
+                profile_image_url: p.user.profile_image_url,
+                online,
+                last_active_at: p.user.last_active_at
+              };
+            })
+          );
 
-      const formattedConversations = conversations.map(conversation => {
-        const lastMessage = conversation.messages[0];
-        
-        // Get ALL participants (not filtering here - let frontend handle it)
-        const allParticipants = conversation.participants.map(p => ({
-          id: p.user.id,
-          clerk_user_id: p.user.clerk_user_id,
-          first_name: p.user.first_name,
-          last_name: p.user.last_name,
-          email: p.user.email,
-          profile_image_url: p.user.profile_image_url,
-          online: false
-        }));
+          return {
+            id: conversation.id.toString(),
+            title: conversation.title,
+            conversation_type: conversation.conversation_type,
+            updated_at: conversation.updated_at.toISOString(),
+            created_at: conversation.created_at.toISOString(),
+            last_message: lastMessage?.message_text || '',
+            last_message_time: lastMessage?.created_at.toISOString(),
+            unread_count: conversation._count.messages,
+            participants: participantsWithStatus
+          };
+        })
+      );
 
-        console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
-
-        return {
-          id: conversation.id.toString(),
-          title: conversation.title,
-          conversation_type: conversation.conversation_type,
-          updated_at: conversation.updated_at.toISOString(),
-          created_at: conversation.created_at.toISOString(),
-          last_message: lastMessage?.message_text || '',
-          last_message_time: lastMessage?.created_at.toISOString(),
-          unread_count: conversation._count.messages,
-          participants: allParticipants  // Send ALL participants
-        };
-      });
-
-      console.log(`💬 Found ${formattedConversations.length} conversations for user ${clerkUserId}`);
+      console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
 
       res.json({
         success: true,
-        data: formattedConversations,
+        data: conversationsWithOnlineStatus,
       });
     } catch (error: any) {
       console.error("💬 Get conversations error:", error.message);
@@ -3177,16 +3184,28 @@ app.get(
 );
 
 // Update user activity
+// Update user activity endpoint - call this every minute when user is active
 app.post("/api/users/:clerkUserId/activity", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { clerk_user_id: clerkUserId },
-      data: { last_active_at: new Date() }
+      data: { 
+        last_active_at: new Date(),
+        updated_at: new Date() 
+      }
     });
 
-    res.json({ success: true, message: "Activity updated" });
+    console.log(`👤 Updated activity for user ${clerkUserId}`);
+
+    res.json({ 
+      success: true, 
+      message: "Activity updated",
+      data: {
+        last_active_at: updatedUser.last_active_at
+      }
+    });
   } catch (error: any) {
     console.error("Error updating user activity:", error.message);
     res.status(500).json({
@@ -3328,3 +3347,28 @@ app.get(
     }
   }
 );
+
+async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
+  try {
+    // First try to get from your database
+    const user = await prisma.user.findUnique({
+      where: { clerk_user_id: clerkUserId },
+      select: { last_active_at: true }
+    });
+
+    if (user?.last_active_at) {
+      const now = new Date();
+      const lastActive = new Date(user.last_active_at);
+      const minutesSinceLastActive = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+      
+      // Consider user online if active in last 3 minutes (more aggressive)
+      return minutesSinceLastActive <= 3;
+    }
+
+    // If no activity data, return false
+    return false;
+  } catch (error) {
+    console.error("Error checking user online status:", error);
+    return false;
+  }
+}
