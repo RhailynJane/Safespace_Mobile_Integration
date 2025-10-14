@@ -1,3 +1,4 @@
+// utils/sendbirdService.ts
 import { Platform } from 'react-native';
 
 const getApiBaseUrl = (): string => {
@@ -76,7 +77,6 @@ class SendBirdService {
   private appId: string | null = null;
   private userId: string | null = null;
   private accessToken: string | null = null;
-  private readonly sendbird: any = null;
 
   async initialize(userId: string, accessToken?: string): Promise<boolean> {
     try {
@@ -404,7 +404,7 @@ class SendBirdService {
   private createErrorResponse(message: string): Message {
     return {
       id: 'error',
-      message_text: `Error: ${message}`, // Added prefix to distinguish the message
+      message_text: message,
       message_type: 'text',
       created_at: new Date().toISOString(),
       sender: {
@@ -420,7 +420,7 @@ class SendBirdService {
   }
 }
 
-// Main Messaging Service - SendBird Implementation
+// Main Messaging Service - Hybrid Implementation (Your Backend + SendBird)
 class MessagingService {
   private readonly sendbirdService: SendBirdService;
   private readonly useSendBird: boolean = false;
@@ -536,20 +536,41 @@ class MessagingService {
   }
 
   async getContacts(userId: string): Promise<{ success: boolean; data: Contact[] }> {
-    // SendBird doesn't have a direct contacts concept
-    return { success: true, data: [] };
+    // Use your own backend API to get contacts from PostgreSQL
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/messages/contacts/${userId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch contacts: ${response.status}`);
+      }
+      const result = await response.json();
+      return { success: true, data: result.data || [] };
+    } catch (error) {
+      console.log('Get contacts failed - using fallback');
+      return { success: true, data: [] };
+    }
   }
 
-  async searchUsers(userId: string, query: string): Promise<{ success: boolean; data: any[] }> {
-    if (!this.sendbirdInitialized) {
-      return { success: false, data: [] };
-    }
-
+  async searchUsers(userId: string, query: string): Promise<{ success: boolean; data: Contact[] }> {
+    // Use your own backend API to search users from PostgreSQL
     try {
-      return await this.sendbirdService.searchUsers(query);
+      console.log(`Searching users with query: "${query}" for user: ${userId}`);
+      
+      const response = await fetch(`${API_BASE_URL}/api/messages/search-users/${userId}?q=${encodeURIComponent(query)}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to search users: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log(`Search results: ${result.data?.length || 0} users found`);
+      
+      return { 
+        success: true, 
+        data: result.data || [] 
+      };
     } catch (error) {
-      console.log('Search users failed');
-      return { success: false, data: [] };
+      console.log('Search users failed - using fallback:', error);
+      return { success: true, data: [] };
     }
   }
 

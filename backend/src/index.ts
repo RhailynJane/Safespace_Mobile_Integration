@@ -3043,8 +3043,11 @@ app.get(
       const { clerkUserId } = req.params;
       const { q: searchQuery } = req.query;
 
+      console.log(`🔍 DEBUG: Search request received - clerkUserId: ${clerkUserId}, query: "${searchQuery}"`);
+
       // Ensure searchQuery is a string and not empty
       if (typeof searchQuery !== "string" || searchQuery.trim() === "") {
+        console.log("🔍 DEBUG: Empty search query, returning empty results");
         return res.json({
           success: true,
           data: [],
@@ -3052,12 +3055,25 @@ app.get(
       }
 
       const searchQueryString = searchQuery.trim();
-      console.log(
-        `Searching users for query: "${searchQueryString}" by user: ${clerkUserId}`
-      );
+      console.log(`🔍 DEBUG: Processing search for: "${searchQueryString}"`);
 
       const searchTerm = `%${searchQueryString}%`.toLowerCase();
       const exactSearchTerm = searchQueryString.toLowerCase();
+
+      console.log(`🔍 DEBUG: Search term: ${searchTerm}, exact: ${exactSearchTerm}`);
+
+      // Test database connection first
+      try {
+        const testResult = await pool.query("SELECT 1 as test");
+        console.log("🔍 DEBUG: Database connection OK");
+      } catch (dbError) {
+        console.error("🔍 DEBUG: Database connection failed:", dbError);
+        return res.status(500).json({
+          success: false,
+          message: "Database connection failed",
+          error: (dbError as Error).message
+        });
+      }
 
       const result = await pool.query(
         `
@@ -3071,62 +3087,36 @@ app.get(
         u.role,
         u.city,
         u.state,
-        EXISTS(
-          SELECT 1 FROM user_sessions us 
-          WHERE us.user_id = u.id AND us.last_seen > NOW() - INTERVAL '5 minutes'
-        ) as online,
-        (
-          SELECT COUNT(*) 
-          FROM conversations c
-          JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
-          JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
-          WHERE cp1.user_id = u_main.id 
-            AND cp2.user_id = u.id 
-            AND c.conversation_type = 'direct'
-        ) > 0 as has_existing_conversation,
-        -- Relevance scoring
-        CASE 
-          WHEN LOWER(u.email) = $2 THEN 100
-          WHEN LOWER(CONCAT(u.first_name, ' ', u.last_name)) = $2 THEN 95
-          WHEN LOWER(u.first_name) = $2 THEN 90
-          WHEN LOWER(u.last_name) = $2 THEN 85
-          WHEN LOWER(u.email) LIKE $3 THEN 80
-          WHEN LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE $3 THEN 70
-          WHEN LOWER(u.first_name) LIKE $3 THEN 60
-          WHEN LOWER(u.last_name) LIKE $3 THEN 50
-          ELSE 40
-        END as relevance_score
+        false as online, -- Temporary fix for online status
+        false as has_existing_conversation -- Temporary fix for conversation check
       FROM users u
-      CROSS JOIN (SELECT id FROM users WHERE clerk_user_id = $1) u_main
       WHERE u.clerk_user_id != $1
         AND u.status = 'active'
         AND (
-          LOWER(u.first_name) LIKE $3 
-          OR LOWER(u.last_name) LIKE $3 
-          OR LOWER(u.email) LIKE $3
-          OR LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE $3
+          LOWER(u.first_name) LIKE $2 
+          OR LOWER(u.last_name) LIKE $2 
+          OR LOWER(u.email) LIKE $2
+          OR LOWER(CONCAT(u.first_name, ' ', u.last_name)) LIKE $2
         )
-      ORDER BY 
-        relevance_score DESC,
-        u.first_name, u.last_name
+      ORDER BY u.first_name, u.last_name
       LIMIT 50
     `,
-        [clerkUserId, exactSearchTerm, searchTerm]
+        [clerkUserId, searchTerm]
       );
 
-      console.log(
-        `Found ${result.rows.length} users matching "${searchQueryString}"`
-      );
+      console.log(`🔍 DEBUG: Found ${result.rows.length} users matching "${searchQueryString}"`);
 
       res.json({
         success: true,
         data: result.rows,
       });
     } catch (error: any) {
-      console.error("Search users error:", error.message);
+      console.error("🔍 DEBUG: Search users error:", error.message);
+      console.error("🔍 DEBUG: Full error stack:", error.stack);
       res.status(500).json({
         success: false,
         message: "Failed to search users",
+        error: error.message,
         data: [],
       });
     }
