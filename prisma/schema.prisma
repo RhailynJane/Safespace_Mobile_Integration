@@ -18,6 +18,7 @@ model User {
   age                Int?
   gender             String?
   profile_image_url  String?
+    last_active_at DateTime? 
   address            String?
   city               String?
   state              String?
@@ -29,13 +30,12 @@ model User {
   email_verified     Boolean    @default(true)
   phone_verified     Boolean    @default(false)
   preferred_language String?    @default("en")
-  timezone           String?    @default("America/Edmonton")
   notification_preferences Json?
   last_login         DateTime?
   email_verified_at  DateTime?
   phone_verified_at  DateTime?
   created_at         DateTime   @default(now())
-  updated_at         DateTime   @default(now()) @updatedAt  // Make sure this line has @default(now())
+  updated_at         DateTime   @default(now()) @updatedAt  
 
   // Relations
   clients            Client[]

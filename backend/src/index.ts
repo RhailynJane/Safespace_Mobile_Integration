@@ -3175,3 +3175,156 @@ app.get(
     }
   }
 );
+
+// Update user activity
+app.post("/api/users/:clerkUserId/activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    await prisma.user.update({
+      where: { clerk_user_id: clerkUserId },
+      data: { last_active_at: new Date() }
+    });
+
+    res.json({ success: true, message: "Activity updated" });
+  } catch (error: any) {
+    console.error("Error updating user activity:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update activity",
+      error: error.message,
+    });
+  }
+});
+
+// Helper function to determine online status
+function isUserOnline(lastActiveAt: Date | null): boolean {
+  if (!lastActiveAt) return false;
+  
+  const now = new Date();
+  const lastActive = new Date(lastActiveAt);
+  const minutesSinceLastActive = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+  
+  // Consider user online if active in last 5 minutes
+  return minutesSinceLastActive <= 5;
+}
+
+
+// Update the conversations endpoint to include online status
+app.get(
+  "/api/messages/conversations/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+
+      console.log("💬 Fetching conversations for user:", clerkUserId);
+
+      const conversations = await prisma.conversation.findMany({
+        where: {
+          participants: {
+            some: {
+              user: {
+                clerk_user_id: clerkUserId
+              }
+            }
+          }
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  clerk_user_id: true,
+                  first_name: true,
+                  last_name: true,
+                  email: true,
+                  profile_image_url: true,
+                  last_active_at: true, // Include last_active_at
+                  updated_at: true
+                }
+              }
+            }
+          },
+          messages: {
+            orderBy: {
+              created_at: 'desc'
+            },
+            take: 1
+          },
+          _count: {
+            select: {
+              messages: {
+                where: {
+                  NOT: {
+                    read_status: {
+                      some: {
+                        user: {
+                          clerk_user_id: clerkUserId
+                        }
+                      }
+                    }
+                  },
+                  sender: {
+                    clerk_user_id: {
+                      not: clerkUserId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          updated_at: 'desc'
+        }
+      });
+
+      console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
+
+      const formattedConversations = conversations.map(conversation => {
+        const lastMessage = conversation.messages[0];
+        
+        // Get ALL participants with online status
+        const allParticipants = conversation.participants.map(p => ({
+          id: p.user.id,
+          clerk_user_id: p.user.clerk_user_id,
+          first_name: p.user.first_name,
+          last_name: p.user.last_name,
+          email: p.user.email,
+          profile_image_url: p.user.profile_image_url,
+          online: isUserOnline(p.user.last_active_at),
+          last_active_at: p.user.last_active_at
+        }));
+
+        console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
+
+        return {
+          id: conversation.id.toString(),
+          title: conversation.title,
+          conversation_type: conversation.conversation_type,
+          updated_at: conversation.updated_at.toISOString(),
+          created_at: conversation.created_at.toISOString(),
+          last_message: lastMessage?.message_text || '',
+          last_message_time: lastMessage?.created_at.toISOString(),
+          unread_count: conversation._count.messages,
+          participants: allParticipants
+        };
+      });
+
+      console.log(`💬 Found ${formattedConversations.length} conversations for user ${clerkUserId}`);
+
+      res.json({
+        success: true,
+        data: formattedConversations,
+      });
+    } catch (error: any) {
+      console.error("💬 Get conversations error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch conversations",
+        error: error.message,
+      });
+    }
+  }
+);
