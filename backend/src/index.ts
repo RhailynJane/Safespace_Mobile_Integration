@@ -130,16 +130,20 @@ app.post("/api/users/sync", async (req: Request, res: Response) => {
       phone_number,
       profile_image_url,
       email_verified,
-      created_at
+      created_at,
     } = req.body;
 
-    console.log('Received user sync request via /api/users/sync:', { clerk_user_id, email });
+    console.log("Received user sync request via /api/users/sync:", {
+      clerk_user_id,
+      email,
+    });
 
     // Validate required fields
     if (!clerk_user_id || !email || !first_name || !last_name) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Missing required fields: clerk_user_id, email, first_name, last_name' 
+        message:
+          "Missing required fields: clerk_user_id, email, first_name, last_name",
       });
     }
 
@@ -156,23 +160,33 @@ app.post("/api/users/sync", async (req: Request, res: Response) => {
          email_verified = EXCLUDED.email_verified,
          updated_at = CURRENT_TIMESTAMP
        RETURNING id, clerk_user_id, email, first_name, last_name`,
-      [clerk_user_id, first_name, last_name, email, phone_number, profile_image_url, email_verified || false]
+      [
+        clerk_user_id,
+        first_name,
+        last_name,
+        email,
+        phone_number,
+        profile_image_url,
+        email_verified || false,
+      ]
     );
 
-    console.log('User synced successfully via /api/users/sync:', result.rows[0].id);
-    
+    console.log(
+      "User synced successfully via /api/users/sync:",
+      result.rows[0].id
+    );
+
     res.status(200).json({
       success: true,
-      message: 'User synced successfully',
-      user: result.rows[0]
+      message: "User synced successfully",
+      user: result.rows[0],
     });
-
   } catch (error: any) {
-    console.error('Database sync error in /api/users/sync:', error.message);
-    res.status(500).json({ 
+    console.error("Database sync error in /api/users/sync:", error.message);
+    res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      error: error.message 
+      message: "Internal server error",
+      error: error.message,
     });
   }
 });
@@ -2666,29 +2680,27 @@ app.get(
       const { conversationId } = req.params;
       const { clerkUserId, page = "1", limit = "50" } = req.query;
 
-      const pageNum = parseInt(typeof page === "string" && page.trim() !== "" ? page : "1", 10);
-      const limitNum = parseInt(typeof limit === "string" && limit.trim() !== "" ? limit : "50", 10);
-      const offset = (pageNum - 1) * limitNum;
-
       console.log(
-        `Fetching messages for conversation ${conversationId}, user ${String(clerkUserId)}`
+        `💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`
       );
+
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = parseInt(limit as string) || 50;
+      const offset = (pageNum - 1) * limitNum;
 
       // Verify user is participant
       const participantCheck = await pool.query(
         `
-      SELECT 1 FROM conversation_participants cp
-      JOIN users u ON cp.user_id = u.id
-      WHERE cp.conversation_id = $1 AND u.clerk_user_id = $2
-    `,
-        [conversationId, String(clerkUserId)]
+        SELECT 1 FROM conversation_participants cp
+        JOIN users u ON cp.user_id = u.id
+        WHERE cp.conversation_id = $1 AND u.clerk_user_id = $2
+        `,
+        [conversationId, clerkUserId]
       );
 
       if (participantCheck.rows.length === 0) {
         console.log(
-          `User ${String(
-            clerkUserId
-          )} is not a participant of conversation ${conversationId}`
+          `💬 User ${clerkUserId} is not a participant of conversation ${conversationId}`
         );
         return res.json({
           success: true,
@@ -2700,59 +2712,33 @@ app.get(
       // Get messages
       const messagesResult = await pool.query(
         `
-      SELECT 
-        m.id,
-        m.message_text,
-        m.message_type,
-        m.created_at,
-        json_build_object(
-          'id', u.id,
-          'clerk_user_id', u.clerk_user_id,
-          'first_name', u.first_name,
-          'last_name', u.last_name,
-          'profile_image_url', u.profile_image_url
-        ) as sender
-      FROM messages m
-      JOIN users u ON m.sender_id = u.id
-      WHERE m.conversation_id = $1
-      ORDER BY m.created_at DESC
-      LIMIT $2 OFFSET $3
-    `,
+        SELECT 
+          m.id,
+          m.message_text,
+          m.message_type,
+          m.created_at,
+          json_build_object(
+            'id', u.id,
+            'clerk_user_id', u.clerk_user_id,
+            'first_name', u.first_name,
+            'last_name', u.last_name,
+            'profile_image_url', u.profile_image_url,
+            'online', false
+          ) as sender
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        WHERE m.conversation_id = $1
+        ORDER BY m.created_at ASC
+        LIMIT $2 OFFSET $3
+        `,
         [conversationId, limitNum, offset]
       );
 
-      console.log(
-        `Found ${messagesResult.rows.length} messages for conversation ${conversationId}`
-      );
-
-      // Mark messages as read
-      try {
-        await pool.query(
-          `
-        INSERT INTO message_read_status (message_id, user_id)
-        SELECT m.id, u.id
-        FROM messages m
-        JOIN users u ON u.clerk_user_id = $1
-        WHERE m.conversation_id = $2 
-          AND m.sender_id != u.id
-          AND NOT EXISTS (
-            SELECT 1 FROM message_read_status mrs 
-            WHERE mrs.message_id = m.id AND mrs.user_id = u.id
-          )
-      `,
-          [String(clerkUserId) || '', conversationId]
-        );
-      } catch (readError: any) {
-        console.log("Error marking messages as read:", readError.message);
-        // Continue even if read status fails
-      }
-
-      // Use toReversed instead of reverse() to avoid mutation
-      const reversedMessages = messagesResult.rows.slice().reverse();
+      console.log(`💬 Found ${messagesResult.rows.length} messages`);
 
       res.json({
         success: true,
-        data: reversedMessages,
+        data: messagesResult.rows,
         pagination: {
           page: pageNum,
           limit: limitNum,
@@ -2760,8 +2746,7 @@ app.get(
         },
       });
     } catch (error: any) {
-      console.error("Get messages error:", error.message);
-      // Return empty array instead of error
+      console.error("💬 Get messages error:", error.message);
       res.json({
         success: true,
         data: [],
@@ -2780,6 +2765,10 @@ app.post(
     try {
       const { conversationId } = req.params;
       const { clerkUserId, messageText, messageType = "text" } = req.body;
+
+      console.log(
+        `💬 Sending message to conversation ${conversationId}: "${messageText}"`
+      );
 
       await client.query("BEGIN");
 
@@ -2816,20 +2805,20 @@ app.post(
       // Insert message
       const messageResult = await client.query(
         `
-      INSERT INTO messages (conversation_id, sender_id, message_text, message_type)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `,
+        INSERT INTO messages (conversation_id, sender_id, message_text, message_type)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, message_text, message_type, created_at
+        `,
         [conversationId, userId, messageText, messageType]
       );
 
       // Update conversation timestamp
       await client.query(
         `
-      UPDATE conversations 
-      SET updated_at = CURRENT_TIMESTAMP 
-      WHERE id = $1
-    `,
+        UPDATE conversations 
+        SET updated_at = CURRENT_TIMESTAMP 
+        WHERE id = $1
+        `,
         [conversationId]
       );
 
@@ -2838,24 +2827,27 @@ app.post(
       // Get complete message with sender info
       const completeMessage = await client.query(
         `
-      SELECT 
-        m.id,
-        m.message_text,
-        m.message_type,
-        m.created_at,
-        json_build_object(
-          'id', u.id,
-          'clerk_user_id', u.clerk_user_id,
-          'first_name', u.first_name,
-          'last_name', u.last_name,
-          'profile_image_url', u.profile_image_url
-        ) as sender
-      FROM messages m
-      JOIN users u ON m.sender_id = u.id
-      WHERE m.id = $1
-    `,
+        SELECT 
+          m.id,
+          m.message_text,
+          m.message_type,
+          m.created_at,
+          json_build_object(
+            'id', u.id,
+            'clerk_user_id', u.clerk_user_id,
+            'first_name', u.first_name,
+            'last_name', u.last_name,
+            'profile_image_url', u.profile_image_url,
+            'online', false
+          ) as sender
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        WHERE m.id = $1
+        `,
         [messageResult.rows[0].id]
       );
+
+      console.log(`💬 Message sent successfully: ${messageResult.rows[0].id}`);
 
       res.json({
         success: true,
@@ -2864,10 +2856,11 @@ app.post(
       });
     } catch (error: any) {
       await client.query("ROLLBACK");
-      console.error("Send message error:", error.message);
+      console.error("💬 Send message error:", error.message);
       res.status(500).json({
         success: false,
         message: "Failed to send message",
+        error: error.message,
       });
     } finally {
       client.release();
@@ -3043,7 +3036,9 @@ app.get(
       const { clerkUserId } = req.params;
       const { q: searchQuery } = req.query;
 
-      console.log(`🔍 DEBUG: Search request received - clerkUserId: ${clerkUserId}, query: "${searchQuery}"`);
+      console.log(
+        `🔍 DEBUG: Search request received - clerkUserId: ${clerkUserId}, query: "${searchQuery}"`
+      );
 
       // Ensure searchQuery is a string and not empty
       if (typeof searchQuery !== "string" || searchQuery.trim() === "") {
@@ -3060,7 +3055,9 @@ app.get(
       const searchTerm = `%${searchQueryString}%`.toLowerCase();
       const exactSearchTerm = searchQueryString.toLowerCase();
 
-      console.log(`🔍 DEBUG: Search term: ${searchTerm}, exact: ${exactSearchTerm}`);
+      console.log(
+        `🔍 DEBUG: Search term: ${searchTerm}, exact: ${exactSearchTerm}`
+      );
 
       // Test database connection first
       try {
@@ -3071,7 +3068,7 @@ app.get(
         return res.status(500).json({
           success: false,
           message: "Database connection failed",
-          error: (dbError as Error).message
+          error: (dbError as Error).message,
         });
       }
 
@@ -3104,7 +3101,9 @@ app.get(
         [clerkUserId, searchTerm]
       );
 
-      console.log(`🔍 DEBUG: Found ${result.rows.length} users matching "${searchQueryString}"`);
+      console.log(
+        `🔍 DEBUG: Found ${result.rows.length} users matching "${searchQueryString}"`
+      );
 
       res.json({
         success: true,

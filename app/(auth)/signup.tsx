@@ -10,7 +10,6 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
 } from "react-native";
 import { router } from "expo-router";
@@ -319,15 +318,17 @@ export default function SignupScreen() {
         await handleVerification();
         break;
       default:
-        const steps: SignupStep[] = [
-          "personal",
-          "password",
-          "verification",
-          "success",
-        ];
-        const currentIndex = steps.indexOf(currentStep);
-        if (currentIndex < steps.length - 1) {
-          setCurrentStep(steps[currentIndex + 1]!);
+        {
+          const steps: SignupStep[] = [
+            "personal",
+            "password",
+            "verification",
+            "success",
+          ];
+          const currentIndex = steps.indexOf(currentStep);
+          if (currentIndex < steps.length - 1) {
+            setCurrentStep(steps[currentIndex + 1]!);
+          }
         }
         break;
     }

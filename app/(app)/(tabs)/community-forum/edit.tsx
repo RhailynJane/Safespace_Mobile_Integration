@@ -37,7 +37,7 @@
  * Reference: chat.deepseek.com
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -164,16 +164,18 @@ export default function EditPostScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await communityApi.deletePost(postId);
-              Alert.alert("Success", "Post deleted successfully!");
-              // Navigate to community forum after successful deletion
-              router.replace("/community-forum");
-            } catch (error) {
-              console.error("Error deleting post:", error);
-              Alert.alert("Error", "Failed to delete post");
-            }
+          onPress: () => {
+            (async () => {
+              try {
+                await communityApi.deletePost(postId);
+                Alert.alert("Success", "Post deleted successfully!");
+                // Navigate to community forum after successful deletion
+                router.replace("/community-forum");
+              } catch (error) {
+                console.error("Error deleting post:", error);
+                Alert.alert("Error", "Failed to delete post");
+              }
+            })();
           },
         },
       ]
