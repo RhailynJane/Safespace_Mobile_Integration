@@ -120,6 +120,63 @@ app.post(
   }
 );
 
+app.post("/api/users/sync", async (req: Request, res: Response) => {
+  try {
+    const {
+      clerk_user_id,
+      email,
+      first_name,
+      last_name,
+      phone_number,
+      profile_image_url,
+      email_verified,
+      created_at
+    } = req.body;
+
+    console.log('Received user sync request via /api/users/sync:', { clerk_user_id, email });
+
+    // Validate required fields
+    if (!clerk_user_id || !email || !first_name || !last_name) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Missing required fields: clerk_user_id, email, first_name, last_name' 
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO users (clerk_user_id, first_name, last_name, email, phone_number, profile_image_url, email_verified, role, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'client', 'active')
+       ON CONFLICT (clerk_user_id) 
+       DO UPDATE SET 
+         first_name = EXCLUDED.first_name,
+         last_name = EXCLUDED.last_name,
+         email = EXCLUDED.email,
+         phone_number = EXCLUDED.phone_number,
+         profile_image_url = EXCLUDED.profile_image_url,
+         email_verified = EXCLUDED.email_verified,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING id, clerk_user_id, email, first_name, last_name`,
+      [clerk_user_id, first_name, last_name, email, phone_number, profile_image_url, email_verified || false]
+    );
+
+    console.log('User synced successfully via /api/users/sync:', result.rows[0].id);
+    
+    res.status(200).json({
+      success: true,
+      message: 'User synced successfully',
+      user: result.rows[0]
+    });
+
+  } catch (error: any) {
+    console.error('Database sync error in /api/users/sync:', error.message);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal server error',
+      error: error.message 
+    });
+  }
+});
+
 // Create client endpoint
 app.post(
   "/api/clients",
