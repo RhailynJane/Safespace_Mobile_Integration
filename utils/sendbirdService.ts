@@ -531,7 +531,10 @@ class MessagingService {
     }
 
     try {
-      const result = await this.sendbirdService.getMessages(conversationId, userId);
+      const result = await this.sendbirdService.getMessages(
+        conversationId,
+        userId
+      );
       return {
         ...result,
         pagination: { page, limit: 50, hasMore: false },
@@ -726,6 +729,40 @@ class MessagingService {
         online: false,
       },
     };
+  }
+
+  async getConversationsFromBackend(
+    userId: string
+  ): Promise<{ success: boolean; data: Conversation[] }> {
+    // Use your own backend API instead of SendBird
+    try {
+      console.log(`💬 Loading conversations for user: ${userId}`);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${userId}`
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          "💬 Get conversations failed:",
+          response.status,
+          errorText
+        );
+        throw new Error(`Failed to get conversations: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`💬 Loaded ${result.data?.length || 0} conversations`);
+
+      return {
+        success: true,
+        data: result.data || [],
+      };
+    } catch (error) {
+      console.log("💬 Get conversations failed - using fallback");
+      return { success: true, data: [] };
+    }
   }
 }
 
