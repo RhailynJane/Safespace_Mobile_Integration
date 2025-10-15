@@ -23,10 +23,7 @@ import { assessmentTracker } from "../../../utils/assessmentTracker";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { 
   Resource, 
-  fetchAllResourcesWithExternal,
-  getRandomQuote,
-  getDailyAffirmation 
-} from "../../../utils/resourcesApi";
+  fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
 
 type MoodEntry = {
   id: string;
