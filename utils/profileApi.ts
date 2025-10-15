@@ -71,46 +71,38 @@ class ProfileAPI {
     try {
       const clerkUserId = await this.getClerkUserId();
       
-      // Step 1: Get client from users table
-      const usersResponse = await fetch(`${this.baseURL}/users`);
-      if (!usersResponse.ok) {
-        throw new Error('Failed to fetch users');
+      // Step 1: Get specific user by Clerk ID
+      const userResponse = await fetch(`${this.baseURL}/users/${clerkUserId}`);  // gets only one user
+      if (!userResponse.ok) {
+        if (userResponse.status === 404) {
+          console.log('User not found');
+          return null;
+        }
+        throw new Error('Failed to fetch user');
       }
       
-      const users = await usersResponse.json();
-      // Find current client (role='client' in users table)
-      const currentClient = users.find((u: any) => 
-        u.clerk_user_id === clerkUserId && u.role === 'client'
-      );
+      const currentClient = await userResponse.json();
+        // Build profile data from users table
+        const profileData: ClientProfileData = {
+          firstName: currentClient.first_name || '',
+          lastName: currentClient.last_name || '',
+          email: currentClient.email || '',
+          phoneNumber: currentClient.phone_number || '',
+          location: '',
+          notifications: false,
+          shareWithSupportWorker: false,
+          profileImage: ''
+        };
       
-      if (!currentClient) {
-        console.log('Client not found in users table');
-        return null;
-      }
-      
-      // Build profile data from users table
-      const profileData: ClientProfileData = {
-        firstName: currentClient.first_name || '',
-        lastName: currentClient.last_name || '',
-        email: currentClient.email || '',
-        phoneNumber: currentClient.phone_number || '',
-        location: '',
-        notifications: false,
-        shareWithSupportWorker: false,
-        profileImage: ''
-      };
-      
-      // Step 2: The clients table data would need a GET endpoint
-      // Your backend has POST /api/clients but no GET
-      // For now, we'll need to store emergency contacts locally or add a GET endpoint
-      
-      // Get emergency contacts from local storage (temporary solution)
-      const savedEmergencyData = await AsyncStorage.getItem('emergencyContacts');
-      if (savedEmergencyData) {
-        const emergencyData = JSON.parse(savedEmergencyData);
-        profileData.emergencyContactName = emergencyData.name;
-        profileData.emergencyContactPhone = emergencyData.phone;
-        profileData.emergencyContactRelationship = emergencyData.relationship;
+      // Step 2: Get client emergency contact info from database
+      const clientResponse = await fetch(`${this.baseURL}/clients/by-clerk/${clerkUserId}`);
+      if (clientResponse.ok) {
+        const clientData = await clientResponse.json();
+        if (clientData && clientData !== null) {
+          profileData.emergencyContactName = clientData.emergency_contact_name;
+          profileData.emergencyContactPhone = clientData.emergency_contact_phone;
+          profileData.emergencyContactRelationship = clientData.emergency_contact_relationship;
+        }
       }
       
       // Get location from local storage (not in database)

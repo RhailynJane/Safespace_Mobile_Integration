@@ -78,6 +78,30 @@ app.get("/api/users", async (req: Request, res: Response) => {
   }
 });
 
+// Get a specific user by their Clerk ID
+app.get("/api/users/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    
+    const result = await pool.query(
+      "SELECT * FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error("Error fetching user:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch user",
+      details: error.message,
+    });
+  }
+});
+
 // Sync user endpoint
 app.post(
   "/api/sync-user",
@@ -168,6 +192,43 @@ app.post(
     }
   }
 );
+
+// Get client emergency contact info
+app.get("/api/clients/by-clerk/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    
+    // First get the user's internal ID
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Get client info
+    const clientResult = await pool.query(
+      "SELECT * FROM clients WHERE user_id = $1",
+      [userId]
+    );
+    
+    if (clientResult.rows.length === 0) {
+      return res.json({ client: null });
+    }
+    
+    res.json(clientResult.rows[0]);
+  } catch (error: any) {
+    console.error("Error fetching client:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch client",
+      details: error.message,
+    });
+  }
+});
 
 // =============================================
 // ASSESSMENT ENDPOINTS
