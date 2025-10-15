@@ -82,3 +82,5 @@ export const profileApi = {
     }
   }
 };
+
+export default profileApi;

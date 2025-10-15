@@ -3541,7 +3541,7 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // =============================================
-// PROFILE ENDPOINTS
+// PROFILE ENDPOINTS - UPDATED FOR client_profiles TABLE
 // =============================================
 
 // Interface for profile data
@@ -3559,18 +3559,25 @@ interface ClientProfileData {
   postalCode?: string;
   country?: string;
   
-  // From clients table (emergency contacts)
+  // From client_profiles table
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelationship?: string;
-  emergencyContactEmail?: string;
-  emergencyContactAddress?: string;
   
-  // Additional fields that might be stored locally
-  location?: string;
+  // CMHA Demographics fields
+  pronouns?: string;
+  isLGBTQ?: string;
+  primaryLanguage?: string;
+  mentalHealthConcerns?: string;
+  supportNeeded?: string;
+  ethnoculturalBackground?: string;
+  canadaStatus?: string;
+  dateCameToCanada?: string;
+  
+  // Additional fields
+  profileImage?: string;
   notifications?: boolean;
   shareWithSupportWorker?: boolean;
-  profileImage?: string;
 }
 
 // Get complete client profile
@@ -3580,59 +3587,69 @@ app.get("/api/client-profile/:clerkUserId", async (req: Request, res: Response) 
 
     console.log('📋 Fetching client profile for:', clerkUserId);
 
-    // Get user data
+    // Get user data from users table
     const userResult = await pool.query(
       `SELECT 
         id, first_name, last_name, email, phone_number, date_of_birth, gender,
-        address, city, state, postal_code, country, profile_image_url,
-        timezone, preferred_language, created_at, updated_at
+        address, city, state, postal_code, country, profile_image_url
        FROM users 
-       WHERE clerk_user_id = $1 AND role = 'client'`,
+       WHERE clerk_user_id = $1`,
       [clerkUserId]
     );
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "Client not found"
+        message: "User not found"
       });
     }
 
     const user = userResult.rows[0];
 
-    // Get client-specific data (emergency contacts)
-    const clientResult = await pool.query(
+    // Get client profile data with all CMHA fields
+    const clientProfileResult = await pool.query(
       `SELECT 
-        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-        emergency_contact_email, emergency_contact_address,
-        secondary_emergency_contact_name, secondary_emergency_contact_phone, secondary_emergency_contact_relationship,
-        guardian_name, guardian_phone, guardian_relationship, legal_status
-       FROM clients 
-       WHERE user_id = $1`,
-      [user.id]
+        phone_number, date_of_birth,
+        emergency_contact_name, emergency_contact_phone, therapist_contact,
+        pronouns, is_lgbtq, primary_language, mental_health_concerns,
+        support_needed, ethnocultural_background, canada_status, date_came_to_canada
+       FROM client_profiles 
+       WHERE clerk_user_id = $1`,
+      [clerkUserId]
     );
 
-    const clientData = clientResult.rows[0] || {};
+    const clientProfile = clientProfileResult.rows[0] || {};
 
     // Combine the data
     const profileData: ClientProfileData = {
+      // From users table
       firstName: user.first_name,
       lastName: user.last_name,
       email: user.email,
-      phoneNumber: user.phone_number,
-      dateOfBirth: user.date_of_birth,
+      phoneNumber: clientProfile.phone_number || user.phone_number,
+      dateOfBirth: clientProfile.date_of_birth || user.date_of_birth,
       gender: user.gender,
       address: user.address,
       city: user.city,
       state: user.state,
       postalCode: user.postal_code,
       country: user.country,
-      emergencyContactName: clientData.emergency_contact_name,
-      emergencyContactPhone: clientData.emergency_contact_phone,
-      emergencyContactRelationship: clientData.emergency_contact_relationship,
-      emergencyContactEmail: clientData.emergency_contact_email,
-      emergencyContactAddress: clientData.emergency_contact_address,
-      profileImage: user.profile_image_url
+      profileImage: user.profile_image_url,
+      
+      // Emergency contacts
+      emergencyContactName: clientProfile.emergency_contact_name,
+      emergencyContactPhone: clientProfile.emergency_contact_phone,
+      emergencyContactRelationship: clientProfile.therapist_contact,
+      
+      // CMHA Demographics
+      pronouns: clientProfile.pronouns,
+      isLGBTQ: clientProfile.is_lgbtq,
+      primaryLanguage: clientProfile.primary_language,
+      mentalHealthConcerns: clientProfile.mental_health_concerns,
+      supportNeeded: clientProfile.support_needed,
+      ethnoculturalBackground: clientProfile.ethnocultural_background,
+      canadaStatus: clientProfile.canada_status,
+      dateCameToCanada: clientProfile.date_came_to_canada
     };
 
     console.log('✅ Client profile fetched successfully');
@@ -3664,23 +3681,7 @@ app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) 
 
     await client.query('BEGIN');
 
-    // 1. Get user ID first
-    const userResult = await client.query(
-      'SELECT id FROM users WHERE clerk_user_id = $1',
-      [clerkUserId]
-    );
-
-    if (userResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
-      });
-    }
-
-    const userId = userResult.rows[0].id;
-
-    // 2. Update users table
+    // 1. Update users table
     const updateUserQuery = `
       UPDATE users 
       SET 
@@ -3696,7 +3697,7 @@ app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) 
         postal_code = COALESCE($10, postal_code),
         country = COALESCE($11, country),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $12
+      WHERE clerk_user_id = $12
       RETURNING *
     `;
 
@@ -3712,35 +3713,79 @@ app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) 
       profileData.state,
       profileData.postalCode,
       profileData.country,
-      userId
+      clerkUserId
     ]);
 
-    // 3. Update or insert into clients table (emergency contacts)
-    const upsertClientQuery = `
-      INSERT INTO clients (
-        user_id, 
-        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-        emergency_contact_email, emergency_contact_address
+    if (userUpdateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // 2. Update or insert into client_profiles table with all CMHA fields
+    const upsertClientProfileQuery = `
+      INSERT INTO client_profiles (
+        clerk_user_id, 
+        display_name,
+        email,
+        phone_number,
+        date_of_birth,
+        emergency_contact_name, 
+        emergency_contact_phone,
+        therapist_contact,
+        pronouns,
+        is_lgbtq,
+        primary_language,
+        mental_health_concerns,
+        support_needed,
+        ethnocultural_background,
+        canada_status,
+        date_came_to_canada,
+        updated_at
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (user_id) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)
+      ON CONFLICT (clerk_user_id) 
       DO UPDATE SET
-        emergency_contact_name = COALESCE(EXCLUDED.emergency_contact_name, clients.emergency_contact_name),
-        emergency_contact_phone = COALESCE(EXCLUDED.emergency_contact_phone, clients.emergency_contact_phone),
-        emergency_contact_relationship = COALESCE(EXCLUDED.emergency_contact_relationship, clients.emergency_contact_relationship),
-        emergency_contact_email = COALESCE(EXCLUDED.emergency_contact_email, clients.emergency_contact_email),
-        emergency_contact_address = COALESCE(EXCLUDED.emergency_contact_address, clients.emergency_contact_address),
+        display_name = COALESCE(EXCLUDED.display_name, client_profiles.display_name),
+        email = COALESCE(EXCLUDED.email, client_profiles.email),
+        phone_number = COALESCE(EXCLUDED.phone_number, client_profiles.phone_number),
+        date_of_birth = COALESCE(EXCLUDED.date_of_birth, client_profiles.date_of_birth),
+        emergency_contact_name = COALESCE(EXCLUDED.emergency_contact_name, client_profiles.emergency_contact_name),
+        emergency_contact_phone = COALESCE(EXCLUDED.emergency_contact_phone, client_profiles.emergency_contact_phone),
+        therapist_contact = COALESCE(EXCLUDED.therapist_contact, client_profiles.therapist_contact),
+        pronouns = COALESCE(EXCLUDED.pronouns, client_profiles.pronouns),
+        is_lgbtq = COALESCE(EXCLUDED.is_lgbtq, client_profiles.is_lgbtq),
+        primary_language = COALESCE(EXCLUDED.primary_language, client_profiles.primary_language),
+        mental_health_concerns = COALESCE(EXCLUDED.mental_health_concerns, client_profiles.mental_health_concerns),
+        support_needed = COALESCE(EXCLUDED.support_needed, client_profiles.support_needed),
+        ethnocultural_background = COALESCE(EXCLUDED.ethnocultural_background, client_profiles.ethnocultural_background),
+        canada_status = COALESCE(EXCLUDED.canada_status, client_profiles.canada_status),
+        date_came_to_canada = COALESCE(EXCLUDED.date_came_to_canada, client_profiles.date_came_to_canada),
         updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `;
 
-    const clientUpdateResult = await client.query(upsertClientQuery, [
-      userId,
+    const displayName = `${profileData.firstName} ${profileData.lastName}`.trim();
+    
+    const clientProfileUpdateResult = await client.query(upsertClientProfileQuery, [
+      clerkUserId,
+      displayName,
+      profileData.email,
+      profileData.phoneNumber,
+      profileData.dateOfBirth,
       profileData.emergencyContactName,
       profileData.emergencyContactPhone,
       profileData.emergencyContactRelationship,
-      profileData.emergencyContactEmail,
-      profileData.emergencyContactAddress
+      profileData.pronouns,
+      profileData.isLGBTQ,
+      profileData.primaryLanguage,
+      profileData.mentalHealthConcerns,
+      profileData.supportNeeded,
+      profileData.ethnoculturalBackground,
+      profileData.canadaStatus,
+      profileData.dateCameToCanada
     ]);
 
     await client.query('COMMIT');
@@ -3752,7 +3797,7 @@ app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) 
       message: "Profile updated successfully",
       data: {
         user: userUpdateResult.rows[0],
-        client: clientUpdateResult.rows[0]
+        clientProfile: clientProfileUpdateResult.rows[0]
       }
     });
 
@@ -3769,7 +3814,7 @@ app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) 
   }
 });
 
-// Update profile image
+// Update profile image (keep this the same)
 app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
@@ -3811,65 +3856,6 @@ app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, r
       success: false,
       message: "Failed to update profile image",
       error: error.message
-    });
-  }
-});
-
-app.post("/api/sync-user", async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId, email, firstName, lastName, phoneNumber } = req.body;
-
-    console.log('🔄 Syncing user:', { clerkUserId, email, firstName, lastName });
-
-    if (!clerkUserId || !email) {
-      return res.status(400).json({
-        success: false,
-        error: "clerkUserId and email are required",
-      });
-    }
-
-    // Check if user exists
-    const existingUser = await pool.query(
-      'SELECT * FROM users WHERE clerk_user_id = $1',
-      [clerkUserId]
-    );
-
-    let user;
-    
-    if (existingUser.rows.length > 0) {
-      // Update existing user
-      user = await pool.query(
-        `UPDATE users 
-         SET email = $1, first_name = $2, last_name = $3, phone_number = $4, 
-             updated_at = CURRENT_TIMESTAMP
-         WHERE clerk_user_id = $5
-         RETURNING *`,
-        [email, firstName || '', lastName || '', phoneNumber || null, clerkUserId]
-      );
-    } else {
-      // Create new user
-      user = await pool.query(
-        `INSERT INTO users 
-         (clerk_user_id, email, first_name, last_name, phone_number, role, status, email_verified)
-         VALUES ($1, $2, $3, $4, $5, 'client', 'active', true)
-         RETURNING *`,
-        [clerkUserId, email, firstName || '', lastName || '', phoneNumber || null]
-      );
-    }
-
-    console.log('✅ User synced successfully:', user.rows[0].id);
-
-    res.json({
-      success: true,
-      message: "User synced successfully",
-      user: user.rows[0],
-    });
-  } catch (error: any) {
-    console.error("❌ Error syncing user:", error.message);
-    res.status(500).json({
-      success: false,
-      error: "Internal server error",
-      details: error.message,
     });
   }
 });

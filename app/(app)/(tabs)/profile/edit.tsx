@@ -1,7 +1,5 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
+/* eslint-disable react-hooks/exhaustive-deps */
+// app/(app)/(tabs)/profile/edit.tsx
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -15,6 +13,7 @@ import {
   Alert,
   Image,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -24,167 +23,83 @@ import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import profileAPI from '../../../../utils/profileApi'; 
-import * as Location from 'expo-location';
+import profileAPI, { ClientProfileData } from '../../../../utils/profileApi'; 
 import settingsApi from "../../../../utils/settingsApi";
+import { locationService } from '../../../../utils/locationService';
 
+// Gender options from CMHA form
+const GENDER_OPTIONS = [
+  'Agender', 'Gender-fluid', 'Genderqueer', 'Gender Variant',
+  'Intersex', 'Man', 'Non-Binary', 'Non-Conforming',
+  'Questioning', 'Transgender Man', 'Transgender Woman', 'Two-Spirit',
+  'I don\'t identify with any gender', 'I do not know', 'Prefer not to answer', "Woman"
+];
 
-/**
- * EditProfileScreen Component
- * 
- * Screen for editing user profile information including photo, name, email,
- * location, and notification preferences. Features image upload functionality
- * and location autocomplete suggestions.
- */
+// Status in Canada options
+const CANADA_STATUS_OPTIONS = [
+  'Canadian Citizen', 'Permanent Resident', 'Refugee', 'Newcomer',
+  'Temporary Resident', 'Do not know', 'Prefer not to answer', 'Other'
+];
+
+// Mental Health/Medical Concerns options
+const HEALTH_CONCERNS_OPTIONS = [
+  'I have a disability',
+  'I have an illness or mental-health concern',
+  'I do not have any ongoing medical conditions',
+  'I do not know',
+  'Not applicable',
+  'Prefer not to answer'
+];
+
 export default function EditProfileScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   
-  const GOOGLE_PLACES_AUTOCOMPLETE_URL = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
-  const GOOGLE_PLACES_DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json';
-  const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
-
-  // Sample cities for autocomplete
-  const sampleCities = [
-    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
-    "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
-    "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
-    "San Francisco, CA", "Indianapolis, IN", "Seattle, WA", "Denver, CO", "Boston, MA",
-    "Toronto, ON", "Vancouver, BC", "Montreal, QC", "Calgary, AB", "Ottawa, ON"
-  ];
+  // Add a ref for debouncing
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get user data from Clerk
   const { user } = useUser();
   
-  // Form state
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    location: "",
-    notifications: true,
-    shareWithSupportWorker: false, // NEW FIELD
-  });
+  firstName: "",
+  lastName: "", 
+  email: "",
+  phoneNumber: "",
+  dateOfBirth: "",
+  gender: "",
+  // Address
+  streetAddress: "",
+  city: "", 
+  postalCode: "",
+  location: "",
+  // Emergency Contact
+  emergencyContactName: "",
+  emergencyContactPhone: "",
+  emergencyContactRelationship: "",
+  // Settings
+  notifications: true,
+  shareWithSupportWorker: false,
+});
 
-    /**
-   * Fetches location suggestions from Google Places API
-   */
-    const fetchGooglePlacesSuggestions = async (input: string) => {
-      if (input.length < 2) {
-        setLocationSuggestions([]);
-        setShowLocationSuggestions(false);
-        return;
-      }
-
-      try {
-        const params = new URLSearchParams({
-          input: input,
-          key: GOOGLE_PLACES_API_KEY,
-          types: '(cities)', // Restrict to cities
-          language: 'en',
-        });
-
-        const response = await fetch(`${GOOGLE_PLACES_AUTOCOMPLETE_URL}?${params}`);
-        const data = await response.json();
-
-        if (data.status === 'OK' && data.predictions) {
-          const suggestions = data.predictions.map((prediction: any) => ({
-            description: prediction.description,
-            place_id: prediction.place_id,
-            main_text: prediction.structured_formatting?.main_text || '',
-            secondary_text: prediction.structured_formatting?.secondary_text || '',
-          }));
-          
-          setLocationSuggestions(suggestions);
-          setShowLocationSuggestions(true);
-        } else {
-          console.log('Google Places API error:', data.status);
-          setLocationSuggestions([]);
-        }
-      } catch (error) {
-        console.error('Error fetching places:', error);
-        // Fallback to your sample cities if API fails
-        const filtered = sampleCities.filter(city =>
-          city.toLowerCase().includes(input.toLowerCase())
-        ).slice(0, 5);
-        setLocationSuggestions(filtered.map(city => ({ description: city })));
-        setShowLocationSuggestions(filtered.length > 0);
-      }
-    };
-
-    /**
-   * Gets detailed place information including coordinates
-   */
-  const fetchPlaceDetails = async (placeId: string) => {
-    try {
-      const params = new URLSearchParams({
-        place_id: placeId,
-        key: GOOGLE_PLACES_API_KEY,
-        fields: 'geometry,formatted_address,address_components',
-      });
-
-      const response = await fetch(`${GOOGLE_PLACES_DETAILS_URL}?${params}`);
-      const data = await response.json();
-
-      if (data.status === 'OK' && data.result) {
-        return {
-          formatted_address: data.result.formatted_address,
-          lat: data.result.geometry.location.lat,
-          lng: data.result.geometry.location.lng,
-          address_components: data.result.address_components,
-        };
-      }
-    } catch (error) {
-      console.error('Error fetching place details:', error);
-    }
-    return null;
-  };
-
-  // Update your handleLocationSearch function
-  const handleLocationSearch = (text: string) => {
-    setLocationQuery(text);
-    setFormData({ ...formData, location: text });
-    
-    // Cancel previous timeout if exists
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    // Debounce the API call
-    searchTimeoutRef.current = setTimeout(() => {
-      fetchGooglePlacesSuggestions(text);
-    }, 300); // Wait 300ms after user stops typing
-  };
-
-  // Add a ref for debouncing
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Update your selectLocation function
-  const selectLocation = async (location: any) => {
-    if (typeof location === 'string') {
-      // Fallback for sample cities
-      setLocationQuery(location);
-      setFormData({ ...formData, location });
-    } else {
-      // Google Places result
-      setLocationQuery(location.description);
-      setFormData({ ...formData, location: location.description });
-      
-      // Optionally fetch more details
-      if (location.place_id) {
-        const details = await fetchPlaceDetails(location.place_id);
-        if (details) {
-          // You can store coordinates or other details if needed
-          console.log('Place details:', details);
-          // Store in formData or separate state as needed
-        }
-      }
-    }
-    setShowLocationSuggestions(false);
-  };
+// For CMHA-specific fields that don't fit in the database yet, store locally:
+const [cmhaData, setCmhaData] = useState({
+  pronouns: "",
+  isLGBTQ: "",
+  primaryLanguage: "", 
+  mentalHealthConcerns: "",
+  supportNeeded: "",
+  ethnoculturalBackground: "",
+  canadaStatus: "",
+  dateCameToCanada: "",
+});
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -196,46 +111,47 @@ export default function EditProfileScreen() {
 
   // Load existing profile data when screen loads
   useEffect(() => {
-    loadProfileData();
-  }, []);
+    if (user?.id) {
+      loadProfileData();
+    }
+  }, [user]);
 
   /**
    * Loads profile data from local storage and Clerk
    */
   const loadProfileData = async () => {
+    if (!user?.id) return;
+
     try {
-      // First, load from Clerk user object (primary source of truth)
-      if (user) {
-        setFormData({
-          firstName: user.firstName || "",
-          lastName: user.lastName || "",
-          email: user.emailAddresses[0]?.emailAddress || "",
-          location: formData.location,
-          notifications: formData.notifications,
-          shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
-        });
-        
-        // Also set profile image from Clerk if available
-        if (user.imageUrl) {
-          setProfileImage(user.imageUrl);
-        }
+      setLoading(true);
+      
+      // Load from Clerk user object first
+      setFormData(prev => ({
+        ...prev,
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.emailAddresses[0]?.emailAddress || "",
+        phoneNumber: user.phoneNumbers[0]?.phoneNumber || "",
+      }));
+      
+      // Set profile image from Clerk if available
+      if (user.imageUrl) {
+        setProfileImage(user.imageUrl);
       }
       
-      // Then load any additional data from local storage (like custom profile image)
+      // Load additional data from local storage
       const savedImage = await AsyncStorage.getItem('profileImage');
       if (savedImage) {
         setProfileImage(savedImage);
       }
       
-      // Load saved profile data for location and other custom fields
+      // Load saved profile data
       const savedProfileData = await AsyncStorage.getItem('profileData');
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
         setFormData(prev => ({
           ...prev,
-          location: parsedData.location || prev.location,
-          notifications: parsedData.notifications !== undefined ? parsedData.notifications : prev.notifications,
-          shareWithSupportWorker: parsedData.shareWithSupportWorker !== undefined ? parsedData.shareWithSupportWorker : prev.shareWithSupportWorker, // NEW
+          ...parsedData
         }));
         
         if (parsedData.location) {
@@ -243,22 +159,44 @@ export default function EditProfileScreen() {
         }
       }
 
-      // Finally, try to fetch from backend API if available
+      // Load CMHA specific data
+      const savedCmhaData = await AsyncStorage.getItem('cmhaProfileData');
+      if (savedCmhaData) {
+        const cmhaData = JSON.parse(savedCmhaData);
+        setFormData(prev => ({
+          ...prev,
+          ...cmhaData
+        }));
+      }
+
+      // Fetch from backend API if available
       try {
-        const profileData = await profileAPI.getClientProfile();
+        const profileData = await profileAPI.getClientProfile(user.id);
         
         if (profileData) {
           setFormData(prev => ({
-            firstName: user?.firstName || profileData.firstName || prev.firstName,
-            lastName: user?.lastName || profileData.lastName || prev.lastName,
-            email: user?.emailAddresses[0]?.emailAddress || profileData.email || prev.email,
-            location: profileData.location || prev.location,
-            notifications: profileData.notifications !== false,
-            shareWithSupportWorker: profileData.shareWithSupportWorker !== undefined ? profileData.shareWithSupportWorker : prev.shareWithSupportWorker, // NEW
+            ...prev,
+            firstName: profileData.firstName || user.firstName || prev.firstName,
+            lastName: profileData.lastName || user.lastName || prev.lastName,
+            email: profileData.email || user.emailAddresses[0]?.emailAddress || prev.email,
+            phoneNumber: profileData.phoneNumber || prev.phoneNumber,
+            location: profileData.city || prev.location, // Note: using city as location
+            dateOfBirth: profileData.dateOfBirth || prev.dateOfBirth,
+            gender: profileData.gender || prev.gender,
+            streetAddress: profileData.address || prev.streetAddress,
+            postalCode: profileData.postalCode || prev.postalCode,
+            emergencyContactName: profileData.emergencyContactName || prev.emergencyContactName,
+            emergencyContactPhone: profileData.emergencyContactPhone || prev.emergencyContactPhone,
+            emergencyContactRelationship: profileData.emergencyContactRelationship || prev.emergencyContactRelationship,
           }));
           
-          if (profileData.location) {
-            setLocationQuery(profileData.location);
+          if (profileData.city) {
+            setLocationQuery(profileData.city);
+          }
+
+          // Set profile image from backend if available
+          if (profileData.profileImage) {
+            setProfileImage(profileData.profileImage);
           }
         }
       } catch (apiError) {
@@ -268,19 +206,108 @@ export default function EditProfileScreen() {
     } catch (error) {
       console.log('Error loading profile data:', error);
       Alert.alert("Error", "Failed to load profile data");
+    } finally {
+      setLoading(false);
     }
   };
 
   /**
-   * Saves image to local storage
+   * Fetches location suggestions from OpenStreetMap
    */
-  const saveImageToStorage = async (imageUri: string) => {
+  const fetchLocationSuggestions = async (input: string) => {
+    if (input.length < 2) {
+      setLocationSuggestions([]);
+      setShowLocationSuggestions(false);
+      return;
+    }
+
     try {
-      await AsyncStorage.setItem('profileImage', imageUri);
-      console.log('Profile image saved successfully');
+      setLoadingLocations(true);
+      const suggestions = await locationService.searchLocations(input);
+      
+      setLocationSuggestions(suggestions);
+      setShowLocationSuggestions(suggestions.length > 0);
     } catch (error) {
-      console.log('Error saving profile image:', error);
-      Alert.alert("Error", "Failed to save profile image");
+      console.error('Error fetching location suggestions:', error);
+      setLocationSuggestions([]);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  /**
+   * Handles location search with debouncing
+   */
+  const handleLocationSearch = (text: string) => {
+    setLocationQuery(text);
+    setFormData({ ...formData, location: text });
+    
+    // Cancel previous timeout if exists
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Debounce the API call
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchLocationSuggestions(text);
+    }, 500);
+  };
+
+  /**
+   * Selects location from suggestions
+   */
+  const selectLocation = (location: any) => {
+    setLocationQuery(location.description);
+    setFormData({ ...formData, location: location.description });
+    setShowLocationSuggestions(false);
+    setLocationSuggestions([]);
+  };
+
+  /**
+   * Handles profile photo selection and upload
+   */
+  const handleSelectImage = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not available");
+      return;
+    }
+
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to change your profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setUploadingImage(true);
+        const imageUri = result.assets[0].uri;
+        
+        try {
+          // Save to local storage immediately
+          await AsyncStorage.setItem('profileImage', imageUri);
+          setProfileImage(imageUri);
+          
+          Alert.alert('Success', 'Profile picture updated successfully!');
+        } catch (uploadError) {
+          console.error('Error saving image:', uploadError);
+          Alert.alert('Error', 'Failed to save profile picture. Please try again.');
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error selecting image:', error);
+      setUploadingImage(false);
+      Alert.alert('Error', 'Failed to update profile picture. Please try again.');
     }
   };
 
@@ -297,60 +324,85 @@ export default function EditProfileScreen() {
   };
 
   /**
+   * Saves CMHA specific data to local storage
+   */
+const saveCmhaDataToStorage = async () => {
+  try {
+    await AsyncStorage.setItem('cmhaProfileData', JSON.stringify(cmhaData));
+    console.log('CMHA data saved to storage');
+  } catch (error) {
+    console.log('Error saving CMHA data to storage:', error);
+  }
+};
+
+  /**
    * Saves profile changes to backend API and local storage
    */
   const handleSaveChanges = async () => {
+    if (!user?.id) {
+      Alert.alert("Error", "User not available");
+      return;
+    }
+
     try {
+      setSaving(true);
+      
       // Validate required fields
       if (!formData.firstName || !formData.email) {
-        Alert.alert("Error", "Please fill in all required fields");
+        Alert.alert("Error", "Please fill in First Name and Email Address");
         return;
       }
 
-      // Note: We don't update firstName, lastName, or email in Clerk
-      // Those should be updated through Clerk's user management
-      // We only save additional profile data like location and notifications
-      
-      // Save to backend API if available
+      // Prepare data for backend API
+      const profileData: Partial<ClientProfileData> = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        address: formData.streetAddress,
+        city: formData.location, // Using location as city
+        postalCode: formData.postalCode,
+        country: "Canada",
+        emergencyContactName: formData.emergencyContactName,
+        emergencyContactPhone: formData.emergencyContactPhone,
+        emergencyContactRelationship: formData.emergencyContactRelationship,
+      };
+
+      // Save to backend API
       try {
-        const result = await profileAPI.updateClientProfile({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          location: formData.location,
-          notifications: formData.notifications,
-          shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
-          profileImage: profileImage || undefined,
-        });
-
-      // Save notification setting separately to SettingsAPI
-      const settingsResult = await settingsApi.saveSettings({
-        notificationsEnabled: formData.notifications,
-        shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
-      });
-
+        const result = await profileAPI.updateClientProfile(user.id, profileData);
+        
         if (result.success) {
-          // Also save to local storage as backup
+          // Save notification settings
+          await settingsApi.saveSettings({
+            notificationsEnabled: formData.notifications,
+            shareWithSupportWorker: formData.shareWithSupportWorker,
+          });
+
+          // Save to local storage as backup
           await saveProfileDataToStorage();
+          await saveCmhaDataToStorage();
           
           Alert.alert("Success", "Profile updated successfully!");
           router.back();
         } else {
-          // If API fails, still save to local storage
-          await saveProfileDataToStorage();
-          Alert.alert("Success", "Profile updated locally!");
-          router.back();
+          throw new Error(result.message);
         }
       } catch (apiError) {
-        // If API is not available, just save to local storage
         console.log('API update failed, saving locally:', apiError);
+        // If API fails, save to local storage only
         await saveProfileDataToStorage();
+        await saveCmhaDataToStorage();
         Alert.alert("Success", "Profile updated locally!");
         router.back();
       }
     } catch (error) {
       console.error('Error in handleSaveChanges:', error);
       Alert.alert("Error", "Failed to update profile. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -373,69 +425,6 @@ export default function EditProfileScreen() {
   };
 
   /**
-   * Opens image picker options for profile photo
-   */
-  const handleEditPhoto = () => {
-    Alert.alert(
-      "Edit Profile Photo",
-      "Choose an option",
-      [
-        { text: "Camera", onPress: openCamera },
-        { text: "Gallery", onPress: openGallery },
-        { text: "Cancel", style: "cancel" },
-      ]
-    );
-  };
-
-  /**
-   * Opens camera to take a new profile photo
-   */
-  const openCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera permission is required to take photos');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const imageUri = result.assets[0].uri;
-      setProfileImage(imageUri);
-      await saveImageToStorage(imageUri);
-    }
-  };
-
-  /**
-   * Opens gallery to select an existing photo
-   */
-  const openGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Gallery permission is required to select photos');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const imageUri = result.assets[0].uri;
-      setProfileImage(imageUri);
-      await saveImageToStorage(imageUri);
-    }
-  };
-
-  /**
    * Generates initials for avatar fallback
    */
   const getInitials = () => {
@@ -451,12 +440,96 @@ export default function EditProfileScreen() {
     return `${formData.firstName} ${formData.lastName}`.trim() || "User";
   };
 
+  /**
+   * Renders option buttons for selection fields
+   */
+  const renderOptionButtons = (options: string[], selectedValue: string, onSelect: (value: string) => void) => {
+    return (
+      <View style={styles.optionsContainer}>
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={[
+              styles.optionButton,
+              selectedValue === option && styles.optionButtonSelected
+            ]}
+            onPress={() => onSelect(option)}
+          >
+            <Text style={[
+              styles.optionText,
+              selectedValue === option && styles.optionTextSelected
+            ]}>
+              {option}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  /**
+   * Renders location suggestions list
+   */
+  const renderLocationSuggestions = () => {
+    if (!showLocationSuggestions || locationSuggestions.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.suggestionsContainer}>
+        <View style={styles.suggestionsList}>
+          {loadingLocations ? (
+            <View style={styles.loadingSuggestions}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+              <Text style={styles.loadingText}>Searching locations...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={locationSuggestions}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.suggestionItem}
+                  onPress={() => selectLocation(item)}
+                >
+                  <Ionicons name="location-outline" size={16} color="#666" />
+                  <Text style={styles.suggestionText} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              style={styles.suggestionsFlatList}
+              nestedScrollEnabled={true}
+            />
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={styles.container}>
+          <AppHeader title="Edit Profile" showBack={true} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
   return (
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
         <AppHeader title="Edit Profile" showBack={true} />
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Profile Photo Section */}
           <View style={styles.profilePhotoSection}>
             <View style={styles.profilePhotoContainer}>
@@ -467,17 +540,26 @@ export default function EditProfileScreen() {
                   <Text style={styles.initialsText}>{getInitials()}</Text>
                 </View>
               )}
-              <TouchableOpacity style={styles.editPhotoButton} onPress={handleEditPhoto}>
-                <Text style={styles.editPhotoText}>Edit Profile</Text>
+              {uploadingImage && (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                </View>
+              )}
+              <TouchableOpacity style={styles.editPhotoButton} onPress={handleSelectImage}>
+                <Text style={styles.editPhotoText}>
+                  {uploadingImage ? "Uploading..." : "Edit Photo"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Form Section */}
+          {/* Personal Information Section */}
           <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            
             {/* Full Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name</Text>
+              <Text style={styles.label}>Full Name *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
@@ -498,7 +580,7 @@ export default function EditProfileScreen() {
 
             {/* Email Address */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
+              <Text style={styles.label}>Email Address *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
@@ -512,31 +594,108 @@ export default function EditProfileScreen() {
               </View>
             </View>
 
-            {/* Password */}
+            {/* Phone Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>Phone Number</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  value="••••••••••"
-                  secureTextEntry={!showPassword}
-                  placeholder="Enter your password"
-                  editable={false}
+                  value={formData.phoneNumber}
+                  onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
+                  placeholder="Enter your phone number"
+                  keyboardType="phone-pad"
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons 
-                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                    size={20} 
-                    color="#666" 
-                  />
-                </TouchableOpacity>
               </View>
             </View>
 
-            {/* Location */}
+            {/* Date of Birth */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Location</Text>
+              <Text style={styles.label}>Date of Birth</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.dateOfBirth}
+                  onChangeText={(text) => setFormData({ ...formData, dateOfBirth: text })}
+                  placeholder="MM/DD/YYYY"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Demographics Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Demographics</Text>
+            
+            {/* Gender */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Gender</Text>
+              {renderOptionButtons(GENDER_OPTIONS, formData.gender, (value) => 
+                setFormData({ ...formData, gender: value })
+              )}
+            </View>
+
+            {/* Pronouns */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Pronouns</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.pronouns}
+                  onChangeText={(text) => setFormData({ ...formData, pronouns: text })}
+                  placeholder="e.g., they/them, he/him, she/her"
+                />
+              </View>
+            </View>
+
+            {/* LGBTQ+ Identification */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Do you identify as LGBTQ+?</Text>
+              {renderOptionButtons(
+                ['Yes', 'No', 'I do not know', 'Prefer not to answer'],
+                formData.isLGBTQ,
+                (value) => setFormData({ ...formData, isLGBTQ: value })
+              )}
+            </View>
+
+            {/* Primary Language */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Primary Language</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="language-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.primaryLanguage}
+                  onChangeText={(text) => setFormData({ ...formData, primaryLanguage: text })}
+                  placeholder="Enter your primary language"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Address Information */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Address Information</Text>
+            
+            {/* Street Address */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Street Address</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="home-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.streetAddress}
+                  onChangeText={(text) => setFormData({ ...formData, streetAddress: text })}
+                  placeholder="Enter your street address"
+                />
+              </View>
+            </View>
+
+            {/* Location/City */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>City</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="location-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
@@ -545,43 +704,147 @@ export default function EditProfileScreen() {
                   onChangeText={handleLocationSearch}
                   placeholder="Enter your city"
                   placeholderTextColor="#999"
-                  onFocus={() => {
-                    if (formData.location) {
-                      setLocationQuery(formData.location);
-                      handleLocationSearch(formData.location);
-                    }
-                  }}
                 />
               </View>
               {/* Location Suggestions Dropdown */}
+              {renderLocationSuggestions()}
             </View>
-            {showLocationSuggestions && locationSuggestions.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              <FlatList
-                data={locationSuggestions}
-                keyExtractor={(item, index) => item.place_id || item.description || index.toString()}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.suggestionItem}
-                    onPress={() => selectLocation(item)}
-                  >
-                    <Ionicons name="location-outline" size={16} color="#666" />
-                    <Text style={styles.suggestionText}>
-                      {item.description || item}  {/* Handle both objects and strings */}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                style={styles.suggestionsList}
-                nestedScrollEnabled={true}
+
+            {/* Postal Code */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Postal Code</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="navigate-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.postalCode}
+                  onChangeText={(text) => setFormData({ ...formData, postalCode: text })}
+                  placeholder="Enter your postal code"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Emergency Contact Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Emergency Contact</Text>
+            
+            {/* Emergency Contact Name & Relationship */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Emergency Contact Name & Relationship</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.emergencyContactName}
+                  onChangeText={(text) => setFormData({ ...formData, emergencyContactName: text })}
+                  placeholder="Name and relationship"
+                />
+              </View>
+            </View>
+
+            {/* Emergency Contact Number */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Emergency Contact Number</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.emergencyContactNumber}
+                  onChangeText={(text) => setFormData({ ...formData, emergencyContactNumber: text })}
+                  placeholder="Emergency contact phone number"
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Health Information Section */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Health Information</Text>
+            
+            {/* Mental Health/Medical Concerns */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Mental Health/Medical Concerns</Text>
+              {renderOptionButtons(
+                HEALTH_CONCERNS_OPTIONS,
+                formData.mentalHealthConcerns,
+                (value) => setFormData({ ...formData, mentalHealthConcerns: value })
+              )}
+            </View>
+
+            {/* Support Needed */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Support Needed</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={formData.supportNeeded}
+                onChangeText={(text) => setFormData({ ...formData, supportNeeded: text })}
+                placeholder="Any access needs or accommodations you'd like us to know about"
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
               />
             </View>
-            )}
-
-            {/* Save Changes Button */}
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
-              <Text style={styles.saveButtonText}>Save Change</Text>
-            </TouchableOpacity>
           </View>
+
+          {/* Additional Information */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Additional Information</Text>
+            
+            {/* Ethnocultural Background */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Ethnocultural Background</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="globe-outline" size={20} color="#666" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={formData.ethnoculturalBackground}
+                  onChangeText={(text) => setFormData({ ...formData, ethnoculturalBackground: text })}
+                  placeholder="Enter your ethnocultural background"
+                />
+              </View>
+            </View>
+
+            {/* Status in Canada */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Status in Canada</Text>
+              {renderOptionButtons(
+                CANADA_STATUS_OPTIONS,
+                formData.canadaStatus,
+                (value) => setFormData({ ...formData, canadaStatus: value })
+              )}
+            </View>
+
+            {/* Date Came to Canada */}
+            {formData.canadaStatus && formData.canadaStatus !== 'Canadian Citizen' && formData.canadaStatus !== 'Do not know' && formData.canadaStatus !== 'Prefer not to answer' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Date Came to Canada</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    value={formData.dateCameToCanada}
+                    onChangeText={(text) => setFormData({ ...formData, dateCameToCanada: text })}
+                    placeholder="MM/DD/YYYY"
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Save Changes Button */}
+          <TouchableOpacity 
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+            onPress={handleSaveChanges}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
 
           {/* Notification Section */}
           <View style={styles.notificationSection}>
@@ -602,7 +865,7 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
-          {/* Privacy Settings Section - NEW */}
+          {/* Privacy Settings Section */}
           <View style={styles.notificationSection}>
             <Text style={styles.sectionTitle}>Privacy Settings</Text>
             <View style={styles.notificationItem}>
@@ -620,41 +883,6 @@ export default function EditProfileScreen() {
               />
             </View>
           </View>
-
-          {/* Other Section */}
-          <View style={styles.otherSection}>
-            <Text style={styles.sectionTitle}>Other</Text>
-            
-            <TouchableOpacity style={styles.otherItem}>
-              <View style={styles.otherLeft}>
-                <View style={styles.otherIcon}>
-                  <Ionicons name="call-outline" size={16} color="#666" />
-                </View>
-                <Text style={styles.otherText}>Contact Us</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#666" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.otherItem}>
-              <View style={styles.otherLeft}>
-                <View style={styles.otherIcon}>
-                  <Ionicons name="shield-outline" size={16} color="#666" />
-                </View>
-                <Text style={styles.otherText}>Privacy Policy</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#666" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.otherItem, styles.lastOtherItem]}>
-              <View style={styles.otherLeft}>
-                <View style={styles.otherIcon}>
-                  <Ionicons name="settings-outline" size={16} color="#666" />
-                </View>
-                <Text style={styles.otherText}>Settings</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#666" />
-            </TouchableOpacity>
-          </View>
         </ScrollView>
 
         <BottomNavigation
@@ -671,20 +899,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContainer: {
     paddingBottom: 100,
@@ -725,12 +943,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   formSection: {
     backgroundColor: "#FFFFFF",
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 15,
   },
   inputGroup: {
     marginBottom: 20,
@@ -757,12 +992,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
+  textArea: {
+    minHeight: 80,
+    borderRadius: 12,
+    textAlignVertical: 'top',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  optionButtonSelected: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  optionText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  optionTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
   saveButton: {
     backgroundColor: "#4CAF50",
     borderRadius: 25,
     paddingVertical: 15,
     alignItems: "center",
-    marginTop: 10,
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#A5D6A7',
   },
   saveButtonText: {
     color: "#FFFFFF",
@@ -775,12 +1046,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 15,
   },
   notificationItem: {
     flexDirection: "row",
@@ -804,58 +1069,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
   },
-  otherSection: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
-    borderRadius: 15,
-    padding: 20,
-  },
-  otherItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  lastOtherItem: {
-    borderBottomWidth: 0,
-  },
-  otherLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  otherIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#F8F8F8",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  otherText: {
-    fontSize: 14,
-    color: "#333",
-  },
   suggestionsContainer: {
     position: "relative",
     zIndex: 1000,
+    marginTop: 5,
   },
   suggestionsList: {
-    maxHeight: 150,
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
-    marginTop: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    maxHeight: 200,
+  },
+  suggestionsFlatList: {
+    borderRadius: 10,
   },
   suggestionItem: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
@@ -865,37 +1099,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     marginLeft: 10,
+    flex: 1,
   },
-});
-
-const bottomNavStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+  loadingSuggestions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    justifyContent: 'center',
   },
-  tab: {
-    alignItems: "center",
-    padding: 8,
-  },
-  tabText: {
-    fontSize: 12,
-    marginTop: 4,
+  loadingText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#666',
   },
 });
