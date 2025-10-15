@@ -11,18 +11,22 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import {
   Message,
   Participant,
 } from "../../../../utils/sendbirdService";
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 export default function ChatScreen() {
-  const { userId } = useAuth(); // Get actual Clerk user ID
+  const { userId } = useAuth();
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
@@ -36,6 +40,26 @@ export default function ChatScreen() {
   const [contact, setContact] = useState<Participant | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Get safe area insets for proper spacing
+  const insets = useSafeAreaInsets();
+
+  // Calculate header height based on screen size and safe area
+  const getHeaderHeight = () => {
+    const baseHeight = 60; // Minimum header height
+    const safeAreaTop = insets.top;
+    
+    // Adjust header height based on screen size
+    if (SCREEN_HEIGHT > 800) {
+      return baseHeight + safeAreaTop + 10; // For larger screens
+    } else if (SCREEN_HEIGHT > 600) {
+      return baseHeight + safeAreaTop + 5; // For medium screens
+    } else {
+      return baseHeight + safeAreaTop; // For smaller screens
+    }
+  };
+
+  const headerHeight = getHeaderHeight();
 
   // Update user activity
   const updateUserActivity = useCallback(async () => {
@@ -290,8 +314,8 @@ export default function ChatScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         <SafeAreaView style={styles.container}>
-          {/* Fixed Header with proper safe area padding */}
-          <View style={styles.headerWrapper}>
+          {/* Fixed Header with dynamic height based on screen size */}
+          <View style={[styles.headerWrapper, { height: headerHeight }]}>
             <View style={styles.header}>
               <TouchableOpacity onPress={() => router.back()}>
                 <Ionicons name="arrow-back" size={24} color="#2E7D32" />
@@ -482,10 +506,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
-  // Wrapper to handle safe area properly
+  // Dynamic header wrapper
   headerWrapper: {
     backgroundColor: "transparent",
-    paddingTop: Platform.OS === "ios" ? 0 : 25,
+    justifyContent: 'flex-end',
   },
   header: {
     flexDirection: "row",
@@ -494,7 +518,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 12,
     backgroundColor: "transparent",
-    minHeight: 60,
   },
   contactInfo: {
     flexDirection: "row",
