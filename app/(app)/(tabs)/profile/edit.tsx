@@ -14,49 +14,99 @@ import {
   Image,
   FlatList,
   ActivityIndicator,
+  Modal,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import profileAPI, { ClientProfileData } from '../../../../utils/profileApi'; 
+import profileAPI, { ClientProfileData } from "../../../../utils/profileApi";
 import settingsApi from "../../../../utils/settingsApi";
-import { locationService } from '../../../../utils/locationService';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Modal, Platform } from 'react-native';
+import { locationService } from "../../../../utils/locationService";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 // Gender options from CMHA form
 const GENDER_OPTIONS = [
-  'Agender', 'Gender-fluid', 'Genderqueer', 'Gender Variant',
-  'Intersex', 'Man', 'Non-Binary', 'Non-Conforming',
-  'Questioning', 'Transgender Man', 'Transgender Woman', 'Two-Spirit',
-  'I don\'t identify with any gender', 'I do not know', 'Prefer not to answer', "Woman"
+  "Agender",
+  "Gender-fluid",
+  "Genderqueer",
+  "Gender Variant",
+  "Intersex",
+  "Man",
+  "Non-Binary",
+  "Non-Conforming",
+  "Questioning",
+  "Transgender Man",
+  "Transgender Woman",
+  "Two-Spirit",
+  "I don't identify with any gender",
+  "I do not know",
+  "Prefer not to answer",
+  "Woman",
 ];
 
 // Status in Canada options
 const CANADA_STATUS_OPTIONS = [
-  'Canadian Citizen', 'Permanent Resident', 'Refugee', 'Newcomer',
-  'Temporary Resident', 'Do not know', 'Prefer not to answer', 'Other'
+  "Canadian Citizen",
+  "Permanent Resident",
+  "Refugee",
+  "Newcomer",
+  "Temporary Resident",
+  "Do not know",
+  "Prefer not to answer",
+  "Other",
+];
+
+const ETHNOCULTURAL_OPTIONS = [
+  "First Nations",
+  "Métis",
+  "Inuit",
+  "European",
+  "Asian",
+  "South Asian",
+  "Southeast Asian",
+  "African",
+  "Caribbean",
+  "Latin American",
+  "Middle Eastern",
+  "Mixed Heritage",
+  "Prefer not to answer",
+  "Other",
 ];
 
 const LANGUAGE_OPTIONS = [
-  'English', 'French', 'Spanish', 'Mandarin', 'Cantonese', 'Punjabi',
-  'Tagalog', 'Arabic', 'German', 'Italian', 'Portuguese', 'Russian',
-  'Japanese', 'Korean', 'Hindi', 'Vietnamese', 'Other'
+  "English",
+  "French",
+  "Spanish",
+  "Mandarin",
+  "Cantonese",
+  "Punjabi",
+  "Tagalog",
+  "Arabic",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Russian",
+  "Japanese",
+  "Korean",
+  "Hindi",
+  "Vietnamese",
+  "Other",
 ];
 
 // Mental Health/Medical Concerns options
 const HEALTH_CONCERNS_OPTIONS = [
-  'I have a disability',
-  'I have an illness or mental-health concern',
-  'I do not have any ongoing medical conditions',
-  'I do not know',
-  'Not applicable',
-  'Prefer not to answer'
+  "I have a disability",
+  "I have an illness or mental-health concern",
+  "I do not have any ongoing medical conditions",
+  "I do not know",
+  "Not applicable",
+  "Prefer not to answer",
 ];
 
 export default function EditProfileScreen() {
@@ -70,45 +120,49 @@ export default function EditProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
-const [tempDate, setTempDate] = useState(new Date());
-const [dateDisplay, setDateDisplay] = useState('');
-const [showLanguagePicker, setShowLanguagePicker] = useState(false);
-
+  const [tempDate, setTempDate] = useState(new Date());
+  const [dateDisplay, setDateDisplay] = useState("");
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [showEthnoculturalPicker, setShowEthnoculturalPicker] = useState(false);
+  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([]);
+  const [showStreetSuggestions, setShowStreetSuggestions] = useState(false);
+  const [postalSuggestions, setPostalSuggestions] = useState<any[]>([]);
+  const [showPostalSuggestions, setShowPostalSuggestions] = useState(false);
   // Add a ref for debouncing
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get user data from Clerk
   const { user } = useUser();
-  
+
   const [formData, setFormData] = useState({
-  firstName: "",
-  lastName: "", 
-  email: "",
-  phoneNumber: "",
-  dateOfBirth: "",
-  gender: "",
-  pronouns: "",
-  // Address
-  streetAddress: "",
-  city: "", 
-  postalCode: "",
-  location: "",
-  // Emergency Contact
-  emergencyContactName: "",
-  emergencyContactPhone: "",
-  emergencyContactRelationship: "",
-  emergencyContactNumber: "",
-  // Settings
-  notifications: true,
-  shareWithSupportWorker: false,
-  isLGBTQ: "",
-  primaryLanguage: "", 
-  mentalHealthConcerns: "",
-  supportNeeded: "",
-  ethnoculturalBackground: "",
-  canadaStatus: "",
-  dateCameToCanada: "",
-});
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    dateOfBirth: "",
+    gender: "",
+    pronouns: "",
+    // Address
+    streetAddress: "",
+    city: "",
+    postalCode: "",
+    location: "",
+    // Emergency Contact
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    emergencyContactRelationship: "",
+    emergencyContactNumber: "",
+    // Settings
+    notifications: true,
+    shareWithSupportWorker: false,
+    isLGBTQ: "",
+    primaryLanguage: "",
+    mentalHealthConcerns: "",
+    supportNeeded: "",
+    ethnoculturalBackground: "",
+    canadaStatus: "",
+    dateCameToCanada: "",
+  });
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -133,72 +187,80 @@ const [showLanguagePicker, setShowLanguagePicker] = useState(false);
 
     try {
       setLoading(true);
-      
+
       // Load from Clerk user object first
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         firstName: user.firstName || "",
         lastName: user.lastName || "",
         email: user.emailAddresses[0]?.emailAddress || "",
         phoneNumber: user.phoneNumbers[0]?.phoneNumber || "",
       }));
-      
+
       // Set profile image from Clerk if available
       if (user.imageUrl) {
         setProfileImage(user.imageUrl);
       }
-      
+
       // Load additional data from local storage
-      const savedImage = await AsyncStorage.getItem('profileImage');
+      const savedImage = await AsyncStorage.getItem("profileImage");
       if (savedImage) {
         setProfileImage(savedImage);
       }
-      
+
       // Load saved profile data
-      const savedProfileData = await AsyncStorage.getItem('profileData');
+      const savedProfileData = await AsyncStorage.getItem("profileData");
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          ...parsedData
+          ...parsedData,
         }));
-        
+
         if (parsedData.location) {
           setLocationQuery(parsedData.location);
         }
       }
 
       // Load CMHA specific data
-      const savedCmhaData = await AsyncStorage.getItem('cmhaProfileData');
+      const savedCmhaData = await AsyncStorage.getItem("cmhaProfileData");
       if (savedCmhaData) {
         const cmhaData = JSON.parse(savedCmhaData);
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          ...cmhaData
+          ...cmhaData,
         }));
       }
 
       // Fetch from backend API if available
       try {
         const profileData = await profileAPI.getClientProfile(user.id);
-        
+
         if (profileData) {
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
-            firstName: profileData.firstName || user.firstName || prev.firstName,
+            firstName:
+              profileData.firstName || user.firstName || prev.firstName,
             lastName: profileData.lastName || user.lastName || prev.lastName,
-            email: profileData.email || user.emailAddresses[0]?.emailAddress || prev.email,
+            email:
+              profileData.email ||
+              user.emailAddresses[0]?.emailAddress ||
+              prev.email,
             phoneNumber: profileData.phoneNumber || prev.phoneNumber,
             location: profileData.city || prev.location, // Note: using city as location
             dateOfBirth: profileData.dateOfBirth || prev.dateOfBirth,
             gender: profileData.gender || prev.gender,
             streetAddress: profileData.address || prev.streetAddress,
             postalCode: profileData.postalCode || prev.postalCode,
-            emergencyContactName: profileData.emergencyContactName || prev.emergencyContactName,
-            emergencyContactPhone: profileData.emergencyContactPhone || prev.emergencyContactPhone,
-            emergencyContactRelationship: profileData.emergencyContactRelationship || prev.emergencyContactRelationship,
+            emergencyContactName:
+              profileData.emergencyContactName || prev.emergencyContactName,
+            emergencyContactPhone:
+              profileData.emergencyContactPhone || prev.emergencyContactPhone,
+            emergencyContactRelationship:
+              profileData.emergencyContactRelationship ||
+              prev.emergencyContactRelationship,
           }));
-          
+
           if (profileData.city) {
             setLocationQuery(profileData.city);
           }
@@ -209,50 +271,89 @@ const [showLanguagePicker, setShowLanguagePicker] = useState(false);
           }
         }
       } catch (apiError) {
-        console.log('API fetch failed, using local/Clerk data:', apiError);
+        console.log("API fetch failed, using local/Clerk data:", apiError);
       }
-      
     } catch (error) {
-      console.log('Error loading profile data:', error);
+      console.log("Error loading profile data:", error);
       Alert.alert("Error", "Failed to load profile data");
     } finally {
       setLoading(false);
     }
   };
 
-  / Date handling functions
-const handleDatePress = () => {
-  if (formData.dateOfBirth) {
-    // Parse existing date if available
-    const [month, day, year] = formData.dateOfBirth.split('/');
-    setTempDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
-  } else {
-    setTempDate(new Date());
-  }
-  setShowDatePicker(true);
-};
+  // Address search functions
+  const handleStreetSearch = async (text: string) => {
+    setFormData({ ...formData, streetAddress: text });
 
-const handleDateConfirm = () => {
-  // Format date as YYYY-MM-DD for database (PostgreSQL format)
-  const year = tempDate.getFullYear();
-  const month = String(tempDate.getMonth() + 1).padStart(2, '0');
-  const day = String(tempDate.getDate()).padStart(2, '0');
-  const formattedDate = `${year}-${month}-${day}`;
-  
-  // Format for display as MM/DD/YYYY
-  const displayDate = `${month}/${day}/${year}`;
-  
-  setFormData({ ...formData, dateOfBirth: formattedDate });
-  setDateDisplay(displayDate);
-  setShowDatePicker(false);
-};
+    if (text.length < 3) {
+      setStreetSuggestions([]);
+      setShowStreetSuggestions(false);
+      return;
+    }
 
-const handleDateChange = (event: any, selectedDate?: Date) => {
-  if (selectedDate) {
-    setTempDate(selectedDate);
-  }
-};
+    try {
+      const suggestions = await locationService.searchAddresses(text);
+      setStreetSuggestions(suggestions);
+      setShowStreetSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error("Error fetching street suggestions:", error);
+    }
+  };
 
+  const handlePostalSearch = async (text: string) => {
+    setFormData({ ...formData, postalCode: text });
+
+    if (text.length < 3) {
+      setPostalSuggestions([]);
+      setShowPostalSuggestions(false);
+      return;
+    }
+
+    try {
+      const suggestions = await locationService.searchPostalCodes(text);
+      setPostalSuggestions(suggestions);
+      setShowPostalSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error("Error fetching postal suggestions:", error);
+    }
+  };
+
+  // Date handling functions
+  const handleDatePress = () => {
+    if (formData.dateOfBirth) {
+      // Parse existing date if available
+      const [month, day, year] = formData.dateOfBirth.split("/");
+      if (year && month && day) {
+        setTempDate(
+          new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+        );
+      }
+    } else {
+      setTempDate(new Date());
+    }
+    setShowDatePicker(true);
+  };
+
+  const handleDateConfirm = () => {
+    // Format date as YYYY-MM-DD for database (PostgreSQL format)
+    const year = tempDate.getFullYear();
+    const month = String(tempDate.getMonth() + 1).padStart(2, "0");
+    const day = String(tempDate.getDate()).padStart(2, "0");
+    const formattedDate = `${year}-${month}-${day}`;
+
+    // Format for display as MM/DD/YYYY
+    const displayDate = `${month}/${day}/${year}`;
+
+    setFormData({ ...formData, dateOfBirth: formattedDate });
+    setDateDisplay(displayDate);
+    setShowDatePicker(false);
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (selectedDate) {
+      setTempDate(selectedDate);
+    }
+  };
 
   /**
    * Fetches location suggestions from OpenStreetMap
@@ -267,11 +368,11 @@ const handleDateChange = (event: any, selectedDate?: Date) => {
     try {
       setLoadingLocations(true);
       const suggestions = await locationService.searchLocations(input);
-      
+
       setLocationSuggestions(suggestions);
       setShowLocationSuggestions(suggestions.length > 0);
     } catch (error) {
-      console.error('Error fetching location suggestions:', error);
+      console.error("Error fetching location suggestions:", error);
       setLocationSuggestions([]);
     } finally {
       setLoadingLocations(false);
@@ -284,12 +385,12 @@ const handleDateChange = (event: any, selectedDate?: Date) => {
   const handleLocationSearch = (text: string) => {
     setLocationQuery(text);
     setFormData({ ...formData, location: text });
-    
+
     // Cancel previous timeout if exists
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    
+
     // Debounce the API call
     searchTimeoutRef.current = setTimeout(() => {
       fetchLocationSuggestions(text);
@@ -316,10 +417,14 @@ const handleDateChange = (event: any, selectedDate?: Date) => {
     }
 
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
       if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to change your profile picture.');
+        Alert.alert(
+          "Permission Required",
+          "Sorry, we need camera roll permissions to change your profile picture."
+        );
         return;
       }
 
@@ -333,24 +438,30 @@ const handleDateChange = (event: any, selectedDate?: Date) => {
       if (!result.canceled && result.assets?.[0]?.uri) {
         setUploadingImage(true);
         const imageUri = result.assets[0].uri;
-        
+
         try {
           // Save to local storage immediately
-          await AsyncStorage.setItem('profileImage', imageUri);
+          await AsyncStorage.setItem("profileImage", imageUri);
           setProfileImage(imageUri);
-          
-          Alert.alert('Success', 'Profile picture updated successfully!');
+
+          Alert.alert("Success", "Profile picture updated successfully!");
         } catch (uploadError) {
-          console.error('Error saving image:', uploadError);
-          Alert.alert('Error', 'Failed to save profile picture. Please try again.');
+          console.error("Error saving image:", uploadError);
+          Alert.alert(
+            "Error",
+            "Failed to save profile picture. Please try again."
+          );
         } finally {
           setUploadingImage(false);
         }
       }
     } catch (error) {
-      console.error('Error selecting image:', error);
+      console.error("Error selecting image:", error);
       setUploadingImage(false);
-      Alert.alert('Error', 'Failed to update profile picture. Please try again.');
+      Alert.alert(
+        "Error",
+        "Failed to update profile picture. Please try again."
+      );
     }
   };
 
@@ -359,107 +470,115 @@ const handleDateChange = (event: any, selectedDate?: Date) => {
    */
   const saveProfileDataToStorage = async () => {
     try {
-      await AsyncStorage.setItem('profileData', JSON.stringify(formData));
-      console.log('Profile data saved to storage');
+      await AsyncStorage.setItem("profileData", JSON.stringify(formData));
+      console.log("Profile data saved to storage");
     } catch (error) {
-      console.log('Error saving profile data to storage:', error);
+      console.log("Error saving profile data to storage:", error);
     }
   };
 
   /**
    * Saves CMHA specific data to local storage
    */
-const saveCmhaDataToStorage = async () => {
-  try {
-    await AsyncStorage.setItem('cmhaProfileData', JSON.stringify(formData));
-    console.log('CMHA data saved to storage');
-  } catch (error) {
-    console.log('Error saving CMHA data to storage:', error);
-  }
-};
+  const saveCmhaDataToStorage = async () => {
+    try {
+      await AsyncStorage.setItem("cmhaProfileData", JSON.stringify(formData));
+      console.log("CMHA data saved to storage");
+    } catch (error) {
+      console.log("Error saving CMHA data to storage:", error);
+    }
+  };
 
   /**
    * Saves profile changes to backend API and local storage
    */
   const handleSaveChanges = async () => {
-  if (!user?.id) {
-    Alert.alert("Error", "User not available");
-    return;
-  }
-
-  try {
-    setSaving(true);
-    
-    // Validate required fields
-    if (!formData.firstName || !formData.email) {
-      Alert.alert("Error", "Please fill in First Name and Email Address");
+    if (!user?.id) {
+      Alert.alert("Error", "User not available");
       return;
     }
 
-    // Prepare data for backend API - FIXED VERSION
-    const profileData: Partial<ClientProfileData> = {
-      firstName: formData.firstName?.trim() || '',
-      lastName: formData.lastName?.trim() || '',
-      email: formData.email?.trim() || '',
-      phoneNumber: formData.phoneNumber?.trim() || undefined,
-      dateOfBirth: formData.dateOfBirth?.trim() || null,
-      gender: formData.gender?.trim() || null,
-      address: formData.streetAddress?.trim() || null,
-      city: formData.location?.trim() || null, // Make sure this matches your backend expectation
-      postalCode: formData.postalCode?.trim() || null,
-      country: "Canada",
-      emergencyContactName: formData.emergencyContactName?.trim() || null,
-      emergencyContactPhone: formData.emergencyContactNumber?.trim() || null,
-      emergencyContactRelationship: formData.emergencyContactRelationship?.trim() || null,
-      
-      // CMHA Demographics
-      pronouns: formData.pronouns?.trim() || null,
-      isLGBTQ: formData.isLGBTQ?.trim() || null,
-      primaryLanguage: formData.primaryLanguage?.trim() || null,
-      mentalHealthConcerns: formData.mentalHealthConcerns?.trim() || null,
-      supportNeeded: formData.supportNeeded?.trim() || null,
-      ethnoculturalBackground: formData.ethnoculturalBackground?.trim() || null,
-      canadaStatus: formData.canadaStatus?.trim() || null,
-      dateCameToCanada: formData.dateCameToCanada?.trim() || null,
-    };
-
-    console.log('🎯 Prepared profile data for API:', profileData);
-
-    // Save to backend API
     try {
-      const result = await profileAPI.updateClientProfile(user.id, profileData);
-      
-      if (result.success) {
-        // Save notification settings
-        await settingsApi.saveSettings({
-          notificationsEnabled: formData.notifications,
-          shareWithSupportWorker: formData.shareWithSupportWorker,
-        });
+      setSaving(true);
 
-        // Save to local storage as backup
+      // Validate required fields
+      if (!formData.firstName || !formData.email) {
+        Alert.alert("Error", "Please fill in First Name and Email Address");
+        return;
+      }
+
+      // Prepare data for backend API - FIXED VERSION
+      const profileData: Partial<ClientProfileData> = {
+        firstName: formData.firstName?.trim() || "",
+        lastName: formData.lastName?.trim() || "",
+        email: formData.email?.trim() || "",
+        phoneNumber: formData.phoneNumber?.trim() || undefined,
+        dateOfBirth: formData.dateOfBirth?.trim() || undefined,
+        gender: formData.gender?.trim() || undefined,
+        address: formData.streetAddress?.trim() || undefined,
+        city: formData.location?.trim() || undefined, // Make sure this matches your backend expectation
+        postalCode: formData.postalCode?.trim() || undefined,
+        country: "Canada",
+        emergencyContactName:
+          formData.emergencyContactName?.trim() || undefined,
+        emergencyContactPhone:
+          formData.emergencyContactNumber?.trim() || undefined,
+        emergencyContactRelationship:
+          formData.emergencyContactRelationship?.trim() || undefined,
+
+        // CMHA Demographics
+        pronouns: formData.pronouns?.trim() || undefined,
+        isLGBTQ: formData.isLGBTQ?.trim() || undefined,
+        primaryLanguage: formData.primaryLanguage?.trim() || undefined,
+        mentalHealthConcerns:
+          formData.mentalHealthConcerns?.trim() || undefined,
+        supportNeeded: formData.supportNeeded?.trim() || undefined,
+        ethnoculturalBackground:
+          formData.ethnoculturalBackground?.trim() || undefined,
+        canadaStatus: formData.canadaStatus?.trim() || undefined,
+        dateCameToCanada: formData.dateCameToCanada?.trim() || undefined,
+      };
+
+      console.log("🎯 Prepared profile data for API:", profileData);
+
+      // Save to backend API
+      try {
+        const result = await profileAPI.updateClientProfile(
+          user.id,
+          profileData
+        );
+
+        if (result.success) {
+          // Save notification settings
+          await settingsApi.saveSettings({
+            notificationsEnabled: formData.notifications,
+            shareWithSupportWorker: formData.shareWithSupportWorker,
+          });
+
+          // Save to local storage as backup
+          await saveProfileDataToStorage();
+          await saveCmhaDataToStorage();
+
+          Alert.alert("Success", "Profile updated successfully!");
+          router.back();
+        } else {
+          throw new Error(result.message);
+        }
+      } catch (apiError) {
+        console.log("API update failed, saving locally:", apiError);
+        // If API fails, save to local storage only
         await saveProfileDataToStorage();
         await saveCmhaDataToStorage();
-        
-        Alert.alert("Success", "Profile updated successfully!");
+        Alert.alert("Success", "Profile updated locally!");
         router.back();
-      } else {
-        throw new Error(result.message);
       }
-    } catch (apiError) {
-      console.log('API update failed, saving locally:', apiError);
-      // If API fails, save to local storage only
-      await saveProfileDataToStorage();
-      await saveCmhaDataToStorage();
-      Alert.alert("Success", "Profile updated locally!");
-      router.back();
+    } catch (error) {
+      console.error("Error in handleSaveChanges:", error);
+      Alert.alert("Error", "Failed to update profile. Please try again.");
+    } finally {
+      setSaving(false);
     }
-  } catch (error) {
-    console.error('Error in handleSaveChanges:', error);
-    Alert.alert("Error", "Failed to update profile. Please try again.");
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   /**
    * Handles tab navigation
@@ -498,7 +617,11 @@ const saveCmhaDataToStorage = async () => {
   /**
    * Renders option buttons for selection fields
    */
-  const renderOptionButtons = (options: string[], selectedValue: string, onSelect: (value: string) => void) => {
+  const renderOptionButtons = (
+    options: string[],
+    selectedValue: string,
+    onSelect: (value: string) => void
+  ) => {
     return (
       <View style={styles.optionsContainer}>
         {options.map((option) => (
@@ -506,14 +629,16 @@ const saveCmhaDataToStorage = async () => {
             key={option}
             style={[
               styles.optionButton,
-              selectedValue === option && styles.optionButtonSelected
+              selectedValue === option && styles.optionButtonSelected,
             ]}
             onPress={() => onSelect(option)}
           >
-            <Text style={[
-              styles.optionText,
-              selectedValue === option && styles.optionTextSelected
-            ]}>
+            <Text
+              style={[
+                styles.optionText,
+                selectedValue === option && styles.optionTextSelected,
+              ]}
+            >
               {option}
             </Text>
           </TouchableOpacity>
@@ -581,7 +706,7 @@ const saveCmhaDataToStorage = async () => {
       <SafeAreaView style={styles.container}>
         <AppHeader title="Edit Profile" showBack={true} />
 
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
         >
@@ -589,7 +714,10 @@ const saveCmhaDataToStorage = async () => {
           <View style={styles.profilePhotoSection}>
             <View style={styles.profilePhotoContainer}>
               {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profilePhoto} />
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.profilePhoto}
+                />
               ) : (
                 <View style={styles.profilePhoto}>
                   <Text style={styles.initialsText}>{getInitials()}</Text>
@@ -600,7 +728,10 @@ const saveCmhaDataToStorage = async () => {
                   <ActivityIndicator size="large" color="#FFFFFF" />
                 </View>
               )}
-              <TouchableOpacity style={styles.editPhotoButton} onPress={handleSelectImage}>
+              <TouchableOpacity
+                style={styles.editPhotoButton}
+                onPress={handleSelectImage}
+              >
                 <Text style={styles.editPhotoText}>
                   {uploadingImage ? "Uploading..." : "Edit Photo"}
                 </Text>
@@ -611,12 +742,17 @@ const saveCmhaDataToStorage = async () => {
           {/* Personal Information Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
-            
+
             {/* Full Name */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Full Name *</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={getFullName()}
@@ -637,11 +773,18 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email Address *</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={formData.email}
-                  onChangeText={(text) => setFormData({ ...formData, email: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, email: text })
+                  }
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -653,11 +796,18 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Phone Number</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="call-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={formData.phoneNumber}
-                  onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, phoneNumber: text })
+                  }
                   placeholder="Enter your phone number"
                   keyboardType="phone-pad"
                 />
@@ -666,69 +816,80 @@ const saveCmhaDataToStorage = async () => {
 
             {/* Date of Birth */}
             <View style={styles.inputGroup}>
-  <Text style={styles.label}>Date of Birth</Text>
-  <TouchableOpacity 
-    style={styles.inputContainer}
-    onPress={handleDatePress}
-  >
-    <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
-    <Text style={[styles.input, !dateDisplay && styles.placeholderText]}>
-      {dateDisplay || "Tap to select date"}
-    </Text>
-  </TouchableOpacity>
-  
-  {/* Date Picker Modal */}
-  <Modal
-    visible={showDatePicker}
-    transparent={true}
-    animationType="slide"
-  >
-    <View style={styles.modalContainer}>
-      <View style={styles.datePickerContainer}>
-        <View style={styles.datePickerHeader}>
-          <Text style={styles.datePickerTitle}>Select Date of Birth</Text>
-          <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-            <Ionicons name="close" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
-        
-        <DateTimePicker
-          value={tempDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          maximumDate={new Date()}
-          style={styles.datePicker}
-        />
-        
-        <View style={styles.datePickerActions}>
-          <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={() => setShowDatePicker(false)}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.confirmButton}
-            onPress={handleDateConfirm}
-          >
-            <Text style={styles.confirmButtonText}>Confirm</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  </Modal>
-</View>
+              <Text style={styles.label}>Date of Birth</Text>
+              <TouchableOpacity
+                style={styles.inputContainer}
+                onPress={handleDatePress}
+              >
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
+                <Text
+                  style={[styles.input, !dateDisplay && styles.placeholderText]}
+                >
+                  {dateDisplay || "Tap to select date"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Date Picker Modal */}
+              <Modal
+                visible={showDatePicker}
+                transparent={true}
+                animationType="slide"
+              >
+                <View style={styles.modalContainer}>
+                  <View style={styles.datePickerContainer}>
+                    <View style={styles.datePickerHeader}>
+                      <Text style={styles.datePickerTitle}>
+                        Select Date of Birth
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowDatePicker(false)}
+                      >
+                        <Ionicons name="close" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <DateTimePicker
+                      value={tempDate}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "spinner" : "default"}
+                      onChange={handleDateChange}
+                      maximumDate={new Date()}
+                      style={styles.datePicker}
+                    />
+
+                    <View style={styles.datePickerActions}>
+                      <TouchableOpacity
+                        style={styles.cancelButton}
+                        onPress={() => setShowDatePicker(false)}
+                      >
+                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.confirmButton}
+                        onPress={handleDateConfirm}
+                      >
+                        <Text style={styles.confirmButtonText}>Confirm</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            </View>
           </View>
 
           {/* Demographics Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Demographics</Text>
-            
+
             {/* Gender */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Gender</Text>
-              {renderOptionButtons(GENDER_OPTIONS, formData.gender, (value) => 
+              {renderOptionButtons(GENDER_OPTIONS, formData.gender, (value) =>
                 setFormData({ ...formData, gender: value })
               )}
             </View>
@@ -737,11 +898,18 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Pronouns</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={formData.pronouns}
-                  onChangeText={(text) => setFormData({ ...formData, pronouns: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, pronouns: text })
+                  }
                   placeholder="e.g., they/them, he/him, she/her"
                 />
               </View>
@@ -751,7 +919,7 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Do you identify as LGBTQ+?</Text>
               {renderOptionButtons(
-                ['Yes', 'No', 'I do not know', 'Prefer not to answer'],
+                ["Yes", "No", "I do not know", "Prefer not to answer"],
                 formData.isLGBTQ,
                 (value) => setFormData({ ...formData, isLGBTQ: value })
               )}
@@ -759,89 +927,153 @@ const saveCmhaDataToStorage = async () => {
 
             {/* Primary Language */}
             <View style={styles.inputGroup}>
-  <Text style={styles.label}>Primary Language</Text>
-  <TouchableOpacity 
-    style={styles.inputContainer}
-    onPress={() => setShowLanguagePicker(true)}
-  >
-    <Ionicons name="language-outline" size={20} color="#666" style={styles.inputIcon} />
-    <Text style={[styles.input, !formData.primaryLanguage && styles.placeholderText]}>
-      {formData.primaryLanguage || "Select your primary language"}
-    </Text>
-    <Ionicons name="chevron-down" size={16} color="#666" />
-  </TouchableOpacity>
+              <Text style={styles.label}>Primary Language</Text>
+              <TouchableOpacity
+                style={styles.inputContainer}
+                onPress={() => setShowLanguagePicker(true)}
+              >
+                <Ionicons
+                  name="language-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
+                <Text
+                  style={[
+                    styles.input,
+                    !formData.primaryLanguage && styles.placeholderText,
+                  ]}
+                >
+                  {formData.primaryLanguage || "Select your primary language"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#666" />
+              </TouchableOpacity>
 
-  {/* Language Picker Modal */}
-  <Modal
-    visible={showLanguagePicker}
-    transparent={true}
-    animationType="slide"
-  >
-    <View style={styles.modalContainer}>
-      <View style={styles.pickerContainer}>
-        <View style={styles.pickerHeader}>
-          <Text style={styles.pickerTitle}>Select Primary Language</Text>
-          <TouchableOpacity onPress={() => setShowLanguagePicker(false)}>
-            <Ionicons name="close" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
-        
-        <FlatList
-          data={LANGUAGE_OPTIONS}
-          keyExtractor={(item) => item}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.optionItem,
-                formData.primaryLanguage === item && styles.optionItemSelected
-              ]}
-              onPress={() => {
-                setFormData({ ...formData, primaryLanguage: item });
-                setShowLanguagePicker(false);
-              }}
-            >
-              <Text style={[
-                styles.optionItemText,
-                formData.primaryLanguage === item && styles.optionItemTextSelected
-              ]}>
-                {item}
-              </Text>
-              {formData.primaryLanguage === item && (
-                <Ionicons name="checkmark" size={20} color="#4CAF50" />
-              )}
-            </TouchableOpacity>
-          )}
-          style={styles.optionsList}
-        />
-      </View>
-    </View>
-  </Modal>
-</View>
+              {/* Language Picker Modal */}
+              <Modal
+                visible={showLanguagePicker}
+                transparent={true}
+                animationType="slide"
+              >
+                <View style={styles.modalContainer}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerHeader}>
+                      <Text style={styles.pickerTitle}>
+                        Select Primary Language
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowLanguagePicker(false)}
+                      >
+                        <Ionicons name="close" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <FlatList
+                      data={LANGUAGE_OPTIONS}
+                      keyExtractor={(item) => item}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.optionItem,
+                            formData.primaryLanguage === item &&
+                              styles.optionItemSelected,
+                          ]}
+                          onPress={() => {
+                            setFormData({ ...formData, primaryLanguage: item });
+                            setShowLanguagePicker(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.optionItemText,
+                              formData.primaryLanguage === item &&
+                                styles.optionItemTextSelected,
+                            ]}
+                          >
+                            {item}
+                          </Text>
+                          {formData.primaryLanguage === item && (
+                            <Ionicons
+                              name="checkmark"
+                              size={20}
+                              color="#4CAF50"
+                            />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      style={styles.optionsList}
+                    />
+                  </View>
+                </View>
+              </Modal>
+            </View>
           </View>
 
           {/* Address Information */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Address Information</Text>
-            
+
+            {/* Street Address */}
             {/* Street Address */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Street Address</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="home-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="home-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={formData.streetAddress}
-                  onChangeText={(text) => setFormData({ ...formData, streetAddress: text })}
+                  onChangeText={handleStreetSearch}
                   placeholder="Enter your street address"
+                  placeholderTextColor="#999"
                 />
               </View>
+              {showStreetSuggestions && streetSuggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  <FlatList
+                    data={streetSuggestions}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.suggestionItem}
+                        onPress={() => {
+                          setFormData({
+                            ...formData,
+                            streetAddress: item.description.split(",")[0], // Get just the street part
+                          });
+                          setShowStreetSuggestions(false);
+                        }}
+                      >
+                        <Ionicons
+                          name="location-outline"
+                          size={16}
+                          color="#666"
+                        />
+                        <Text style={styles.suggestionText} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    style={styles.suggestionsList}
+                  />
+                </View>
+              )}
             </View>
 
             {/* Location/City */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>City</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="location-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="location-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={locationQuery || formData.location}
@@ -858,30 +1090,75 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Postal Code</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="navigate-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="navigate-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={formData.postalCode}
-                  onChangeText={(text) => setFormData({ ...formData, postalCode: text })}
+                  onChangeText={handlePostalSearch}
                   placeholder="Enter your postal code"
+                  placeholderTextColor="#999"
                 />
               </View>
+              {showPostalSuggestions && postalSuggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  <FlatList
+                    data={postalSuggestions}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.suggestionItem}
+                        onPress={() => {
+                          setFormData({
+                            ...formData,
+                            postalCode: item.postalCode,
+                          });
+                          setShowPostalSuggestions(false);
+                        }}
+                      >
+                        <Ionicons
+                          name="location-outline"
+                          size={16}
+                          color="#666"
+                        />
+                        <Text style={styles.suggestionText} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    style={styles.suggestionsList}
+                  />
+                </View>
+              )}
             </View>
           </View>
 
           {/* Emergency Contact Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Emergency Contact</Text>
-            
+
             {/* Emergency Contact Name & Relationship */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Emergency Contact Name & Relationship</Text>
+              <Text style={styles.label}>
+                Emergency Contact Name & Relationship
+              </Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={formData.emergencyContactName}
-                  onChangeText={(text) => setFormData({ ...formData, emergencyContactName: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, emergencyContactName: text })
+                  }
                   placeholder="Name and relationship"
                 />
               </View>
@@ -891,11 +1168,18 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Emergency Contact Number</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons
+                  name="call-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   value={formData.emergencyContactNumber}
-                  onChangeText={(text) => setFormData({ ...formData, emergencyContactNumber: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, emergencyContactNumber: text })
+                  }
                   placeholder="Emergency contact phone number"
                   keyboardType="phone-pad"
                 />
@@ -906,14 +1190,15 @@ const saveCmhaDataToStorage = async () => {
           {/* Health Information Section */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Health Information</Text>
-            
+
             {/* Mental Health/Medical Concerns */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Mental Health/Medical Concerns</Text>
               {renderOptionButtons(
                 HEALTH_CONCERNS_OPTIONS,
                 formData.mentalHealthConcerns,
-                (value) => setFormData({ ...formData, mentalHealthConcerns: value })
+                (value) =>
+                  setFormData({ ...formData, mentalHealthConcerns: value })
               )}
             </View>
 
@@ -921,13 +1206,16 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Support Needed</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.textArea, styles.borderedInput]}
                 value={formData.supportNeeded}
-                onChangeText={(text) => setFormData({ ...formData, supportNeeded: text })}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, supportNeeded: text })
+                }
                 placeholder="Any access needs or accommodations you'd like us to know about"
                 multiline
-                numberOfLines={3}
+                numberOfLines={4}
                 textAlignVertical="top"
+                placeholderTextColor="#999"
               />
             </View>
           </View>
@@ -935,19 +1223,92 @@ const saveCmhaDataToStorage = async () => {
           {/* Additional Information */}
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Additional Information</Text>
-            
+
             {/* Ethnocultural Background */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Ethnocultural Background</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="globe-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={formData.ethnoculturalBackground}
-                  onChangeText={(text) => setFormData({ ...formData, ethnoculturalBackground: text })}
-                  placeholder="Enter your ethnocultural background"
+              <TouchableOpacity
+                style={styles.inputContainer}
+                onPress={() => setShowEthnoculturalPicker(true)}
+              >
+                <Ionicons
+                  name="globe-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
                 />
-              </View>
+                <Text
+                  style={[
+                    styles.input,
+                    !formData.ethnoculturalBackground && styles.placeholderText,
+                  ]}
+                >
+                  {formData.ethnoculturalBackground ||
+                    "Select ethnocultural background"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#666" />
+              </TouchableOpacity>
+
+              {/* Ethnocultural Picker Modal */}
+              <Modal
+                visible={showEthnoculturalPicker}
+                transparent={true}
+                animationType="slide"
+              >
+                <View style={styles.modalContainer}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerHeader}>
+                      <Text style={styles.pickerTitle}>
+                        Select Ethnocultural Background
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowEthnoculturalPicker(false)}
+                      >
+                        <Ionicons name="close" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <FlatList
+                      data={ETHNOCULTURAL_OPTIONS}
+                      keyExtractor={(item) => item}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.optionItem,
+                            formData.ethnoculturalBackground === item &&
+                              styles.optionItemSelected,
+                          ]}
+                          onPress={() => {
+                            setFormData({
+                              ...formData,
+                              ethnoculturalBackground: item,
+                            });
+                            setShowEthnoculturalPicker(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.optionItemText,
+                              formData.ethnoculturalBackground === item &&
+                                styles.optionItemTextSelected,
+                            ]}
+                          >
+                            {item}
+                          </Text>
+                          {formData.ethnoculturalBackground === item && (
+                            <Ionicons
+                              name="checkmark"
+                              size={20}
+                              color="#4CAF50"
+                            />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      style={styles.optionsList}
+                    />
+                  </View>
+                </View>
+              </Modal>
             </View>
 
             {/* Status in Canada */}
@@ -961,15 +1322,27 @@ const saveCmhaDataToStorage = async () => {
             </View>
 
             {/* Date Came to Canada */}
-            {Boolean(formData.canadaStatus && formData.canadaStatus !== 'Canadian Citizen' && formData.canadaStatus !== 'Do not know' && formData.canadaStatus !== 'Prefer not to answer') && (
+            {Boolean(
+              formData.canadaStatus &&
+                formData.canadaStatus !== "Canadian Citizen" &&
+                formData.canadaStatus !== "Do not know" &&
+                formData.canadaStatus !== "Prefer not to answer"
+            ) && (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Date Came to Canada</Text>
                 <View style={styles.inputContainer}>
-                  <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color="#666"
+                    style={styles.inputIcon}
+                  />
                   <TextInput
                     style={styles.input}
                     value={formData.dateCameToCanada}
-                    onChangeText={(text) => setFormData({ ...formData, dateCameToCanada: text })}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, dateCameToCanada: text })
+                    }
                     placeholder="MM/DD/YYYY"
                   />
                 </View>
@@ -978,8 +1351,8 @@ const saveCmhaDataToStorage = async () => {
           </View>
 
           {/* Save Changes Button */}
-          <TouchableOpacity 
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
             onPress={handleSaveChanges}
             disabled={saving}
           >
@@ -996,13 +1369,21 @@ const saveCmhaDataToStorage = async () => {
             <View style={styles.notificationItem}>
               <View style={styles.notificationLeft}>
                 <View style={styles.notificationIcon}>
-                  <Ionicons name="notifications-outline" size={16} color="#4CAF50" />
+                  <Ionicons
+                    name="notifications-outline"
+                    size={16}
+                    color="#4CAF50"
+                  />
                 </View>
-                <Text style={styles.notificationText}>Sign up for Notifications</Text>
+                <Text style={styles.notificationText}>
+                  Sign up for Notifications
+                </Text>
               </View>
               <Switch
                 value={formData.notifications}
-                onValueChange={(value) => setFormData({ ...formData, notifications: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, notifications: value })
+                }
                 trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
                 thumbColor="#FFFFFF"
               />
@@ -1017,11 +1398,15 @@ const saveCmhaDataToStorage = async () => {
                 <View style={styles.notificationIcon}>
                   <Ionicons name="shield-outline" size={16} color="#4CAF50" />
                 </View>
-                <Text style={styles.notificationText}>Share info with support worker</Text>
+                <Text style={styles.notificationText}>
+                  Share info with support worker
+                </Text>
               </View>
               <Switch
                 value={formData.shareWithSupportWorker}
-                onValueChange={(value) => setFormData({ ...formData, shareWithSupportWorker: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, shareWithSupportWorker: value })
+                }
                 trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
                 thumbColor="#FFFFFF"
               />
@@ -1045,8 +1430,8 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollContainer: {
     paddingBottom: 100,
@@ -1088,15 +1473,15 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   uploadingOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   formSection: {
     backgroundColor: "#FFFFFF",
@@ -1136,37 +1521,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
-  textArea: {
-    minHeight: 80,
-    borderRadius: 12,
-    textAlignVertical: 'top',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-  },
   optionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   optionButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: "#F8F8F8",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
   },
   optionButtonSelected: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
   },
   optionText: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
   },
   optionTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '500',
+    color: "#FFFFFF",
+    fontWeight: "500",
   },
   saveButton: {
     backgroundColor: "#4CAF50",
@@ -1177,7 +1555,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   saveButtonDisabled: {
-    backgroundColor: '#A5D6A7',
+    backgroundColor: "#A5D6A7",
   },
   saveButtonText: {
     color: "#FFFFFF",
@@ -1246,14 +1624,129 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loadingSuggestions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 15,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   loadingText: {
     marginLeft: 10,
     fontSize: 14,
-    color: '#666',
+    color: "#666",
+  },
+  placeholderText: {
+    color: "#999",
+  },
+  borderedInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  datePickerContainer: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  pickerContainer: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  datePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  datePicker: {
+    height: Platform.OS === "ios" ? 200 : 0,
+  },
+  datePickerActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: "#F8F8F8",
+    borderRadius: 10,
+    alignItems: "center",
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontWeight: "600",
+  },
+  confirmButton: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: "#4CAF50",
+    borderRadius: 10,
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  confirmButtonText: {
+    color: "white",
+    fontWeight: "600",
+  },
+  optionsList: {
+    maxHeight: 400,
+  },
+  optionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  optionItemSelected: {
+    backgroundColor: "#F0F8F0",
+  },
+  optionItemText: {
+    fontSize: 16,
+    color: "#333",
+    flex: 1,
+  },
+  optionItemTextSelected: {
+    color: "#4CAF50",
+    fontWeight: "500",
+  },
+  textArea: {
+    minHeight: 100,
+    borderRadius: 12,
+    textAlignVertical: "top",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: "#F8F8F8",
+    fontSize: 16,
+    color: "#333",
   },
 });
