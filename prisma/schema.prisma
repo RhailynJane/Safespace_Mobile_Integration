@@ -165,7 +165,7 @@ model User {
   phone_number             String?
   date_of_birth            DateTime?
   age                      Int?
-  gender                   Gender?
+  gender                   String?
   profile_image_url        String?
   last_active_at           DateTime?
   address                  String?

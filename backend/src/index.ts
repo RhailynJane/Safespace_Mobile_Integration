@@ -34,6 +34,7 @@ interface SyncUserRequest {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+  gender?: string; // Add this line
 }
 
 interface CreateClientRequest {
@@ -49,6 +50,28 @@ interface SubmitAssessmentRequest {
   totalScore: number;
   assessmentType?: string;
 }
+
+const mapGenderToDatabase = (gender: string) => {
+  const genderMap: { [key: string]: string } = {
+    'Woman': 'female',
+    'Man': 'male',
+    'Non-Binary': 'non_binary',
+    'Agender': 'other',
+    'Gender-fluid': 'other',
+    'Genderqueer': 'other',
+    'Gender Variant': 'other',
+    'Intersex': 'other',
+    'Non-Conforming': 'other',
+    'Questioning': 'other',
+    'Transgender Man': 'male',
+    'Transgender Woman': 'female',
+    'Two-Spirit': 'other',
+    'I don\'t identify with any gender': 'other',
+    'I do not know': 'prefer_not_to_say',
+    'Prefer not to answer': 'prefer_not_to_say'
+  };
+  return genderMap[gender] || 'other';
+};
 
 // Test database connection
 pool.connect((err, client, release) => {
@@ -90,7 +113,7 @@ app.post(
   "/api/sync-user",
   async (req: Request<{}, {}, SyncUserRequest>, res: Response) => {
     try {
-      const { clerkUserId, email, firstName, lastName, phoneNumber } = req.body;
+      const { clerkUserId, email, firstName, lastName, phoneNumber, gender } = req.body;
 
       if (!clerkUserId || !email) {
         return res.status(400).json({
@@ -107,6 +130,7 @@ app.post(
           last_name: lastName,
           email: email,
           phone_number: phoneNumber,
+          gender: gender ? { set: mapGenderToDatabase(gender) } : undefined,
           updated_at: new Date(), // Explicitly set updated_at
         },
         create: {
@@ -115,6 +139,7 @@ app.post(
           last_name: lastName,
           email: email,
           phone_number: phoneNumber,
+          gender: gender ? mapGenderToDatabase(gender) : undefined,
           role: 'client',
           status: 'active',
           email_verified: true,
