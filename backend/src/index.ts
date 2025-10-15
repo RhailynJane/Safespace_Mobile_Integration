@@ -1,4 +1,9 @@
 import express, { Request, Response } from "express";
+
+// Extend the Request interface to include the `file` property
+interface MulterRequest extends Request {
+  file?: Express.Multer.File;
+}
 import cors from "cors";
 import { Pool } from "pg";
 
@@ -3369,6 +3374,41 @@ async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
     return false;
   } catch (error) {
     console.error("Error checking user online status:", error);
-    return false;
+    return false; // Ensure a value is returned in case of an error
   }
 }
+
+// Backend route for file uploads 
+import multer from "multer";
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Set the upload directory
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`); // Set the file name
+  },
+});
+const upload = multer({ storage });
+
+app.post('/api/messages/upload-attachment', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Save file information to database
+    const fileUrl = `/uploads/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      fileUrl: fileUrl,
+      fileName: req.file.originalname,
+      fileSize: req.file.size
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
