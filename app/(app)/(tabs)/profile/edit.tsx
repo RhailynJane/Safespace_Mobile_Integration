@@ -75,6 +75,7 @@ export default function EditProfileScreen() {
   phoneNumber: "",
   dateOfBirth: "",
   gender: "",
+  pronouns: "",
   // Address
   streetAddress: "",
   city: "", 
@@ -84,14 +85,10 @@ export default function EditProfileScreen() {
   emergencyContactName: "",
   emergencyContactPhone: "",
   emergencyContactRelationship: "",
+  emergencyContactNumber: "",
   // Settings
   notifications: true,
   shareWithSupportWorker: false,
-});
-
-// For CMHA-specific fields that don't fit in the database yet, store locally:
-const [cmhaData, setCmhaData] = useState({
-  pronouns: "",
   isLGBTQ: "",
   primaryLanguage: "", 
   mentalHealthConcerns: "",
@@ -328,7 +325,7 @@ const [cmhaData, setCmhaData] = useState({
    */
 const saveCmhaDataToStorage = async () => {
   try {
-    await AsyncStorage.setItem('cmhaProfileData', JSON.stringify(cmhaData));
+    await AsyncStorage.setItem('cmhaProfileData', JSON.stringify(formData));
     console.log('CMHA data saved to storage');
   } catch (error) {
     console.log('Error saving CMHA data to storage:', error);
@@ -355,20 +352,30 @@ const saveCmhaDataToStorage = async () => {
 
       // Prepare data for backend API
       const profileData: Partial<ClientProfileData> = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phoneNumber: formData.phoneNumber,
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        address: formData.streetAddress,
-        city: formData.location, // Using location as city
-        postalCode: formData.postalCode,
-        country: "Canada",
-        emergencyContactName: formData.emergencyContactName,
-        emergencyContactPhone: formData.emergencyContactPhone,
-        emergencyContactRelationship: formData.emergencyContactRelationship,
-      };
+  firstName: formData.firstName,
+  lastName: formData.lastName,
+  email: formData.email,
+  phoneNumber: formData.phoneNumber,
+  dateOfBirth: formData.dateOfBirth,
+  gender: formData.gender,
+  address: formData.streetAddress,
+  city: formData.location,
+  postalCode: formData.postalCode,
+  country: "Canada",
+  emergencyContactName: formData.emergencyContactName,
+  emergencyContactPhone: formData.emergencyContactPhone,
+  emergencyContactRelationship: formData.emergencyContactRelationship,
+  
+  // CMHA Demographics
+  pronouns: formData.pronouns,
+  isLGBTQ: formData.isLGBTQ,
+  primaryLanguage: formData.primaryLanguage,
+  mentalHealthConcerns: formData.mentalHealthConcerns,
+  supportNeeded: formData.supportNeeded,
+  ethnoculturalBackground: formData.ethnoculturalBackground,
+  canadaStatus: formData.canadaStatus,
+  dateCameToCanada: formData.dateCameToCanada,
+};
 
       // Save to backend API
       try {
@@ -817,7 +824,7 @@ const saveCmhaDataToStorage = async () => {
             </View>
 
             {/* Date Came to Canada */}
-            {formData.canadaStatus && formData.canadaStatus !== 'Canadian Citizen' && formData.canadaStatus !== 'Do not know' && formData.canadaStatus !== 'Prefer not to answer' && (
+            {Boolean(formData.canadaStatus && formData.canadaStatus !== 'Canadian Citizen' && formData.canadaStatus !== 'Do not know' && formData.canadaStatus !== 'Prefer not to answer') && (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Date Came to Canada</Text>
                 <View style={styles.inputContainer}>
