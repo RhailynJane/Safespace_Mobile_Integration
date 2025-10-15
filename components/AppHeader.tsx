@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { assessmentTracker } from "../utils/assessmentTracker";
+import { useFocusEffect } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
@@ -67,6 +68,9 @@ export const AppHeader = ({
   }, [user?.id]);
 
   const showSideMenu = () => {
+    // ✅ Reload profile image when opening menu
+    loadProfileImage();
+
     setSideMenuVisible(true);
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -131,24 +135,66 @@ export const AppHeader = ({
 
   const loadProfileImage = useCallback(async () => {
     try {
-      if (user?.id) {
-        const savedImage = await AsyncStorage.getItem(
-          `profileImage_${user.id}`
-        );
-        if (savedImage) {
-          setProfileImage(savedImage);
+      // Priority 1: Check AsyncStorage "profileImage" (set by edit screen)
+      const savedImage = await AsyncStorage.getItem("profileImage");
+      if (savedImage) {
+        console.log("📸 AppHeader: Found profile image in AsyncStorage");
+        setProfileImage(savedImage);
+        return;
+      }
+
+      // Priority 2: Check "profileData" in AsyncStorage
+      const savedProfileData = await AsyncStorage.getItem("profileData");
+      if (savedProfileData) {
+        const parsedData = JSON.parse(savedProfileData);
+        if (parsedData.profileImageUrl) {
+          console.log("📸 AppHeader: Found profile image in profileData");
+          setProfileImage(parsedData.profileImageUrl);
+          return;
         }
       }
+
+      // Priority 3: Check user-specific key (legacy support)
+      if (user?.id) {
+        const userSpecificImage = await AsyncStorage.getItem(
+          `profileImage_${user.id}`
+        );
+        if (userSpecificImage) {
+          console.log("📸 AppHeader: Found user-specific profile image");
+          setProfileImage(userSpecificImage);
+          return;
+        }
+      }
+
+      // Priority 4: Use Clerk image as fallback
+      if (user?.imageUrl) {
+        console.log("📸 AppHeader: Using Clerk profile image");
+        setProfileImage(user.imageUrl);
+        return;
+      }
+
+      console.log("📸 AppHeader: No profile image found");
+      setProfileImage(null);
     } catch (error) {
       console.log("Error loading profile image:", error);
+      setProfileImage(null);
     }
-  }, [user?.id]);
+  }, [user?.id, user?.imageUrl]);
 
   useEffect(() => {
     if (user?.id) {
       loadProfileImage();
     }
   }, [user?.id, loadProfileImage]);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log("🔄 AppHeader: Screen focused, reloading profile image");
+      if (user?.id) {
+        loadProfileImage();
+      }
+    }, [user?.id, loadProfileImage])
+  );
 
   const getInitials = () => {
     console.log("User data:", {

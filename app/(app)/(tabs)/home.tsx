@@ -48,6 +48,7 @@ export default function HomeScreen() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
+const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const { user } = useUser();
 
@@ -145,6 +146,46 @@ export default function HomeScreen() {
   };
 
   /**
+ * Loads profile image from AsyncStorage and Clerk
+ */
+const fetchProfileImage = useCallback(async () => {
+  try {
+    // Priority 1: Check AsyncStorage (set by edit screen)
+    const savedImage = await AsyncStorage.getItem('profileImage');
+    if (savedImage) {
+      console.log('📸 Found profile image in AsyncStorage');
+      setProfileImage(savedImage);
+      return;
+    }
+
+    // Priority 2: Check profileData in AsyncStorage
+    const savedProfileData = await AsyncStorage.getItem('profileData');
+    if (savedProfileData) {
+      const parsedData = JSON.parse(savedProfileData);
+      if (parsedData.profileImageUrl) {
+        console.log('📸 Found profile image in profileData');
+        setProfileImage(parsedData.profileImageUrl);
+        return;
+      }
+    }
+
+    // Priority 3: Use Clerk user image as fallback
+    if (user?.imageUrl) {
+      console.log('📸 Using Clerk profile image');
+      setProfileImage(user.imageUrl);
+      return;
+    }
+
+    console.log('📸 No profile image found');
+    setProfileImage(null);
+  } catch (error) {
+    console.error('Error loading profile image:', error);
+    setProfileImage(null);
+  }
+}, [user?.imageUrl]);
+
+
+  /**
    * Returns label text for mood type
    */
   const getLabelForMood = (moodType: string) => {
@@ -224,23 +265,24 @@ export default function HomeScreen() {
   }, []);
 
   useFocusEffect(
-    useCallback(() => {
-      const fetchData = async () => {
-        setLoading(true);
-        try {
-          await Promise.all([
-            fetchRecentMoods(),
-            fetchResources(),
-            checkAssessmentStatus(),
-          ]);
-        } finally {
-          setLoading(false);
-        }
-      };
+  useCallback(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchRecentMoods(),
+          fetchResources(),
+          checkAssessmentStatus(),
+          fetchProfileImage(), // ✅ Add this
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      fetchData();
-    }, [fetchRecentMoods, fetchResources, checkAssessmentStatus])
-  );
+    fetchData();
+  }, [fetchRecentMoods, fetchResources, checkAssessmentStatus, fetchProfileImage])
+);
 
   /**
    * Formats date into relative or short format
