@@ -49,3 +49,6 @@ CREATE INDEX idx_users_status ON users(status);
 CREATE INDEX idx_users_created_at ON users(created_at);
 CREATE INDEX idx_users_full_name ON users(first_name, last_name);
 CREATE INDEX idx_users_phone ON users(phone_number);
+
+ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN last_logout_at TIMESTAMP;

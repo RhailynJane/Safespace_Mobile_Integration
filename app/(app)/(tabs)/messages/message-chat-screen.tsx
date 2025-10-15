@@ -17,7 +17,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import {
-  messagingService,
   Message,
   Participant,
 } from "../../../../utils/sendbirdService";
@@ -35,6 +34,7 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [contact, setContact] = useState<Participant | null>(null);
+  const [isOnline, setIsOnline] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   // Update user activity
@@ -51,9 +51,9 @@ export default function ChatScreen() {
     }
   }, [userId, API_BASE_URL]);
 
-  // Get last seen text
-  const getLastSeenText = (lastActiveAt: string | null, isOnline: boolean) => {
-    if (isOnline) return "Online now";
+  // Get last seen text with persistent online status
+  const getLastSeenText = useCallback((lastActiveAt: string | null, online: boolean) => {
+    if (online) return "Online now";
 
     if (!lastActiveAt) return "Offline";
 
@@ -68,7 +68,7 @@ export default function ChatScreen() {
     if (diffMinutes < 1440)
       return `Offline - ${Math.floor(diffMinutes / 60)}h ago`;
     return `Offline - ${Math.floor(diffMinutes / 1440)}d ago`;
-  };
+  }, []);
 
   // Load messages
   const loadMessages = useCallback(async () => {
@@ -82,51 +82,58 @@ export default function ChatScreen() {
       // Update user's activity
       await updateUserActivity();
 
-      console.log(
-        `💬 Loading messages for conversation ${conversationId}, user ${userId}`
+      console.log(`💬 Loading messages for conversation ${conversationId}, user ${userId}`);
+      
+      // Use direct backend API instead of messagingService
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=50`
       );
 
-      const result = await messagingService.getMessages(conversationId, userId);
-      if (result.success) {
+      if (response.ok) {
+        const result = await response.json();
         console.log(`💬 Loaded ${result.data.length} messages`);
         setMessages(result.data);
-
+        
         // Get conversation details to find the other participant with online status
         const conversationsResponse = await fetch(
           `${API_BASE_URL}/api/messages/conversations/${userId}`
         );
-
+        
         if (conversationsResponse.ok) {
           const conversationsResult = await conversationsResponse.json();
           const currentConversation = conversationsResult.data.find(
             (conv: any) => conv.id === conversationId
           );
-
+          
           if (currentConversation) {
             const otherParticipant = currentConversation.participants.find(
               (p: Participant) => p.clerk_user_id !== userId
             );
             if (otherParticipant) {
               setContact(otherParticipant);
+              // Set online status once and persist it
+              setIsOnline(otherParticipant.online || false);
             }
           }
         }
 
         // Fallback if no contact found
         if (!contact) {
-          setContact({
-            id: "unknown",
-            clerk_user_id: "unknown",
-            first_name: conversationTitle?.split(" ")[0] || "User",
-            last_name: conversationTitle?.split(" ").slice(1).join(" ") || "",
-            email: "",
+          const fallbackContact = {
+            id: 'unknown',
+            clerk_user_id: 'unknown', 
+            first_name: conversationTitle?.split(' ')[0] || 'User',
+            last_name: conversationTitle?.split(' ').slice(1).join(' ') || '',
+            email: '',
             profile_image_url: undefined,
             online: false,
-            last_active_at: null,
-          });
+            last_active_at: null
+          };
+          setContact(fallbackContact);
+          setIsOnline(false);
         }
       } else {
-        console.error("💬 Failed to load messages:", result);
+        console.error("💬 Failed to load messages:", response.status);
         Alert.alert("Error", "Failed to load messages");
       }
     } catch (error) {
@@ -135,26 +142,45 @@ export default function ChatScreen() {
     } finally {
       setLoading(false);
     }
-  }, [
-    conversationId,
-    userId,
-    conversationTitle,
-    API_BASE_URL,
-    contact,
-    updateUserActivity,
-  ]);
+  }, [conversationId, userId, conversationTitle, API_BASE_URL, contact, updateUserActivity]);
 
-  // Poll for new messages every 3 seconds
+  // Load messages with 30-second polling
   useEffect(() => {
     if (!conversationId || !userId) return;
 
     loadMessages(); // Load immediately
+
+    // Use a longer interval for polling
     const pollInterval = setInterval(() => {
       loadMessages();
-    }, 3000); // Check every 3 seconds
+    }, 30000); // 30 seconds
 
     return () => clearInterval(pollInterval);
   }, [conversationId, userId, loadMessages]);
+
+  // Update online status based on last activity (every 10 seconds)
+  useEffect(() => {
+    if (!contact) return;
+
+    const updateOnlineStatus = () => {
+      if (contact.last_active_at) {
+        const lastActive = new Date(contact.last_active_at);
+        const now = new Date();
+        const diffMinutes = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+        
+        // Consider online if active in last 3 minutes
+        const shouldBeOnline = diffMinutes <= 3;
+        if (isOnline !== shouldBeOnline) {
+          setIsOnline(shouldBeOnline);
+        }
+      }
+    };
+
+    updateOnlineStatus();
+    const statusInterval = setInterval(updateOnlineStatus, 10000); // Check every 10 seconds
+
+    return () => clearInterval(statusInterval);
+  }, [contact, isOnline]);
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -177,16 +203,22 @@ export default function ChatScreen() {
       // Update activity when sending message
       await updateUserActivity();
 
-      const result = await messagingService.sendMessage(
-        conversationId,
-        userId,
+      // Use direct backend API instead of messagingService
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
         {
-          messageText: newMessage,
-          messageType: "text",
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clerkUserId: userId,
+            messageText: newMessage,
+            messageType: "text",
+          }),
         }
       );
 
-      if (result.success) {
+      if (response.ok) {
+        const result = await response.json();
         console.log("💬 Message sent successfully");
         setMessages((prev) => [...prev, result.data]);
         setNewMessage("");
@@ -194,7 +226,7 @@ export default function ChatScreen() {
         // Reload messages to ensure both parties see the same
         setTimeout(() => loadMessages(), 500);
       } else {
-        console.error("💬 Failed to send message:", result);
+        console.error("💬 Failed to send message:", response.status);
         Alert.alert("Error", "Failed to send message");
       }
     } catch (error) {
@@ -270,12 +302,20 @@ export default function ChatScreen() {
                   <Text style={styles.headerAvatarText}>
                     {getUserInitials(contact?.first_name, contact?.last_name)}
                   </Text>
+                  {/* Online/Offline indicator in header */}
+                  <View style={[
+                    styles.headerStatusIndicator,
+                    isOnline ? styles.onlineIndicator : styles.offlineIndicator
+                  ]} />
                 </View>
                 <View>
                   <Text style={styles.contactName}>{conversationTitle}</Text>
-                  <Text style={styles.contactStatus}>
+                  <Text style={[
+                    styles.contactStatus,
+                    isOnline ? styles.onlineStatus : styles.offlineStatus
+                  ]}>
                     {contact
-                      ? getLastSeenText(contact.last_active_at, contact.online)
+                      ? getLastSeenText(contact.last_active_at, isOnline)
                       : "Offline"}
                   </Text>
                 </View>
@@ -470,11 +510,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
+    position: 'relative',
   },
   headerAvatarText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  headerStatusIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#FFF",
+  },
+  onlineIndicator: {
+    backgroundColor: "#4CAF50",
+  },
+  offlineIndicator: {
+    backgroundColor: "#9E9E9E",
   },
   contactName: {
     fontSize: 16,
@@ -483,6 +540,11 @@ const styles = StyleSheet.create({
   },
   contactStatus: {
     fontSize: 12,
+  },
+  onlineStatus: {
+    color: "#4CAF50",
+  },
+  offlineStatus: {
     color: "#666",
   },
   messagesContainer: {
@@ -617,15 +679,4 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: "#E0E0E0",
   },
-  offlineIndicator: {
-  position: "absolute",
-  bottom: 0,
-  right: 0,
-  width: 12,
-  height: 12,
-  borderRadius: 6,
-  backgroundColor: "#9E9E9E", // Gray color
-  borderWidth: 2,
-  borderColor: "#FFF",
-},
 });
