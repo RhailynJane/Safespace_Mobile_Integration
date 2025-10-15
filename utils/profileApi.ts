@@ -9,29 +9,22 @@ const API_BASE_URL = Platform.select({
 });
 
 export interface ClientProfileData {
-  // Personal Information
   firstName: string;
   lastName: string;
   email: string;
   phoneNumber?: string;
   dateOfBirth?: string;
   gender?: string;
-  
-  // Address
   address?: string;
   city?: string;
   state?: string;
   postalCode?: string;
   country?: string;
-  
-  // Emergency Contacts
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelationship?: string;
   emergencyContactEmail?: string;
   emergencyContactAddress?: string;
-  
-  // Local-only settings (not in database)
   location?: string;
   notifications?: boolean;
   shareWithSupportWorker?: boolean;
@@ -47,15 +40,31 @@ class ProfileAPI {
 
   async getClerkUserId(): Promise<string> {
     try {
+      // Try multiple ways to get the Clerk user ID
+      
+      // 1. First try from AsyncStorage (your current approach)
       const authData = await AsyncStorage.getItem('authData');
       if (authData) {
         const parsed = JSON.parse(authData);
-        return parsed.clerkUserId;
+        if (parsed.clerkUserId) {
+          return parsed.clerkUserId;
+        }
       }
-      throw new Error('User not authenticated');
+
+      // 2. Try from a different storage key that Clerk might use
+      const clerkStorage = await AsyncStorage.getItem('clerk');
+      if (clerkStorage) {
+        const parsed = JSON.parse(clerkStorage);
+        if (parsed.userId) {
+          return parsed.userId;
+        }
+      }
+
+      // 3. If we can't find it in storage, throw a more specific error
+      throw new Error('Clerk user ID not found in storage. User might not be authenticated.');
     } catch (error) {
       console.error('Error getting Clerk user ID:', error);
-      throw new Error('User not authenticated');
+      throw new Error('User not authenticated. Please sign in again.');
     }
   }
 
@@ -63,13 +72,22 @@ class ProfileAPI {
     try {
       const clerkUserId = await this.getClerkUserId();
       
+      console.log('📋 Fetching profile for user:', clerkUserId);
+      
       const response = await fetch(`${this.baseURL}/client-profile/${clerkUserId}`);
       
+      console.log('Profile response status:', response.status);
+      
       if (!response.ok) {
+        if (response.status === 404) {
+          console.log('Profile not found, might be new user');
+          return null;
+        }
         throw new Error(`Failed to fetch profile: ${response.status}`);
       }
 
       const result = await response.json();
+      console.log('Profile API result:', result);
       
       if (result.success) {
         return result.data;
@@ -86,6 +104,8 @@ class ProfileAPI {
     try {
       const clerkUserId = await this.getClerkUserId();
       
+      console.log('🔄 Updating profile for user:', clerkUserId, profileData);
+      
       const response = await fetch(`${this.baseURL}/client-profile/${clerkUserId}`, {
         method: 'PUT',
         headers: {
@@ -93,6 +113,8 @@ class ProfileAPI {
         },
         body: JSON.stringify(profileData),
       });
+
+      console.log('Update response status:', response.status);
 
       if (!response.ok) {
         throw new Error(`Failed to update profile: ${response.status}`);

@@ -3815,7 +3815,6 @@ app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, r
   }
 });
 
-// Simple sync user endpoint (for initial user creation)
 app.post("/api/sync-user", async (req: Request, res: Response) => {
   try {
     const { clerkUserId, email, firstName, lastName, phoneNumber } = req.body;
@@ -3845,7 +3844,7 @@ app.post("/api/sync-user", async (req: Request, res: Response) => {
              updated_at = CURRENT_TIMESTAMP
          WHERE clerk_user_id = $5
          RETURNING *`,
-        [email, firstName, lastName, phoneNumber, clerkUserId]
+        [email, firstName || '', lastName || '', phoneNumber || null, clerkUserId]
       );
     } else {
       // Create new user
@@ -3854,7 +3853,7 @@ app.post("/api/sync-user", async (req: Request, res: Response) => {
          (clerk_user_id, email, first_name, last_name, phone_number, role, status, email_verified)
          VALUES ($1, $2, $3, $4, $5, 'client', 'active', true)
          RETURNING *`,
-        [clerkUserId, email, firstName, lastName, phoneNumber]
+        [clerkUserId, email, firstName || '', lastName || '', phoneNumber || null]
       );
     }
 
