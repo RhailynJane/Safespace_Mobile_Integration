@@ -1,4 +1,30 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+
+// Utility function to get file icon based on file name or extension
+const getFileIcon = (fileName?: string): "document-outline" | "document-text-outline" | "grid-outline" | "image-outline" | "archive-outline" => {
+  if (!fileName) return "document-outline";
+  const extension = fileName.split(".").pop()?.toLowerCase();
+  switch (extension) {
+    case "pdf":
+      return "document-text-outline";
+    case "doc":
+    case "docx":
+      return "document-outline";
+    case "xls":
+    case "xlsx":
+      return "grid-outline";
+    case "jpg":
+    case "jpeg":
+    case "png":
+    case "gif":
+      return "image-outline";
+    case "zip":
+    case "rar":
+      return "archive-outline";
+    default:
+      return "document-outline";
+  }
+};
 import {
   View,
   Text,
@@ -502,6 +528,16 @@ export default function ChatScreen() {
   };
 
   // Render message content based on type
+  // Handle viewing attachments
+  const handleViewAttachment = (message: ExtendedMessage) => {
+    if (message.attachment_url) {
+      Alert.alert("Attachment", `Viewing attachment: ${message.attachment_url}`);
+      // Add logic to open the attachment in a viewer or browser
+    } else {
+      Alert.alert("Error", "No attachment URL found.");
+    }
+  };
+
   // Render message content based on type with view/download options
 const renderMessageContent = (message: ExtendedMessage) => {
   if (message.message_type === 'image' && message.attachment_url) {
