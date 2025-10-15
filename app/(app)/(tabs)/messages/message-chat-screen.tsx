@@ -593,8 +593,8 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
               "Image Options",
               "What would you like to do?",
               [
-                { text: "View", onPress: () => handleViewAttachment(message) },
-                { text: "Save", onPress: () => saveImageToGallery() },
+                { text: "View", onPress: () => { handleViewAttachment(message); } },
+                { text: "Save", onPress: () => { saveImageToGallery(); } },
                 { text: "Cancel", style: "cancel" }
               ]
             );
@@ -623,7 +623,7 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
               "File Options",
               `File: ${message.file_name || 'Unknown file'}`,
               [
-                { text: "Download", onPress: () => handleDownloadFile(message) },
+                { text: "Download", onPress: () => { handleDownloadFile(message); } },
                 { text: "Cancel", style: "cancel" }
               ]
             );
@@ -681,7 +681,7 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
               { text: "Cancel", style: "cancel" },
               { 
                 text: "Download", 
-                onPress: () => downloadAndShareFile(fileUri, fileName)
+                onPress: () => { downloadAndShareFile(fileUri, fileName).catch(console.error); }
               }
             ]
           );
