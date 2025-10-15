@@ -34,6 +34,7 @@ export default function MessagesScreen() {
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [sendbirdStatus, setSendbirdStatus] =
     useState<string>("Initializing...");
   const API_BASE_URL =
@@ -87,10 +88,47 @@ export default function MessagesScreen() {
     }, [userId])
   );
 
+  // Filter conversations based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredConversations(conversations);
+      return;
+    }
+
+    const filtered = conversations.filter(conversation => {
+      const searchLower = searchQuery.toLowerCase().trim();
+      
+      // Search in participant names
+      const participantNames = conversation.participants
+        .filter(p => p.clerk_user_id !== userId) // Exclude current user
+        .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
+      
+      const hasMatchingParticipant = participantNames.some(name => 
+        name.includes(searchLower)
+      );
+
+      // Search in conversation title
+      const hasMatchingTitle = conversation.title?.toLowerCase().includes(searchLower);
+
+      // Search in last message
+      const hasMatchingLastMessage = conversation.last_message?.toLowerCase().includes(searchLower);
+
+      // Search in participant emails
+      const hasMatchingEmail = conversation.participants.some(p => 
+        p.email?.toLowerCase().includes(searchLower)
+      );
+
+      return hasMatchingParticipant || hasMatchingTitle || hasMatchingLastMessage || hasMatchingEmail;
+    });
+
+    setFilteredConversations(filtered);
+  }, [searchQuery, conversations, userId]);
+
   const loadConversations = async () => {
     if (!userId) {
       console.log("❌ No user ID available for loading conversations");
       setConversations([]);
+      setFilteredConversations([]);
       setLoading(false);
       return;
     }
@@ -106,6 +144,8 @@ export default function MessagesScreen() {
       if (response.ok) {
         const result = await response.json();
         console.log(`💬 Setting ${result.data.length} conversations`);
+        setConversations(result.data);
+        setFilteredConversations(result.data); // Initialize filtered conversations
 
         // DEBUG: Check what online status is being returned
         console.log(
@@ -119,15 +159,15 @@ export default function MessagesScreen() {
             })),
           }))
         );
-
-        setConversations(result.data);
       } else {
         console.log("💬 Failed to load conversations from backend");
         setConversations([]);
+        setFilteredConversations([]);
       }
     } catch (error) {
       console.error("💬 Error loading conversations:", error);
       setConversations([]);
+      setFilteredConversations([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -149,36 +189,21 @@ export default function MessagesScreen() {
   };
 
   const getDisplayName = (conversation: Conversation) => {
-    console.log("🔍 getDisplayName - Current userId:", userId);
-    console.log(
-      "🔍 getDisplayName - All participants:",
-      conversation.participants
-    );
-    console.log("🔍 getDisplayName - Conversation title:", conversation.title);
-
-    // ⚠️ IGNORE the conversation title - always use participant names
     // Filter out current user from participants list
     const otherParticipants = conversation.participants.filter(
       (p) => p.clerk_user_id !== userId
     );
-
-    console.log("🔍 getDisplayName - Other participants:", otherParticipants);
 
     // If there are other participants, show their FULL names
     if (otherParticipants.length > 0) {
       const fullNames = otherParticipants
         .map((p) => `${p.first_name} ${p.last_name}`.trim())
         .join(", ");
-      console.log("🔍 getDisplayName - Final display name:", fullNames);
       return fullNames;
     }
 
     // If no other participants found, fallback to conversation title
     if (conversation.title) {
-      console.log(
-        "🔍 getDisplayName - Using conversation title as fallback:",
-        conversation.title
-      );
       return conversation.title;
     }
 
@@ -232,6 +257,10 @@ export default function MessagesScreen() {
     }
   };
 
+  const clearSearch = () => {
+    setSearchQuery("");
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -270,20 +299,41 @@ export default function MessagesScreen() {
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
+          <Ionicons
+            name="search"
+            size={20}
+            color="#666"
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search conversations..."
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholderTextColor="#9E9E9E"
+            returnKeyType="search"
           />
-          <Ionicons
-            name="search"
-            size={22}
-            color="#333"
-            style={styles.searchIcon}
-          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Search Results Info */}
+        {searchQuery.trim() && (
+          <View style={styles.searchResultsInfo}>
+            <Text style={styles.searchResultsText}>
+              {filteredConversations.length === 0 
+                ? "No conversations found" 
+                : `Found ${filteredConversations.length} conversation${filteredConversations.length === 1 ? '' : 's'}`
+              }
+            </Text>
+            <TouchableOpacity onPress={clearSearch}>
+              <Text style={styles.clearSearchText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Connection Status */}
         <View
@@ -320,22 +370,43 @@ export default function MessagesScreen() {
               />
             }
           >
-            {conversations.length === 0 ? (
+            {filteredConversations.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
-                <Text style={styles.emptyStateText}>No conversations yet</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Start a new conversation to begin messaging
+                <Ionicons 
+                  name={searchQuery.trim() ? "search-outline" : "chatbubble-outline"} 
+                  size={64} 
+                  color="#CCCCCC" 
+                />
+                <Text style={styles.emptyStateText}>
+                  {searchQuery.trim() 
+                    ? "No conversations found" 
+                    : "No conversations yet"
+                  }
                 </Text>
-                <TouchableOpacity
-                  style={styles.retryButton}
-                  onPress={loadConversations}
-                >
-                  <Text style={styles.retryButtonText}>Refresh</Text>
-                </TouchableOpacity>
+                <Text style={styles.emptyStateSubtext}>
+                  {searchQuery.trim() 
+                    ? "Try adjusting your search terms"
+                    : "Start a new conversation to begin messaging"
+                  }
+                </Text>
+                {searchQuery.trim() ? (
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={clearSearch}
+                  >
+                    <Text style={styles.retryButtonText}>Clear Search</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.retryButton}
+                    onPress={loadConversations}
+                  >
+                    <Text style={styles.retryButtonText}>Refresh</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
-              conversations.map((conversation) => (
+              filteredConversations.map((conversation) => (
                 <TouchableOpacity
                   key={conversation.id}
                   style={styles.conversationItem}
@@ -353,7 +424,6 @@ export default function MessagesScreen() {
                     });
                   }}
                 >
-                  {/* In your MessagesScreen, update the avatar container section: */}
                   <View style={styles.avatarContainer}>
                     {(() => {
                       const avatar = getAvatarDisplay(
@@ -496,13 +566,34 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchIcon: {
-    marginRight: 5,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 16,
     color: "#333",
-    fontStyle: "italic",
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  searchResultsInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  searchResultsText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  clearSearchText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
   statusIndicator: {
     flexDirection: "row",
@@ -690,7 +781,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#9E9E9E", // Gray color
+    backgroundColor: "#9E9E9E",
     borderWidth: 2,
     borderColor: "#FFF",
   },
