@@ -62,5 +62,63 @@ export const locationService = {
         description: city,
         address: { city }
       }));
+  },
+  async searchAddresses(query: string): Promise<any[]> {
+    try {
+      const params = new URLSearchParams({
+        q: query + ', Canada',
+        format: 'json',
+        addressdetails: '1',
+        limit: '5',
+        countrycodes: 'ca',
+        'accept-language': 'en',
+      });
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params}`
+      );
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const data = await response.json();
+      
+      return data.map((item: any) => ({
+        id: item.place_id,
+        description: item.display_name,
+        address: item.address
+      }));
+    } catch (error) {
+      console.error('Error searching addresses:', error);
+      return [];
+    }
+  },
+
+  async searchPostalCodes(query: string): Promise<any[]> {
+    try {
+      const params = new URLSearchParams({
+        postalcode: query,
+        country: 'Canada',
+        format: 'json',
+        limit: '5'
+      });
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params}`
+      );
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const data = await response.json();
+      
+      return data.map((item: any) => ({
+        id: item.place_id,
+        description: `${item.display_name} (${item.address?.postcode})`,
+        postalCode: item.address?.postcode
+      }));
+    } catch (error) {
+      console.error('Error searching postal codes:', error);
+      return [];
+    }
   }
-};
+}
+

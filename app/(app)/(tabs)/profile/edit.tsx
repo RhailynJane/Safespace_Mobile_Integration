@@ -26,6 +26,8 @@ import BottomNavigation from "../../../../components/BottomNavigation";
 import profileAPI, { ClientProfileData } from '../../../../utils/profileApi'; 
 import settingsApi from "../../../../utils/settingsApi";
 import { locationService } from '../../../../utils/locationService';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Modal, Platform } from 'react-native';
 
 // Gender options from CMHA form
 const GENDER_OPTIONS = [
@@ -39,6 +41,12 @@ const GENDER_OPTIONS = [
 const CANADA_STATUS_OPTIONS = [
   'Canadian Citizen', 'Permanent Resident', 'Refugee', 'Newcomer',
   'Temporary Resident', 'Do not know', 'Prefer not to answer', 'Other'
+];
+
+const LANGUAGE_OPTIONS = [
+  'English', 'French', 'Spanish', 'Mandarin', 'Cantonese', 'Punjabi',
+  'Tagalog', 'Arabic', 'German', 'Italian', 'Portuguese', 'Russian',
+  'Japanese', 'Korean', 'Hindi', 'Vietnamese', 'Other'
 ];
 
 // Mental Health/Medical Concerns options
@@ -61,7 +69,11 @@ export default function EditProfileScreen() {
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+  const [showDatePicker, setShowDatePicker] = useState(false);
+const [tempDate, setTempDate] = useState(new Date());
+const [dateDisplay, setDateDisplay] = useState('');
+const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+
   // Add a ref for debouncing
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -207,6 +219,40 @@ export default function EditProfileScreen() {
       setLoading(false);
     }
   };
+
+  / Date handling functions
+const handleDatePress = () => {
+  if (formData.dateOfBirth) {
+    // Parse existing date if available
+    const [month, day, year] = formData.dateOfBirth.split('/');
+    setTempDate(new Date(parseInt(year), parseInt(month) - 1, parseInt(day)));
+  } else {
+    setTempDate(new Date());
+  }
+  setShowDatePicker(true);
+};
+
+const handleDateConfirm = () => {
+  // Format date as YYYY-MM-DD for database (PostgreSQL format)
+  const year = tempDate.getFullYear();
+  const month = String(tempDate.getMonth() + 1).padStart(2, '0');
+  const day = String(tempDate.getDate()).padStart(2, '0');
+  const formattedDate = `${year}-${month}-${day}`;
+  
+  // Format for display as MM/DD/YYYY
+  const displayDate = `${month}/${day}/${year}`;
+  
+  setFormData({ ...formData, dateOfBirth: formattedDate });
+  setDateDisplay(displayDate);
+  setShowDatePicker(false);
+};
+
+const handleDateChange = (event: any, selectedDate?: Date) => {
+  if (selectedDate) {
+    setTempDate(selectedDate);
+  }
+};
+
 
   /**
    * Fetches location suggestions from OpenStreetMap
@@ -355,7 +401,7 @@ const saveCmhaDataToStorage = async () => {
       firstName: formData.firstName?.trim() || '',
       lastName: formData.lastName?.trim() || '',
       email: formData.email?.trim() || '',
-      phoneNumber: formData.phoneNumber?.trim() || null,
+      phoneNumber: formData.phoneNumber?.trim() || undefined,
       dateOfBirth: formData.dateOfBirth?.trim() || null,
       gender: formData.gender?.trim() || null,
       address: formData.streetAddress?.trim() || null,
@@ -620,17 +666,59 @@ const saveCmhaDataToStorage = async () => {
 
             {/* Date of Birth */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Date of Birth</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={formData.dateOfBirth}
-                  onChangeText={(text) => setFormData({ ...formData, dateOfBirth: text })}
-                  placeholder="MM/DD/YYYY"
-                />
-              </View>
-            </View>
+  <Text style={styles.label}>Date of Birth</Text>
+  <TouchableOpacity 
+    style={styles.inputContainer}
+    onPress={handleDatePress}
+  >
+    <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
+    <Text style={[styles.input, !dateDisplay && styles.placeholderText]}>
+      {dateDisplay || "Tap to select date"}
+    </Text>
+  </TouchableOpacity>
+  
+  {/* Date Picker Modal */}
+  <Modal
+    visible={showDatePicker}
+    transparent={true}
+    animationType="slide"
+  >
+    <View style={styles.modalContainer}>
+      <View style={styles.datePickerContainer}>
+        <View style={styles.datePickerHeader}>
+          <Text style={styles.datePickerTitle}>Select Date of Birth</Text>
+          <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+            <Ionicons name="close" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+        
+        <DateTimePicker
+          value={tempDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          maximumDate={new Date()}
+          style={styles.datePicker}
+        />
+        
+        <View style={styles.datePickerActions}>
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={() => setShowDatePicker(false)}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.confirmButton}
+            onPress={handleDateConfirm}
+          >
+            <Text style={styles.confirmButtonText}>Confirm</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  </Modal>
+</View>
           </View>
 
           {/* Demographics Section */}
@@ -671,17 +759,64 @@ const saveCmhaDataToStorage = async () => {
 
             {/* Primary Language */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Primary Language</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="language-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={formData.primaryLanguage}
-                  onChangeText={(text) => setFormData({ ...formData, primaryLanguage: text })}
-                  placeholder="Enter your primary language"
-                />
-              </View>
-            </View>
+  <Text style={styles.label}>Primary Language</Text>
+  <TouchableOpacity 
+    style={styles.inputContainer}
+    onPress={() => setShowLanguagePicker(true)}
+  >
+    <Ionicons name="language-outline" size={20} color="#666" style={styles.inputIcon} />
+    <Text style={[styles.input, !formData.primaryLanguage && styles.placeholderText]}>
+      {formData.primaryLanguage || "Select your primary language"}
+    </Text>
+    <Ionicons name="chevron-down" size={16} color="#666" />
+  </TouchableOpacity>
+
+  {/* Language Picker Modal */}
+  <Modal
+    visible={showLanguagePicker}
+    transparent={true}
+    animationType="slide"
+  >
+    <View style={styles.modalContainer}>
+      <View style={styles.pickerContainer}>
+        <View style={styles.pickerHeader}>
+          <Text style={styles.pickerTitle}>Select Primary Language</Text>
+          <TouchableOpacity onPress={() => setShowLanguagePicker(false)}>
+            <Ionicons name="close" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+        
+        <FlatList
+          data={LANGUAGE_OPTIONS}
+          keyExtractor={(item) => item}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[
+                styles.optionItem,
+                formData.primaryLanguage === item && styles.optionItemSelected
+              ]}
+              onPress={() => {
+                setFormData({ ...formData, primaryLanguage: item });
+                setShowLanguagePicker(false);
+              }}
+            >
+              <Text style={[
+                styles.optionItemText,
+                formData.primaryLanguage === item && styles.optionItemTextSelected
+              ]}>
+                {item}
+              </Text>
+              {formData.primaryLanguage === item && (
+                <Ionicons name="checkmark" size={20} color="#4CAF50" />
+              )}
+            </TouchableOpacity>
+          )}
+          style={styles.optionsList}
+        />
+      </View>
+    </View>
+  </Modal>
+</View>
           </View>
 
           {/* Address Information */}
