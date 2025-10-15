@@ -13,7 +13,6 @@ const PORT = 3001;
 const axios = require("axios");
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
 
 // Middleware
 app.use(cors());
@@ -2729,12 +2728,19 @@ app.get(
   async (req: Request, res: Response) => {
     try {
       const { conversationId } = req.params;
-      const { clerkUserId, page = "1", limit = "50" } = req.query;
+      const { clerkUserId } = req.query;
+      // Safely extract page and limit as strings
+      const pageRaw = req.query.page;
+      const limitRaw = req.query.limit;
+      const pageStr = Array.isArray(pageRaw) ? pageRaw[0] : pageRaw;
+      const limitStr = Array.isArray(limitRaw) ? limitRaw[0] : limitRaw;
+      const page = typeof pageStr === "string" ? pageStr : "1";
+      const limit = typeof limitStr === "string" ? limitStr : "50";
 
       console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
 
-      const pageNum = parseInt(page as string) || 1;
-      const limitNum = parseInt(limit as string) || 50;
+      const pageNum = parseInt(page) || 1;
+      const limitNum = parseInt(limit) || 50;
       const skip = (pageNum - 1) * limitNum;
 
       // Verify user is participant
@@ -2778,37 +2784,15 @@ app.get(
         take: limitNum
       });
 
-      console.log(`💬 Found ${messages.length} messages`);
-
-      // Mark messages as read for this user
-      if (clerkUserId && messages.length > 0) {
-        try {
-          const user = await prisma.user.findUnique({
-            where: { clerk_user_id: clerkUserId as string }
-          });
-
-          if (user) {
-            const messageIds = messages.map(msg => msg.id);
-            
-            // Create read status for unread messages
-            await prisma.messageReadStatus.createMany({
-              data: messageIds.map(messageId => ({
-                message_id: messageId,
-                user_id: user.id
-              })),
-              skipDuplicates: true
-            });
-          }
-        } catch (readError) {
-          console.error("Error marking messages as read:", readError);
-        }
-      }
-
+      // Format response with file attachments
       const formattedMessages = messages.map(message => ({
         id: message.id.toString(),
         message_text: message.message_text,
         message_type: message.message_type,
         created_at: message.created_at.toISOString(),
+        attachment_url: message.attachment_url, // This should now be populated
+        file_name: message.file_name,
+        file_size: message.file_size,
         sender: {
           id: message.sender.id,
           clerk_user_id: message.sender.clerk_user_id,
@@ -2828,16 +2812,14 @@ app.get(
           hasMore: messages.length === limitNum,
         },
       });
-    } catch (error: any) {
-      console.error("💬 Get messages error:", error.message);
-      res.status(500).json({
-        success: false,
-        message: "Failed to fetch messages",
-        error: error.message,
-      });
-    }
+  } catch (error) {
+    console.error("Get messages error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch messages"
+    });
   }
-);
+});
 
 // Send a message
 app.post(
@@ -3378,37 +3360,182 @@ async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
   }
 }
 
-// Backend route for file uploads 
-import multer from "multer";
 
-// Configure multer for file uploads
+// Removed duplicate import of PrismaClient
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+const prisma = new PrismaClient();
+
+// Configure multer (add this if not already present)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/"); // Set the upload directory
+    const uploadDir = path.join(__dirname, '../uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`); // Set the file name
-  },
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, uniqueSuffix + '-' + safeFileName);
+  }
 });
-const upload = multer({ storage });
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
 
 app.post('/api/messages/upload-attachment', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No file uploaded' 
+      });
     }
 
-    // Save file information to database
-    const fileUrl = `/uploads/${req.file.filename}`;
-    
+    const { conversationId, clerkUserId, messageType = 'file' } = req.body;
+
+    if (!conversationId || !clerkUserId) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        success: false,
+        message: 'conversationId and clerkUserId are required'
+      });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { clerk_user_id: clerkUserId }
+    });
+
+    if (!user) {
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify participant
+    const participant = await prisma.conversationParticipant.findFirst({
+      where: {
+        conversation_id: parseInt(conversationId),
+        user_id: user.id
+      }
+    });
+
+    if (!participant) {
+      fs.unlinkSync(req.file.path);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied to this conversation'
+      });
+    }
+
+    // Construct file URL
+    const fileUrl = `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001'}/uploads/${req.file.filename}`;
+
+    // Create message with file attachment - FIXED VERSION
+    const message = await prisma.message.create({
+      data: {
+        conversation_id: parseInt(conversationId),
+        sender_id: user.id,
+        message_text: `Shared ${messageType}: ${req.file.originalname}`,
+        message_type: messageType,
+        attachment_url: fileUrl, // ✅ Now valid
+        file_name: req.file.originalname, // ✅ Now valid
+        file_size: req.file.size, // ✅ Now valid
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            clerk_user_id: true,
+            first_name: true,
+            last_name: true,
+            profile_image_url: true
+          }
+        }
+      }
+    });
+
+    // Update conversation timestamp
+    await prisma.conversation.update({
+      where: { id: parseInt(conversationId) },
+      data: { updated_at: new Date() }
+    });
+
+    // Format response - FIXED VERSION
+    const formattedMessage = {
+      id: message.id.toString(),
+      message_text: message.message_text,
+      message_type: message.message_type,
+      created_at: message.created_at.toISOString(),
+      attachment_url: message.attachment_url,
+      file_name: message.file_name,
+      file_size: message.file_size,
+      sender: {
+        id: message.sender.id,
+        clerk_user_id: message.sender.clerk_user_id,
+        first_name: message.sender.first_name,
+        last_name: message.sender.last_name,
+        profile_image_url: message.sender.profile_image_url,
+        online: false
+      }
+    };
+
+    // Optional: Save to file_uploads table using manual SQL
+    try {
+      const db = require('../services/db'); // Your database connection
+      await db.query(`
+        INSERT INTO file_uploads 
+          (message_id, original_name, stored_name, file_path, file_size, mime_type, uploaded_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        message.id,
+        req.file.originalname,
+        req.file.filename,
+        req.file.path,
+        req.file.size,
+        req.file.mimetype,
+        user.id
+      ]);
+      console.log('📁 File upload record created successfully');
+    } catch (uploadError) {
+      console.error('📁 Failed to create file_uploads record:', uploadError);
+      // Don't fail the entire request if this fails
+    }
+
+    console.log(`📁 File uploaded successfully: ${req.file.originalname}`);
+
     res.json({
       success: true,
-      fileUrl: fileUrl,
-      fileName: req.file.originalname,
-      fileSize: req.file.size
+      message: 'File uploaded successfully',
+      data: formattedMessage
     });
+
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: 'Upload failed' });
+    console.error('📁 File upload error:', error);
+    
+    // Clean up file if upload failed
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'File upload failed',
+      error: (error as any).message
+    });
   }
 });
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

@@ -86,35 +86,35 @@ enum LegalStatus {
 // MODELS
 // =============================================
 model User {
-  id                      Int           @id @default(autoincrement())
-  clerk_user_id           String        @unique
-  first_name              String
-  last_name               String
-  email                   String        @unique
-  phone_number            String?
-  date_of_birth          DateTime?
-  age                     Int?
-  gender                  Gender?
-  profile_image_url       String?
-  last_active_at          DateTime?
-  address                 String?
-  city                    String?
-  state                   String?
-  postal_code             String?
-  country                 String?       @default("Canada")
-  role                    UserRole      @default(client)
-  status                  UserStatus    @default(active)
-  password_hash           String?
-  email_verified          Boolean       @default(true)
-  phone_verified          Boolean       @default(false)
-  preferred_language      String?       @default("en")
-  timezone                String?       @default("America/Edmonton")
+  id                       Int        @id @default(autoincrement())
+  clerk_user_id            String     @unique
+  first_name               String
+  last_name                String
+  email                    String     @unique
+  phone_number             String?
+  date_of_birth            DateTime?
+  age                      Int?
+  gender                   Gender?
+  profile_image_url        String?
+  last_active_at           DateTime?
+  address                  String?
+  city                     String?
+  state                    String?
+  postal_code              String?
+  country                  String?    @default("Canada")
+  role                     UserRole   @default(client)
+  status                   UserStatus @default(active)
+  password_hash            String?
+  email_verified           Boolean    @default(true)
+  phone_verified           Boolean    @default(false)
+  preferred_language       String?    @default("en")
+  timezone                 String?    @default("America/Edmonton")
   notification_preferences Json?
-  last_login              DateTime?
-  email_verified_at       DateTime?
-  phone_verified_at       DateTime?
-  created_at              DateTime      @default(now())
-  updated_at              DateTime      @default(now()) @updatedAt
+  last_login               DateTime?
+  email_verified_at        DateTime?
+  phone_verified_at        DateTime?
+  created_at               DateTime   @default(now())
+  updated_at               DateTime   @default(now()) @updatedAt
 
   // Relations
   clients                   Client[]
@@ -130,29 +130,30 @@ model User {
   notification_settings     NotificationSetting[]
   wellbeing_settings        WellbeingSetting[]
   bookmarks                 Bookmark[]
-  created_conversations     Conversation[]           @relation("ConversationCreator")
-  assigned_assessments      Assessment[]             @relation("AssignedWorker")
+  created_conversations     Conversation[]            @relation("ConversationCreator")
+  assigned_assessments      Assessment[]              @relation("AssignedWorker")
+  file_uploads              FileUpload[]              @relation("FileUploadUploadedBy") // Add this reverse relation
 
   @@map("users")
 }
 
 model Client {
-  id                                  Int       @id @default(autoincrement())
-  user_id                             Int       @unique
-  emergency_contact_name              String?
-  emergency_contact_phone             String?
-  emergency_contact_relationship      String?
-  emergency_contact_email             String?
-  emergency_contact_address           String?
-  secondary_emergency_contact_name    String?
-  secondary_emergency_contact_phone   String?
+  id                                       Int          @id @default(autoincrement())
+  user_id                                  Int          @unique
+  emergency_contact_name                   String?
+  emergency_contact_phone                  String?
+  emergency_contact_relationship           String?
+  emergency_contact_email                  String?
+  emergency_contact_address                String?
+  secondary_emergency_contact_name         String?
+  secondary_emergency_contact_phone        String?
   secondary_emergency_contact_relationship String?
-  guardian_name                       String?
-  guardian_phone                      String?
-  guardian_relationship               String?
-  legal_status                        LegalStatus?
-  created_at                          DateTime  @default(now())
-  updated_at                          DateTime  @updatedAt
+  guardian_name                            String?
+  guardian_phone                           String?
+  guardian_relationship                    String?
+  legal_status                             LegalStatus?
+  created_at                               DateTime     @default(now())
+  updated_at                               DateTime     @updatedAt
 
   // Relations
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -161,36 +162,36 @@ model Client {
 }
 
 model Assessment {
-  id                    Int       @id @default(autoincrement())
-  user_id               Int
-  assessment_type       AssessmentType @default(pre_survey)
-  responses             Json
-  total_score           Int?
-  completed_at          DateTime  @default(now())
-  submitted_to_worker   Boolean?  @default(false)
-  reviewed_by_worker    Boolean?  @default(false)
-  assigned_worker_id    Int?
-  next_due_date         DateTime?
-  created_at            DateTime  @default(now())
-  updated_at            DateTime  @updatedAt
+  id                  Int            @id @default(autoincrement())
+  user_id             Int
+  assessment_type     AssessmentType @default(pre_survey)
+  responses           Json
+  total_score         Int?
+  completed_at        DateTime       @default(now())
+  submitted_to_worker Boolean?       @default(false)
+  reviewed_by_worker  Boolean?       @default(false)
+  assigned_worker_id  Int?
+  next_due_date       DateTime?
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
 
   // Relations
-  user              User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  assigned_worker   User?  @relation("AssignedWorker", fields: [assigned_worker_id], references: [id])
+  user            User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  assigned_worker User? @relation("AssignedWorker", fields: [assigned_worker_id], references: [id])
 
   @@map("assessments")
 }
 
 model MoodEntry {
-  id                      Int       @id @default(autoincrement())
-  user_id                 Int
-  clerk_user_id           String
-  mood_type               MoodType
-  intensity               Int       // 1-5 scale
-  notes                   String?
+  id                        Int      @id @default(autoincrement())
+  user_id                   Int
+  clerk_user_id             String
+  mood_type                 MoodType
+  intensity                 Int // 1-5 scale
+  notes                     String?
   share_with_support_worker Boolean  @default(false)
-  created_at              DateTime  @default(now())
-  updated_at              DateTime  @updatedAt
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
 
   // Relations
   user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -200,10 +201,10 @@ model MoodEntry {
 }
 
 model MoodFactor {
-  id           Int      @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   mood_entry_id Int
-  factor       String
-  created_at   DateTime @default(now())
+  factor        String
+  created_at    DateTime @default(now())
 
   // Relations
   mood_entry MoodEntry @relation(fields: [mood_entry_id], references: [id], onDelete: Cascade)
@@ -226,20 +227,20 @@ model JournalTemplate {
 }
 
 model JournalEntry {
-  id                      Int       @id @default(autoincrement())
-  user_id                 Int
-  clerk_user_id           String
-  title                   String
-  content                 String
-  emotion_type            EmotionType?
-  emoji                   String?
-  template_id             Int?
-  share_with_support_worker Boolean  @default(false)
-  created_at              DateTime  @default(now())
-  updated_at              DateTime  @updatedAt
+  id                        Int          @id @default(autoincrement())
+  user_id                   Int
+  clerk_user_id             String
+  title                     String
+  content                   String
+  emotion_type              EmotionType?
+  emoji                     String?
+  template_id               Int?
+  share_with_support_worker Boolean      @default(false)
+  created_at                DateTime     @default(now())
+  updated_at                DateTime     @updatedAt
 
   // Relations
-  user     User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
   template JournalTemplate? @relation(fields: [template_id], references: [id], onDelete: SetNull)
   tags     JournalTag[]
 
@@ -259,12 +260,12 @@ model JournalTag {
 }
 
 model Conversation {
-  id                Int       @id @default(autoincrement())
+  id                Int              @id @default(autoincrement())
   title             String?
   conversation_type ConversationType @default(direct)
   created_by        Int?
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
 
   // Relations
   creator      User?                     @relation("ConversationCreator", fields: [created_by], references: [id])
@@ -275,11 +276,11 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  id              Int    @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   conversation_id Int
   user_id         Int
-  role            String? @default("member")
-  joined_at       DateTime @default(now())
+  role            String?   @default("member")
+  joined_at       DateTime  @default(now())
   left_at         DateTime?
 
   // Relations
@@ -295,18 +296,42 @@ model Message {
   conversation_id Int
   sender_id       Int
   message_text    String
-  message_type    MessageType? @default(text)
+  message_type    String    @default("text") // "text", "image", "file", "system"
+  attachment_url  String?
+  file_name       String?
+  file_size       Int?
   metadata        Json?     @default("{}")
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
   read_at         DateTime?
 
   // Relations
-  conversation Conversation      @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
-  sender       User             @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+  conversation Conversation        @relation(fields: [conversation_id], references: [id])
+  sender       User                @relation(fields: [sender_id], references: [id])
   read_status  MessageReadStatus[]
+  file_uploads FileUpload[] // Add this reverse relation
 
   @@map("messages")
+}
+
+model FileUpload {
+  id            Int       @id @default(autoincrement())
+  message_id    Int
+  original_name String
+  stored_name   String
+  file_path     String
+  file_size     Int
+  mime_type     String?
+  upload_status String    @default("completed")
+  uploaded_by   Int
+  uploaded_at   DateTime  @default(now())
+  deleted_at    DateTime?
+
+  // Relations - fixed with proper relation names
+  message    Message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("FileUploadUploadedBy", fields: [uploaded_by], references: [id])
+
+  @@map("file_uploads")
 }
 
 model MessageReadStatus {
@@ -337,32 +362,32 @@ model CommunityCategory {
 }
 
 model CommunityPost {
-  id            Int      @id @default(autoincrement())
-  title         String
-  content       String
-  category_id   Int?
-  author_id     String?
-  author_name   String?
-  is_private    Boolean? @default(false)
-  is_draft      Boolean? @default(false)
-  reaction_count Int?    @default(0)
-  comment_count Int?     @default(0)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  title          String
+  content        String
+  category_id    Int?
+  author_id      String?
+  author_name    String?
+  is_private     Boolean? @default(false)
+  is_draft       Boolean? @default(false)
+  reaction_count Int?     @default(0)
+  comment_count  Int?     @default(0)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
 
   // Relations
-  category      CommunityCategory? @relation(fields: [category_id], references: [id])
-  reactions     PostReaction[]
-  bookmarks     PostBookmark[]
+  category  CommunityCategory? @relation(fields: [category_id], references: [id])
+  reactions PostReaction[]
+  bookmarks PostBookmark[]
 
   @@map("community_posts")
 }
 
 model PostReaction {
-  id        Int      @id @default(autoincrement())
-  post_id   Int
-  user_id   String?
-  emoji     String
+  id         Int      @id @default(autoincrement())
+  post_id    Int
+  user_id    String?
+  emoji      String
   created_at DateTime @default(now())
 
   // Relations
@@ -373,9 +398,9 @@ model PostReaction {
 }
 
 model PostBookmark {
-  id        Int      @id @default(autoincrement())
-  post_id   Int
-  user_id   String?
+  id         Int      @id @default(autoincrement())
+  post_id    Int
+  user_id    String?
   created_at DateTime @default(now())
 
   // Relations
@@ -386,7 +411,7 @@ model PostBookmark {
 }
 
 model Resource {
-  id               Int       @id @default(autoincrement())
+  id               Int          @id @default(autoincrement())
   title            String
   type             ResourceType
   duration         String?
@@ -396,8 +421,8 @@ model Resource {
   image_emoji      String?
   background_color String?
   tags             String[]
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @updatedAt
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
 
   // Relations
   bookmarks Bookmark[]
@@ -425,7 +450,7 @@ model ClientProfile {
   display_name            String?
   email                   String?
   phone_number            String?
-  date_of_birth          DateTime?
+  date_of_birth           DateTime?
   emergency_contact_name  String?
   emergency_contact_phone String?
   therapist_contact       String?
@@ -439,14 +464,14 @@ model ClientProfile {
 }
 
 model AccessibilitySetting {
-  id                     Int       @id @default(autoincrement())
-  clerk_user_id          String    @unique
-  dark_mode_enabled      Boolean?  @default(false)
-  text_size              String?   @default("Medium")
-  high_contrast_enabled  Boolean?  @default(false)
-  reduce_motion_enabled  Boolean?  @default(false)
-  created_at             DateTime  @default(now())
-  updated_at             DateTime  @updatedAt
+  id                    Int      @id @default(autoincrement())
+  clerk_user_id         String   @unique
+  dark_mode_enabled     Boolean? @default(false)
+  text_size             String?  @default("Medium")
+  high_contrast_enabled Boolean? @default(false)
+  reduce_motion_enabled Boolean? @default(false)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
 
   // Relations
   user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
@@ -455,13 +480,13 @@ model AccessibilitySetting {
 }
 
 model SecuritySetting {
-  id                    Int       @id @default(autoincrement())
-  clerk_user_id         String    @unique
+  id                     Int      @id @default(autoincrement())
+  clerk_user_id          String   @unique
   biometric_lock_enabled Boolean? @default(false)
-  auto_lock_timer       String?   @default("5 minutes")
-  hide_app_content      Boolean?  @default(true)
-  created_at            DateTime  @default(now())
-  updated_at            DateTime  @updatedAt
+  auto_lock_timer        String?  @default("5 minutes")
+  hide_app_content       Boolean? @default(true)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
 
   // Relations
   user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
@@ -470,16 +495,16 @@ model SecuritySetting {
 }
 
 model NotificationSetting {
-  id                   Int       @id @default(autoincrement())
-  clerk_user_id        String
-  notification_type    String    @default("general")
-  enabled              Boolean?  @default(true)
-  frequency            String?   @default("Daily")
-  quiet_hours_enabled  Boolean?  @default(false)
-  quiet_hours_start    String?   @default("22:00")
-  quiet_hours_end      String?   @default("08:00")
-  created_at           DateTime  @default(now())
-  updated_at           DateTime  @updatedAt
+  id                  Int      @id @default(autoincrement())
+  clerk_user_id       String
+  notification_type   String   @default("general")
+  enabled             Boolean? @default(true)
+  frequency           String?  @default("Daily")
+  quiet_hours_enabled Boolean? @default(false)
+  quiet_hours_start   String?  @default("22:00")
+  quiet_hours_end     String?  @default("08:00")
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
 
   // Relations
   user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
@@ -489,15 +514,15 @@ model NotificationSetting {
 }
 
 model WellbeingSetting {
-  id                           Int       @id @default(autoincrement())
-  clerk_user_id                String    @unique
-  safe_mode_enabled            Boolean?  @default(false)
-  break_reminders_enabled      Boolean?  @default(true)
-  breathing_exercise_duration  String?   @default("5 minutes")
-  breathing_exercise_style     String?   @default("4-7-8 Technique")
-  offline_mode_enabled         Boolean?  @default(false)
-  created_at                   DateTime  @default(now())
-  updated_at                   DateTime  @updatedAt
+  id                          Int      @id @default(autoincrement())
+  clerk_user_id               String   @unique
+  safe_mode_enabled           Boolean? @default(false)
+  break_reminders_enabled     Boolean? @default(true)
+  breathing_exercise_duration String?  @default("5 minutes")
+  breathing_exercise_style    String?  @default("4-7-8 Technique")
+  offline_mode_enabled        Boolean? @default(false)
+  created_at                  DateTime @default(now())
+  updated_at                  DateTime @updatedAt
 
   // Relations
   user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)

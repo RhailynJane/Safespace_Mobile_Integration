@@ -1,7 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
 // Utility function to get file icon based on file name or extension
-const getFileIcon = (fileName?: string): "document-outline" | "document-text-outline" | "grid-outline" | "image-outline" | "archive-outline" => {
+const getFileIcon = (
+  fileName?: string
+):
+  | "document-outline"
+  | "document-text-outline"
+  | "grid-outline"
+  | "image-outline"
+  | "archive-outline" => {
   if (!fileName) return "document-outline";
   const extension = fileName.split(".").pop()?.toLowerCase();
   switch (extension) {
@@ -49,9 +56,10 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { Message, Participant } from "../../../../utils/sendbirdService";
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import * as WebBrowser from "expo-web-browser";
+import * as MediaLibrary from "expo-media-library";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -79,8 +87,9 @@ export default function ChatScreen() {
   const [attachmentModalVisible, setAttachmentModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
-const [viewerModalVisible, setViewerModalVisible] = useState(false);
-  const [currentAttachment, setCurrentAttachment] = useState<ExtendedMessage | null>(null);
+  const [viewerModalVisible, setViewerModalVisible] = useState(false);
+  const [currentAttachment, setCurrentAttachment] =
+    useState<ExtendedMessage | null>(null);
   const [downloading, setDownloading] = useState(false);
 
   // Get safe area insets for proper spacing
@@ -290,7 +299,7 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
       setAttachmentModalVisible(false);
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -533,49 +542,134 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
     return message.sender.clerk_user_id === userId;
   };
 
-   // Download file to local storage and share
+  // Download file to local storage and share
   const downloadAndShareFile = async (remoteUri: string, fileName: string) => {
     try {
-      const fileExtension = remoteUri.split('.').pop();
-      const localUri = `${FileSystem.documentDirectory}${fileName}.${fileExtension}`;
-      
-      const downloadResult = await FileSystem.downloadAsync(remoteUri, localUri);
-      
+      setDownloading(true);
+
+      console.log("Downloading file:", { remoteUri, fileName });
+
+      // Extract file extension
+      const urlWithoutParams = remoteUri.split("?")[0];
+      const fileExtension =
+        (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
+      const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const localUri = `${FileSystem.documentDirectory}${safeFileName}.${fileExtension}`;
+
+      console.log("Download details:", { localUri, fileExtension });
+
+      // Download file
+      const downloadResult = await FileSystem.downloadAsync(
+        remoteUri,
+        localUri
+      );
+
+      console.log("Download result:", downloadResult);
+
       if (downloadResult.status === 200) {
-        await Sharing.shareAsync(downloadResult.uri);
+        // Check if sharing is available
+        const canShare = await Sharing.isAvailableAsync();
+
+        if (canShare) {
+          await Sharing.shareAsync(downloadResult.uri, {
+            mimeType: getMimeType(fileExtension),
+            dialogTitle: `Download ${fileName}`,
+            UTI: getUTI(fileExtension), // For iOS
+          });
+
+          Alert.alert("Success", "File downloaded and shared successfully!");
+        } else {
+          Alert.alert("Success", "File downloaded successfully!");
+          // If sharing not available, open the file directly
+          await WebBrowser.openBrowserAsync(remoteUri);
+        }
       } else {
-        throw new Error('Download failed');
+        throw new Error(
+          `Download failed with status: ${downloadResult.status}`
+        );
       }
     } catch (error) {
       console.error("Download error:", error);
-      Alert.alert("Error", "Failed to download file");
+
+      let errorMessage = "Unable to download the file.";
+
+      if (error instanceof Error) {
+        if (error.message.includes("Network request failed")) {
+          errorMessage = "Network error. Please check your connection.";
+        } else if (error.message.includes("Invalid file URL")) {
+          errorMessage = "The file link is invalid or broken.";
+        } else if (error.message.includes("404")) {
+          errorMessage = "File not found on server.";
+        }
+      }
+
+      Alert.alert("Download Failed", errorMessage);
+    } finally {
+      setDownloading(false);
     }
   };
 
-  // Save image to gallery
-  const saveImageToGallery = async () => {
-    if (!currentAttachment?.attachment_url) return;
+  // Helper function to get MIME type
+  const getMimeType = (extension: string): string => {
+    const mimeTypes: { [key: string]: string } = {
+      pdf: "application/pdf",
+      doc: "application/msword",
+      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      xls: "application/vnd.ms-excel",
+      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      zip: "application/zip",
+      rar: "application/x-rar-compressed",
+      txt: "text/plain",
+    };
 
+    return mimeTypes[extension.toLowerCase()] || "application/octet-stream";
+  };
+
+  // Save image to gallery
+  const saveImageToGallery = async (imageUri: string) => {
     try {
       setDownloading(true);
-      
-      const imageUri = currentAttachment.attachment_url;
-      const fileName = `image_${Date.now()}.jpg`;
-      
-      if (imageUri.startsWith('http')) {
-        const localUri = `${FileSystem.documentDirectory}${fileName}`;
-        const downloadResult = await FileSystem.downloadAsync(imageUri, localUri);
-        
-        if (downloadResult.status === 200) {
-          // Note: For actual gallery saving, you might need expo-media-library
-          Alert.alert("Success", "Image saved to your device");
-        }
-      } else {
-        Alert.alert("Info", "Image is already available locally");
+
+      // Request permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "We need access to your media library to save images."
+        );
+        return;
       }
+
+      let finalUri = imageUri;
+
+      // If it's a remote URL, download it first
+      if (imageUri.startsWith("http")) {
+        const fileName = `image_${Date.now()}.jpg`;
+        const localUri = `${FileSystem.documentDirectory}${fileName}`;
+        const downloadResult = await FileSystem.downloadAsync(
+          imageUri,
+          localUri
+        );
+
+        if (downloadResult.status !== 200) {
+          throw new Error("Failed to download image");
+        }
+        finalUri = downloadResult.uri;
+      }
+
+      // Save to gallery
+      const asset = await MediaLibrary.createAssetAsync(finalUri);
+      await MediaLibrary.createAlbumAsync("Downloads", asset, false);
+
+      Alert.alert("Success", "Image saved to your gallery!");
     } catch (error) {
       console.error("Save image error:", error);
-      Alert.alert("Error", "Failed to save image");
+      Alert.alert("Error", "Failed to save image to gallery");
     } finally {
       setDownloading(false);
     }
@@ -583,80 +677,129 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
 
   // Enhanced renderMessageContent function
   const renderMessageContent = (message: ExtendedMessage) => {
-    if (message.message_type === 'image' && message.attachment_url) {
+    // Handle image attachments
+    if (message.message_type === "image" && message.attachment_url) {
       return (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.imageAttachment}
           onPress={() => handleViewAttachment(message)}
           onLongPress={() => {
-            Alert.alert(
-              "Image Options",
-              "What would you like to do?",
-              [
-                { text: "View", onPress: () => { handleViewAttachment(message); } },
-                { text: "Save", onPress: () => { saveImageToGallery(); } },
-                { text: "Cancel", style: "cancel" }
-              ]
-            );
+            Alert.alert("Image Options", "What would you like to do?", [
+              { text: "View", onPress: () => handleViewAttachment(message) },
+              {
+                text: "Save to Gallery",
+                onPress: () => saveImageToGallery(message.attachment_url!),
+              },
+              {
+                text: "Download",
+                onPress: () => handleDownloadFile(message),
+              },
+              { text: "Cancel", style: "cancel" },
+            ]);
           }}
         >
-          <Image 
-            source={{ uri: message.attachment_url }} 
+          <Image
+            source={{ uri: message.attachment_url }}
             style={styles.attachmentImage}
             resizeMode="cover"
           />
           <View style={styles.imageOverlay}>
             <Ionicons name="expand" size={20} color="#FFFFFF" />
-            <Text style={styles.imageText}>Tap to view • Long press for options</Text>
+            <Text style={styles.imageText}>📷 Photo • Tap to view</Text>
           </View>
         </TouchableOpacity>
       );
     }
 
-    if (message.message_type === 'file' && message.attachment_url) {
+    // Handle file attachments
+    if (message.message_type === "file" && message.attachment_url) {
       return (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.fileAttachment}
-          onPress={() => handleViewAttachment(message)}
+          onPress={() => handleDownloadFile(message)}
           onLongPress={() => {
             Alert.alert(
               "File Options",
-              `File: ${message.file_name || 'Unknown file'}`,
+              `File: ${message.file_name || "Unknown file"}`,
               [
-                { text: "Download", onPress: () => { handleDownloadFile(message); } },
-                { text: "Cancel", style: "cancel" }
+                {
+                  text: "Download & Share",
+                  onPress: () => handleDownloadFile(message),
+                },
+                {
+                  text: "Open in Browser",
+                  onPress: () =>
+                    WebBrowser.openBrowserAsync(message.attachment_url!),
+                },
+                { text: "Cancel", style: "cancel" },
               ]
             );
           }}
         >
           <View style={styles.fileIconContainer}>
-            <Ionicons 
-              name={getFileIcon(message.file_name)} 
-              size={24} 
-              color="#4CAF50" 
+            <Ionicons
+              name={getFileIcon(message.file_name)}
+              size={24}
+              color="#4CAF50"
             />
           </View>
           <View style={styles.fileInfo}>
             <Text style={styles.fileName} numberOfLines={1}>
-              {message.file_name || 'Download file'}
+              {message.file_name || "Download file"}
             </Text>
             {message.file_size && (
               <Text style={styles.fileSize}>
                 {formatFileSize(message.file_size)}
               </Text>
             )}
-            <Text style={styles.fileHint}>Tap to open • Long press for options</Text>
+            <Text style={styles.fileHint}>
+              {getFileTypeText(message.file_name)} • Tap to download
+            </Text>
           </View>
           <Ionicons name="download-outline" size={20} color="#666" />
         </TouchableOpacity>
       );
     }
 
+    // Regular text message
     return (
-      <Text style={styles.messageText}>
+      <Text
+        style={[
+          styles.messageText,
+          isMyMessage(message) ? styles.myMessageText : styles.theirMessageText,
+        ]}
+      >
         {message.message_text}
       </Text>
     );
+  };
+
+  const getFileTypeText = (fileName?: string): string => {
+    if (!fileName) return "File";
+    const extension = fileName.split(".").pop()?.toLowerCase();
+
+    switch (extension) {
+      case "pdf":
+        return "PDF Document";
+      case "doc":
+      case "docx":
+        return "Word Document";
+      case "xls":
+      case "xlsx":
+        return "Excel Spreadsheet";
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+        return "Image";
+      case "zip":
+      case "rar":
+        return "Archive";
+      case "txt":
+        return "Text File";
+      default:
+        return "Document";
+    }
   };
 
   const handleDownloadFile = async (message: ExtendedMessage) => {
@@ -664,38 +807,34 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
 
     try {
       setDownloading(true);
-      
+
       const fileUri = message.attachment_url;
       const fileName = message.file_name || `file_${Date.now()}`;
-      
-      // Check if we can share/download the file
-      const canShare = await Sharing.isAvailableAsync();
-      
-      if (canShare) {
-        // For external URLs, we need to download first
-        if (fileUri.startsWith('http')) {
-          Alert.alert(
-            "Download File",
-            `Do you want to download "${fileName}"?`,
-            [
-              { text: "Cancel", style: "cancel" },
-              { 
-                text: "Download", 
-                onPress: () => { downloadAndShareFile(fileUri, fileName).catch(console.error); }
+
+      console.log("Starting download:", { fileUri, fileName });
+
+      // Show download confirmation
+      Alert.alert(
+        "Download File",
+        `Download "${message.file_name || "this file"}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Download",
+            onPress: async () => {
+              try {
+                await downloadAndShareFile(fileUri, fileName);
+              } catch (error) {
+                console.error("Download error:", error);
+                Alert.alert("Error", "Failed to download file");
               }
-            ]
-          );
-        } else {
-          // For local files, share directly
-          await Sharing.shareAsync(fileUri);
-        }
-      } else {
-        // If sharing not available, open in browser
-        await WebBrowser.openBrowserAsync(fileUri);
-      }
+            },
+          },
+        ]
+      );
     } catch (error) {
       console.error("Error handling file:", error);
-      Alert.alert("Error", "Failed to open file");
+      Alert.alert("Error", "Failed to download file");
     } finally {
       setDownloading(false);
     }
@@ -703,23 +842,22 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
 
   // Render message content based on type
   // Handle viewing attachments
-   const handleViewAttachment = async (message: ExtendedMessage) => {
+  const handleViewAttachment = async (message: ExtendedMessage) => {
     if (!message.attachment_url) {
       Alert.alert("Error", "No attachment URL found.");
       return;
     }
 
     setCurrentAttachment(message);
-    
+
     // For images, show in viewer modal
-    if (message.message_type === 'image') {
+    if (message.message_type === "image") {
       setViewerModalVisible(true);
     } else {
-      // For files, try to open in browser or download
+      // For files, download directly
       await handleDownloadFile(message);
     }
   };
-
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
@@ -822,7 +960,7 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
                         : styles.theirMessageContainer,
                     ]}
                   >
-                    {/* Other user's avatar (left side) */}
+                    {/* Other user's avatar */}
                     {!myMessage && (
                       <View style={styles.avatarContainer}>
                         <View style={styles.avatar}>
@@ -836,7 +974,7 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
                       </View>
                     )}
 
-                    {/* Message bubble */}
+                    {/* Message bubble with file attachment */}
                     <View
                       style={[
                         styles.messageBubble,
@@ -856,7 +994,7 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
                       </Text>
                     </View>
 
-                    {/* My avatar (right side) */}
+                    {/* My avatar */}
                     {myMessage && (
                       <View style={styles.avatarContainer}>
                         <View style={[styles.avatar, styles.myAvatar]}>
@@ -942,21 +1080,24 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
                 >
                   <Ionicons name="close" size={28} color="#FFFFFF" />
                 </TouchableOpacity>
-                
+
                 {currentAttachment && (
                   <View style={styles.viewerHeaderInfo}>
                     <Text style={styles.viewerFileName} numberOfLines={1}>
-                      {currentAttachment.file_name || 'Image'}
+                      {currentAttachment.file_name || "Image"}
                     </Text>
                     <Text style={styles.viewerFileSize}>
-                      {currentAttachment.file_size && formatFileSize(currentAttachment.file_size)}
+                      {currentAttachment.file_size &&
+                        formatFileSize(currentAttachment.file_size)}
                     </Text>
                   </View>
                 )}
-                
+
                 <TouchableOpacity
                   style={styles.viewerActionButton}
-                  onPress={saveImageToGallery}
+                  onPress={() =>
+                    saveImageToGallery(currentAttachment?.attachment_url || "")
+                  }
                   disabled={downloading}
                 >
                   {downloading ? (
@@ -967,7 +1108,7 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
                 </TouchableOpacity>
               </View>
 
-              <ScrollView 
+              <ScrollView
                 style={styles.viewerContent}
                 maximumZoomScale={3}
                 minimumZoomScale={1}
@@ -991,73 +1132,72 @@ const [viewerModalVisible, setViewerModalVisible] = useState(false);
           </Modal>
 
           <Modal
-          visible={attachmentModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setAttachmentModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Choose Attachment</Text>
-                <TouchableOpacity
-                  onPress={() => setAttachmentModalVisible(false)}
-                  style={styles.closeButton}
-                >
-                  <Ionicons name="close" size={24} color="#666" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.attachmentOptions}>
-                <TouchableOpacity
-                  style={styles.attachmentOption}
-                  onPress={takePhoto}
-                >
-                  <View
-                    style={[
-                      styles.optionIcon,
-                      { backgroundColor: "#4CAF50" },
-                    ]}
+            visible={attachmentModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setAttachmentModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Choose Attachment</Text>
+                  <TouchableOpacity
+                    onPress={() => setAttachmentModalVisible(false)}
+                    style={styles.closeButton}
                   >
-                    <Ionicons name="camera" size={24} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.optionText}>Camera</Text>
-                </TouchableOpacity>
+                    <Ionicons name="close" size={24} color="#666" />
+                  </TouchableOpacity>
+                </View>
 
-                <TouchableOpacity
-                  style={styles.attachmentOption}
-                  onPress={pickImage}
-                >
-                  <View
-                    style={[
-                      styles.optionIcon,
-                      { backgroundColor: "#2196F3" },
-                    ]}
+                <View style={styles.attachmentOptions}>
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={takePhoto}
                   >
-                    <Ionicons name="image" size={24} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.optionText}>Gallery</Text>
-                </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.optionIcon,
+                        { backgroundColor: "#4CAF50" },
+                      ]}
+                    >
+                      <Ionicons name="camera" size={24} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.optionText}>Camera</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.attachmentOption}
-                  onPress={pickDocument}
-                >
-                  <View
-                    style={[
-                      styles.optionIcon,
-                      { backgroundColor: "#FF9800" },
-                    ]}
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={pickImage}
                   >
-                    <Ionicons name="document" size={24} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.optionText}>Document</Text>
-                </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.optionIcon,
+                        { backgroundColor: "#2196F3" },
+                      ]}
+                    >
+                      <Ionicons name="image" size={24} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.optionText}>Gallery</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={pickDocument}
+                  >
+                    <View
+                      style={[
+                        styles.optionIcon,
+                        { backgroundColor: "#FF9800" },
+                      ]}
+                    >
+                      <Ionicons name="document" size={24} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.optionText}>Document</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-
+          </Modal>
         </SafeAreaView>
       </KeyboardAvoidingView>
     </CurvedBackground>
@@ -1384,33 +1524,33 @@ const styles = StyleSheet.create({
   // Viewer Modal Styles
   viewerModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    backgroundColor: "rgba(0, 0, 0, 0.95)",
   },
   viewerModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
   },
   viewerCloseButton: {
     padding: 8,
   },
   viewerHeaderInfo: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 15,
   },
   viewerFileName: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
   },
   viewerFileSize: {
-    color: '#CCCCCC',
+    color: "#CCCCCC",
     fontSize: 12,
     marginTop: 2,
   },
@@ -1422,20 +1562,38 @@ const styles = StyleSheet.create({
   },
   viewerScrollContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   fullSizeImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   viewerFooter: {
     padding: 20,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
   },
   viewerFooterText: {
-    color: '#CCCCCC',
+    color: "#CCCCCC",
     fontSize: 12,
   },
 });
+
+const getUTI = (extension: string): string => {
+  const utiMap: { [key: string]: string } = {
+    pdf: "com.adobe.pdf",
+    doc: "com.microsoft.word.doc",
+    docx: "org.openxmlformats.wordprocessingml.document",
+    xls: "com.microsoft.excel.xls",
+    xlsx: "org.openxmlformats.spreadsheetml.sheet",
+    jpg: "public.jpeg",
+    jpeg: "public.jpeg",
+    png: "public.png",
+    gif: "com.compuserve.gif",
+    zip: "public.zip-archive",
+    txt: "public.plain-text",
+  };
+
+  return utiMap[extension.toLowerCase()] || "public.data";
+};
