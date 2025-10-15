@@ -144,7 +144,7 @@ export default function ChatScreen() {
     }
   }, [conversationId, userId, conversationTitle, API_BASE_URL, contact, updateUserActivity]);
 
-  // Load messages with 30-second polling
+  // Load messages with 60-second polling
   useEffect(() => {
     if (!conversationId || !userId) return;
 
@@ -153,7 +153,7 @@ export default function ChatScreen() {
     // Use a longer interval for polling
     const pollInterval = setInterval(() => {
       loadMessages();
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds
 
     return () => clearInterval(pollInterval);
   }, [conversationId, userId, loadMessages]);
