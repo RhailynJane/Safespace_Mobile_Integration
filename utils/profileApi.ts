@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
 
 // utils/profileApi.ts
 export interface ClientProfileData {
@@ -34,9 +34,8 @@ export const profileApi = {
   async getClientProfile(clerkUserId: string): Promise<ClientProfileData | null> {
     try {
       console.log('📋 Fetching profile for user:', clerkUserId);
-      
-      const response = await fetch(`${API_BASE_URL}/client-profile/${clerkUserId}`);
-      
+      const response = await fetch(`${API_BASE_URL}/api/client-profile/${clerkUserId}`);
+
       console.log('Profile response status:', response.status);
       
       if (!response.ok) {
@@ -63,9 +62,13 @@ export const profileApi = {
 
   async updateClientProfile(clerkUserId: string, profileData: Partial<ClientProfileData>): Promise<any> {
     try {
-      console.log('🔄 Updating profile for user:', clerkUserId, profileData);
+      console.log('🔄 Updating profile for user:', clerkUserId);
+      console.log('📦 Full profile data being sent:', JSON.stringify(profileData, null, 2));
       
-      const response = await fetch(`${API_BASE_URL}/client-profile/${clerkUserId}`, {
+      const API_URL = `${API_BASE_URL}/api/client-profile/${clerkUserId}`;
+      console.log('🌐 Making request to:', API_URL);
+      
+      const response = await fetch(API_URL, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -73,21 +76,22 @@ export const profileApi = {
         body: JSON.stringify(profileData),
       });
 
-      console.log('Update response status:', response.status);
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
 
       if (!response.ok) {
-        throw new Error(`Failed to update profile: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ Full error response:', errorText);
+        throw new Error(`Failed to update profile: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('✅ Update successful:', result);
       
-      if (result.success) {
-        return result;
-      } else {
-        throw new Error(result.message);
-      }
+      return result;
+      
     } catch (error) {
-      console.error('Error updating client profile:', error);
+      console.error('❌ Error updating client profile:', error);
       throw error;
     }
   }

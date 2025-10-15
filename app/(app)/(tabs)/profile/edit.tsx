@@ -336,82 +336,84 @@ const saveCmhaDataToStorage = async () => {
    * Saves profile changes to backend API and local storage
    */
   const handleSaveChanges = async () => {
-    if (!user?.id) {
-      Alert.alert("Error", "User not available");
+  if (!user?.id) {
+    Alert.alert("Error", "User not available");
+    return;
+  }
+
+  try {
+    setSaving(true);
+    
+    // Validate required fields
+    if (!formData.firstName || !formData.email) {
+      Alert.alert("Error", "Please fill in First Name and Email Address");
       return;
     }
 
-    try {
-      setSaving(true);
+    // Prepare data for backend API - FIXED VERSION
+    const profileData: Partial<ClientProfileData> = {
+      firstName: formData.firstName?.trim() || '',
+      lastName: formData.lastName?.trim() || '',
+      email: formData.email?.trim() || '',
+      phoneNumber: formData.phoneNumber?.trim() || null,
+      dateOfBirth: formData.dateOfBirth?.trim() || null,
+      gender: formData.gender?.trim() || null,
+      address: formData.streetAddress?.trim() || null,
+      city: formData.location?.trim() || null, // Make sure this matches your backend expectation
+      postalCode: formData.postalCode?.trim() || null,
+      country: "Canada",
+      emergencyContactName: formData.emergencyContactName?.trim() || null,
+      emergencyContactPhone: formData.emergencyContactNumber?.trim() || null,
+      emergencyContactRelationship: formData.emergencyContactRelationship?.trim() || null,
       
-      // Validate required fields
-      if (!formData.firstName || !formData.email) {
-        Alert.alert("Error", "Please fill in First Name and Email Address");
-        return;
-      }
+      // CMHA Demographics
+      pronouns: formData.pronouns?.trim() || null,
+      isLGBTQ: formData.isLGBTQ?.trim() || null,
+      primaryLanguage: formData.primaryLanguage?.trim() || null,
+      mentalHealthConcerns: formData.mentalHealthConcerns?.trim() || null,
+      supportNeeded: formData.supportNeeded?.trim() || null,
+      ethnoculturalBackground: formData.ethnoculturalBackground?.trim() || null,
+      canadaStatus: formData.canadaStatus?.trim() || null,
+      dateCameToCanada: formData.dateCameToCanada?.trim() || null,
+    };
 
-      // Prepare data for backend API
-      const profileData: Partial<ClientProfileData> = {
-  firstName: formData.firstName,
-  lastName: formData.lastName,
-  email: formData.email,
-  phoneNumber: formData.phoneNumber,
-  dateOfBirth: formData.dateOfBirth,
-  gender: formData.gender,
-  address: formData.streetAddress,
-  city: formData.location,
-  postalCode: formData.postalCode,
-  country: "Canada",
-  emergencyContactName: formData.emergencyContactName,
-  emergencyContactPhone: formData.emergencyContactPhone,
-  emergencyContactRelationship: formData.emergencyContactRelationship,
-  
-  // CMHA Demographics
-  pronouns: formData.pronouns,
-  isLGBTQ: formData.isLGBTQ,
-  primaryLanguage: formData.primaryLanguage,
-  mentalHealthConcerns: formData.mentalHealthConcerns,
-  supportNeeded: formData.supportNeeded,
-  ethnoculturalBackground: formData.ethnoculturalBackground,
-  canadaStatus: formData.canadaStatus,
-  dateCameToCanada: formData.dateCameToCanada,
-};
+    console.log('🎯 Prepared profile data for API:', profileData);
 
-      // Save to backend API
-      try {
-        const result = await profileAPI.updateClientProfile(user.id, profileData);
-        
-        if (result.success) {
-          // Save notification settings
-          await settingsApi.saveSettings({
-            notificationsEnabled: formData.notifications,
-            shareWithSupportWorker: formData.shareWithSupportWorker,
-          });
+    // Save to backend API
+    try {
+      const result = await profileAPI.updateClientProfile(user.id, profileData);
+      
+      if (result.success) {
+        // Save notification settings
+        await settingsApi.saveSettings({
+          notificationsEnabled: formData.notifications,
+          shareWithSupportWorker: formData.shareWithSupportWorker,
+        });
 
-          // Save to local storage as backup
-          await saveProfileDataToStorage();
-          await saveCmhaDataToStorage();
-          
-          Alert.alert("Success", "Profile updated successfully!");
-          router.back();
-        } else {
-          throw new Error(result.message);
-        }
-      } catch (apiError) {
-        console.log('API update failed, saving locally:', apiError);
-        // If API fails, save to local storage only
+        // Save to local storage as backup
         await saveProfileDataToStorage();
         await saveCmhaDataToStorage();
-        Alert.alert("Success", "Profile updated locally!");
+        
+        Alert.alert("Success", "Profile updated successfully!");
         router.back();
+      } else {
+        throw new Error(result.message);
       }
-    } catch (error) {
-      console.error('Error in handleSaveChanges:', error);
-      Alert.alert("Error", "Failed to update profile. Please try again.");
-    } finally {
-      setSaving(false);
+    } catch (apiError) {
+      console.log('API update failed, saving locally:', apiError);
+      // If API fails, save to local storage only
+      await saveProfileDataToStorage();
+      await saveCmhaDataToStorage();
+      Alert.alert("Success", "Profile updated locally!");
+      router.back();
     }
-  };
+  } catch (error) {
+    console.error('Error in handleSaveChanges:', error);
+    Alert.alert("Error", "Failed to update profile. Please try again.");
+  } finally {
+    setSaving(false);
+  }
+};
 
   /**
    * Handles tab navigation
