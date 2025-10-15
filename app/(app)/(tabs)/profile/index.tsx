@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -17,6 +18,8 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { syncUserWithDatabase } from '../../../../utils/userSync';
+import { profileApi } from '../../../../utils/profileApi';
+
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 

@@ -1,12 +1,4 @@
-// utils/profileApi.ts
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
-
-const API_BASE_URL = Platform.select({
-  ios: 'http://localhost:3001/api',
-  android: 'http://10.0.2.2:3001/api',
-  default: 'http://localhost:3001/api'
-});
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface ClientProfileData {
   firstName: string;
@@ -25,56 +17,15 @@ export interface ClientProfileData {
   emergencyContactRelationship?: string;
   emergencyContactEmail?: string;
   emergencyContactAddress?: string;
-  location?: string;
-  notifications?: boolean;
-  shareWithSupportWorker?: boolean;
   profileImage?: string;
 }
 
-class ProfileAPI {
-  private baseURL: string;
-
-  constructor() {
-    this.baseURL = API_BASE_URL;
-  }
-
-  async getClerkUserId(): Promise<string> {
+export const profileApi = {
+  async getClientProfile(clerkUserId: string): Promise<ClientProfileData | null> {
     try {
-      // Try multiple ways to get the Clerk user ID
-      
-      // 1. First try from AsyncStorage (your current approach)
-      const authData = await AsyncStorage.getItem('authData');
-      if (authData) {
-        const parsed = JSON.parse(authData);
-        if (parsed.clerkUserId) {
-          return parsed.clerkUserId;
-        }
-      }
-
-      // 2. Try from a different storage key that Clerk might use
-      const clerkStorage = await AsyncStorage.getItem('clerk');
-      if (clerkStorage) {
-        const parsed = JSON.parse(clerkStorage);
-        if (parsed.userId) {
-          return parsed.userId;
-        }
-      }
-
-      // 3. If we can't find it in storage, throw a more specific error
-      throw new Error('Clerk user ID not found in storage. User might not be authenticated.');
-    } catch (error) {
-      console.error('Error getting Clerk user ID:', error);
-      throw new Error('User not authenticated. Please sign in again.');
-    }
-  }
-
-  async getClientProfile(): Promise<ClientProfileData | null> {
-    try {
-      const clerkUserId = await this.getClerkUserId();
-      
       console.log('📋 Fetching profile for user:', clerkUserId);
       
-      const response = await fetch(`${this.baseURL}/client-profile/${clerkUserId}`);
+      const response = await fetch(`${API_BASE_URL}/client-profile/${clerkUserId}`);
       
       console.log('Profile response status:', response.status);
       
@@ -98,15 +49,13 @@ class ProfileAPI {
       console.error('Error fetching client profile:', error);
       return null;
     }
-  }
+  },
 
-  async updateClientProfile(profileData: Partial<ClientProfileData>): Promise<any> {
+  async updateClientProfile(clerkUserId: string, profileData: Partial<ClientProfileData>): Promise<any> {
     try {
-      const clerkUserId = await this.getClerkUserId();
-      
       console.log('🔄 Updating profile for user:', clerkUserId, profileData);
       
-      const response = await fetch(`${this.baseURL}/client-profile/${clerkUserId}`, {
+      const response = await fetch(`${API_BASE_URL}/client-profile/${clerkUserId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -132,46 +81,4 @@ class ProfileAPI {
       throw error;
     }
   }
-
-  async updateProfileImage(imageUri: string): Promise<string> {
-    try {
-      const clerkUserId = await this.getClerkUserId();
-      
-      const response = await fetch(`${this.baseURL}/client-profile/${clerkUserId}/profile-image`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ profileImageUrl: imageUri }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update profile image: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        // Also save locally for offline access
-        await AsyncStorage.setItem('profileImage', imageUri);
-        return result.data.profileImageUrl;
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      console.error('Error updating profile image:', error);
-      throw error;
-    }
-  }
-
-  async getProfileImage(): Promise<string | null> {
-    try {
-      return await AsyncStorage.getItem('profileImage');
-    } catch (error) {
-      console.error('Error getting profile image:', error);
-      return null;
-    }
-  }
-}
-
-export default new ProfileAPI();
+};
