@@ -321,12 +321,15 @@ export default function MessagesScreen() {
         </View>
 
         {/* Search Results Info */}
-        {searchQuery.trim() && (
+        {!!searchQuery.trim() && (
           <View style={styles.searchResultsInfo}>
             <Text style={styles.searchResultsText}>
               {filteredConversations.length === 0 
                 ? "No conversations found" 
-                : `Found ${filteredConversations.length} conversation${filteredConversations.length === 1 ? '' : 's'}`
+                : (() => {
+                    const conversationText = filteredConversations.length === 1 ? '' : 's';
+                    return `Found ${filteredConversations.length} conversation${conversationText}`;
+                  })()
               }
             </Text>
             <TouchableOpacity onPress={clearSearch}>
