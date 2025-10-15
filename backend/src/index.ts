@@ -3539,3 +3539,338 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// =============================================
+// PROFILE ENDPOINTS
+// =============================================
+
+// Interface for profile data
+interface ClientProfileData {
+  // From users table
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  
+  // From clients table (emergency contacts)
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  emergencyContactEmail?: string;
+  emergencyContactAddress?: string;
+  
+  // Additional fields that might be stored locally
+  location?: string;
+  notifications?: boolean;
+  shareWithSupportWorker?: boolean;
+  profileImage?: string;
+}
+
+// Get complete client profile
+app.get("/api/client-profile/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    console.log('📋 Fetching client profile for:', clerkUserId);
+
+    // Get user data
+    const userResult = await pool.query(
+      `SELECT 
+        id, first_name, last_name, email, phone_number, date_of_birth, gender,
+        address, city, state, postal_code, country, profile_image_url,
+        timezone, preferred_language, created_at, updated_at
+       FROM users 
+       WHERE clerk_user_id = $1 AND role = 'client'`,
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Client not found"
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    // Get client-specific data (emergency contacts)
+    const clientResult = await pool.query(
+      `SELECT 
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        emergency_contact_email, emergency_contact_address,
+        secondary_emergency_contact_name, secondary_emergency_contact_phone, secondary_emergency_contact_relationship,
+        guardian_name, guardian_phone, guardian_relationship, legal_status
+       FROM clients 
+       WHERE user_id = $1`,
+      [user.id]
+    );
+
+    const clientData = clientResult.rows[0] || {};
+
+    // Combine the data
+    const profileData: ClientProfileData = {
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      phoneNumber: user.phone_number,
+      dateOfBirth: user.date_of_birth,
+      gender: user.gender,
+      address: user.address,
+      city: user.city,
+      state: user.state,
+      postalCode: user.postal_code,
+      country: user.country,
+      emergencyContactName: clientData.emergency_contact_name,
+      emergencyContactPhone: clientData.emergency_contact_phone,
+      emergencyContactRelationship: clientData.emergency_contact_relationship,
+      emergencyContactEmail: clientData.emergency_contact_email,
+      emergencyContactAddress: clientData.emergency_contact_address,
+      profileImage: user.profile_image_url
+    };
+
+    console.log('✅ Client profile fetched successfully');
+
+    res.json({
+      success: true,
+      data: profileData
+    });
+
+  } catch (error: any) {
+    console.error("❌ Error fetching client profile:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch client profile",
+      error: error.message
+    });
+  }
+});
+
+// Update client profile
+app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { clerkUserId } = req.params;
+    const profileData: Partial<ClientProfileData> = req.body;
+
+    console.log('🔄 Updating client profile for:', clerkUserId, profileData);
+
+    await client.query('BEGIN');
+
+    // 1. Get user ID first
+    const userResult = await client.query(
+      'SELECT id FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // 2. Update users table
+    const updateUserQuery = `
+      UPDATE users 
+      SET 
+        first_name = COALESCE($1, first_name),
+        last_name = COALESCE($2, last_name),
+        email = COALESCE($3, email),
+        phone_number = COALESCE($4, phone_number),
+        date_of_birth = COALESCE($5, date_of_birth),
+        gender = COALESCE($6, gender),
+        address = COALESCE($7, address),
+        city = COALESCE($8, city),
+        state = COALESCE($9, state),
+        postal_code = COALESCE($10, postal_code),
+        country = COALESCE($11, country),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $12
+      RETURNING *
+    `;
+
+    const userUpdateResult = await client.query(updateUserQuery, [
+      profileData.firstName,
+      profileData.lastName,
+      profileData.email,
+      profileData.phoneNumber,
+      profileData.dateOfBirth,
+      profileData.gender,
+      profileData.address,
+      profileData.city,
+      profileData.state,
+      profileData.postalCode,
+      profileData.country,
+      userId
+    ]);
+
+    // 3. Update or insert into clients table (emergency contacts)
+    const upsertClientQuery = `
+      INSERT INTO clients (
+        user_id, 
+        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+        emergency_contact_email, emergency_contact_address
+      ) 
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (user_id) 
+      DO UPDATE SET
+        emergency_contact_name = COALESCE(EXCLUDED.emergency_contact_name, clients.emergency_contact_name),
+        emergency_contact_phone = COALESCE(EXCLUDED.emergency_contact_phone, clients.emergency_contact_phone),
+        emergency_contact_relationship = COALESCE(EXCLUDED.emergency_contact_relationship, clients.emergency_contact_relationship),
+        emergency_contact_email = COALESCE(EXCLUDED.emergency_contact_email, clients.emergency_contact_email),
+        emergency_contact_address = COALESCE(EXCLUDED.emergency_contact_address, clients.emergency_contact_address),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `;
+
+    const clientUpdateResult = await client.query(upsertClientQuery, [
+      userId,
+      profileData.emergencyContactName,
+      profileData.emergencyContactPhone,
+      profileData.emergencyContactRelationship,
+      profileData.emergencyContactEmail,
+      profileData.emergencyContactAddress
+    ]);
+
+    await client.query('COMMIT');
+
+    console.log('✅ Client profile updated successfully');
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: {
+        user: userUpdateResult.rows[0],
+        client: clientUpdateResult.rows[0]
+      }
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error("❌ Error updating client profile:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile",
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Update profile image
+app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { profileImageUrl } = req.body;
+
+    if (!profileImageUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "profileImageUrl is required"
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE users 
+       SET profile_image_url = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $2
+       RETURNING profile_image_url`,
+      [profileImageUrl, clerkUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Profile image updated successfully",
+      data: {
+        profileImageUrl: result.rows[0].profile_image_url
+      }
+    });
+
+  } catch (error: any) {
+    console.error("❌ Error updating profile image:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile image",
+      error: error.message
+    });
+  }
+});
+
+// Simple sync user endpoint (for initial user creation)
+app.post("/api/sync-user", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, email, firstName, lastName, phoneNumber } = req.body;
+
+    console.log('🔄 Syncing user:', { clerkUserId, email, firstName, lastName });
+
+    if (!clerkUserId || !email) {
+      return res.status(400).json({
+        success: false,
+        error: "clerkUserId and email are required",
+      });
+    }
+
+    // Check if user exists
+    const existingUser = await pool.query(
+      'SELECT * FROM users WHERE clerk_user_id = $1',
+      [clerkUserId]
+    );
+
+    let user;
+    
+    if (existingUser.rows.length > 0) {
+      // Update existing user
+      user = await pool.query(
+        `UPDATE users 
+         SET email = $1, first_name = $2, last_name = $3, phone_number = $4, 
+             updated_at = CURRENT_TIMESTAMP
+         WHERE clerk_user_id = $5
+         RETURNING *`,
+        [email, firstName, lastName, phoneNumber, clerkUserId]
+      );
+    } else {
+      // Create new user
+      user = await pool.query(
+        `INSERT INTO users 
+         (clerk_user_id, email, first_name, last_name, phone_number, role, status, email_verified)
+         VALUES ($1, $2, $3, $4, $5, 'client', 'active', true)
+         RETURNING *`,
+        [clerkUserId, email, firstName, lastName, phoneNumber]
+      );
+    }
+
+    console.log('✅ User synced successfully:', user.rows[0].id);
+
+    res.json({
+      success: true,
+      message: "User synced successfully",
+      user: user.rows[0],
+    });
+  } catch (error: any) {
+    console.error("❌ Error syncing user:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: error.message,
+    });
+  }
+});
