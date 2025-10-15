@@ -26,7 +26,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import profileAPI, { ClientProfileData } from "../../../../utils/profileApi";
-import settingsApi from "../../../../utils/settingsApi";
 import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
@@ -50,29 +49,6 @@ const GENDER_OPTIONS = [
   "Prefer not to answer",
 ];
 
-// Gender options from CMHA form
-const mapGenderToDatabase = (frontendGender: string): string => {
-  const genderMap: { [key: string]: string } = {
-    Woman: "female",
-    Man: "male",
-    "Non-Binary": "non_binary",
-    Agender: "other",
-    "Gender-fluid": "other",
-    Genderqueer: "other",
-    "Gender Variant": "other",
-    Intersex: "other",
-    "Non-Conforming": "other",
-    Questioning: "other",
-    "Transgender Man": "male",
-    "Transgender Woman": "female",
-    "Two-Spirit": "other",
-    "I don't identify with any gender": "other",
-    "I do not know": "prefer_not_to_say",
-    "Prefer not to answer": "prefer_not_to_say",
-  };
-
-  return genderMap[frontendGender] || "other";
-};
 // Status in Canada options
 const CANADA_STATUS_OPTIONS = [
   "Canadian Citizen",
@@ -151,6 +127,9 @@ export default function EditProfileScreen() {
   const [showStreetSuggestions, setShowStreetSuggestions] = useState(false);
   const [postalSuggestions, setPostalSuggestions] = useState<any[]>([]);
   const [showPostalSuggestions, setShowPostalSuggestions] = useState(false);
+  const [showCanadaDatePicker, setShowCanadaDatePicker] = useState(false);
+  const [tempCanadaDate, setTempCanadaDate] = useState(new Date());
+  const [canadaDateDisplay, setCanadaDateDisplay] = useState("");
   // Add a ref for debouncing
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -162,7 +141,7 @@ export default function EditProfileScreen() {
     lastName: "",
     email: "",
     phoneNumber: "",
-    dateOfBirth: "",
+    dateOfBirth: "", // This ensures it's always a string, not undefined
     gender: "",
     pronouns: "",
     // Address
@@ -203,6 +182,54 @@ export default function EditProfileScreen() {
   }, [user]);
 
   /**
+   * Opens the Canada date picker and initializes with existing date
+   */
+  const handleCanadaDatePress = () => {
+    if (formData.dateCameToCanada) {
+      let dateToParse: string = formData.dateCameToCanada;
+
+      // Handle both MM/DD/YYYY and YYYY-MM-DD formats
+      let year: string, month: string, day: string;
+
+      if (dateToParse.includes("/")) {
+        // MM/DD/YYYY format
+        const dateParts = dateToParse.split("/");
+        month = dateParts[0] || "1";
+        day = dateParts[1] || "1";
+        year = dateParts[2] || "2020";
+      } else if (dateToParse.includes("-")) {
+        // YYYY-MM-DD format
+        if (dateToParse.includes("T")) {
+          const splitResult = dateToParse.split("T")[0];
+          dateToParse = splitResult || dateToParse;
+        }
+        const dateParts = dateToParse.split("-");
+        year = dateParts[0] || "2020";
+        month = dateParts[1] || "1";
+        day = dateParts[2] || "1";
+      } else {
+        year = "2020";
+        month = "1";
+        day = "1";
+      }
+
+      const parsedDate = new Date(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day)
+      );
+      setTempCanadaDate(parsedDate);
+
+      const displayDate = `${String(parsedDate.getMonth() + 1).padStart(2, "0")}/${String(parsedDate.getDate()).padStart(2, "0")}/${parsedDate.getFullYear()}`;
+      setCanadaDateDisplay(displayDate);
+    } else {
+      setTempCanadaDate(new Date());
+      setCanadaDateDisplay("");
+    }
+    setShowCanadaDatePicker(true);
+  };
+
+  /**
    * Loads profile data from local storage and Clerk
    */
   const loadProfileData = async () => {
@@ -211,7 +238,6 @@ export default function EditProfileScreen() {
     try {
       setLoading(true);
 
-      // Load from Clerk user object first
       setFormData((prev) => ({
         ...prev,
         firstName: user.firstName || "",
@@ -221,24 +247,37 @@ export default function EditProfileScreen() {
       }));
 
       const profileData = await profileAPI.getClientProfile(user.id);
+
+      // Handle Date of Birth
       if (profileData?.dateOfBirth) {
-        const [year, month, day] = profileData.dateOfBirth.split("-");
+        let dateString: string = profileData.dateOfBirth;
+        if (dateString.includes("T")) {
+          const splitResult = dateString.split("T")[0];
+          dateString = splitResult || dateString;
+        }
+
+        const dateParts = dateString.split("-");
+        const year: string = dateParts[0] || "";
+        const month: string = dateParts[1] || "";
+        const day: string = dateParts[2] || "";
         const displayDate = `${month}/${day}/${year}`;
         setDateDisplay(displayDate);
+
+        setFormData((prev) => ({
+          ...prev,
+          dateOfBirth: dateString,
+        }));
       }
 
-      // Set profile image from Clerk if available
       if (user.imageUrl) {
         setProfileImage(user.imageUrl);
       }
 
-      // Load additional data from local storage
       const savedImage = await AsyncStorage.getItem("profileImage");
       if (savedImage) {
         setProfileImage(savedImage);
       }
 
-      // Load saved profile data
       const savedProfileData = await AsyncStorage.getItem("profileData");
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
@@ -252,7 +291,6 @@ export default function EditProfileScreen() {
         }
       }
 
-      // Load CMHA specific data
       const savedCmhaData = await AsyncStorage.getItem("cmhaProfileData");
       if (savedCmhaData) {
         const cmhaData = JSON.parse(savedCmhaData);
@@ -262,7 +300,6 @@ export default function EditProfileScreen() {
         }));
       }
 
-      // Fetch from backend API if available
       try {
         const profileData = await profileAPI.getClientProfile(user.id);
 
@@ -270,32 +307,74 @@ export default function EditProfileScreen() {
           setFormData((prev) => ({
             ...prev,
             firstName:
-              profileData.firstName || user.firstName || prev.firstName,
-            lastName: profileData.lastName || user.lastName || prev.lastName,
+              profileData.firstName || user.firstName || prev.firstName || "",
+            lastName:
+              profileData.lastName || user.lastName || prev.lastName || "",
             email:
               profileData.email ||
               user.emailAddresses[0]?.emailAddress ||
-              prev.email,
-            phoneNumber: profileData.phoneNumber || prev.phoneNumber,
-            location: profileData.city || prev.location, // Note: using city as location
-            dateOfBirth: profileData.dateOfBirth || prev.dateOfBirth,
-            gender: profileData.gender || prev.gender,
-            streetAddress: profileData.address || prev.streetAddress,
-            postalCode: profileData.postalCode || prev.postalCode,
+              prev.email ||
+              "",
+            phoneNumber: profileData.phoneNumber || prev.phoneNumber || "",
+            location: profileData.city || prev.location || "",
+            dateOfBirth: profileData.dateOfBirth || prev.dateOfBirth || "",
+            gender: profileData.gender || prev.gender || "",
+            streetAddress: profileData.address || prev.streetAddress || "",
+            postalCode: profileData.postalCode || prev.postalCode || "",
             emergencyContactName:
-              profileData.emergencyContactName || prev.emergencyContactName,
+              profileData.emergencyContactName ||
+              prev.emergencyContactName ||
+              "",
             emergencyContactPhone:
-              profileData.emergencyContactPhone || prev.emergencyContactPhone,
+              profileData.emergencyContactPhone ||
+              prev.emergencyContactPhone ||
+              "",
             emergencyContactRelationship:
               profileData.emergencyContactRelationship ||
-              prev.emergencyContactRelationship,
+              prev.emergencyContactRelationship ||
+              "",
+            pronouns: profileData.pronouns || prev.pronouns || "",
+            isLGBTQ: profileData.isLGBTQ || prev.isLGBTQ || "",
+            primaryLanguage:
+              profileData.primaryLanguage || prev.primaryLanguage || "",
+            mentalHealthConcerns:
+              profileData.mentalHealthConcerns ||
+              prev.mentalHealthConcerns ||
+              "",
+            supportNeeded:
+              profileData.supportNeeded || prev.supportNeeded || "",
+            ethnoculturalBackground:
+              profileData.ethnoculturalBackground ||
+              prev.ethnoculturalBackground ||
+              "",
+            canadaStatus: profileData.canadaStatus || prev.canadaStatus || "",
+            dateCameToCanada:
+              profileData.dateCameToCanada || prev.dateCameToCanada || "",
           }));
 
           if (profileData.city) {
             setLocationQuery(profileData.city);
           }
 
-          // Set profile image from backend if available
+          // ✅ Handle Date Came to Canada display
+          if (profileData.dateCameToCanada) {
+            let dateString: string = profileData.dateCameToCanada;
+            if (dateString.includes("T")) {
+              const splitResult = dateString.split("T")[0];
+              dateString = splitResult || dateString;
+            }
+
+            const dateParts = dateString.split("-");
+            const year: string = dateParts[0] || "";
+            const month: string = dateParts[1] || "";
+            const day: string = dateParts[2] || "";
+
+            if (year && month && day) {
+              const displayDate = `${month}/${day}/${year}`;
+              setCanadaDateDisplay(displayDate);
+            }
+          }
+
           if (profileData.profileImage) {
             setProfileImage(profileData.profileImage);
           }
@@ -309,6 +388,50 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Handles Canada date selection changes
+   */
+  const handleCanadaDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowCanadaDatePicker(false);
+    }
+
+    if (selectedDate) {
+      if (Platform.OS === "android") {
+        // For Android, confirm immediately
+        const year = selectedDate.getUTCFullYear();
+        const month = String(selectedDate.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(selectedDate.getUTCDate()).padStart(2, "0");
+        const formattedDate = `${year}-${month}-${day}`;
+        const displayDate = `${month}/${day}/${year}`;
+
+        setFormData({ ...formData, dateCameToCanada: formattedDate });
+        setCanadaDateDisplay(displayDate);
+      } else {
+        // For iOS, just update tempDate
+        setTempCanadaDate(selectedDate);
+      }
+    }
+  };
+
+  /**
+   * Confirms the Canada date selection (iOS only)
+   */
+  const handleCanadaDateConfirm = () => {
+    const year = tempCanadaDate.getFullYear();
+    const month = String(tempCanadaDate.getMonth() + 1).padStart(2, "0");
+    const day = String(tempCanadaDate.getDate()).padStart(2, "0");
+    const formattedDate = `${year}-${month}-${day}`;
+    const displayDate = `${month}/${day}/${year}`;
+
+    setFormData({
+      ...formData,
+      dateCameToCanada: formattedDate,
+    });
+    setCanadaDateDisplay(displayDate);
+    setShowCanadaDatePicker(false);
   };
 
   // Address search functions
@@ -348,31 +471,45 @@ export default function EditProfileScreen() {
     }
   };
 
-  // Date handling functions
+  /**
+   * Opens the date picker modal and initializes the temporary date state
+   * with the current date of birth from the form, handling both ISO and YYYY-MM-DD formats.
+   */
   const handleDatePress = () => {
     if (formData.dateOfBirth) {
-      // Parse the stored date (YYYY-MM-DD format) correctly
-      const [year, month, day] = formData.dateOfBirth.split("-");
-      // Create date in UTC to avoid timezone issues
-      const utcDate = new Date(
-        Date.UTC(
-          parseInt(year ?? "0"),
-          parseInt(month ?? "1") - 1,
-          parseInt(day ?? "1")
-        )
+      let dateToParse: string = formData.dateOfBirth;
+
+      if (dateToParse.includes("T")) {
+        const splitResult = dateToParse.split("T")[0];
+        dateToParse = splitResult || dateToParse;
+      }
+
+      const dateParts = dateToParse.split("-");
+      const year: string = dateParts[0] || "0";
+      const month: string = dateParts[1] || "1";
+      const day: string = dateParts[2] || "1";
+
+      const parsedDate = new Date(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day)
       );
-      setTempDate(utcDate);
+      setTempDate(parsedDate);
+
+      const displayDate = `${String(parsedDate.getMonth() + 1).padStart(2, "0")}/${String(parsedDate.getDate()).padStart(2, "0")}/${parsedDate.getFullYear()}`;
+      setDateDisplay(displayDate);
     } else {
       setTempDate(new Date());
+      setDateDisplay("");
     }
     setShowDatePicker(true);
   };
 
   const handleDateConfirm = () => {
-    // Use UTC methods to avoid timezone issues
-    const year = tempDate.getUTCFullYear();
-    const month = String(tempDate.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(tempDate.getUTCDate()).padStart(2, "0");
+    // Format date as YYYY-MM-DD for database (without timezone)
+    const year = tempDate.getFullYear();
+    const month = String(tempDate.getMonth() + 1).padStart(2, "0");
+    const day = String(tempDate.getDate()).padStart(2, "0");
     const formattedDate = `${year}-${month}-${day}`;
 
     // Format for display as MM/DD/YYYY
@@ -570,14 +707,14 @@ export default function EditProfileScreen() {
 
       // Prepare data for backend API - FIXED VERSION
       const profileData: Partial<ClientProfileData> = {
-        firstName: formData.firstName?.trim() || "",
-        lastName: formData.lastName?.trim() || "",
-        email: formData.email?.trim() || "",
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
         phoneNumber: formData.phoneNumber?.trim() || undefined,
         dateOfBirth: formData.dateOfBirth?.trim() || undefined,
         gender: formData.gender?.trim() || undefined,
         address: formData.streetAddress?.trim() || undefined,
-        city: formData.location?.trim() || undefined, // Make sure this matches your backend expectation
+        city: formData.location?.trim() || undefined,
         postalCode: formData.postalCode?.trim() || undefined,
         country: "Canada",
         emergencyContactName:
@@ -610,12 +747,6 @@ export default function EditProfileScreen() {
         );
 
         if (result.success) {
-          // Save notification settings
-          await settingsApi.saveSettings({
-            notificationsEnabled: formData.notifications,
-            shareWithSupportWorker: formData.shareWithSupportWorker,
-          });
-
           // Save to local storage as backup
           await saveProfileDataToStorage();
           await saveCmhaDataToStorage();
@@ -672,7 +803,9 @@ export default function EditProfileScreen() {
    * Returns full name for display
    */
   const getFullName = () => {
-    return `${formData.firstName} ${formData.lastName}`.trim() || "User";
+    const firstName = formData.firstName || "";
+    const lastName = formData.lastName || "";
+    return `${firstName} ${lastName}`.trim() || "User";
   };
 
   /**
@@ -932,8 +1065,6 @@ export default function EditProfileScreen() {
                           maximumDate={new Date()}
                           style={styles.datePicker}
                         />
-
-                        {/* REMOVED the cancel/confirm buttons - iOS native behavior */}
                       </View>
                     </View>
                   </Modal>
@@ -947,21 +1078,6 @@ export default function EditProfileScreen() {
                     maximumDate={new Date()}
                   />
                 ))}
-            </View>
-
-            <View style={styles.datePickerActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowDatePicker(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleDateConfirm}
-              >
-                <Text style={styles.confirmButtonText}>Confirm</Text>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -1413,22 +1529,74 @@ export default function EditProfileScreen() {
             ) && (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Date Came to Canada</Text>
-                <View style={styles.inputContainer}>
+                <TouchableOpacity
+                  style={styles.inputContainer}
+                  onPress={handleCanadaDatePress}
+                >
                   <Ionicons
                     name="calendar-outline"
                     size={20}
                     color="#666"
                     style={styles.inputIcon}
                   />
-                  <TextInput
-                    style={styles.input}
-                    value={formData.dateCameToCanada}
-                    onChangeText={(text) =>
-                      setFormData({ ...formData, dateCameToCanada: text })
-                    }
-                    placeholder="MM/DD/YYYY"
-                  />
-                </View>
+                  <Text
+                    style={[
+                      styles.input,
+                      !canadaDateDisplay && styles.placeholderText,
+                    ]}
+                  >
+                    {canadaDateDisplay || "Tap to select date"}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Canada Date Picker */}
+                {showCanadaDatePicker &&
+                  (Platform.OS === "ios" ? (
+                    <Modal
+                      visible={showCanadaDatePicker}
+                      transparent={true}
+                      animationType="slide"
+                      onRequestClose={() => setShowCanadaDatePicker(false)}
+                    >
+                      <View style={styles.modalContainer}>
+                        <View style={styles.datePickerContainer}>
+                          <View style={styles.datePickerHeader}>
+                            <Text style={styles.datePickerTitle}>
+                              Select Date Came to Canada
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => setShowCanadaDatePicker(false)}
+                              hitSlop={{
+                                top: 10,
+                                bottom: 10,
+                                left: 10,
+                                right: 10,
+                              }}
+                            >
+                              <Ionicons name="close" size={24} color="#666" />
+                            </TouchableOpacity>
+                          </View>
+
+                          <DateTimePicker
+                            value={tempCanadaDate}
+                            mode="date"
+                            display="spinner"
+                            onChange={handleCanadaDateChange}
+                            maximumDate={new Date()}
+                            style={styles.datePicker}
+                          />
+                        </View>
+                      </View>
+                    </Modal>
+                  ) : (
+                    <DateTimePicker
+                      value={tempCanadaDate}
+                      mode="date"
+                      display="default"
+                      onChange={handleCanadaDateChange}
+                      maximumDate={new Date()}
+                    />
+                  ))}
               </View>
             )}
           </View>
