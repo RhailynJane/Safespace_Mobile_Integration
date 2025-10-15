@@ -83,24 +83,136 @@ type ViewType = "newsfeed" | "my-posts";
  * Main community forum component with dual-view functionality
  * Handles newsfeed browsing and personal post management
  */
-export default function CommunityMainScreen() {
-  // State management for UI and data
-  const [selectedCategory, setSelectedCategory] = useState("Trending"); // Currently selected category filter
-  const [activeView, setActiveView] = useState<ViewType>("newsfeed"); // Active view mode
-  const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set()); // Track user's bookmarked posts
-  const [sideMenuVisible, setSideMenuVisible] = useState(false); // Side navigation menu visibility
-  const [posts, setPosts] = useState<any[]>([]); // Community posts data
-  const [myPosts, setMyPosts] = useState<any[]>([]); // User's personal posts including drafts
-  const [loading, setLoading] = useState(true); // Main loading state
-  const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh state
-  const [categories, setCategories] = useState<any[]>([]); // Available categories from API
-  const fadeAnim = useRef(new Animated.Value(0)).current; // Animation for side menu
-  const [isSigningOut, setIsSigningOut] = useState(false); // Sign-out process state
+function useCommunityMainScreenState() {
+  const [selectedCategory, setSelectedCategory] = useState("Trending");
+  const [activeView, setActiveView] = useState<ViewType>("newsfeed");
+  const [activeTab, setActiveTab] = useState("community-forum");
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // Authentication and user context
+  return {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+  };
+}
+
+function CommunityMainScreenLogic() {
+  const {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+  } = useCommunityMainScreenState();
+
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  return {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+    signOut,
+    isSignedIn,
+    user,
+  };
+}
+
+export default function CommunityMainScreen() {
+  const {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+    signOut,
+    isSignedIn,
+    user,
+  } = CommunityMainScreenLogic();
 
   /**
    * Load initial data when component mounts
@@ -391,21 +503,23 @@ export default function CommunityMainScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await communityApi.deletePost(postId);
-              Alert.alert("Success", "Post deleted successfully!");
+          onPress: () => {
+            (async () => {
+              try {
+                await communityApi.deletePost(postId);
+                Alert.alert("Success", "Post deleted successfully!");
 
-              // Update the UI immediately for better UX
-              if (activeView === "my-posts") {
-                setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-              } else {
-                setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+                // Update the UI immediately for better UX
+                if (activeView === "my-posts") {
+                  setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+                } else {
+                  setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+                }
+              } catch (error) {
+                console.error("Error deleting post:", error);
+                Alert.alert("Error", "Failed to delete post");
               }
-            } catch (error) {
-              console.error("Error deleting post:", error);
-              Alert.alert("Error", "Failed to delete post");
-            }
+            })();
           },
         },
       ]
@@ -464,7 +578,7 @@ export default function CommunityMainScreen() {
   const confirmSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+      { text: "Sign Out", style: "destructive", onPress: () => { handleLogout(); } },
     ]);
   };
 
@@ -977,7 +1091,7 @@ export default function CommunityMainScreen() {
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
                 <TouchableOpacity
-                  key={index}
+                  key={item.title}
                   style={[
                     styles.sideMenuItem,
                     item.disabled && styles.sideMenuItemDisabled,
