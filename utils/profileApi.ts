@@ -1,5 +1,6 @@
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
+// utils/profileApi.ts
 export interface ClientProfileData {
   firstName: string;
   lastName: string;
@@ -15,8 +16,17 @@ export interface ClientProfileData {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelationship?: string;
-  emergencyContactEmail?: string;
-  emergencyContactAddress?: string;
+  
+  // CMHA Demographics fields
+  pronouns?: string;
+  isLGBTQ?: string;
+  primaryLanguage?: string;
+  mentalHealthConcerns?: string;
+  supportNeeded?: string;
+  ethnoculturalBackground?: string;
+  canadaStatus?: string;
+  dateCameToCanada?: string;
+  
   profileImage?: string;
 }
 
