@@ -751,6 +751,33 @@ export default function EditProfileScreen() {
           await saveProfileDataToStorage();
           await saveCmhaDataToStorage();
 
+          try {
+            const currentProfileData =
+              await AsyncStorage.getItem("profileData");
+            const parsedProfileData = currentProfileData
+              ? JSON.parse(currentProfileData)
+              : {};
+
+            const updatedProfileData = {
+              ...parsedProfileData,
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              email: formData.email,
+              phoneNumber: formData.phoneNumber,
+              location: formData.location,
+              profileImageUrl: profileImage, // ✅ Include the image URL
+            };
+
+            await AsyncStorage.setItem(
+              "profileData",
+              JSON.stringify(updatedProfileData)
+            );
+            console.log("✅ Updated profileData in AsyncStorage");
+          } catch (syncError) {
+            console.error("Error syncing profileData:", syncError);
+          }
+          // ✅ END OF NEW CODE
+
           Alert.alert("Success", "Profile updated successfully!");
           router.back();
         } else {
@@ -761,6 +788,35 @@ export default function EditProfileScreen() {
         // If API fails, save to local storage only
         await saveProfileDataToStorage();
         await saveCmhaDataToStorage();
+
+        try {
+          const currentProfileData = await AsyncStorage.getItem("profileData");
+          const parsedProfileData = currentProfileData
+            ? JSON.parse(currentProfileData)
+            : {};
+
+          const updatedProfileData = {
+            ...parsedProfileData,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phoneNumber: formData.phoneNumber,
+            location: formData.location,
+            profileImageUrl: profileImage,
+          };
+
+          await AsyncStorage.setItem(
+            "profileData",
+            JSON.stringify(updatedProfileData)
+          );
+          console.log(
+            "✅ Updated profileData in AsyncStorage (local fallback)"
+          );
+        } catch (syncError) {
+          console.error("Error syncing profileData:", syncError);
+        }
+        // ✅ END OF NEW CODE
+
         Alert.alert("Success", "Profile updated locally!");
         router.back();
       }

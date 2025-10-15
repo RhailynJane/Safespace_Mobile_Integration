@@ -18,7 +18,6 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { syncUserWithDatabase } from '../../../../utils/userSync';
-import { profileApi } from '../../../../utils/profileApi';
 
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -104,79 +103,96 @@ export default function ProfileScreen() {
 
   // Fetch profile data from backend
   const fetchProfileData = useCallback(async () => {
-    if (!user?.id) {
-      console.log('❌ No user available');
-      setLoading(false);
-      return;
-    }
+  if (!user?.id) {
+    console.log('❌ No user available');
+    setLoading(false);
+    return;
+  }
 
+  try {
+    setLoading(true);
+    console.log('📋 Starting profile data fetch...');
+    
+    // First try to sync user (but don't block if it fails)
+    const syncSuccess = await syncUserWithBackend();
+    console.log('Sync success:', syncSuccess);
+    
+    // ✅ Load profile image from AsyncStorage FIRST (highest priority)
+    let localProfileImage: string | undefined;
     try {
-      setLoading(true);
-      console.log('📋 Starting profile data fetch...');
+      const savedImage = await AsyncStorage.getItem('profileImage');
+      if (savedImage) {
+        localProfileImage = savedImage;
+        console.log('📸 Found local profile image');
+      }
+    } catch (storageError) {
+      console.error('Error loading profile image from storage:', storageError);
+    }
+    
+    // Try to load from backend API using direct function call
+    try {
+      const backendProfile = await fetchClientProfile(user.id);
+      console.log('Backend profile data:', backendProfile);
       
-      // First try to sync user (but don't block if it fails)
-      const syncSuccess = await syncUserWithBackend();
-      console.log('Sync success:', syncSuccess);
-      
-      // Try to load from backend API using direct function call
-      try {
-        const backendProfile = await fetchClientProfile(user.id);
-        console.log('Backend profile data:', backendProfile);
-        
-        if (backendProfile) {
-          setProfileData(prev => ({
-            ...prev,
-            firstName: backendProfile.firstName || user.firstName || "User",
-            lastName: backendProfile.lastName || user.lastName || "",
-            email: backendProfile.email || user.emailAddresses[0]?.emailAddress || "",
-            phoneNumber: backendProfile.phoneNumber || user.phoneNumbers[0]?.phoneNumber,
-            profileImageUrl: backendProfile.profileImage || user.imageUrl || prev.profileImageUrl,
-          }));
-        } else {
-          // Fallback to Clerk data
-          console.log('Using Clerk data as fallback');
-          setProfileData(prev => ({
-            ...prev,
-            firstName: user.firstName || prev.firstName || "User",
-            lastName: user.lastName || prev.lastName || "",
-            email: user.emailAddresses[0]?.emailAddress || prev.email || "",
-            phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
-            profileImageUrl: user.imageUrl || prev.profileImageUrl,
-          }));
-        }
-      } catch (apiError) {
-        console.error('❌ API error, using Clerk data:', apiError);
-        // Use Clerk data as final fallback
+      if (backendProfile) {
+        setProfileData(prev => ({
+          ...prev,
+          firstName: backendProfile.firstName || user.firstName || "User",
+          lastName: backendProfile.lastName || user.lastName || "",
+          email: backendProfile.email || user.emailAddresses[0]?.emailAddress || "",
+          phoneNumber: backendProfile.phoneNumber || user.phoneNumbers[0]?.phoneNumber,
+          // ✅ Priority: Local > Backend > Clerk
+          profileImageUrl: localProfileImage || backendProfile.profileImage || user.imageUrl || prev.profileImageUrl,
+        }));
+      } else {
+        // Fallback to Clerk data
+        console.log('Using Clerk data as fallback');
         setProfileData(prev => ({
           ...prev,
           firstName: user.firstName || prev.firstName || "User",
           lastName: user.lastName || prev.lastName || "",
           email: user.emailAddresses[0]?.emailAddress || prev.email || "",
           phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
-          profileImageUrl: user.imageUrl || prev.profileImageUrl,
+          // ✅ Priority: Local > Clerk
+          profileImageUrl: localProfileImage || user.imageUrl || prev.profileImageUrl,
         }));
       }
-
-      // Load local storage data
-      try {
-        const savedProfileData = await AsyncStorage.getItem('profileData');
-        if (savedProfileData) {
-          const parsedData = JSON.parse(savedProfileData);
-          setProfileData(prev => ({
-            ...prev,
-            ...parsedData
-          }));
-        }
-      } catch (storageError) {
-        console.error('Error loading local storage:', storageError);
-      }
-
-    } catch (error) {
-      console.error('❌ Error in fetchProfileData:', error);
-    } finally {
-      setLoading(false);
+    } catch (apiError) {
+      console.error('❌ API error, using Clerk data:', apiError);
+      // Use Clerk data as final fallback
+      setProfileData(prev => ({
+        ...prev,
+        firstName: user.firstName || prev.firstName || "User",
+        lastName: user.lastName || prev.lastName || "",
+        email: user.emailAddresses[0]?.emailAddress || prev.email || "",
+        phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
+        // ✅ Priority: Local > Clerk
+        profileImageUrl: localProfileImage || user.imageUrl || prev.profileImageUrl,
+      }));
     }
-  }, [user]);
+
+    // Load local storage data for other fields
+    try {
+      const savedProfileData = await AsyncStorage.getItem('profileData');
+      if (savedProfileData) {
+        const parsedData = JSON.parse(savedProfileData);
+        setProfileData(prev => ({
+          ...prev,
+          ...parsedData,
+          // ✅ Keep the profile image we already set (don't overwrite)
+          profileImageUrl: prev.profileImageUrl,
+        }));
+      }
+    } catch (storageError) {
+      console.error('Error loading local storage:', storageError);
+    }
+
+  } catch (error) {
+    console.error('❌ Error in fetchProfileData:', error);
+  } finally {
+    setLoading(false);
+  }
+}, [user]);
 
   useEffect(() => {
     fetchProfileData();
