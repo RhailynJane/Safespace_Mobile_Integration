@@ -21,7 +21,6 @@ import { useAuth } from "@clerk/clerk-expo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { Message, Participant } from "../../../../utils/sendbirdService";
 
@@ -259,7 +258,7 @@ export default function ChatScreen() {
       setAttachmentModalVisible(false);
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -284,7 +283,7 @@ export default function ChatScreen() {
         copyToCacheDirectory: true,
       });
 
-      if (result.assets && result.assets[0]) {
+      if (result.assets?.[0]) {
         const asset = result.assets[0];
         await uploadAttachment(asset.uri, "file", asset.name);
       }
@@ -503,58 +502,61 @@ export default function ChatScreen() {
   };
 
   // Render message content based on type
-  const renderMessageContent = (message: ExtendedMessage) => {
-    if (message.message_type === "image" && message.attachment_url) {
-      return (
-        <TouchableOpacity
-          style={styles.imageAttachment}
-          onPress={() => {
-            // You can implement a full-screen image viewer here
-            Alert.alert("Image", "Tap to view image in full screen");
-          }}
-        >
-          <Image
-            source={{ uri: message.attachment_url }}
-            style={styles.attachmentImage}
-            resizeMode="cover"
+  // Render message content based on type with view/download options
+const renderMessageContent = (message: ExtendedMessage) => {
+  if (message.message_type === 'image' && message.attachment_url) {
+    return (
+      <TouchableOpacity 
+        style={styles.imageAttachment}
+        onPress={() => handleViewAttachment(message)}
+      >
+        <Image 
+          source={{ uri: message.attachment_url }} 
+          style={styles.attachmentImage}
+          resizeMode="cover"
+        />
+        <View style={styles.imageOverlay}>
+          <Ionicons name="expand" size={20} color="#FFFFFF" />
+          <Text style={styles.imageText}>Tap to view</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  if (message.message_type === 'file' && message.attachment_url) {
+    return (
+      <TouchableOpacity 
+        style={styles.fileAttachment}
+        onPress={() => handleViewAttachment(message)}
+      >
+        <View style={styles.fileIconContainer}>
+          <Ionicons 
+            name={getFileIcon(message.file_name)} 
+            size={24} 
+            color="#4CAF50" 
           />
-          <View style={styles.imageOverlay}>
-            <Ionicons name="image" size={20} color="#FFFFFF" />
-            <Text style={styles.imageText}>Image</Text>
-          </View>
-        </TouchableOpacity>
-      );
-    }
-
-    if (message.message_type === "file" && message.attachment_url) {
-      return (
-        <TouchableOpacity
-          style={styles.fileAttachment}
-          onPress={() => {
-            // Handle file download/view
-            Alert.alert("File", `Download ${message.file_name || "file"}`);
-          }}
-        >
-          <View style={styles.fileIconContainer}>
-            <Ionicons name="document" size={24} color="#4CAF50" />
-          </View>
-          <View style={styles.fileInfo}>
-            <Text style={styles.fileName} numberOfLines={1}>
-              {message.file_name || "Download file"}
+        </View>
+        <View style={styles.fileInfo}>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {message.file_name || 'Download file'}
+          </Text>
+          {message.file_size && (
+            <Text style={styles.fileSize}>
+              {formatFileSize(message.file_size)}
             </Text>
-            {message.file_size && (
-              <Text style={styles.fileSize}>
-                {formatFileSize(message.file_size)}
-              </Text>
-            )}
-          </View>
-          <Ionicons name="download" size={20} color="#666" />
-        </TouchableOpacity>
-      );
-    }
+          )}
+        </View>
+        <Ionicons name="download-outline" size={20} color="#666" />
+      </TouchableOpacity>
+    );
+  }
 
-    return <Text style={styles.messageText}>{message.message_text}</Text>;
-  };
+  return (
+    <Text style={styles.messageText}>
+      {message.message_text}
+    </Text>
+  );
+};
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
