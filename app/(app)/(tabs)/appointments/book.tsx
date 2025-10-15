@@ -15,6 +15,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -23,7 +24,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Alert } from "react-native";
 
 /**
  * BookAppointment Component
@@ -128,7 +128,7 @@ export default function BookAppointment() {
   const confirmSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+      { text: "Sign Out", style: "destructive", onPress: () => { handleLogout(); } },
     ]);
   };
 
@@ -342,8 +342,8 @@ export default function BookAppointment() {
 
               {/* Support Worker Specialties */}
               <View style={styles.specialtiesContainer}>
-                {supportWorker.specialties.map((specialty, index) => (
-                  <Text key={index} style={styles.specialtyText}>
+                {supportWorker.specialties.map((specialty) => (
+                  <Text key={specialty} style={styles.specialtyText}>
                     {specialty}
                   </Text>
                 ))}
@@ -375,7 +375,7 @@ export default function BookAppointment() {
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
                   <TouchableOpacity
-                    key={index}
+                    key={item.title}
                     style={[
                       styles.sideMenuItem,
                       item.disabled && styles.sideMenuItemDisabled,

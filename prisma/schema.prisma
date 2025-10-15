@@ -1,0 +1,506 @@
+// schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// ENUMS
+// =============================================
+enum UserRole {
+  admin
+  team_leader
+  support_worker
+  client
+  family_member
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+  pending
+}
+
+enum Gender {
+  male
+  female
+  other
+  prefer_not_to_say
+  non_binary
+}
+
+enum AssessmentType {
+  pre_survey
+  post_survey
+  periodic_check
+}
+
+enum MoodType {
+  very_happy
+  happy
+  neutral
+  sad
+  very_sad
+}
+
+enum ConversationType {
+  direct
+  group
+}
+
+enum MessageType {
+  text
+  image
+  file
+  system
+}
+
+enum EmotionType {
+  very_sad
+  sad
+  neutral
+  happy
+  very_happy
+}
+
+enum ResourceType {
+  Affirmation
+  Quote
+  Article
+  Exercise
+  Guide
+}
+
+enum LegalStatus {
+  independent
+  guardianship
+  co_decision_making
+}
+
+// =============================================
+// MODELS
+// =============================================
+model User {
+  id                      Int           @id @default(autoincrement())
+  clerk_user_id           String        @unique
+  first_name              String
+  last_name               String
+  email                   String        @unique
+  phone_number            String?
+  date_of_birth          DateTime?
+  age                     Int?
+  gender                  Gender?
+  profile_image_url       String?
+  last_active_at          DateTime?
+  address                 String?
+  city                    String?
+  state                   String?
+  postal_code             String?
+  country                 String?       @default("Canada")
+  role                    UserRole      @default(client)
+  status                  UserStatus    @default(active)
+  password_hash           String?
+  email_verified          Boolean       @default(true)
+  phone_verified          Boolean       @default(false)
+  preferred_language      String?       @default("en")
+  timezone                String?       @default("America/Edmonton")
+  notification_preferences Json?
+  last_login              DateTime?
+  email_verified_at       DateTime?
+  phone_verified_at       DateTime?
+  created_at              DateTime      @default(now())
+  updated_at              DateTime      @default(now()) @updatedAt
+
+  // Relations
+  clients                   Client[]
+  assessments               Assessment[]
+  mood_entries              MoodEntry[]
+  journal_entries           JournalEntry[]
+  conversation_participants ConversationParticipant[]
+  messages                  Message[]
+  message_read_status       MessageReadStatus[]
+  client_profiles           ClientProfile[]
+  accessibility_settings    AccessibilitySetting[]
+  security_settings         SecuritySetting[]
+  notification_settings     NotificationSetting[]
+  wellbeing_settings        WellbeingSetting[]
+  bookmarks                 Bookmark[]
+  created_conversations     Conversation[]           @relation("ConversationCreator")
+  assigned_assessments      Assessment[]             @relation("AssignedWorker")
+
+  @@map("users")
+}
+
+model Client {
+  id                                  Int       @id @default(autoincrement())
+  user_id                             Int       @unique
+  emergency_contact_name              String?
+  emergency_contact_phone             String?
+  emergency_contact_relationship      String?
+  emergency_contact_email             String?
+  emergency_contact_address           String?
+  secondary_emergency_contact_name    String?
+  secondary_emergency_contact_phone   String?
+  secondary_emergency_contact_relationship String?
+  guardian_name                       String?
+  guardian_phone                      String?
+  guardian_relationship               String?
+  legal_status                        LegalStatus?
+  created_at                          DateTime  @default(now())
+  updated_at                          DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("clients")
+}
+
+model Assessment {
+  id                    Int       @id @default(autoincrement())
+  user_id               Int
+  assessment_type       AssessmentType @default(pre_survey)
+  responses             Json
+  total_score           Int?
+  completed_at          DateTime  @default(now())
+  submitted_to_worker   Boolean?  @default(false)
+  reviewed_by_worker    Boolean?  @default(false)
+  assigned_worker_id    Int?
+  next_due_date         DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  // Relations
+  user              User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  assigned_worker   User?  @relation("AssignedWorker", fields: [assigned_worker_id], references: [id])
+
+  @@map("assessments")
+}
+
+model MoodEntry {
+  id                      Int       @id @default(autoincrement())
+  user_id                 Int
+  clerk_user_id           String
+  mood_type               MoodType
+  intensity               Int       // 1-5 scale
+  notes                   String?
+  share_with_support_worker Boolean  @default(false)
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  // Relations
+  user    User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  factors MoodFactor[]
+
+  @@map("mood_entries")
+}
+
+model MoodFactor {
+  id           Int      @id @default(autoincrement())
+  mood_entry_id Int
+  factor       String
+  created_at   DateTime @default(now())
+
+  // Relations
+  mood_entry MoodEntry @relation(fields: [mood_entry_id], references: [id], onDelete: Cascade)
+
+  @@map("mood_factors")
+}
+
+model JournalTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  prompts     Json
+  icon        String?
+  created_at  DateTime @default(now())
+
+  // Relations
+  journal_entries JournalEntry[]
+
+  @@map("journal_templates")
+}
+
+model JournalEntry {
+  id                      Int       @id @default(autoincrement())
+  user_id                 Int
+  clerk_user_id           String
+  title                   String
+  content                 String
+  emotion_type            EmotionType?
+  emoji                   String?
+  template_id             Int?
+  share_with_support_worker Boolean  @default(false)
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  // Relations
+  user     User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  template JournalTemplate? @relation(fields: [template_id], references: [id], onDelete: SetNull)
+  tags     JournalTag[]
+
+  @@map("journal_entries")
+}
+
+model JournalTag {
+  id               Int      @id @default(autoincrement())
+  journal_entry_id Int
+  tag              String
+  created_at       DateTime @default(now())
+
+  // Relations
+  journal_entry JournalEntry @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade)
+
+  @@map("journal_tags")
+}
+
+model Conversation {
+  id                Int       @id @default(autoincrement())
+  title             String?
+  conversation_type ConversationType @default(direct)
+  created_by        Int?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  // Relations
+  creator      User?                     @relation("ConversationCreator", fields: [created_by], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id              Int    @id @default(autoincrement())
+  conversation_id Int
+  user_id         Int
+  role            String? @default("member")
+  joined_at       DateTime @default(now())
+  left_at         DateTime?
+
+  // Relations
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([conversation_id, user_id])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id              Int       @id @default(autoincrement())
+  conversation_id Int
+  sender_id       Int
+  message_text    String
+  message_type    MessageType? @default(text)
+  metadata        Json?     @default("{}")
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  read_at         DateTime?
+
+  // Relations
+  conversation Conversation      @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender       User             @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+  read_status  MessageReadStatus[]
+
+  @@map("messages")
+}
+
+model MessageReadStatus {
+  id         Int      @id @default(autoincrement())
+  message_id Int
+  user_id    Int
+  read_at    DateTime @default(now())
+
+  // Relations
+  message Message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([message_id, user_id])
+  @@map("message_read_status")
+}
+
+model CommunityCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  icon_url    String?
+  created_at  DateTime @default(now())
+
+  // Relations
+  posts CommunityPost[]
+
+  @@map("community_categories")
+}
+
+model CommunityPost {
+  id            Int      @id @default(autoincrement())
+  title         String
+  content       String
+  category_id   Int?
+  author_id     String?
+  author_name   String?
+  is_private    Boolean? @default(false)
+  is_draft      Boolean? @default(false)
+  reaction_count Int?    @default(0)
+  comment_count Int?     @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Relations
+  category      CommunityCategory? @relation(fields: [category_id], references: [id])
+  reactions     PostReaction[]
+  bookmarks     PostBookmark[]
+
+  @@map("community_posts")
+}
+
+model PostReaction {
+  id        Int      @id @default(autoincrement())
+  post_id   Int
+  user_id   String?
+  emoji     String
+  created_at DateTime @default(now())
+
+  // Relations
+  post CommunityPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, user_id, emoji])
+  @@map("post_reactions")
+}
+
+model PostBookmark {
+  id        Int      @id @default(autoincrement())
+  post_id   Int
+  user_id   String?
+  created_at DateTime @default(now())
+
+  // Relations
+  post CommunityPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@unique([post_id, user_id])
+  @@map("post_bookmarks")
+}
+
+model Resource {
+  id               Int       @id @default(autoincrement())
+  title            String
+  type             ResourceType
+  duration         String?
+  category         String
+  content          String
+  author           String?
+  image_emoji      String?
+  background_color String?
+  tags             String[]
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  // Relations
+  bookmarks Bookmark[]
+
+  @@map("resources")
+}
+
+model Bookmark {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  resource_id Int
+  saved_at    DateTime @default(now())
+
+  // Relations
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resource_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, resource_id])
+  @@map("bookmarks")
+}
+
+model ClientProfile {
+  id                      Int       @id @default(autoincrement())
+  clerk_user_id           String    @unique
+  display_name            String?
+  email                   String?
+  phone_number            String?
+  date_of_birth          DateTime?
+  emergency_contact_name  String?
+  emergency_contact_phone String?
+  therapist_contact       String?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  // Relations
+  user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
+
+  @@map("client_profiles")
+}
+
+model AccessibilitySetting {
+  id                     Int       @id @default(autoincrement())
+  clerk_user_id          String    @unique
+  dark_mode_enabled      Boolean?  @default(false)
+  text_size              String?   @default("Medium")
+  high_contrast_enabled  Boolean?  @default(false)
+  reduce_motion_enabled  Boolean?  @default(false)
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  // Relations
+  user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
+
+  @@map("accessibility_settings")
+}
+
+model SecuritySetting {
+  id                    Int       @id @default(autoincrement())
+  clerk_user_id         String    @unique
+  biometric_lock_enabled Boolean? @default(false)
+  auto_lock_timer       String?   @default("5 minutes")
+  hide_app_content      Boolean?  @default(true)
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  // Relations
+  user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
+
+  @@map("security_settings")
+}
+
+model NotificationSetting {
+  id                   Int       @id @default(autoincrement())
+  clerk_user_id        String
+  notification_type    String    @default("general")
+  enabled              Boolean?  @default(true)
+  frequency            String?   @default("Daily")
+  quiet_hours_enabled  Boolean?  @default(false)
+  quiet_hours_start    String?   @default("22:00")
+  quiet_hours_end      String?   @default("08:00")
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  // Relations
+  user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
+
+  @@unique([clerk_user_id, notification_type])
+  @@map("notification_settings")
+}
+
+model WellbeingSetting {
+  id                           Int       @id @default(autoincrement())
+  clerk_user_id                String    @unique
+  safe_mode_enabled            Boolean?  @default(false)
+  break_reminders_enabled      Boolean?  @default(true)
+  breathing_exercise_duration  String?   @default("5 minutes")
+  breathing_exercise_style     String?   @default("4-7-8 Technique")
+  offline_mode_enabled         Boolean?  @default(false)
+  created_at                   DateTime  @default(now())
+  updated_at                   DateTime  @updatedAt
+
+  // Relations
+  user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
+
+  @@map("wellbeing_settings")
+}

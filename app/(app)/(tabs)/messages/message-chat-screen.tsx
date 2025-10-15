@@ -1,8 +1,4 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,109 +7,204 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Image,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { AppHeader } from "../../../../components/AppHeader";
+import {
+  Message,
+  Participant,
+} from "../../../../utils/sendbirdService";
 
-// Sample messages data for each conversation
-const conversationMessages: {
-  [key: string]: { id: number; text: string; time: string; sender: string }[];
-} = {
-  "1": [
-    {
-      id: 1,
-      text: "Hi Eric I scheduled an appointment to you for this month.",
-      time: "Today 9:41 am",
-      sender: "me",
-    },
-    {
-      id: 2,
-      text: "Hi John. Yes, I saw it. Lets talk then.",
-      time: "Today 9:42 am",
-      sender: "other",
-    },
-    {
-      id: 3,
-      text: "I'm glad you're feeling okay now.",
-      time: "30m ago",
-      sender: "other",
-    },
-  ],
-  "2": [
-    {
-      id: 1,
-      text: "Jenny: I found this article really helpful for managing anxiety during stressful times.",
-      time: "2d ago",
-      sender: "other",
-    },
-    {
-      id: 2,
-      text: "Mike: Thanks for sharing Jenny! This was exactly what I needed to read today.",
-      time: "1d ago",
-      sender: "other",
-    },
-    {
-      id: 3,
-      text: "Sarah: Has anyone tried the breathing techniques mentioned in the article?",
-      time: "1d ago",
-      sender: "other",
-    },
-    {
-      id: 4,
-      text: "Yes, I've been practicing them daily and they really help!",
-      time: "12h ago",
-      sender: "me",
-    },
-  ],
-};
-
-// Sample contacts data
-type Contact = {
-  id: number;
-  name: string;
-  avatar: string;
-  online: boolean;
-};
-
-const contacts: { [key: string]: Contact } = {
-  "1": {
-    id: 1,
-    name: "Eric Young",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    online: true,
-  },
-  "2": {
-    id: 2,
-    name: "Support Group",
-    avatar: "https://randomuser.me/api/portraits/women/4.jpg",
-    online: false,
-  },
-  "3": {
-    id: 3,
-    name: "Sophia Lee",
-    avatar: "https://randomuser.me/api/portraits/women/3.jpg",
-    online: true,
-  },
-};
-
-// User avatar for sent messages
-const userAvatar = "https://randomuser.me/api/portraits/women/17.jpg";
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function ChatScreen() {
+  const { userId } = useAuth();
   const params = useLocalSearchParams();
-  const contactId = params.id as string;
-  const contact = contacts[contactId];
+  const conversationId = params.id as string;
+  const conversationTitle = params.title as string;
+  const API_BASE_URL =
+    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
-  const [messages, setMessages] = useState(
-    conversationMessages[contactId] || []
-  );
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [contact, setContact] = useState<Participant | null>(null);
+  const [isOnline, setIsOnline] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Get safe area insets for proper spacing
+  const insets = useSafeAreaInsets();
+
+  // Calculate header height based on screen size and safe area
+  const getHeaderHeight = () => {
+    const baseHeight = 60; // Minimum header height
+    const safeAreaTop = insets.top;
+    
+    // Adjust header height based on screen size
+    if (SCREEN_HEIGHT > 800) {
+      return baseHeight + safeAreaTop + 10; // For larger screens
+    } else if (SCREEN_HEIGHT > 600) {
+      return baseHeight + safeAreaTop + 5; // For medium screens
+    } else {
+      return baseHeight + safeAreaTop; // For smaller screens
+    }
+  };
+
+  const headerHeight = getHeaderHeight();
+
+  // Update user activity
+  const updateUserActivity = useCallback(async () => {
+    if (!userId) return;
+
+    try {
+      await fetch(`${API_BASE_URL}/api/users/${userId}/activity`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("Error updating user activity:", error);
+    }
+  }, [userId, API_BASE_URL]);
+
+  // Get last seen text with persistent online status
+  const getLastSeenText = useCallback((lastActiveAt: string | null, online: boolean) => {
+    if (online) return "Online now";
+
+    if (!lastActiveAt) return "Offline";
+
+    const lastActive = new Date(lastActiveAt);
+    const now = new Date();
+    const diffMinutes = Math.floor(
+      (now.getTime() - lastActive.getTime()) / (1000 * 60)
+    );
+
+    if (diffMinutes < 1) return "Online now";
+    if (diffMinutes < 60) return `Offline - ${diffMinutes}m ago`;
+    if (diffMinutes < 1440)
+      return `Offline - ${Math.floor(diffMinutes / 60)}h ago`;
+    return `Offline - ${Math.floor(diffMinutes / 1440)}d ago`;
+  }, []);
+
+  // Load messages
+  const loadMessages = useCallback(async () => {
+    if (!conversationId || !userId) {
+      console.log("❌ Missing conversationId or userId");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Update user's activity
+      await updateUserActivity();
+
+      console.log(`💬 Loading messages for conversation ${conversationId}, user ${userId}`);
+      
+      // Use direct backend API instead of messagingService
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=50`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`💬 Loaded ${result.data.length} messages`);
+        setMessages(result.data);
+        
+        // Get conversation details to find the other participant with online status
+        const conversationsResponse = await fetch(
+          `${API_BASE_URL}/api/messages/conversations/${userId}`
+        );
+        
+        if (conversationsResponse.ok) {
+          const conversationsResult = await conversationsResponse.json();
+          const currentConversation = conversationsResult.data.find(
+            (conv: any) => conv.id === conversationId
+          );
+          
+          if (currentConversation) {
+            const otherParticipant = currentConversation.participants.find(
+              (p: Participant) => p.clerk_user_id !== userId
+            );
+            if (otherParticipant) {
+              setContact(otherParticipant);
+              // Set online status once and persist it
+              setIsOnline(otherParticipant.online || false);
+            }
+          }
+        }
+
+        // Fallback if no contact found
+        if (!contact) {
+          const fallbackContact = {
+            id: 'unknown',
+            clerk_user_id: 'unknown', 
+            first_name: conversationTitle?.split(' ')[0] || 'User',
+            last_name: conversationTitle?.split(' ').slice(1).join(' ') || '',
+            email: '',
+            profile_image_url: undefined,
+            online: false,
+            last_active_at: null
+          };
+          setContact(fallbackContact);
+          setIsOnline(false);
+        }
+      } else {
+        console.error("💬 Failed to load messages:", response.status);
+        Alert.alert("Error", "Failed to load messages");
+      }
+    } catch (error) {
+      console.error("💬 Error loading messages:", error);
+      Alert.alert("Error", "Failed to load messages");
+    } finally {
+      setLoading(false);
+    }
+  }, [conversationId, userId, conversationTitle, API_BASE_URL, contact, updateUserActivity]);
+
+  // Load messages with 60-second polling
+  useEffect(() => {
+    if (!conversationId || !userId) return;
+
+    loadMessages(); // Load immediately
+
+    // Use a longer interval for polling
+    const pollInterval = setInterval(() => {
+      loadMessages();
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [conversationId, userId, loadMessages]);
+
+  // Update online status based on last activity (every 10 seconds)
+  useEffect(() => {
+    if (!contact) return;
+
+    const updateOnlineStatus = () => {
+      if (contact.last_active_at) {
+        const lastActive = new Date(contact.last_active_at);
+        const now = new Date();
+        const diffMinutes = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+        
+        // Consider online if active in last 3 minutes
+        const shouldBeOnline = diffMinutes <= 3;
+        if (isOnline !== shouldBeOnline) {
+          setIsOnline(shouldBeOnline);
+        }
+      }
+    };
+
+    updateOnlineStatus();
+    const statusInterval = setInterval(updateOnlineStatus, 10000); // Check every 10 seconds
+
+    return () => clearInterval(statusInterval);
+  }, [contact, isOnline]);
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -124,42 +215,92 @@ export default function ChatScreen() {
     }, 100);
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() === "") return;
+  const handleSendMessage = async () => {
+    if (newMessage.trim() === "" || sending || !userId || !conversationId) {
+      return;
+    }
 
-    const newMsg = {
-      id: messages.length + 1,
-      text: newMessage,
-      time: "Just now",
-      sender: "me",
-    };
+    try {
+      setSending(true);
+      console.log(`💬 Sending message: "${newMessage}"`);
 
-    setMessages([...messages, newMsg]);
-    setNewMessage("");
+      // Update activity when sending message
+      await updateUserActivity();
 
-    if (contactId === "1") {
-      setTimeout(() => {
-        const reply = {
-          id: messages.length + 2,
-          text: "Thanks for your message. I'll get back to you soon.",
-          time: "Just now",
-          sender: "other",
-        };
-        setMessages((prev: typeof messages) => [...prev, reply]);
-      }, 1500);
+      // Use direct backend API instead of messagingService
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clerkUserId: userId,
+            messageText: newMessage,
+            messageType: "text",
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("💬 Message sent successfully");
+        setMessages((prev) => [...prev, result.data]);
+        setNewMessage("");
+
+        // Reload messages to ensure both parties see the same
+        setTimeout(() => loadMessages(), 500);
+      } else {
+        console.error("💬 Failed to send message:", response.status);
+        Alert.alert("Error", "Failed to send message");
+      }
+    } catch (error) {
+      console.error("💬 Error sending message:", error);
+      Alert.alert("Error", "Failed to send message");
+    } finally {
+      setSending(false);
     }
   };
 
-  if (!contact) {
+  const formatTime = (timestamp: string) => {
+    if (!timestamp) return "Just now";
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+
+    if (diff < 60 * 1000) {
+      return "Just now";
+    } else if (diff < 60 * 60 * 1000) {
+      const minutes = Math.floor(diff / (60 * 1000));
+      return `${minutes}m ago`;
+    } else if (diff < 24 * 60 * 60 * 1000) {
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } else {
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    }
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = (firstName?: string, lastName?: string) => {
+    const first = firstName?.charAt(0) || "";
+    const last = lastName?.charAt(0) || "";
+    return `${first}${last}`.toUpperCase() || "U";
+  };
+
+  // Check if message is from current user
+  const isMyMessage = (message: Message) => {
+    return message.sender.clerk_user_id === userId;
+  };
+
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-          </TouchableOpacity>
-          <View style={styles.contactInfo}>
-            <Text style={styles.contactName}>Contact not found</Text>
-          </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Loading messages...</Text>
         </View>
       </SafeAreaView>
     );
@@ -167,123 +308,184 @@ export default function ChatScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
-        {/* Fixed Header with proper safe area padding */}
-        <View style={styles.headerWrapper}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#2E7D32" />
-            </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <SafeAreaView style={styles.container}>
+          {/* Fixed Header with dynamic height based on screen size */}
+          <View style={[styles.headerWrapper, { height: headerHeight }]}>
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+              </TouchableOpacity>
 
-            <View style={styles.contactInfo}>
-              <Image
-                source={{ uri: contact.avatar }}
-                style={styles.headerAvatar}
-              />
-              <View>
-                <Text style={styles.contactName}>{contact.name}</Text>
-                <Text style={styles.contactStatus}>
-                  {contact.online ? "Online" : "Offline"}
-                </Text>
+              <View style={styles.contactInfo}>
+                <View style={styles.headerAvatar}>
+                  <Text style={styles.headerAvatarText}>
+                    {getUserInitials(contact?.first_name, contact?.last_name)}
+                  </Text>
+                  {/* Online/Offline indicator in header */}
+                  <View style={[
+                    styles.headerStatusIndicator,
+                    isOnline ? styles.onlineIndicator : styles.offlineIndicator
+                  ]} />
+                </View>
+                <View>
+                  <Text style={styles.contactName}>{conversationTitle}</Text>
+                  <Text style={[
+                    styles.contactStatus,
+                    isOnline ? styles.onlineStatus : styles.offlineStatus
+                  ]}>
+                    {contact
+                      ? getLastSeenText(contact.last_active_at, isOnline)
+                      : "Offline"}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            <TouchableOpacity onPress={() => router.push("../appointments/book")}>
-              <Ionicons name="call-outline" size={24} color="#2E7D32" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Chat Messages */}
-        <ScrollView
-          style={styles.messagesContainer}
-          ref={scrollViewRef}
-          contentContainerStyle={styles.messagesContent}
-        >
-          {messages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                styles.messageContainer,
-                message.sender === "me"
-                  ? styles.myMessageContainer
-                  : styles.theirMessageContainer,
-              ]}
-            >
-              {message.sender === "other" && (
-                <Image
-                  source={{ uri: contact.avatar }}
-                  style={styles.messageAvatar}
-                />
-              )}
-
-              <View
-                style={[
-                  styles.messageBubble,
-                  message.sender === "me"
-                    ? styles.myMessage
-                    : styles.theirMessage,
-                ]}
+              <TouchableOpacity
+                onPress={() => router.push("../appointments/book")}
               >
-                <Text
-                  style={[
-                    styles.messageText,
-                    message.sender === "me"
-                      ? styles.myMessageText
-                      : styles.theirMessageText,
-                  ]}
-                >
-                  {message.text}
-                </Text>
-                <Text style={styles.messageTime}>{message.time}</Text>
-              </View>
-
-              {message.sender === "me" && (
-                <Image
-                  source={{ uri: userAvatar }}
-                  style={styles.messageAvatar}
-                />
-              )}
+                <Ionicons name="call-outline" size={24} color="#2E7D32" />
+              </TouchableOpacity>
             </View>
-          ))}
-        </ScrollView>
-
-        {/* Message Input */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.inputContainer}
-        >
-          <View style={styles.inputWrapper}>
-            <TouchableOpacity style={styles.attachmentButton}>
-              <Ionicons name="attach" size={24} color="#4CAF50" />
-            </TouchableOpacity>
-
-            <TextInput
-              style={styles.textInput}
-              placeholder="Type a message..."
-              value={newMessage}
-              onChangeText={setNewMessage}
-              multiline
-              maxLength={500}
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                newMessage.trim() === "" && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSendMessage}
-              disabled={newMessage.trim() === ""}
-            >
-              <Ionicons
-                name="send"
-                size={24}
-                color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
-              />
-            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+
+          {/* Chat Messages */}
+          <ScrollView
+            style={styles.messagesContainer}
+            ref={scrollViewRef}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {messages.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
+                <Text style={styles.emptyStateText}>No messages yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Start the conversation by sending a message
+                </Text>
+              </View>
+            ) : (
+              messages.map((message) => {
+                const myMessage = isMyMessage(message);
+
+                return (
+                  <View
+                    key={message.id}
+                    style={[
+                      styles.messageContainer,
+                      myMessage
+                        ? styles.myMessageContainer
+                        : styles.theirMessageContainer,
+                    ]}
+                  >
+                    {/* Other user's avatar (left side) */}
+                    {!myMessage && (
+                      <View style={styles.avatarContainer}>
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>
+                            {getUserInitials(
+                              message.sender.first_name,
+                              message.sender.last_name
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Message bubble */}
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        myMessage ? styles.myMessage : styles.theirMessage,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.messageText,
+                          myMessage
+                            ? styles.myMessageText
+                            : styles.theirMessageText,
+                        ]}
+                      >
+                        {message.message_text}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.messageTime,
+                          myMessage
+                            ? styles.myMessageTime
+                            : styles.theirMessageTime,
+                        ]}
+                      >
+                        {formatTime(message.created_at)}
+                      </Text>
+                    </View>
+
+                    {/* My avatar (right side) */}
+                    {myMessage && (
+                      <View style={styles.avatarContainer}>
+                        <View style={[styles.avatar, styles.myAvatar]}>
+                          <Text style={styles.avatarText}>
+                            {getUserInitials(
+                              message.sender.first_name,
+                              message.sender.last_name
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+
+          {/* Message Input */}
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <TouchableOpacity style={styles.attachmentButton}>
+                <Ionicons name="attach" size={24} color="#4CAF50" />
+              </TouchableOpacity>
+
+              <TextInput
+                style={styles.textInput}
+                placeholder="Type a message..."
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+                maxLength={500}
+                editable={!sending}
+                onSubmitEditing={handleSendMessage}
+                returnKeyType="send"
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  (newMessage.trim() === "" || sending) &&
+                    styles.sendButtonDisabled,
+                ]}
+                onPress={handleSendMessage}
+                disabled={newMessage.trim() === "" || sending || !userId}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons
+                    name="send"
+                    size={24}
+                    color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </CurvedBackground>
   );
 }
@@ -293,17 +495,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "transparent",
   },
-  // Wrapper to handle safe area properly
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
+  // Dynamic header wrapper
   headerWrapper: {
     backgroundColor: "transparent",
-    paddingTop: Platform.OS === 'ios' ? 0 : 25, // Adjust for Android status bar
+    justifyContent: 'flex-end',
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 12,
     backgroundColor: "transparent",
   },
   contactInfo: {
@@ -316,7 +529,32 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: "#2196F3",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 10,
+    position: 'relative',
+  },
+  headerAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  headerStatusIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#FFF",
+  },
+  onlineIndicator: {
+    backgroundColor: "#4CAF50",
+  },
+  offlineIndicator: {
+    backgroundColor: "#9E9E9E",
   },
   contactName: {
     fontSize: 16,
@@ -325,9 +563,12 @@ const styles = StyleSheet.create({
   },
   contactStatus: {
     fontSize: 12,
-    color: "#000000",
-    flexDirection: "row",
-    alignItems: "center",
+  },
+  onlineStatus: {
+    color: "#4CAF50",
+  },
+  offlineStatus: {
+    color: "#666",
   },
   messagesContainer: {
     flex: 1,
@@ -337,16 +578,27 @@ const styles = StyleSheet.create({
     padding: 15,
     paddingBottom: 10,
   },
-  messageBubble: {
-    maxWidth: "80%",
-    padding: 12,
-    borderRadius: 18,
-    marginBottom: 10,
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    color: "#666",
+    marginTop: 16,
+    fontWeight: "600",
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
+    textAlign: "center",
   },
   messageContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    marginBottom: 10,
+    marginBottom: 15,
     maxWidth: "100%",
   },
   myMessageContainer: {
@@ -355,20 +607,37 @@ const styles = StyleSheet.create({
   theirMessageContainer: {
     justifyContent: "flex-start",
   },
-  messageAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginHorizontal: 5,
+  avatarContainer: {
+    marginHorizontal: 8,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#859ce1ff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  myAvatar: {
+    backgroundColor: "#2196F3",
+  },
+  avatarText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  messageBubble: {
+    maxWidth: "70%",
+    padding: 12,
+    borderRadius: 18,
+    marginBottom: 4,
   },
   myMessage: {
-    alignSelf: "flex-end",
     backgroundColor: "#DCF8C6",
     borderTopRightRadius: 4,
   },
   theirMessage: {
-    alignSelf: "flex-start",
-    backgroundColor: "#cfe2f3",
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 4,
     elevation: 1,
     shadowColor: "#000",
@@ -378,7 +647,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   myMessageText: {
     color: "#000000",
@@ -387,9 +656,14 @@ const styles = StyleSheet.create({
     color: "#000000",
   },
   messageTime: {
-    fontSize: 12,
-    color: "#9E9E9E",
+    fontSize: 11,
     alignSelf: "flex-end",
+  },
+  myMessageTime: {
+    color: "#666",
+  },
+  theirMessageTime: {
+    color: "#999",
   },
   inputContainer: {
     padding: 15,
@@ -401,27 +675,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F5F5F5",
-    borderRadius: 24,
-    paddingHorizontal: 10,
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
   },
   attachmentButton: {
-    padding: 8,
+    padding: 4,
   },
   textInput: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     maxHeight: 100,
     fontSize: 16,
+    color: "#333",
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#4CAF50",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 5,
+    marginLeft: 8,
   },
   sendButtonDisabled: {
     backgroundColor: "#E0E0E0",

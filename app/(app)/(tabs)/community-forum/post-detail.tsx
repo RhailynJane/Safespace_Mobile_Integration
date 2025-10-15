@@ -27,7 +27,6 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Image,
   Pressable,
   ActivityIndicator,
   Alert,

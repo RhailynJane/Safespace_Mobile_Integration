@@ -1,11 +1,14 @@
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { Pool } from "pg";
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 const app = express();
 const PORT = 3001;
 const axios = require("axios");
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 // Middleware
 app.use(cors());
@@ -91,24 +94,35 @@ app.post(
         });
       }
 
-      const result = await pool.query(
-        `INSERT INTO users (clerk_user_id, first_name, last_name, email, phone_number, role, status) 
-       VALUES ($1, $2, $3, $4, $5, 'client', 'active')
-       ON CONFLICT (clerk_user_id) 
-       DO UPDATE SET 
-         first_name = EXCLUDED.first_name,
-         last_name = EXCLUDED.last_name,
-         email = EXCLUDED.email,
-         phone_number = EXCLUDED.phone_number,
-         updated_at = CURRENT_TIMESTAMP
-       RETURNING id, clerk_user_id, email`,
-        [clerkUserId, firstName, lastName, email, phoneNumber]
-      );
+      const result = await prisma.user.upsert({
+        where: {
+          clerk_user_id: clerkUserId,
+        },
+        update: {
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          phone_number: phoneNumber,
+          updated_at: new Date(), // Explicitly set updated_at
+        },
+        create: {
+          clerk_user_id: clerkUserId,
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          phone_number: phoneNumber,
+          role: 'client',
+          status: 'active',
+          email_verified: true,
+          created_at: new Date(),
+          updated_at: new Date(), // Explicitly set for create too
+        },
+      });
 
       res.json({
         success: true,
         message: "User synced successfully",
-        user: result.rows[0],
+        user: result,
       });
     } catch (error: any) {
       console.error("Error syncing user:", error.message);
@@ -119,6 +133,81 @@ app.post(
     }
   }
 );
+
+app.post("/api/users/sync", async (req: Request, res: Response) => {
+  try {
+    const {
+      clerk_user_id,
+      email,
+      first_name,
+      last_name,
+      phone_number,
+      profile_image_url,
+      email_verified,
+      created_at,
+    } = req.body;
+
+    console.log("Received user sync request via /api/users/sync:", {
+      clerk_user_id,
+      email,
+    });
+
+    // Validate required fields
+    if (!clerk_user_id || !email || !first_name || !last_name) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Missing required fields: clerk_user_id, email, first_name, last_name",
+      });
+    }
+
+    const result = await prisma.user.upsert({
+      where: {
+        clerk_user_id: clerk_user_id,
+      },
+      update: {
+        first_name: first_name,
+        last_name: last_name,
+        email: email,
+        phone_number: phone_number,
+        profile_image_url: profile_image_url,
+        email_verified: email_verified || false,
+        updated_at: new Date(), // Explicitly set updated_at
+      },
+      create: {
+        clerk_user_id: clerk_user_id,
+        first_name: first_name,
+        last_name: last_name,
+        email: email,
+        phone_number: phone_number,
+        profile_image_url: profile_image_url,
+        email_verified: email_verified || false,
+        role: 'client',
+        status: 'active',
+        created_at: new Date(created_at),
+        updated_at: new Date(), // Explicitly set for create too
+      },
+    });
+
+    console.log(
+      "User synced successfully via /api/users/sync:",
+      result.id
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "User synced successfully",
+      user: result,
+    });
+  } catch (error: any) {
+    console.error("Database sync error in /api/users/sync:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+});
 
 // Create client endpoint
 app.post(
@@ -356,7 +445,6 @@ app.get(
   }
 );
 
-
 // =============================================
 // COMMUNITY FORUM ENDPOINTS - MOVE THESE UP
 // =============================================
@@ -545,7 +633,8 @@ app.post(
             `${user.first_name} ${user.last_name}`.trim() || "Community Member";
         }
       } catch (userError) {
-        console.log("User not found in database, using default author name");
+        console.error("User not found in database:", userError);
+        authorName = "Anonymous User";
       }
 
       // Get category ID
@@ -719,7 +808,7 @@ app.get(
       });
     }
   }
-)
+);
 
 // Start server
 app.listen(PORT, "0.0.0.0", () => {
@@ -1229,6 +1318,9 @@ app.get(
       const { clerkUserId } = req.params;
       const { days = "30" } = req.query;
 
+      // Convert days to string explicitly
+      const daysString = String(parseInt(days as string, 10) || 30);
+
       const result = await pool.query(
         `SELECT 
         mood_type,
@@ -1238,7 +1330,7 @@ app.get(
         get_mood_label(mood_type) as label
       FROM mood_entries
       WHERE clerk_user_id = $1
-        AND created_at >= NOW() - INTERVAL '${parseInt(days as string)} days'
+        AND created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
       GROUP BY mood_type
       ORDER BY count DESC`,
         [clerkUserId]
@@ -1250,7 +1342,7 @@ app.get(
       FROM mood_factors mf
       JOIN mood_entries me ON mf.mood_entry_id = me.id
       WHERE me.clerk_user_id = $1
-        AND me.created_at >= NOW() - INTERVAL '${parseInt(days as string)} days'
+        AND me.created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
       GROUP BY mf.factor
       ORDER BY count DESC
       LIMIT 10`,
@@ -1260,7 +1352,7 @@ app.get(
       res.json({
         moodDistribution: result.rows,
         topFactors: factorsResult.rows,
-        period: `${days} days`,
+        period: `${Number(days)} days`,
       });
     } catch (error: any) {
       console.error("Error fetching mood stats:", error.message);
@@ -1912,6 +2004,8 @@ app.get("/api/resources/search", async (req, res) => {
   try {
     const { q } = req.query;
 
+    const searchQuery = typeof q === "string" ? q : "";
+
     const result = await pool.query(
       `
       SELECT * FROM resources 
@@ -1920,12 +2014,12 @@ app.get("/api/resources/search", async (req, res) => {
          OR $2 = ANY(tags)
       ORDER BY created_at DESC
     `,
-      [`%${q}%`, q]
+      [`%${searchQuery}%`, searchQuery]
     );
 
     res.json(result.rows);
-  } catch (error) {
-    console.error("Error searching resources:", error);
+  } catch (error: any) {
+    console.error("Error searching resources:", error.message);
     res.status(500).json({ error: "Failed to search resources" });
   }
 });
@@ -2095,7 +2189,7 @@ class ExternalApiService {
   async getRandomQuote() {
     try {
       const response = await axios.get("https://zenquotes.io/api/random");
-      if (response.data && response.data[0]) {
+      if (response.data?.[0]) {
         return {
           quote: response.data[0].q,
           author: response.data[0].a,
@@ -2159,22 +2253,22 @@ interface UserSettings {
   textSize: string;
   highContrast: boolean;
   reduceMotion: boolean;
-  
+
   // Privacy & Security
   biometricLock: boolean;
   autoLockTimer: string;
-  
+
   // Notifications
   notificationsEnabled: boolean;
   quietHoursEnabled: boolean;
   quietStartTime: string;
   quietEndTime: string;
   reminderFrequency: string;
-  
+
   // Contacts
   crisisContact: string;
   therapistContact: string;
-  
+
   // Wellbeing
   safeMode: boolean;
   breakReminders: boolean;
@@ -2193,7 +2287,7 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
 
-    // Get user's internal ID 
+    // Get user's internal ID
     const userResult = await pool.query(
       "SELECT id FROM users WHERE clerk_user_id = $1",
       [clerkUserId]
@@ -2233,7 +2327,7 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           breathingDuration: "5 minutes",
           breathingStyle: "4-7-8 Technique",
           offlineMode: false,
-        }
+        },
       });
     }
 
@@ -2250,7 +2344,14 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
 // Update user settings
 app.put(
   "/api/settings/:clerkUserId",
-  async (req: Request<{ clerkUserId: string }, {}, { settings: Partial<UserSettings> }>, res: Response) => {
+  async (
+    req: Request<
+      { clerkUserId: string },
+      {},
+      { settings: Partial<UserSettings> }
+    >,
+    res: Response
+  ) => {
     try {
       const { clerkUserId } = req.params;
       const { settings } = req.body;
@@ -2351,7 +2452,13 @@ app.patch(
       const updates = req.body;
 
       // Validate category
-      const validCategories = ['display', 'privacy', 'notifications', 'contacts', 'wellbeing'];
+      const validCategories = [
+        "display",
+        "privacy",
+        "notifications",
+        "contacts",
+        "wellbeing",
+      ];
       if (!validCategories.includes(category)) {
         return res.status(400).json({ error: "Invalid settings category" });
       }
@@ -2374,7 +2481,7 @@ app.patch(
       let paramIndex = 2;
 
       Object.keys(updates).forEach((key) => {
-        const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+        const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
         updateFields.push(`${snakeKey} = $${paramIndex}`);
         updateValues.push(updates[key]);
         paramIndex++;
@@ -2386,7 +2493,7 @@ app.patch(
 
       const query = `
         UPDATE user_settings 
-        SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+        SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
         WHERE user_id = $1
         RETURNING *
       `;
@@ -2409,68 +2516,859 @@ app.patch(
 );
 
 // Reset settings to default
-app.post("/api/settings/:clerkUserId/reset", async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
+app.post(
+  "/api/settings/:clerkUserId/reset",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
 
-    // Get user's internal ID
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
 
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Delete existing settings (will trigger default values on next fetch)
+      await pool.query("DELETE FROM user_settings WHERE user_id = $1", [
+        userId,
+      ]);
+
+      res.json({
+        success: true,
+        message: "Settings reset to defaults successfully",
+      });
+    } catch (error: any) {
+      console.error("Error resetting settings:", error.message);
+      res.status(500).json({
+        error: "Failed to reset settings",
+        details: error.message,
+      });
     }
-
-    const userId = userResult.rows[0].id;
-
-    // Delete existing settings (will trigger default values on next fetch)
-    await pool.query("DELETE FROM user_settings WHERE user_id = $1", [userId]);
-
-    res.json({
-      success: true,
-      message: "Settings reset to defaults successfully",
-    });
-  } catch (error: any) {
-    console.error("Error resetting settings:", error.message);
-    res.status(500).json({
-      error: "Failed to reset settings",
-      details: error.message,
-    });
   }
-});
+);
 
 // Export settings (for backup/migration)
-app.get("/api/settings/:clerkUserId/export", async (req: Request, res: Response) => {
+app.get(
+  "/api/settings/:clerkUserId/export",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      const result = await pool.query(
+        "SELECT * FROM user_settings WHERE user_id = $1",
+        [userId]
+      );
+
+      res.json({
+        exportDate: new Date().toISOString(),
+        settings: result.rows[0] || {},
+      });
+    } catch (error: any) {
+      console.error("Error exporting settings:", error.message);
+      res.status(500).json({
+        error: "Failed to export settings",
+        details: error.message,
+      });
+    }
+  }
+);
+
+
+// =============================================
+// MESSAGING ENDPOINTS - PRISMA VERSION
+// =============================================
+
+// Get all conversations for a user
+// Replace the existing conversations endpoint with this updated version
+app.get(
+  "/api/messages/conversations/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+
+      console.log("💬 Fetching conversations for user:", clerkUserId);
+
+      const conversations = await prisma.conversation.findMany({
+        where: {
+          participants: {
+            some: {
+              user: {
+                clerk_user_id: clerkUserId
+              }
+            }
+          }
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  clerk_user_id: true,
+                  first_name: true,
+                  last_name: true,
+                  email: true,
+                  profile_image_url: true,
+                  last_active_at: true,
+                }
+              }
+            }
+          },
+          messages: {
+            orderBy: {
+              created_at: 'desc'
+            },
+            take: 1
+          },
+          _count: {
+            select: {
+              messages: {
+                where: {
+                  NOT: {
+                    read_status: {
+                      some: {
+                        user: {
+                          clerk_user_id: clerkUserId
+                        }
+                      }
+                    }
+                  },
+                  sender: {
+                    clerk_user_id: {
+                      not: clerkUserId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          updated_at: 'desc'
+        }
+      });
+
+      // Get online status for all participants
+      const conversationsWithOnlineStatus = await Promise.all(
+        conversations.map(async (conversation) => {
+          const lastMessage = conversation.messages[0];
+          
+          // Get participants with real online status
+          const participantsWithStatus = await Promise.all(
+            conversation.participants.map(async (p) => {
+              const online = await getUserOnlineStatus(p.user.clerk_user_id);
+              return {
+                id: p.user.id,
+                clerk_user_id: p.user.clerk_user_id,
+                first_name: p.user.first_name,
+                last_name: p.user.last_name,
+                email: p.user.email,
+                profile_image_url: p.user.profile_image_url,
+                online,
+                last_active_at: p.user.last_active_at
+              };
+            })
+          );
+
+          return {
+            id: conversation.id.toString(),
+            title: conversation.title,
+            conversation_type: conversation.conversation_type,
+            updated_at: conversation.updated_at.toISOString(),
+            created_at: conversation.created_at.toISOString(),
+            last_message: lastMessage?.message_text || '',
+            last_message_time: lastMessage?.created_at.toISOString(),
+            unread_count: conversation._count.messages,
+            participants: participantsWithStatus
+          };
+        })
+      );
+
+      console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
+
+      res.json({
+        success: true,
+        data: conversationsWithOnlineStatus,
+      });
+    } catch (error: any) {
+      console.error("💬 Get conversations error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch conversations",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Get messages for a conversation
+app.get(
+  "/api/messages/conversations/:conversationId/messages",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId, page = "1", limit = "50" } = req.query;
+
+      console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
+
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = parseInt(limit as string) || 50;
+      const skip = (pageNum - 1) * limitNum;
+
+      // Verify user is participant
+      const participant = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversation_id: parseInt(conversationId),
+          user: {
+            clerk_user_id: clerkUserId as string
+          }
+        }
+      });
+
+      if (!participant) {
+        console.log(`💬 User ${clerkUserId} is not a participant of conversation ${conversationId}`);
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this conversation",
+        });
+      }
+
+      // Get messages
+      const messages = await prisma.message.findMany({
+        where: {
+          conversation_id: parseInt(conversationId)
+        },
+        include: {
+          sender: {
+            select: {
+              id: true,
+              clerk_user_id: true,
+              first_name: true,
+              last_name: true,
+              profile_image_url: true
+            }
+          }
+        },
+        orderBy: {
+          created_at: 'asc'
+        },
+        skip,
+        take: limitNum
+      });
+
+      console.log(`💬 Found ${messages.length} messages`);
+
+      // Mark messages as read for this user
+      if (clerkUserId && messages.length > 0) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { clerk_user_id: clerkUserId as string }
+          });
+
+          if (user) {
+            const messageIds = messages.map(msg => msg.id);
+            
+            // Create read status for unread messages
+            await prisma.messageReadStatus.createMany({
+              data: messageIds.map(messageId => ({
+                message_id: messageId,
+                user_id: user.id
+              })),
+              skipDuplicates: true
+            });
+          }
+        } catch (readError) {
+          console.error("Error marking messages as read:", readError);
+        }
+      }
+
+      const formattedMessages = messages.map(message => ({
+        id: message.id.toString(),
+        message_text: message.message_text,
+        message_type: message.message_type,
+        created_at: message.created_at.toISOString(),
+        sender: {
+          id: message.sender.id,
+          clerk_user_id: message.sender.clerk_user_id,
+          first_name: message.sender.first_name,
+          last_name: message.sender.last_name,
+          profile_image_url: message.sender.profile_image_url,
+          online: false
+        }
+      }));
+
+      res.json({
+        success: true,
+        data: formattedMessages,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          hasMore: messages.length === limitNum,
+        },
+      });
+    } catch (error: any) {
+      console.error("💬 Get messages error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch messages",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Send a message
+app.post(
+  "/api/messages/conversations/:conversationId/messages",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId, messageText, messageType = "text" } = req.body;
+
+      console.log(`💬 Sending message to conversation ${conversationId}: "${messageText}" from user ${clerkUserId}`);
+
+      if (!clerkUserId || !messageText?.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "clerkUserId and messageText are required",
+        });
+      }
+
+      // Get user and verify participation in transaction
+      const result = await prisma.$transaction(async (tx) => {
+        // Get user and verify they're a participant
+        const user = await tx.user.findUnique({
+          where: { clerk_user_id: clerkUserId }
+        });
+
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        const participant = await tx.conversationParticipant.findFirst({
+          where: {
+            conversation_id: parseInt(conversationId),
+            user_id: user.id
+          }
+        });
+
+        if (!participant) {
+          throw new Error("Access denied to this conversation");
+        }
+
+        // Create message
+        const message = await tx.message.create({
+          data: {
+            conversation_id: parseInt(conversationId),
+            sender_id: user.id,
+            message_text: messageText.trim(),
+            message_type: messageType
+          },
+          include: {
+            sender: {
+              select: {
+                id: true,
+                clerk_user_id: true,
+                first_name: true,
+                last_name: true,
+                profile_image_url: true
+              }
+            }
+          }
+        });
+
+        // Update conversation timestamp
+        await tx.conversation.update({
+          where: { id: parseInt(conversationId) },
+          data: { updated_at: new Date() }
+        });
+
+        return message;
+      });
+
+      console.log(`💬 Message sent successfully: ${result.id}`);
+
+      const formattedMessage = {
+        id: result.id.toString(),
+        message_text: result.message_text,
+        message_type: result.message_type,
+        created_at: result.created_at.toISOString(),
+        sender: {
+          id: result.sender.id,
+          clerk_user_id: result.sender.clerk_user_id,
+          first_name: result.sender.first_name,
+          last_name: result.sender.last_name,
+          profile_image_url: result.sender.profile_image_url,
+          online: false
+        }
+      };
+
+      res.json({
+        success: true,
+        message: "Message sent successfully",
+        data: formattedMessage,
+      });
+    } catch (error: any) {
+      console.error("💬 Send message error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to send message",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Create new conversation
+app.post("/api/messages/conversations", async (req: Request, res: Response) => {
   try {
-    const { clerkUserId } = req.params;
+    const {
+      clerkUserId,
+      participantIds,
+      title,
+      conversationType = "direct",
+    } = req.body;
 
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
+    console.log("💬 Creating conversation:", { clerkUserId, participantIds, title });
 
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
+    if (!clerkUserId || !participantIds || participantIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "clerkUserId and participantIds are required",
+      });
     }
 
-    const userId = userResult.rows[0].id;
+    const result = await prisma.$transaction(async (tx) => {
+      // Get creator user
+      const creator = await tx.user.findUnique({
+        where: { clerk_user_id: clerkUserId }
+      });
 
-    const result = await pool.query(
-      "SELECT * FROM user_settings WHERE user_id = $1",
-      [userId]
-    );
+      if (!creator) {
+        throw new Error("User not found");
+      }
 
-    res.json({
-      exportDate: new Date().toISOString(),
-      settings: result.rows[0] || {},
+      // Get participant users
+      const participants = await tx.user.findMany({
+        where: {
+          clerk_user_id: {
+            in: [clerkUserId, ...participantIds]
+          }
+        }
+      });
+
+      if (participants.length < 2) {
+        throw new Error("At least one other valid participant is required");
+      }
+
+      // Generate conversation title if not provided
+      let conversationTitle = title;
+      if (!conversationTitle) {
+        const otherParticipants = participants.filter(p => p.clerk_user_id !== clerkUserId);
+        const names = otherParticipants.map(p => `${p.first_name} ${p.last_name}`.trim());
+        conversationTitle = names.join(', ');
+      }
+
+      // Create conversation
+      const conversation = await tx.conversation.create({
+        data: {
+          title: conversationTitle,
+          conversation_type: conversationType,
+          created_by: creator.id,
+          participants: {
+            create: participants.map(participant => ({
+              user_id: participant.id
+            }))
+          }
+        }
+      });
+
+      return conversation;
+    });
+
+    console.log(`💬 Conversation created successfully: ${result.id}`);
+
+    res.status(201).json({
+      success: true,
+      message: "Conversation created successfully",
+      data: {
+        id: result.id.toString(),
+        title: result.title,
+        conversation_type: result.conversation_type,
+        created_at: result.created_at.toISOString(),
+        updated_at: result.updated_at.toISOString()
+      },
     });
   } catch (error: any) {
-    console.error("Error exporting settings:", error.message);
+    console.error("💬 Create conversation error:", error.message);
     res.status(500).json({
-      error: "Failed to export settings",
-      details: error.message,
+      success: false,
+      message: "Failed to create conversation",
+      error: error.message,
     });
   }
 });
+
+// Get available contacts for messaging
+app.get(
+  "/api/messages/contacts/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+
+      console.log("👥 Fetching contacts for user:", clerkUserId);
+
+      const contacts = await prisma.user.findMany({
+        where: {
+          clerk_user_id: {
+            not: clerkUserId
+          },
+          status: 'active'
+        },
+        select: {
+          id: true,
+          clerk_user_id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          profile_image_url: true,
+          role: true
+        },
+        orderBy: [
+          { first_name: 'asc' },
+          { last_name: 'asc' }
+        ]
+      });
+
+      // Check for existing conversations
+      const contactsWithConversations = await Promise.all(
+        contacts.map(async (contact) => {
+          const existingConversation = await prisma.conversation.findFirst({
+            where: {
+              AND: [
+                {
+                  participants: {
+                    some: {
+                      user: {
+                        clerk_user_id: clerkUserId
+                      }
+                    }
+                  }
+                },
+                {
+                  participants: {
+                    some: {
+                      user: {
+                        clerk_user_id: contact.clerk_user_id
+                      }
+                    }
+                  }
+                },
+                {
+                  conversation_type: 'direct'
+                }
+              ]
+            }
+          });
+
+          return {
+            ...contact,
+            online: false,
+            has_existing_conversation: !!existingConversation
+          };
+        })
+      );
+
+      console.log(`👥 Found ${contactsWithConversations.length} contacts for user ${clerkUserId}`);
+
+      res.json({
+        success: true,
+        data: contactsWithConversations,
+      });
+    } catch (error: any) {
+      console.error("👥 Get contacts error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch contacts",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Search users by name or email
+app.get(
+  "/api/messages/search-users/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+      const { q: searchQuery } = req.query;
+
+      console.log(`🔍 Searching users for ${clerkUserId}, query: "${searchQuery}"`);
+
+      if (!searchQuery || typeof searchQuery !== "string" || searchQuery.trim() === "") {
+        return res.json({
+          success: true,
+          data: [],
+        });
+      }
+
+      const searchTerm = `%${searchQuery.trim()}%`;
+
+      const users = await prisma.user.findMany({
+        where: {
+          clerk_user_id: {
+            not: clerkUserId
+          },
+          status: 'active',
+          OR: [
+            { first_name: { contains: searchTerm, mode: 'insensitive' } },
+            { last_name: { contains: searchTerm, mode: 'insensitive' } },
+            { email: { contains: searchTerm, mode: 'insensitive' } }
+          ]
+        },
+        select: {
+          id: true,
+          clerk_user_id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          profile_image_url: true,
+          role: true
+        },
+        orderBy: [
+          { first_name: 'asc' },
+          { last_name: 'asc' }
+        ],
+        take: 20
+      });
+
+      const formattedUsers = users.map(user => ({
+        ...user,
+        online: false,
+        has_existing_conversation: false
+      }));
+
+      console.log(`🔍 Found ${formattedUsers.length} users matching "${searchQuery}"`);
+
+      res.json({
+        success: true,
+        data: formattedUsers,
+      });
+    } catch (error: any) {
+      console.error("🔍 Search users error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to search users",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Update user activity
+// Update user activity endpoint - call this every minute when user is active
+app.post("/api/users/:clerkUserId/activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    const updatedUser = await prisma.user.update({
+      where: { clerk_user_id: clerkUserId },
+      data: { 
+        last_active_at: new Date(),
+        updated_at: new Date() 
+      }
+    });
+
+    console.log(`👤 Updated activity for user ${clerkUserId}`);
+
+    res.json({ 
+      success: true, 
+      message: "Activity updated",
+      data: {
+        last_active_at: updatedUser.last_active_at
+      }
+    });
+  } catch (error: any) {
+    console.error("Error updating user activity:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update activity",
+      error: error.message,
+    });
+  }
+});
+
+// Helper function to determine online status
+function isUserOnline(lastActiveAt: Date | null): boolean {
+  if (!lastActiveAt) return false;
+  
+  const now = new Date();
+  const lastActive = new Date(lastActiveAt);
+  const minutesSinceLastActive = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+  
+  // Consider user online if active in last 5 minutes
+  return minutesSinceLastActive <= 5;
+}
+
+
+// Update the conversations endpoint to include online status
+app.get(
+  "/api/messages/conversations/:clerkUserId",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+
+      console.log("💬 Fetching conversations for user:", clerkUserId);
+
+      const conversations = await prisma.conversation.findMany({
+        where: {
+          participants: {
+            some: {
+              user: {
+                clerk_user_id: clerkUserId
+              }
+            }
+          }
+        },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  clerk_user_id: true,
+                  first_name: true,
+                  last_name: true,
+                  email: true,
+                  profile_image_url: true,
+                  last_active_at: true, // Include last_active_at
+                  updated_at: true
+                }
+              }
+            }
+          },
+          messages: {
+            orderBy: {
+              created_at: 'desc'
+            },
+            take: 1
+          },
+          _count: {
+            select: {
+              messages: {
+                where: {
+                  NOT: {
+                    read_status: {
+                      some: {
+                        user: {
+                          clerk_user_id: clerkUserId
+                        }
+                      }
+                    }
+                  },
+                  sender: {
+                    clerk_user_id: {
+                      not: clerkUserId
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          updated_at: 'desc'
+        }
+      });
+
+      console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
+
+      const formattedConversations = conversations.map(conversation => {
+        const lastMessage = conversation.messages[0];
+        
+        // Get ALL participants with online status
+        const allParticipants = conversation.participants.map(p => ({
+          id: p.user.id,
+          clerk_user_id: p.user.clerk_user_id,
+          first_name: p.user.first_name,
+          last_name: p.user.last_name,
+          email: p.user.email,
+          profile_image_url: p.user.profile_image_url,
+          online: isUserOnline(p.user.last_active_at),
+          last_active_at: p.user.last_active_at
+        }));
+
+        console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
+
+        return {
+          id: conversation.id.toString(),
+          title: conversation.title,
+          conversation_type: conversation.conversation_type,
+          updated_at: conversation.updated_at.toISOString(),
+          created_at: conversation.created_at.toISOString(),
+          last_message: lastMessage?.message_text || '',
+          last_message_time: lastMessage?.created_at.toISOString(),
+          unread_count: conversation._count.messages,
+          participants: allParticipants
+        };
+      });
+
+      console.log(`💬 Found ${formattedConversations.length} conversations for user ${clerkUserId}`);
+
+      res.json({
+        success: true,
+        data: formattedConversations,
+      });
+    } catch (error: any) {
+      console.error("💬 Get conversations error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch conversations",
+        error: error.message,
+      });
+    }
+  }
+);
+
+async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
+  try {
+    // First try to get from your database
+    const user = await prisma.user.findUnique({
+      where: { clerk_user_id: clerkUserId },
+      select: { last_active_at: true }
+    });
+
+    if (user?.last_active_at) {
+      const now = new Date();
+      const lastActive = new Date(user.last_active_at);
+      const minutesSinceLastActive = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+      
+      // Consider user online if active in last 3 minutes (more aggressive)
+      return minutesSinceLastActive <= 3;
+    }
+
+    // If no activity data, return false
+    return false;
+  } catch (error) {
+    console.error("Error checking user online status:", error);
+    return false;
+  }
+}
