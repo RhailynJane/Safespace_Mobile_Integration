@@ -741,4 +741,6 @@ private async getMessagesFromBackend(
   }
 }
 
+
+
 export const messagingService = new MessagingService();

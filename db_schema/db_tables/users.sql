@@ -52,3 +52,15 @@ CREATE INDEX idx_users_phone ON users(phone_number);
 
 ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP;
 ALTER TABLE users ADD COLUMN last_logout_at TIMESTAMP;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'America/Edmonton';
+-- Create the missing enum types
+CREATE TYPE "UserRole" AS ENUM ('admin', 'team_leader', 'support_worker', 'client', 'family_member');
+CREATE TYPE "UserStatus" AS ENUM ('active', 'inactive', 'suspended', 'pending');
+CREATE TYPE "Gender" AS ENUM ('male', 'female', 'other', 'prefer_not_to_say', 'non_binary');
+CREATE TYPE "AssessmentType" AS ENUM ('pre_survey', 'post_survey', 'periodic_check');
+CREATE TYPE "MoodType" AS ENUM ('very_happy', 'happy', 'neutral', 'sad', 'very_sad');
+CREATE TYPE "ConversationType" AS ENUM ('direct', 'group');
+CREATE TYPE "MessageType" AS ENUM ('text', 'image', 'file', 'system');
+CREATE TYPE "EmotionType" AS ENUM ('very_sad', 'sad', 'neutral', 'happy', 'very_happy');
+CREATE TYPE "ResourceType" AS ENUM ('Affirmation', 'Quote', 'Article', 'Exercise', 'Guide');
+CREATE TYPE "LegalStatus" AS ENUM ('independent', 'guardianship', 'co_decision_making');
