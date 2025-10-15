@@ -685,14 +685,14 @@ export default function ChatScreen() {
           onPress={() => handleViewAttachment(message)}
           onLongPress={() => {
             Alert.alert("Image Options", "What would you like to do?", [
-              { text: "View", onPress: () => handleViewAttachment(message) },
+              { text: "View", onPress: () => { handleViewAttachment(message); } },
               {
                 text: "Save to Gallery",
-                onPress: () => saveImageToGallery(message.attachment_url!),
+                onPress: () => { saveImageToGallery(message.attachment_url!); },
               },
               {
                 text: "Download",
-                onPress: () => handleDownloadFile(message),
+                onPress: () => { handleDownloadFile(message); },
               },
               { text: "Cancel", style: "cancel" },
             ]);
@@ -724,12 +724,13 @@ export default function ChatScreen() {
               [
                 {
                   text: "Download & Share",
-                  onPress: () => handleDownloadFile(message),
+                  onPress: () => { handleDownloadFile(message); },
                 },
                 {
                   text: "Open in Browser",
-                  onPress: () =>
-                    WebBrowser.openBrowserAsync(message.attachment_url!),
+                  onPress: () => {
+                    WebBrowser.openBrowserAsync(message.attachment_url!);
+                  },
                 },
                 { text: "Cancel", style: "cancel" },
               ]
@@ -821,13 +822,15 @@ export default function ChatScreen() {
           { text: "Cancel", style: "cancel" },
           {
             text: "Download",
-            onPress: async () => {
-              try {
-                await downloadAndShareFile(fileUri, fileName);
-              } catch (error) {
-                console.error("Download error:", error);
-                Alert.alert("Error", "Failed to download file");
-              }
+            onPress: () => {
+              (async () => {
+                try {
+                  await downloadAndShareFile(fileUri, fileName);
+                } catch (error) {
+                  console.error("Download error:", error);
+                  Alert.alert("Error", "Failed to download file");
+                }
+              })();
             },
           },
         ]
