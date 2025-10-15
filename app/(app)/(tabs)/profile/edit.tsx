@@ -30,15 +30,16 @@ import settingsApi from "../../../../utils/settingsApi";
 import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-// Gender options from CMHA form
+// Gender options for the form
 const GENDER_OPTIONS = [
+  "Woman",
+  "Man",
+  "Non-Binary",
   "Agender",
   "Gender-fluid",
   "Genderqueer",
   "Gender Variant",
   "Intersex",
-  "Man",
-  "Non-Binary",
   "Non-Conforming",
   "Questioning",
   "Transgender Man",
@@ -47,9 +48,31 @@ const GENDER_OPTIONS = [
   "I don't identify with any gender",
   "I do not know",
   "Prefer not to answer",
-  "Woman",
 ];
 
+// Gender options from CMHA form
+const mapGenderToDatabase = (frontendGender: string): string => {
+  const genderMap: { [key: string]: string } = {
+    Woman: "female",
+    Man: "male",
+    "Non-Binary": "non_binary",
+    Agender: "other",
+    "Gender-fluid": "other",
+    Genderqueer: "other",
+    "Gender Variant": "other",
+    Intersex: "other",
+    "Non-Conforming": "other",
+    Questioning: "other",
+    "Transgender Man": "male",
+    "Transgender Woman": "female",
+    "Two-Spirit": "other",
+    "I don't identify with any gender": "other",
+    "I do not know": "prefer_not_to_say",
+    "Prefer not to answer": "prefer_not_to_say",
+  };
+
+  return genderMap[frontendGender] || "other";
+};
 // Status in Canada options
 const CANADA_STATUS_OPTIONS = [
   "Canadian Citizen",
@@ -197,6 +220,13 @@ export default function EditProfileScreen() {
         phoneNumber: user.phoneNumbers[0]?.phoneNumber || "",
       }));
 
+      const profileData = await profileAPI.getClientProfile(user.id);
+      if (profileData?.dateOfBirth) {
+        const [year, month, day] = profileData.dateOfBirth.split("-");
+        const displayDate = `${month}/${day}/${year}`;
+        setDateDisplay(displayDate);
+      }
+
       // Set profile image from Clerk if available
       if (user.imageUrl) {
         setProfileImage(user.imageUrl);
@@ -321,13 +351,17 @@ export default function EditProfileScreen() {
   // Date handling functions
   const handleDatePress = () => {
     if (formData.dateOfBirth) {
-      // Parse existing date if available
-      const [month, day, year] = formData.dateOfBirth.split("/");
-      if (year && month && day) {
-        setTempDate(
-          new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-        );
-      }
+      // Parse the stored date (YYYY-MM-DD format) correctly
+      const [year, month, day] = formData.dateOfBirth.split("-");
+      // Create date in UTC to avoid timezone issues
+      const utcDate = new Date(
+        Date.UTC(
+          parseInt(year ?? "0"),
+          parseInt(month ?? "1") - 1,
+          parseInt(day ?? "1")
+        )
+      );
+      setTempDate(utcDate);
     } else {
       setTempDate(new Date());
     }
@@ -335,23 +369,50 @@ export default function EditProfileScreen() {
   };
 
   const handleDateConfirm = () => {
-    // Format date as YYYY-MM-DD for database (PostgreSQL format)
-    const year = tempDate.getFullYear();
-    const month = String(tempDate.getMonth() + 1).padStart(2, "0");
-    const day = String(tempDate.getDate()).padStart(2, "0");
+    // Use UTC methods to avoid timezone issues
+    const year = tempDate.getUTCFullYear();
+    const month = String(tempDate.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(tempDate.getUTCDate()).padStart(2, "0");
     const formattedDate = `${year}-${month}-${day}`;
 
     // Format for display as MM/DD/YYYY
     const displayDate = `${month}/${day}/${year}`;
 
-    setFormData({ ...formData, dateOfBirth: formattedDate });
+    console.log("📅 Date selected:", {
+      tempDate,
+      formattedDate,
+      displayDate,
+    });
+
+    setFormData({
+      ...formData,
+      dateOfBirth: formattedDate,
+    });
     setDateDisplay(displayDate);
     setShowDatePicker(false);
   };
 
+  // For Android, handle the native date picker - FIXED VERSION
   const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+
     if (selectedDate) {
-      setTempDate(selectedDate);
+      if (Platform.OS === "android") {
+        // For Android, confirm immediately - use UTC methods
+        const year = selectedDate.getUTCFullYear();
+        const month = String(selectedDate.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(selectedDate.getUTCDate()).padStart(2, "0");
+        const formattedDate = `${year}-${month}-${day}`;
+        const displayDate = `${month}/${day}/${year}`;
+
+        setFormData({ ...formData, dateOfBirth: formattedDate });
+        setDateDisplay(displayDate);
+      } else {
+        // For iOS, just update tempDate (user will confirm with button)
+        setTempDate(selectedDate);
+      }
     }
   };
 
@@ -834,51 +895,73 @@ export default function EditProfileScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Date Picker Modal */}
-              <Modal
-                visible={showDatePicker}
-                transparent={true}
-                animationType="slide"
+              {/* Date Picker - SIMPLIFIED VERSION */}
+              {showDatePicker &&
+                (Platform.OS === "ios" ? (
+                  // iOS: Use modal with native iOS picker behavior (no buttons needed)
+                  <Modal
+                    visible={showDatePicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowDatePicker(false)}
+                  >
+                    <View style={styles.modalContainer}>
+                      <View style={styles.datePickerContainer}>
+                        <View style={styles.datePickerHeader}>
+                          <Text style={styles.datePickerTitle}>
+                            Select Date of Birth
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(false)}
+                            hitSlop={{
+                              top: 10,
+                              bottom: 10,
+                              left: 10,
+                              right: 10,
+                            }}
+                          >
+                            <Ionicons name="close" size={24} color="#666" />
+                          </TouchableOpacity>
+                        </View>
+
+                        <DateTimePicker
+                          value={tempDate}
+                          mode="date"
+                          display="spinner"
+                          onChange={handleDateChange}
+                          maximumDate={new Date()}
+                          style={styles.datePicker}
+                        />
+
+                        {/* REMOVED the cancel/confirm buttons - iOS native behavior */}
+                      </View>
+                    </View>
+                  </Modal>
+                ) : (
+                  // Android: Use native date picker
+                  <DateTimePicker
+                    value={tempDate}
+                    mode="date"
+                    display="default"
+                    onChange={handleDateChange}
+                    maximumDate={new Date()}
+                  />
+                ))}
+            </View>
+
+            <View style={styles.datePickerActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowDatePicker(false)}
               >
-                <View style={styles.modalContainer}>
-                  <View style={styles.datePickerContainer}>
-                    <View style={styles.datePickerHeader}>
-                      <Text style={styles.datePickerTitle}>
-                        Select Date of Birth
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => setShowDatePicker(false)}
-                      >
-                        <Ionicons name="close" size={24} color="#666" />
-                      </TouchableOpacity>
-                    </View>
-
-                    <DateTimePicker
-                      value={tempDate}
-                      mode="date"
-                      display={Platform.OS === "ios" ? "spinner" : "default"}
-                      onChange={handleDateChange}
-                      maximumDate={new Date()}
-                      style={styles.datePicker}
-                    />
-
-                    <View style={styles.datePickerActions}>
-                      <TouchableOpacity
-                        style={styles.cancelButton}
-                        onPress={() => setShowDatePicker(false)}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.confirmButton}
-                        onPress={handleDateConfirm}
-                      >
-                        <Text style={styles.confirmButtonText}>Confirm</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </Modal>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={handleDateConfirm}
+              >
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
