@@ -375,7 +375,7 @@ export default function ChatScreen() {
       // Try to get content-length from headers
       const contentLength = response.headers.get("content-length");
       if (contentLength) {
-        fileSize = parseInt(contentLength, 10);
+        fileSize = Number.parseInt(contentLength, 10);
       }
 
       // If we can't determine size from headers, use a fallback
@@ -867,7 +867,7 @@ export default function ChatScreen() {
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   if (loading) {

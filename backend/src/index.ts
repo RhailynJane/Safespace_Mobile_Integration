@@ -3813,12 +3813,12 @@ app.patch(
       let updateValues: any[] = [userId];
       let paramIndex = 2;
 
-      Object.keys(updates).forEach((key) => {
+      for (const key of Object.keys(updates)) {
         const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
         updateFields.push(`${snakeKey} = $${paramIndex}`);
         updateValues.push(updates[key]);
         paramIndex++;
-      });
+      }
 
       if (updateFields.length === 0) {
         return res.status(400).json({ 

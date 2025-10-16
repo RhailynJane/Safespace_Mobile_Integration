@@ -11,12 +11,10 @@ import {
   Switch,
   TextInput,
   Alert,
-  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
@@ -187,7 +185,7 @@ export default function SettingsScreen() {
       await AsyncStorage.setItem('appAutoLockTimer', timer);
       
       // Convert timer to milliseconds
-      let lockTimeMs = 0;
+      let lockTimeMs;
       switch (timer) {
         case "Immediate":
           lockTimeMs = 0;
@@ -204,6 +202,8 @@ export default function SettingsScreen() {
         case "Never":
           lockTimeMs = -1;
           break;
+        default:
+          lockTimeMs = 0;
       }
       
       await AsyncStorage.setItem('appAutoLockTimeMs', JSON.stringify(lockTimeMs));

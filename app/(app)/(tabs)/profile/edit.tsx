@@ -214,9 +214,9 @@ export default function EditProfileScreen() {
       }
 
       const parsedDate = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day)
+        Number.parseInt(year),
+        Number.parseInt(month) - 1,
+        Number.parseInt(day)
       );
       setTempCanadaDate(parsedDate);
 
@@ -490,9 +490,9 @@ export default function EditProfileScreen() {
       const day: string = dateParts[2] || "1";
 
       const parsedDate = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day)
+        Number.parseInt(year),
+        Number.parseInt(month) - 1,
+        Number.parseInt(day)
       );
       setTempDate(parsedDate);
 
