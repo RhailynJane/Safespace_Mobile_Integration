@@ -13,12 +13,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { syncUserWithDatabase } from '../../../../utils/userSync';
-
+import { syncUserWithDatabase } from "../../../../utils/userSync";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -40,6 +39,7 @@ export default function ProfileScreen() {
     location: "",
   });
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const { signOut } = useAuth();
   const { user } = useUser();
@@ -55,17 +55,17 @@ export default function ProfileScreen() {
   // Use the existing sync function from userSync.ts
   const syncUserWithBackend = async (): Promise<boolean> => {
     if (!user) {
-      console.log('❌ No user available for sync');
+      console.log("❌ No user available for sync");
       return false;
     }
 
     try {
-      console.log('🔄 Using userSync.ts to sync user...');
+      console.log("🔄 Using userSync.ts to sync user...");
       await syncUserWithDatabase(user);
-      console.log('✅ User synced successfully via userSync.ts');
+      console.log("✅ User synced successfully via userSync.ts");
       return true;
     } catch (error) {
-      console.error('❌ Error syncing user via userSync.ts:', error);
+      console.error("❌ Error syncing user via userSync.ts:", error);
       return false;
     }
   };
@@ -73,126 +73,140 @@ export default function ProfileScreen() {
   // Simple function to fetch client profile directly
   const fetchClientProfile = async (clerkUserId: string): Promise<any> => {
     try {
-      console.log('📋 Fetching client profile for:', clerkUserId);
-      
-      const response = await fetch(`${API_URL}/api/client-profile/${clerkUserId}`);
-      
-      console.log('Profile response status:', response.status);
-      
+      console.log("📋 Fetching client profile for:", clerkUserId);
+
+      const response = await fetch(
+        `${API_URL}/api/client-profile/${clerkUserId}`
+      );
+
+      console.log("Profile response status:", response.status);
+
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('Profile not found, might be new user');
+          console.log("Profile not found, might be new user");
           return null;
         }
         throw new Error(`Failed to fetch profile: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('Profile API result:', result);
-      
+      console.log("Profile API result:", result);
+
       if (result.success) {
         return result.data;
       } else {
         throw new Error(result.message);
       }
     } catch (error) {
-      console.error('Error fetching client profile:', error);
+      console.error("Error fetching client profile:", error);
       return null;
     }
   };
 
   // Fetch profile data from backend
   const fetchProfileData = useCallback(async () => {
-  if (!user?.id) {
-    console.log('❌ No user available');
-    setLoading(false);
-    return;
-  }
-
-  try {
-    setLoading(true);
-    console.log('📋 Starting profile data fetch...');
-    
-    // First try to sync user (but don't block if it fails)
-    const syncSuccess = await syncUserWithBackend();
-    console.log('Sync success:', syncSuccess);
-    
-    // ✅ Load profile image from AsyncStorage FIRST (highest priority)
-    let localProfileImage: string | undefined;
-    try {
-      const savedImage = await AsyncStorage.getItem('profileImage');
-      if (savedImage) {
-        localProfileImage = savedImage;
-        console.log('📸 Found local profile image');
-      }
-    } catch (storageError) {
-      console.error('Error loading profile image from storage:', storageError);
+    if (!user?.id) {
+      console.log("❌ No user available");
+      setLoading(false);
+      return;
     }
-    
-    // Try to load from backend API using direct function call
+
     try {
-      const backendProfile = await fetchClientProfile(user.id);
-      console.log('Backend profile data:', backendProfile);
-      
-      if (backendProfile) {
-        setProfileData(prev => ({
-          ...prev,
-          firstName: backendProfile.firstName || user.firstName || "User",
-          lastName: backendProfile.lastName || user.lastName || "",
-          email: backendProfile.email || user.emailAddresses[0]?.emailAddress || "",
-          phoneNumber: backendProfile.phoneNumber || user.phoneNumbers[0]?.phoneNumber,
-          // ✅ Priority: Local > Backend > Clerk
-          profileImageUrl: localProfileImage || backendProfile.profileImage || user.imageUrl || prev.profileImageUrl,
-        }));
-      } else {
-        // Fallback to Clerk data
-        console.log('Using Clerk data as fallback');
-        setProfileData(prev => ({
+      setLoading(true);
+      console.log("📋 Starting profile data fetch...");
+
+      // First try to sync user (but don't block if it fails)
+      const syncSuccess = await syncUserWithBackend();
+      console.log("Sync success:", syncSuccess);
+
+      // ✅ Load profile image from AsyncStorage FIRST (highest priority)
+      let localProfileImage: string | undefined;
+      try {
+        const savedImage = await AsyncStorage.getItem("profileImage");
+        if (savedImage) {
+          localProfileImage = savedImage;
+          console.log("📸 Found local profile image");
+        }
+      } catch (storageError) {
+        console.error(
+          "Error loading profile image from storage:",
+          storageError
+        );
+      }
+
+      // Try to load from backend API using direct function call
+      try {
+        const backendProfile = await fetchClientProfile(user.id);
+        console.log("Backend profile data:", backendProfile);
+
+        if (backendProfile) {
+          setProfileData((prev) => ({
+            ...prev,
+            firstName: backendProfile.firstName || user.firstName || "User",
+            lastName: backendProfile.lastName || user.lastName || "",
+            email:
+              backendProfile.email ||
+              user.emailAddresses[0]?.emailAddress ||
+              "",
+            phoneNumber:
+              backendProfile.phoneNumber || user.phoneNumbers[0]?.phoneNumber,
+            // ✅ Priority: Local > Backend > Clerk
+            profileImageUrl:
+              localProfileImage ||
+              backendProfile.profileImage ||
+              user.imageUrl ||
+              prev.profileImageUrl,
+          }));
+        } else {
+          // Fallback to Clerk data
+          console.log("Using Clerk data as fallback");
+          setProfileData((prev) => ({
+            ...prev,
+            firstName: user.firstName || prev.firstName || "User",
+            lastName: user.lastName || prev.lastName || "",
+            email: user.emailAddresses[0]?.emailAddress || prev.email || "",
+            phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
+            // ✅ Priority: Local > Clerk
+            profileImageUrl:
+              localProfileImage || user.imageUrl || prev.profileImageUrl,
+          }));
+        }
+      } catch (apiError) {
+        console.error("❌ API error, using Clerk data:", apiError);
+        // Use Clerk data as final fallback
+        setProfileData((prev) => ({
           ...prev,
           firstName: user.firstName || prev.firstName || "User",
           lastName: user.lastName || prev.lastName || "",
           email: user.emailAddresses[0]?.emailAddress || prev.email || "",
           phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
           // ✅ Priority: Local > Clerk
-          profileImageUrl: localProfileImage || user.imageUrl || prev.profileImageUrl,
+          profileImageUrl:
+            localProfileImage || user.imageUrl || prev.profileImageUrl,
         }));
       }
-    } catch (apiError) {
-      console.error('❌ API error, using Clerk data:', apiError);
-      // Use Clerk data as final fallback
-      setProfileData(prev => ({
-        ...prev,
-        firstName: user.firstName || prev.firstName || "User",
-        lastName: user.lastName || prev.lastName || "",
-        email: user.emailAddresses[0]?.emailAddress || prev.email || "",
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
-        // ✅ Priority: Local > Clerk
-        profileImageUrl: localProfileImage || user.imageUrl || prev.profileImageUrl,
-      }));
-    }
 
-    // Load local storage data for other fields
-    try {
-      const savedProfileData = await AsyncStorage.getItem('profileData');
-      if (savedProfileData) {
-        const parsedData = JSON.parse(savedProfileData);
-        setProfileData(prev => ({
-          ...prev,
-          ...parsedData,
-          // ✅ Keep the profile image we already set (don't overwrite)
-          profileImageUrl: prev.profileImageUrl,
-        }));
+      // Load local storage data for other fields
+      try {
+        const savedProfileData = await AsyncStorage.getItem("profileData");
+        if (savedProfileData) {
+          const parsedData = JSON.parse(savedProfileData);
+          setProfileData((prev) => ({
+            ...prev,
+            ...parsedData,
+            // ✅ Keep the profile image we already set (don't overwrite)
+            profileImageUrl: prev.profileImageUrl,
+          }));
+        }
+      } catch (storageError) {
+        console.error("Error loading local storage:", storageError);
       }
-    } catch (storageError) {
-      console.error('Error loading local storage:', storageError);
+    } catch (error) {
+      console.error("❌ Error in fetchProfileData:", error);
+    } finally {
+      setLoading(false);
     }
-
-  } catch (error) {
-    console.error('❌ Error in fetchProfileData:', error);
-  } finally {
-    setLoading(false);
-  }
-}, [user]);
+  }, [user]);
 
   useEffect(() => {
     fetchProfileData();
@@ -207,25 +221,75 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (user: any) => {
     try {
-      console.log('Signout initiated...');
-      
+      console.log("Signout initiated...");
+
+      // Get current user info before signing out
+      const clerkUserId = user?.id;
+
+      // Update logout timestamp in database
+      if (clerkUserId) {
+        try {
+          await fetch(
+            `${process.env.EXPO_PUBLIC_API_URL}/api/users/${clerkUserId}/logout`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          console.log("Logout timestamp updated in database");
+        } catch (dbError) {
+          console.error("Failed to update logout timestamp:", dbError);
+          // Continue with logout even if DB update fails
+        }
+      }
+
+      await AsyncStorage.clear();
+      console.log("AsyncStorage cleared");
+
       if (signOut) {
         await signOut();
-        console.log('Clerk signout successful');
+        console.log("Clerk signout successful");
       }
-      
-      await AsyncStorage.clear();
-      console.log('AsyncStorage cleared');
-      
-      router.replace("/(auth)/login");
-      console.log('Navigation to login completed');
-      
+
+      router.navigate("/(auth)/login");
+      console.log("Navigation to login completed");
     } catch (error) {
       console.error("Signout error:", error);
-      Alert.alert("Sign Out Failed", "Unable to sign out. Please try again.");
+
+      // Force navigation even on error
+      try {
+        router.navigate("/(auth)/login");
+      } catch (navError) {
+        console.error("Navigation failed:", navError);
+      }
+
+      Alert.alert(
+        "Sign Out Issue",
+        "You have been signed out locally. Please restart the app if you encounter issues.",
+        [{ text: "OK" }]
+      );
     }
+  };
+
+  // Usage with confirmation
+  const confirmLogout = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: () => {
+          handleLogout(user);
+        },
+      },
+    ]);
   };
 
   const getFullName = () => {
@@ -238,13 +302,13 @@ export default function ProfileScreen() {
   const getInitials = () => {
     const firstName = profileData.firstName || "";
     const lastName = profileData.lastName || "";
-    
+
     if (firstName && lastName) {
       return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     } else if (firstName) {
       return firstName.charAt(0).toUpperCase();
     }
-    
+
     return "U";
   };
 
@@ -268,9 +332,9 @@ export default function ProfileScreen() {
           {/* Profile Information Section */}
           <View style={styles.profileSection}>
             {profileData.profileImageUrl ? (
-              <Image 
-                source={{ uri: profileData.profileImageUrl }} 
-                style={styles.profileImage} 
+              <Image
+                source={{ uri: profileData.profileImageUrl }}
+                style={styles.profileImage}
               />
             ) : (
               <View style={styles.profileInitials}>
@@ -318,9 +382,8 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={[styles.menuItem, styles.logoutItem]}
-              onPress={handleLogout}
+              onPress={() => handleLogout(user)}
             >
-              <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
               <Text style={[styles.menuText, styles.logoutText]}>Sign Out</Text>
             </TouchableOpacity>
           </View>
@@ -347,13 +410,13 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   profileSection: {
     alignItems: "center",

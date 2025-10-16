@@ -4062,3 +4062,79 @@ app.post('/api/help-sections/:sectionId/view', async (req, res) => {
     });
   }
 });
+
+app.post('/api/users/:clerkUserId/logout', async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      const updateQuery = `
+        UPDATE users 
+        SET last_logout_at = CURRENT_TIMESTAMP,
+            last_active_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE clerk_user_id = $1
+        RETURNING id, clerk_user_id, last_logout_at
+      `;
+      
+      const result = await client.query(updateQuery, [clerkUserId]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Logout timestamp updated',
+        user: result.rows[0]
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating logout timestamp:', error);
+    res.status(500).json({ 
+      error: 'Failed to update logout timestamp',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/api/users/:clerkUserId/login', async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      const updateQuery = `
+        UPDATE users 
+        SET last_login_at = CURRENT_TIMESTAMP,
+            last_active_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE clerk_user_id = $1
+        RETURNING id, clerk_user_id, last_login_at
+      `;
+      
+      const result = await client.query(updateQuery, [clerkUserId]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Login timestamp updated',
+        user: result.rows[0]
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating login timestamp:', error);
+    res.status(500).json({ 
+      error: 'Failed to update login timestamp',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
