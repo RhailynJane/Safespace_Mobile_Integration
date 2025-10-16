@@ -563,15 +563,15 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
                ORDER BY cp.reaction_count DESC, cp.created_at DESC 
                LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
-    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
+    params.push(Number.parseInt(limit), (Number.parseInt(page) - 1) * Number.parseInt(limit));
 
     const result = await pool.query(query, params);
 
     res.json({
       posts: result.rows,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: Number.parseInt(page),
+        limit: Number.parseInt(limit),
         total: result.rows.length,
       },
     });
@@ -733,7 +733,7 @@ app.post(
       // Check if user already reacted with this emoji
       const existingReaction = await client.query(
         "SELECT id FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-        [parseInt(id), clerkUserId, emoji]
+        [Number.parseInt(id), clerkUserId, emoji]
       );
 
       let reactionChange = 0;
@@ -742,20 +742,20 @@ app.post(
         // Remove existing reaction
         await client.query(
           "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-          [parseInt(id), clerkUserId, emoji]
+          [Number.parseInt(id), clerkUserId, emoji]
         );
         reactionChange = -1;
       } else {
         // Remove any existing reaction from this user to this post
         await client.query(
           "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-          [parseInt(id), clerkUserId]
+          [Number.parseInt(id), clerkUserId]
         );
 
         // Add new reaction
         await client.query(
           "INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3)",
-          [parseInt(id), clerkUserId, emoji]
+          [Number.parseInt(id), clerkUserId, emoji]
         );
         reactionChange = 1;
       }
@@ -763,7 +763,7 @@ app.post(
       // Update reaction count
       await client.query(
         "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count + $1) WHERE id = $2",
-        [reactionChange, parseInt(id)]
+        [reactionChange, Number.parseInt(id)]
       );
 
       // Get updated reaction counts by emoji
@@ -772,19 +772,19 @@ app.post(
        FROM post_reactions 
        WHERE post_id = $1 
        GROUP BY emoji`,
-        [parseInt(id)]
+        [Number.parseInt(id)]
       );
 
       // Convert to object format
       const reactions: { [key: string]: number } = {};
-      reactionCounts.rows.forEach((row: any) => {
-        reactions[row.emoji] = parseInt(row.count);
-      });
+      for (const row of reactionCounts.rows) {
+        reactions[row.emoji] = Number.parseInt(row.count);
+      }
 
       // Check if user has any reaction to this post
       const userReactionResult = await client.query(
         "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
+        [Number.parseInt(id), clerkUserId]
       );
 
       const userReaction =
@@ -823,7 +823,7 @@ app.get(
 
       const result = await pool.query(
         "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
+        [Number.parseInt(id), clerkUserId]
       );
 
       res.json({
@@ -888,7 +888,7 @@ app.put("/api/community/posts/:id", async (req: Request, res: Response) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $5
        RETURNING *`,
-      [title, content, isDraft, category, parseInt(id)]
+      [title, content, isDraft, category, Number.parseInt(id)]
     );
 
     if (result.rows.length === 0) {
@@ -916,7 +916,7 @@ app.delete("/api/community/posts/:id", async (req: Request, res: Response) => {
 
     const result = await pool.query(
       "DELETE FROM community_posts WHERE id = $1 RETURNING id",
-      [parseInt(id)]
+      [Number.parseInt(id)]
     );
 
     if (result.rows.length === 0) {
@@ -950,7 +950,7 @@ app.delete(
 
       const result = await pool.query(
         "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-        [parseInt(id), clerkUserId, emoji]
+        [Number.parseInt(id), clerkUserId, emoji]
       );
 
       if (result.rowCount === 0) {
@@ -960,7 +960,7 @@ app.delete(
       // Update reaction count
       await pool.query(
         "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count - 1) WHERE id = $1",
-        [parseInt(id)]
+        [Number.parseInt(id)]
       );
 
       res.json({ success: true, message: "Reaction removed successfully" });
@@ -992,21 +992,21 @@ app.post(
       // Check if already bookmarked
       const existingBookmark = await pool.query(
         "SELECT id FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
+        [Number.parseInt(id), clerkUserId]
       );
 
       if (existingBookmark.rows.length > 0) {
         // Remove bookmark
         await pool.query(
           "DELETE FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
-          [parseInt(id), clerkUserId]
+          [Number.parseInt(id), clerkUserId]
         );
         res.json({ bookmarked: false, message: "Bookmark removed" });
       } else {
         // Add bookmark
         await pool.query(
           "INSERT INTO post_bookmarks (post_id, user_id) VALUES ($1, $2)",
-          [parseInt(id), clerkUserId]
+          [Number.parseInt(id), clerkUserId]
         );
         res.json({ bookmarked: true, message: "Post bookmarked" });
       }
@@ -1042,8 +1042,8 @@ app.get(
       LIMIT $2 OFFSET $3`,
         [
           clerkUserId,
-          parseInt(limit as string),
-          (parseInt(page as string) - 1) * parseInt(limit as string),
+          Number.parseInt(limit as string),
+          (Number.parseInt(page as string) - 1) * Number.parseInt(limit as string),
         ]
       );
 
@@ -1209,7 +1209,7 @@ app.get(
   async (req: Request, res: Response) => {
     try {
       const { clerkUserId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = Number.parseInt(req.query.limit as string) || 10;
 
       const result = await pool.query(
         `SELECT 
@@ -1312,7 +1312,7 @@ app.get(
       query += ` ORDER BY me.created_at DESC LIMIT $${paramIndex} OFFSET $${
         paramIndex + 1
       }`;
-      params.push(parseInt(limit), parseInt(offset));
+      params.push(Number.parseInt(limit), Number.parseInt(offset));
 
       const result = await pool.query(query, params);
 
@@ -1325,9 +1325,9 @@ app.get(
       res.json({
         moods: result.rows,
         count: result.rows.length,
-        total: parseInt(countResult.rows[0].count),
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        total: Number.parseInt(countResult.rows[0].count),
+        limit: Number.parseInt(limit),
+        offset: Number.parseInt(offset),
       });
     } catch (error: any) {
       console.error("Error fetching mood history:", error.message);
@@ -1348,7 +1348,7 @@ app.get(
       const { days = "30" } = req.query;
 
       // Convert days to string explicitly
-      const daysString = String(parseInt(days as string, 10) || 30);
+      const daysString = String(Number.parseInt(days as string, 10) || 30);
 
       const result = await pool.query(
         `SELECT 
@@ -1359,7 +1359,7 @@ app.get(
         get_mood_label(mood_type) as label
       FROM mood_entries
       WHERE clerk_user_id = $1
-        AND created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
+        AND created_at >= NOW() - INTERVAL '${Number.parseInt(daysString)} days'
       GROUP BY mood_type
       ORDER BY count DESC`,
         [clerkUserId]
@@ -1371,7 +1371,7 @@ app.get(
       FROM mood_factors mf
       JOIN mood_entries me ON mf.mood_entry_id = me.id
       WHERE me.clerk_user_id = $1
-        AND me.created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
+        AND me.created_at >= NOW() - INTERVAL '${Number.parseInt(daysString)} days'
       GROUP BY mf.factor
       ORDER BY count DESC
       LIMIT 10`,
@@ -1692,7 +1692,7 @@ app.get(
   async (req: Request, res: Response) => {
     try {
       const { clerkUserId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = Number.parseInt(req.query.limit as string) || 10;
 
       const result = await pool.query(
         `SELECT 
@@ -1789,7 +1789,7 @@ app.get(
       query += ` ORDER BY je.created_at DESC LIMIT $${paramIndex} OFFSET $${
         paramIndex + 1
       }`;
-      params.push(parseInt(limit), parseInt(offset));
+      params.push(Number.parseInt(limit), Number.parseInt(offset));
 
       const result = await pool.query(query, params);
 
@@ -1802,9 +1802,9 @@ app.get(
       res.json({
         entries: result.rows,
         count: result.rows.length,
-        total: parseInt(countResult.rows[0].count),
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        total: Number.parseInt(countResult.rows[0].count),
+        limit: Number.parseInt(limit),
+        offset: Number.parseInt(offset),
       });
     } catch (error: any) {
       console.error("Error fetching journal history:", error.message);
@@ -2416,14 +2416,14 @@ app.get(
 
       console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
 
-      const pageNum = parseInt(page) || 1;
-      const limitNum = parseInt(limit) || 50;
+      const pageNum = Number.parseInt(page) || 1;
+      const limitNum = Number.parseInt(limit) || 50;
       const skip = (pageNum - 1) * limitNum;
 
       // Verify user is participant
       const participant = await prisma.conversationParticipant.findFirst({
         where: {
-          conversation_id: parseInt(conversationId),
+          conversation_id: Number.parseInt(conversationId),
           user: {
             clerk_user_id: clerkUserId as string
           }
@@ -2441,7 +2441,7 @@ app.get(
       // Get messages
       const messages = await prisma.message.findMany({
         where: {
-          conversation_id: parseInt(conversationId)
+          conversation_id: Number.parseInt(conversationId)
         },
         include: {
           sender: {
@@ -2528,7 +2528,7 @@ app.post(
 
         const participant = await tx.conversationParticipant.findFirst({
           where: {
-            conversation_id: parseInt(conversationId),
+            conversation_id: Number.parseInt(conversationId),
             user_id: user.id
           }
         });
@@ -2540,7 +2540,7 @@ app.post(
         // Create message
         const message = await tx.message.create({
           data: {
-            conversation_id: parseInt(conversationId),
+            conversation_id: Number.parseInt(conversationId),
             sender_id: user.id,
             message_text: messageText.trim(),
             message_type: messageType
@@ -2560,7 +2560,7 @@ app.post(
 
         // Update conversation timestamp
         await tx.conversation.update({
-          where: { id: parseInt(conversationId) },
+          where: { id: Number.parseInt(conversationId) },
           data: { updated_at: new Date() }
         });
 
@@ -3040,8 +3040,8 @@ async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
 
 // Removed duplicate import of PrismaClient
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 
 const prisma = new PrismaClient();
 
@@ -3103,7 +3103,7 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
     // Verify participant
     const participant = await prisma.conversationParticipant.findFirst({
       where: {
-        conversation_id: parseInt(conversationId),
+        conversation_id: Number.parseInt(conversationId),
         user_id: user.id
       }
     });
@@ -3122,7 +3122,7 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
     // Create message with file attachment - FIXED VERSION
     const message = await prisma.message.create({
       data: {
-        conversation_id: parseInt(conversationId),
+        conversation_id: Number.parseInt(conversationId),
         sender_id: user.id,
         message_text: `Shared ${messageType}: ${req.file.originalname}`,
         message_type: messageType,
@@ -3145,7 +3145,7 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
 
     // Update conversation timestamp
     await prisma.conversation.update({
-      where: { id: parseInt(conversationId) },
+      where: { id: Number.parseInt(conversationId) },
       data: { updated_at: new Date() }
     });
 

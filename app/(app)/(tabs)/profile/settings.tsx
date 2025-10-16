@@ -19,6 +19,33 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
+// utils/settingsAPI.ts
+import { useAuth, useUser } from '@clerk/clerk-expo';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+
+export interface SettingsAPIResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  error?: string;
+}
+
+export interface LocalUserSettings {
+  // Display & Accessibility
+  darkMode: boolean;
+  textSize: string;
+  
+  // Privacy & Security
+  autoLockTimer: string;
+
+  // Notifications
+  notificationsEnabled: boolean;
+  quietHoursEnabled: boolean;
+  quietStartTime: string;
+  quietEndTime: string;
+  reminderFrequency: string;
+}
 
 /**
  * SettingsScreen Component
@@ -29,6 +56,7 @@ import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useUser();
 
   // Settings state - simplified based on requirements
   const [darkMode, setDarkMode] = useState(false);

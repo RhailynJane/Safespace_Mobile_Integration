@@ -1,7 +1,9 @@
--- Create user_settings table
-CREATE TABLE IF NOT EXISTS user_settings (
+-- Drop and recreate the table with proper constraints
+DROP TABLE IF EXISTS user_settings;
+
+CREATE TABLE user_settings (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE, -- ADD UNIQUE HERE
     clerk_user_id VARCHAR(255) UNIQUE NOT NULL,
     
     -- Display & Accessibility
@@ -23,5 +25,5 @@ CREATE TABLE IF NOT EXISTS user_settings (
 );
 
 -- Create index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_user_settings_clerk_user_id ON user_settings(clerk_user_id);
-CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
+CREATE INDEX idx_user_settings_clerk_user_id ON user_settings(clerk_user_id);
+CREATE INDEX idx_user_settings_user_id ON user_settings(user_id);
