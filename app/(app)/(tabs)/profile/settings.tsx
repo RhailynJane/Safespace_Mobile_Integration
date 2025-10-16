@@ -11,6 +11,7 @@ import {
   Switch,
   TextInput,
   Alert,
+  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -19,33 +20,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
-// utils/settingsAPI.ts
-import { useAuth, useUser } from '@clerk/clerk-expo';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-
-export interface SettingsAPIResponse {
-  success: boolean;
-  message: string;
-  data?: any;
-  error?: string;
-}
-
-export interface LocalUserSettings {
-  // Display & Accessibility
-  darkMode: boolean;
-  textSize: string;
-  
-  // Privacy & Security
-  autoLockTimer: string;
-
-  // Notifications
-  notificationsEnabled: boolean;
-  quietHoursEnabled: boolean;
-  quietStartTime: string;
-  quietEndTime: string;
-  reminderFrequency: string;
-}
 
 /**
  * SettingsScreen Component
@@ -56,9 +30,8 @@ export interface LocalUserSettings {
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useUser();
 
-  // Settings state - simplified based on requirements
+  // Settings state
   const [darkMode, setDarkMode] = useState(false);
   const [textSize, setTextSize] = useState("Medium");
   const [autoLockTimer, setAutoLockTimer] = useState("5 minutes");
@@ -81,18 +54,10 @@ export default function SettingsScreen() {
     loadSettings();
   }, []);
 
-  // Save settings to backend whenever they change (with debouncing)
+  // Apply settings when they change
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      saveSettings();
-    }, 500); // Debounce to avoid too many API calls
-
-    return () => clearTimeout(timeoutId);
-  }, [
-    darkMode, textSize, autoLockTimer,
-    notificationsEnabled, quietHoursEnabled, quietStartTime, 
-    quietEndTime, reminderFrequency
-  ]);
+    applySettings();
+  }, [darkMode, textSize, autoLockTimer]);
 
   /**
    * Loads settings from backend API
@@ -111,9 +76,6 @@ export default function SettingsScreen() {
       setQuietStartTime(settings.quietStartTime);
       setQuietEndTime(settings.quietEndTime);
       setReminderFrequency(settings.reminderFrequency);
-
-      // Apply dark mode globally immediately
-      applyDarkMode(settings.darkMode);
       
     } catch (error) {
       console.log('Error loading settings:', error);
@@ -140,13 +102,30 @@ export default function SettingsScreen() {
       };
 
       await settingsAPI.saveSettings(settings);
-      
-      // Apply dark mode globally when it changes
-      applyDarkMode(darkMode);
+      console.log('Settings saved successfully');
       
     } catch (error) {
       console.log('Error saving settings:', error);
-      // Don't show alert for every auto-save to avoid annoying the user
+      Alert.alert("Error", "Failed to save settings");
+    }
+  };
+
+  /**
+   * Applies all settings globally
+   */
+  const applySettings = async () => {
+    try {
+      // Apply dark mode globally
+      await applyDarkMode(darkMode);
+      
+      // Apply text size globally
+      await applyTextSize(textSize);
+      
+      // Apply auto-lock timer
+      await applyAutoLockTimer(autoLockTimer);
+      
+    } catch (error) {
+      console.log('Error applying settings:', error);
     }
   };
 
@@ -158,13 +137,108 @@ export default function SettingsScreen() {
       // Save to local storage for immediate access
       await AsyncStorage.setItem('appDarkMode', JSON.stringify(isDark));
       
-      // You can also trigger a global theme update here
-      // This would depend on your app's theme system
-      console.log('Dark mode applied:', isDark);
+      // Apply to entire app - you might need to modify this based on your app structure
+      // This would typically involve a context or global state management
+      console.log('Dark mode applied globally:', isDark);
+      
+      // Force re-render of all components to apply theme
+      // You might need to implement a theme context for this
       
     } catch (error) {
       console.log('Error applying dark mode:', error);
     }
+  };
+
+  /**
+   * Applies text size globally
+   */
+  const applyTextSize = async (size: string) => {
+    try {
+      await AsyncStorage.setItem('appTextSize', size);
+      
+      // Calculate font scale based on text size
+      let fontScale = 1.0;
+      switch (size) {
+        case "Small":
+          fontScale = 0.9;
+          break;
+        case "Medium":
+          fontScale = 1.5;
+          break;
+        case "Large":
+          fontScale = 2;
+          break;
+    
+      }
+      
+      await AsyncStorage.setItem('appFontScale', JSON.stringify(fontScale));
+      console.log('Text size applied:', size, 'Scale:', fontScale);
+      
+    } catch (error) {
+      console.log('Error applying text size:', error);
+    }
+  };
+
+  /**
+   * Applies auto-lock timer
+   */
+  const applyAutoLockTimer = async (timer: string) => {
+    try {
+      await AsyncStorage.setItem('appAutoLockTimer', timer);
+      
+      // Convert timer to milliseconds
+      let lockTimeMs = 0;
+      switch (timer) {
+        case "Immediate":
+          lockTimeMs = 0;
+          break;
+        case "1 minute":
+          lockTimeMs = 60 * 1000;
+          break;
+        case "5 minutes":
+          lockTimeMs = 5 * 60 * 1000;
+          break;
+        case "15 minutes":
+          lockTimeMs = 15 * 60 * 1000;
+          break;
+        case "Never":
+          lockTimeMs = -1;
+          break;
+      }
+      
+      await AsyncStorage.setItem('appAutoLockTimeMs', JSON.stringify(lockTimeMs));
+      console.log('Auto-lock timer applied:', timer, 'MS:', lockTimeMs);
+      
+    } catch (error) {
+      console.log('Error applying auto-lock timer:', error);
+    }
+  };
+
+  /**
+   * Handles dark mode toggle with immediate feedback
+   */
+  const handleDarkModeToggle = (value: boolean) => {
+    setDarkMode(value);
+    // Apply immediately
+    applyDarkMode(value);
+  };
+
+  /**
+   * Handles text size change with immediate feedback
+   */
+  const handleTextSizeChange = (size: string) => {
+    setTextSize(size);
+    // Apply immediately
+    applyTextSize(size);
+  };
+
+  /**
+   * Handles auto-lock timer change with immediate feedback
+   */
+  const handleAutoLockTimerChange = (timer: string) => {
+    setAutoLockTimer(timer);
+    // Apply immediately
+    applyAutoLockTimer(timer);
   };
 
   /**
@@ -189,7 +263,7 @@ export default function SettingsScreen() {
   const autoLockOptions = ["Immediate", "1 minute", "5 minutes", "15 minutes", "Never"];
   const reminderFrequencyOptions = ["Never", "Daily", "Twice daily", "Weekly"];
 
-  // Define theme colors - now applied globally
+  // Define theme colors based on dark mode
   const theme = {
     colors: {
       background: darkMode ? "#121212" : "#F5F5F5",
@@ -330,11 +404,17 @@ export default function SettingsScreen() {
   );
 
   return (
-    <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={styles.safeArea}>
         <AppHeader title="Profile Settings" showBack={true} />
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView 
+          contentContainerStyle={[
+            styles.scrollContainer, 
+            { backgroundColor: theme.colors.background }
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Display & Accessibility */}
           <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Display & Accessibility</Text>
@@ -343,7 +423,7 @@ export default function SettingsScreen() {
               "Dark Mode",
               "Switch between light and dark themes for the entire app",
               darkMode,
-              setDarkMode,
+              handleDarkModeToggle,
               "moon"
             )}
 
@@ -352,7 +432,7 @@ export default function SettingsScreen() {
               "Adjust text size for better readability",
               textSize,
               textSizeOptions,
-              setTextSize,
+              handleTextSizeChange,
               "text"
             )}
           </View>
@@ -366,7 +446,7 @@ export default function SettingsScreen() {
               "Automatically lock app after inactivity",
               autoLockTimer,
               autoLockOptions,
-              setAutoLockTimer,
+              handleAutoLockTimerChange,
               "time"
             )}
           </View>
@@ -415,6 +495,14 @@ export default function SettingsScreen() {
             )}
           </View>
 
+          {/* Save Button */}
+          <TouchableOpacity 
+            style={[styles.saveButton, { backgroundColor: theme.colors.primary }]}
+            onPress={saveSettings}
+          >
+            <Text style={styles.saveButtonText}>Save Settings</Text>
+          </TouchableOpacity>
+
           {/* Loading Indicator */}
           {isLoading && (
             <View style={styles.loadingContainer}>
@@ -431,7 +519,7 @@ export default function SettingsScreen() {
           onTabPress={handleTabPress}
         />
       </SafeAreaView>
-    </CurvedBackground>
+    </View>
   );
 }
 
@@ -439,23 +527,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+  safeArea: {
+    flex: 1,
   },
   scrollContainer: {
+    flexGrow: 1,
     paddingBottom: 100,
+    paddingHorizontal: 16,
   },
   section: {
-    marginHorizontal: 20,
     marginVertical: 10,
     borderRadius: 15,
     padding: 20,
@@ -466,7 +546,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
     marginBottom: 15,
   },
@@ -490,11 +570,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
   },
   settingSubtitle: {
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 2,
   },
   settingRight: {
@@ -513,25 +593,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 6,
     fontSize: 14,
-    width: 60,
-    textAlign: "center" as const,
+    width: 70,
+    textAlign: "center",
   },
   timeSeparator: {
     fontSize: 14,
     marginHorizontal: 8,
-  },
-  enabledIndicator: {
-    backgroundColor: "#E8F5E8",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  enabledText: {
-    fontSize: 12,
-    color: "#4CAF50",
-    fontWeight: "500",
   },
   nestedSettings: {
     marginLeft: 32,
@@ -545,35 +614,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: "italic",
   },
-});
-
-const bottomNavStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  saveButton: {
+    margin: 20,
+    padding: 16,
+    borderRadius: 10,
     alignItems: "center",
-    paddingVertical: 16,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
   },
-  tab: {
-    alignItems: "center",
-    padding: 8,
-  },
-  tabText: {
-    fontSize: 12,
-    marginTop: 4,
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

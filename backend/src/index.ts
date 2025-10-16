@@ -3653,39 +3653,65 @@ app.put(
 
       const userId = userResult.rows[0].id;
 
-      // Upsert settings
-      const result = await pool.query(
-        `INSERT INTO user_settings (
-          user_id, clerk_user_id, 
-          dark_mode, text_size,
-          auto_lock_timer,
-          notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        ON CONFLICT (user_id) 
-        DO UPDATE SET 
-          dark_mode = COALESCE($3, user_settings.dark_mode),
-          text_size = COALESCE($4, user_settings.text_size),
-          auto_lock_timer = COALESCE($5, user_settings.auto_lock_timer),
-          notifications_enabled = COALESCE($6, user_settings.notifications_enabled),
-          quiet_hours_enabled = COALESCE($7, user_settings.quiet_hours_enabled),
-          quiet_start_time = COALESCE($8, user_settings.quiet_start_time),
-          quiet_end_time = COALESCE($9, user_settings.quiet_end_time),
-          reminder_frequency = COALESCE($10, user_settings.reminder_frequency),
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING *`,
-        [
-          userId,
-          clerkUserId,
-          settings.darkMode,
-          settings.textSize,
-          settings.autoLockTimer,
-          settings.notificationsEnabled,
-          settings.quietHoursEnabled,
-          settings.quietStartTime,
-          settings.quietEndTime,
-          settings.reminderFrequency,
-        ]
+      // Check if settings already exist
+      const existingSettings = await pool.query(
+        "SELECT id FROM user_settings WHERE user_id = $1",
+        [userId]
       );
+
+      let result;
+      
+      if (existingSettings.rows.length > 0) {
+        // UPDATE existing settings
+        result = await pool.query(
+          `UPDATE user_settings 
+           SET 
+             dark_mode = COALESCE($1, dark_mode),
+             text_size = COALESCE($2, text_size),
+             auto_lock_timer = COALESCE($3, auto_lock_timer),
+             notifications_enabled = COALESCE($4, notifications_enabled),
+             quiet_hours_enabled = COALESCE($5, quiet_hours_enabled),
+             quiet_start_time = COALESCE($6, quiet_start_time),
+             quiet_end_time = COALESCE($7, quiet_end_time),
+             reminder_frequency = COALESCE($8, reminder_frequency),
+             updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = $9
+           RETURNING *`,
+          [
+            settings.darkMode,
+            settings.textSize,
+            settings.autoLockTimer,
+            settings.notificationsEnabled,
+            settings.quietHoursEnabled,
+            settings.quietStartTime,
+            settings.quietEndTime,
+            settings.reminderFrequency,
+            userId
+          ]
+        );
+      } else {
+        // INSERT new settings
+        result = await pool.query(
+          `INSERT INTO user_settings (
+            user_id, clerk_user_id, 
+            dark_mode, text_size, auto_lock_timer,
+            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *`,
+          [
+            userId,
+            clerkUserId,
+            settings.darkMode ?? false,
+            settings.textSize ?? 'Medium',
+            settings.autoLockTimer ?? '5 minutes',
+            settings.notificationsEnabled ?? true,
+            settings.quietHoursEnabled ?? false,
+            settings.quietStartTime ?? '22:00',
+            settings.quietEndTime ?? '08:00',
+            settings.reminderFrequency ?? 'Daily'
+          ]
+        );
+      }
 
       console.log('✅ Settings updated successfully:', result.rows[0]);
       res.json({
