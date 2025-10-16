@@ -3915,7 +3915,9 @@ app.get('/api/help-sections', async (req, res) => {
         }
       } else {
         // Initialize empty content array
-        sections.forEach(section => section.content = []);
+        for (const section of sections) {
+          section.content = [];
+        }
       }
 
       res.json(sections);

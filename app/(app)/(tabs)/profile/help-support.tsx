@@ -15,12 +15,19 @@ import { router } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { fetchAllHelpData, trackHelpSectionView, HelpSection, HelpItem } from "../../../../utils/helpService";
+import {
+  fetchAllHelpData,
+  trackHelpSectionView,
+  HelpSection,
+  HelpItem,
+} from "../../../../utils/helpService";
 
 const HelpSupportScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState("profile");
   const [helpSections, setHelpSections] = useState<HelpSection[]>([]);
-  const [expandedSections, setExpandedSections] = useState<string[]>(["getting_started"]);
+  const [expandedSections, setExpandedSections] = useState<string[]>([
+    "getting_started",
+  ]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -80,7 +87,14 @@ const HelpSupportScreen: React.FC = () => {
   const renderHelpItem = (item: HelpItem, index: number) => (
     <View key={index} style={styles.helpItem}>
       <Text style={styles.helpItemTitle}>{item.title}</Text>
-      <Text style={styles.helpItemContent}>{item.content}</Text>
+      <Text style={styles.helpItemContent}>
+        {item.content.split("\n").map((line, i) => (
+          <Text key={i}>
+            {line}
+            {"\n"}
+          </Text>
+        ))}
+      </Text>
     </View>
   );
 
@@ -93,12 +107,8 @@ const HelpSupportScreen: React.FC = () => {
           style={styles.sectionHeader}
           onPress={() => toggleSection(section.id)}
         >
-          <Text style={styles.sectionTitle}>
-            {section.title}
-          </Text>
-          <Text style={styles.expandIcon}>
-            {isExpanded ? "−" : "+"}
-          </Text>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+          <Text style={styles.expandIcon}>{isExpanded ? "−" : "+"}</Text>
         </TouchableOpacity>
 
         {isExpanded && (
@@ -128,7 +138,7 @@ const HelpSupportScreen: React.FC = () => {
     <CurvedBackground>
       <SafeAreaView style={styles.container}>
         <AppHeader title="Help & Support" showBack={true} />
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -154,7 +164,7 @@ const HelpSupportScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </ScrollView>
-        
+
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -253,6 +263,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 15,
     borderRadius: 30,
+    marginBottom: 50,
+    minWidth: 200,
   },
   contactButtonText: {
     color: "white",
