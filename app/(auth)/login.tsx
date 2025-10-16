@@ -27,6 +27,24 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+
+  // Function to update login timestamp
+  const updateLoginTimestamp = async (clerkUserId: string) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      console.log('Login timestamp updated successfully');
+    } catch (error) {
+      console.error('Failed to update login timestamp:', error);
+      // Don't throw error - continue with login even if timestamp update fails
+    }
+  };
+
   const handleSignIn = async () => {
     if (!isLoaded) {
       setError("Authentication service not ready");
@@ -44,6 +62,13 @@ export default function LoginScreen() {
 
       if (signInAttempt.status === "complete") {
         await setActive({ session: signInAttempt.createdSessionId });
+        
+        // Update login timestamp after successful login
+        const clerkUserId = signInAttempt.createdSessionId;
+        if (clerkUserId) {
+          await updateLoginTimestamp(clerkUserId);
+        }
+        
         router.replace("/(app)/(tabs)/home");
       } else {
         setError("Sign in process incomplete. Please try again.");
@@ -171,7 +196,7 @@ export default function LoginScreen() {
                 disabled={loading}
               >
                 <Text style={styles.footerText}>
-                  Don't have an account?{" "}
+                  Dont have an account?{" "}
                   <Text style={styles.linkText}>Sign Up</Text>
                 </Text>
               </TouchableOpacity>

@@ -4110,6 +4110,7 @@ app.post('/api/users/:clerkUserId/login', async (req, res) => {
       const updateQuery = `
         UPDATE users 
         SET last_login_at = CURRENT_TIMESTAMP,
+            last_login = CURRENT_TIMESTAMP,
             last_active_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
         WHERE clerk_user_id = $1

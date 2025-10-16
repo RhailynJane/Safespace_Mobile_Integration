@@ -221,6 +221,9 @@ export default function ProfileScreen() {
     }
   };
 
+  const API_BASE_URL =
+    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+
   const handleLogout = async (user: any) => {
     try {
       console.log("Signout initiated...");
@@ -231,15 +234,12 @@ export default function ProfileScreen() {
       // Update logout timestamp in database
       if (clerkUserId) {
         try {
-          await fetch(
-            `${process.env.EXPO_PUBLIC_API_URL}/api/users/${clerkUserId}/logout`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
+          await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/logout`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
           console.log("Logout timestamp updated in database");
         } catch (dbError) {
           console.error("Failed to update logout timestamp:", dbError);
@@ -259,37 +259,8 @@ export default function ProfileScreen() {
       console.log("Navigation to login completed");
     } catch (error) {
       console.error("Signout error:", error);
-
-      // Force navigation even on error
-      try {
-        router.navigate("/(auth)/login");
-      } catch (navError) {
-        console.error("Navigation failed:", navError);
-      }
-
-      Alert.alert(
-        "Sign Out Issue",
-        "You have been signed out locally. Please restart the app if you encounter issues.",
-        [{ text: "OK" }]
-      );
+      router.navigate("/(auth)/login");
     }
-  };
-
-  // Usage with confirmation
-  const confirmLogout = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          handleLogout(user);
-        },
-      },
-    ]);
   };
 
   const getFullName = () => {
