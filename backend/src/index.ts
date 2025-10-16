@@ -3852,3 +3852,211 @@ app.patch(
     }
   }
 );
+// =============================================
+// HELP ENDPOINTS
+// =============================================
+
+interface HelpItem {
+  id?: string;
+  title: string;
+  content: string;
+  type?: 'guide' | 'faq' | 'contact';
+  sort_order?: number;
+  related_features?: string[];
+  estimated_read_time?: number;
+  last_updated?: string;
+}
+
+interface HelpSection {
+  id: string;
+  title: string;
+  icon: string;
+  content: HelpItem[];
+  expanded?: boolean;
+  sort_order?: number;
+  description?: string;
+  category?: 'getting_started' | 'features' | 'support' | 'privacy' | 'troubleshooting';
+  priority?: 'high' | 'medium' | 'low';
+}
+
+// Help endpoints
+app.get('/api/help-sections', async (req, res) => {
+  try {
+    const { include } = req.query;
+    const client = await pool.connect();
+
+    try {
+      // Fetch all help sections
+      const sectionsQuery = `
+        SELECT id, title, icon, sort_order, created_at, updated_at 
+        FROM help_sections 
+        ORDER BY sort_order ASC
+      `;
+      const sectionsResult = await client.query(sectionsQuery);
+      
+      const sections: HelpSection[] = sectionsResult.rows;
+
+      // If include=items, fetch items for each section
+      if (include === 'items') {
+        for (const section of sections) {
+          const itemsQuery = `
+            SELECT id, title, content, type, sort_order, created_at, updated_at
+            FROM help_items 
+            WHERE section_id = $1 
+            ORDER BY sort_order ASC
+          `;
+          const itemsResult = await client.query(itemsQuery, [section.id]);
+          section.content = itemsResult.rows.map(item => ({
+            ...item,
+            related_features: [],
+            estimated_read_time: Math.ceil(item.content.length / 200), // ~200 chars per minute
+            last_updated: item.updated_at
+          }));
+        }
+      } else {
+        // Initialize empty content array
+        sections.forEach(section => section.content = []);
+      }
+
+      res.json(sections);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error fetching help sections:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch help sections',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.get('/api/help-sections/:sectionId/items', async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      // First verify the section exists
+      const sectionCheck = await client.query(
+        'SELECT id FROM help_sections WHERE id = $1',
+        [sectionId]
+      );
+
+      if (sectionCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Help section not found' });
+      }
+
+      // Fetch items for the specific section
+      const itemsQuery = `
+        SELECT id, title, content, type, sort_order, created_at, updated_at
+        FROM help_items 
+        WHERE section_id = $1 
+        ORDER BY sort_order ASC
+      `;
+      const itemsResult = await client.query(itemsQuery, [sectionId]);
+
+      const items: HelpItem[] = itemsResult.rows.map(item => ({
+        ...item,
+        related_features: [],
+        estimated_read_time: Math.ceil(item.content.length / 200), // ~200 chars per minute
+        last_updated: item.updated_at
+      }));
+
+      res.json(items);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error fetching help items:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch help items',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.get('/api/help/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Query parameter "q" is required' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      const searchQuery = `
+        SELECT hi.id, hi.title, hi.content, hi.type, hi.section_id, hs.title as section_title
+        FROM help_items hi
+        JOIN help_sections hs ON hi.section_id = hs.id
+        WHERE hi.title ILIKE $1 OR hi.content ILIKE $1
+        ORDER BY 
+          CASE 
+            WHEN hi.title ILIKE $1 THEN 1
+            ELSE 2
+          END,
+          hi.sort_order ASC
+      `;
+      
+      const searchResult = await client.query(searchQuery, [`%${q}%`]);
+
+      const items: HelpItem[] = searchResult.rows.map(item => ({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        type: item.type,
+        related_features: [],
+        estimated_read_time: Math.ceil(item.content.length / 200),
+        last_updated: item.updated_at
+      }));
+
+      res.json(items);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error searching help content:', error);
+    res.status(500).json({ 
+      error: 'Failed to search help content',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/api/help-sections/:sectionId/view', async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      // Verify section exists
+      const sectionCheck = await client.query(
+        'SELECT id FROM help_sections WHERE id = $1',
+        [sectionId]
+      );
+
+      if (sectionCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Help section not found' });
+      }
+
+      // In a real app, you might want to:
+      // 1. Track user ID if authenticated
+      // 2. Store view timestamps
+      // 3. Update analytics
+      
+      console.log(`Help section viewed: ${sectionId}`);
+      
+      res.json({ success: true, message: 'View tracked' });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error tracking help section view:', error);
+    res.status(500).json({ 
+      error: 'Failed to track view',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
