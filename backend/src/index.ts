@@ -2271,354 +2271,6 @@ app.get("/api/external/affirmation", async (req, res) => {
   }
 });
 
-// =============================================
-// SETTINGS ENDPOINTS
-// =============================================
-
-// Interfaces for Settings
-interface UserSettings {
-  // Display & Accessibility
-  darkMode: boolean;
-  textSize: string;
-  highContrast: boolean;
-  reduceMotion: boolean;
-
-  // Privacy & Security
-  biometricLock: boolean;
-  autoLockTimer: string;
-
-  // Notifications
-  notificationsEnabled: boolean;
-  quietHoursEnabled: boolean;
-  quietStartTime: string;
-  quietEndTime: string;
-  reminderFrequency: string;
-
-  // Contacts
-  crisisContact: string;
-  therapistContact: string;
-
-  // Wellbeing
-  safeMode: boolean;
-  breakReminders: boolean;
-  breathingDuration: string;
-  breathingStyle: string;
-  offlineMode: boolean;
-}
-
-interface UpdateSettingsRequest {
-  clerkUserId: string;
-  settings: Partial<UserSettings>;
-}
-
-// Get user settings
-app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
-
-    // Get user's internal ID
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const userId = userResult.rows[0].id;
-
-    // Get user settings
-    const result = await pool.query(
-      `SELECT * FROM user_settings WHERE user_id = $1`,
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
-      // Return default settings if none exist
-      return res.json({
-        settings: {
-          darkMode: false,
-          textSize: "Medium",
-          highContrast: false,
-          reduceMotion: false,
-          biometricLock: false,
-          autoLockTimer: "5 minutes",
-          notificationsEnabled: true,
-          quietHoursEnabled: false,
-          quietStartTime: "22:00",
-          quietEndTime: "08:00",
-          reminderFrequency: "Daily",
-          crisisContact: "",
-          therapistContact: "",
-          safeMode: false,
-          breakReminders: true,
-          breathingDuration: "5 minutes",
-          breathingStyle: "4-7-8 Technique",
-          offlineMode: false,
-        },
-      });
-    }
-
-    res.json({ settings: result.rows[0] });
-  } catch (error: any) {
-    console.error("Error fetching settings:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch settings",
-      details: error.message,
-    });
-  }
-});
-
-// Update user settings
-app.put(
-  "/api/settings/:clerkUserId",
-  async (
-    req: Request<
-      { clerkUserId: string },
-      {},
-      { settings: Partial<UserSettings> }
-    >,
-    res: Response
-  ) => {
-    try {
-      const { clerkUserId } = req.params;
-      const { settings } = req.body;
-
-      if (!settings) {
-        return res.status(400).json({ error: "Settings data is required" });
-      }
-
-      // Get user's internal ID
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      // Upsert settings
-      const result = await pool.query(
-        `INSERT INTO user_settings (
-          user_id, clerk_user_id, 
-          dark_mode, text_size, high_contrast, reduce_motion,
-          biometric_lock, auto_lock_timer,
-          notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
-          crisis_contact, therapist_contact,
-          safe_mode, break_reminders, breathing_duration, breathing_style, offline_mode
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-        ON CONFLICT (user_id) 
-        DO UPDATE SET 
-          dark_mode = COALESCE($3, user_settings.dark_mode),
-          text_size = COALESCE($4, user_settings.text_size),
-          high_contrast = COALESCE($5, user_settings.high_contrast),
-          reduce_motion = COALESCE($6, user_settings.reduce_motion),
-          biometric_lock = COALESCE($7, user_settings.biometric_lock),
-          auto_lock_timer = COALESCE($8, user_settings.auto_lock_timer),
-          notifications_enabled = COALESCE($9, user_settings.notifications_enabled),
-          quiet_hours_enabled = COALESCE($10, user_settings.quiet_hours_enabled),
-          quiet_start_time = COALESCE($11, user_settings.quiet_start_time),
-          quiet_end_time = COALESCE($12, user_settings.quiet_end_time),
-          reminder_frequency = COALESCE($13, user_settings.reminder_frequency),
-          crisis_contact = COALESCE($14, user_settings.crisis_contact),
-          therapist_contact = COALESCE($15, user_settings.therapist_contact),
-          safe_mode = COALESCE($16, user_settings.safe_mode),
-          break_reminders = COALESCE($17, user_settings.break_reminders),
-          breathing_duration = COALESCE($18, user_settings.breathing_duration),
-          breathing_style = COALESCE($19, user_settings.breathing_style),
-          offline_mode = COALESCE($20, user_settings.offline_mode),
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING *`,
-        [
-          userId,
-          clerkUserId,
-          settings.darkMode,
-          settings.textSize,
-          settings.highContrast,
-          settings.reduceMotion,
-          settings.biometricLock,
-          settings.autoLockTimer,
-          settings.notificationsEnabled,
-          settings.quietHoursEnabled,
-          settings.quietStartTime,
-          settings.quietEndTime,
-          settings.reminderFrequency,
-          settings.crisisContact,
-          settings.therapistContact,
-          settings.safeMode,
-          settings.breakReminders,
-          settings.breathingDuration,
-          settings.breathingStyle,
-          settings.offlineMode,
-        ]
-      );
-
-      res.json({
-        success: true,
-        message: "Settings updated successfully",
-        settings: result.rows[0],
-      });
-    } catch (error: any) {
-      console.error("Error updating settings:", error.message);
-      res.status(500).json({
-        error: "Failed to update settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Batch update specific setting categories
-app.patch(
-  "/api/settings/:clerkUserId/category/:category",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId, category } = req.params;
-      const updates = req.body;
-
-      // Validate category
-      const validCategories = [
-        "display",
-        "privacy",
-        "notifications",
-        "contacts",
-        "wellbeing",
-      ];
-      if (!validCategories.includes(category)) {
-        return res.status(400).json({ error: "Invalid settings category" });
-      }
-
-      // Get user's internal ID
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      // Build dynamic update query based on category
-      let updateFields: string[] = [];
-      let updateValues: any[] = [userId];
-      let paramIndex = 2;
-
-      Object.keys(updates).forEach((key) => {
-        const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-        updateFields.push(`${snakeKey} = $${paramIndex}`);
-        updateValues.push(updates[key]);
-        paramIndex++;
-      });
-
-      if (updateFields.length === 0) {
-        return res.status(400).json({ error: "No valid updates provided" });
-      }
-
-      const query = `
-        UPDATE user_settings 
-        SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $1
-        RETURNING *
-      `;
-
-      const result = await pool.query(query, updateValues);
-
-      res.json({
-        success: true,
-        message: `${category} settings updated successfully`,
-        settings: result.rows[0],
-      });
-    } catch (error: any) {
-      console.error("Error updating category settings:", error.message);
-      res.status(500).json({
-        error: "Failed to update settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Reset settings to default
-app.post(
-  "/api/settings/:clerkUserId/reset",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId } = req.params;
-
-      // Get user's internal ID
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      // Delete existing settings (will trigger default values on next fetch)
-      await pool.query("DELETE FROM user_settings WHERE user_id = $1", [
-        userId,
-      ]);
-
-      res.json({
-        success: true,
-        message: "Settings reset to defaults successfully",
-      });
-    } catch (error: any) {
-      console.error("Error resetting settings:", error.message);
-      res.status(500).json({
-        error: "Failed to reset settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Export settings (for backup/migration)
-app.get(
-  "/api/settings/:clerkUserId/export",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId } = req.params;
-
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      const result = await pool.query(
-        "SELECT * FROM user_settings WHERE user_id = $1",
-        [userId]
-      );
-
-      res.json({
-        exportDate: new Date().toISOString(),
-        settings: result.rows[0] || {},
-      });
-    } catch (error: any) {
-      console.error("Error exporting settings:", error.message);
-      res.status(500).json({
-        error: "Failed to export settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
 
 // =============================================
 // MESSAGING ENDPOINTS - PRISMA VERSION
@@ -3884,3 +3536,293 @@ app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, r
     });
   }
 });
+
+// =============================================
+// SETTINGS ENDPOINTS - ADD THESE TO YOUR BACKEND
+// =============================================
+
+// Interfaces for Settings
+interface UserSettings {
+  // Display & Accessibility
+  darkMode: boolean;
+  textSize: string;
+  
+  // Privacy & Security
+  autoLockTimer: string;
+
+  // Notifications
+  notificationsEnabled: boolean;
+  quietHoursEnabled: boolean;
+  quietStartTime: string;
+  quietEndTime: string;
+  reminderFrequency: string;
+}
+
+// Get user settings
+app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    console.log('🔧 Fetching settings for user:', clerkUserId);
+
+    // Get user's internal ID
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: "User not found" 
+      });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Get user settings
+    const result = await pool.query(
+      `SELECT * FROM user_settings WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      // Return default settings if none exist
+      console.log('🔧 No settings found, returning defaults');
+      return res.json({
+        success: true,
+        settings: {
+          dark_mode: false,
+          text_size: "Medium",
+          auto_lock_timer: "5 minutes",
+          notifications_enabled: true,
+          quiet_hours_enabled: false,
+          quiet_start_time: "22:00",
+          quiet_end_time: "08:00",
+          reminder_frequency: "Daily",
+        },
+      });
+    }
+
+    console.log('🔧 Settings found:', result.rows[0]);
+    res.json({
+      success: true,
+      settings: result.rows[0],
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching settings:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch settings",
+      details: error.message,
+    });
+  }
+});
+
+// Update user settings
+app.put(
+  "/api/settings/:clerkUserId",
+  async (
+    req: Request<{ clerkUserId: string }, {}, { settings: Partial<UserSettings> }>,
+    res: Response
+  ) => {
+    try {
+      const { clerkUserId } = req.params;
+      const { settings } = req.body;
+
+      console.log('🔧 Updating settings for user:', clerkUserId, settings);
+
+      if (!settings) {
+        return res.status(400).json({ 
+          success: false,
+          error: "Settings data is required" 
+        });
+      }
+
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          error: "User not found" 
+        });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Upsert settings
+      const result = await pool.query(
+        `INSERT INTO user_settings (
+          user_id, clerk_user_id, 
+          dark_mode, text_size,
+          auto_lock_timer,
+          notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (user_id) 
+        DO UPDATE SET 
+          dark_mode = COALESCE($3, user_settings.dark_mode),
+          text_size = COALESCE($4, user_settings.text_size),
+          auto_lock_timer = COALESCE($5, user_settings.auto_lock_timer),
+          notifications_enabled = COALESCE($6, user_settings.notifications_enabled),
+          quiet_hours_enabled = COALESCE($7, user_settings.quiet_hours_enabled),
+          quiet_start_time = COALESCE($8, user_settings.quiet_start_time),
+          quiet_end_time = COALESCE($9, user_settings.quiet_end_time),
+          reminder_frequency = COALESCE($10, user_settings.reminder_frequency),
+          updated_at = CURRENT_TIMESTAMP
+        RETURNING *`,
+        [
+          userId,
+          clerkUserId,
+          settings.darkMode,
+          settings.textSize,
+          settings.autoLockTimer,
+          settings.notificationsEnabled,
+          settings.quietHoursEnabled,
+          settings.quietStartTime,
+          settings.quietEndTime,
+          settings.reminderFrequency,
+        ]
+      );
+
+      console.log('✅ Settings updated successfully:', result.rows[0]);
+      res.json({
+        success: true,
+        message: "Settings updated successfully",
+        settings: result.rows[0],
+      });
+    } catch (error: any) {
+      console.error("❌ Error updating settings:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update settings",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// Reset settings to default
+app.post(
+  "/api/settings/:clerkUserId/reset",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+      console.log('🔧 Resetting settings for user:', clerkUserId);
+
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          error: "User not found" 
+        });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Delete existing settings (will trigger default values on next fetch)
+      await pool.query("DELETE FROM user_settings WHERE user_id = $1", [
+        userId,
+      ]);
+
+      console.log('✅ Settings reset successfully');
+      res.json({
+        success: true,
+        message: "Settings reset to defaults successfully",
+      });
+    } catch (error: any) {
+      console.error("❌ Error resetting settings:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to reset settings",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// Update settings category
+app.patch(
+  "/api/settings/:clerkUserId/category/:category",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId, category } = req.params;
+      const updates = req.body;
+
+      console.log('🔧 Updating category:', category, 'for user:', clerkUserId, updates);
+
+      // Validate category
+      const validCategories = ["display", "privacy", "notifications"];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ 
+          success: false,
+          error: "Invalid settings category" 
+        });
+      }
+
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          error: "User not found" 
+        });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Build dynamic update query based on category
+      let updateFields: string[] = [];
+      let updateValues: any[] = [userId];
+      let paramIndex = 2;
+
+      Object.keys(updates).forEach((key) => {
+        const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+        updateFields.push(`${snakeKey} = $${paramIndex}`);
+        updateValues.push(updates[key]);
+        paramIndex++;
+      });
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ 
+          success: false,
+          error: "No valid updates provided" 
+        });
+      }
+
+      const query = `
+        UPDATE user_settings 
+        SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $1
+        RETURNING *
+      `;
+
+      const result = await pool.query(query, updateValues);
+
+      console.log('✅ Category settings updated successfully');
+      res.json({
+        success: true,
+        message: `${category} settings updated successfully`,
+        settings: result.rows[0],
+      });
+    } catch (error: any) {
+      console.error("❌ Error updating category settings:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update settings",
+        details: error.message,
+      });
+    }
+  }
+);
