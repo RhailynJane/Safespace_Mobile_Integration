@@ -3538,7 +3538,7 @@ app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, r
 });
 
 // =============================================
-// SETTINGS ENDPOINTS - ADD THESE TO YOUR BACKEND
+// SETTINGS ENDPOINTS 
 // =============================================
 
 // Interfaces for Settings

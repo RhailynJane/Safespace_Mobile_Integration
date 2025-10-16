@@ -1,7 +1,7 @@
 // utils/settingsAPI.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
 
 export interface SettingsAPIResponse {
   success: boolean;
@@ -52,28 +52,36 @@ class SettingsAPI {
   async fetchSettings(): Promise<UserSettings> {
     try {
       const clerkUserId = await this.getClerkUserId();
+      console.log('🔧 Fetching settings for user:', clerkUserId);
       
-      const response = await fetch(`${this.baseURL}/settings/${clerkUserId}`, {
+      const response = await fetch(`${this.baseURL}/api/settings/${clerkUserId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         }
       });
 
+      console.log('🔧 Response status:', response.status);
+
       if (!response.ok) {
+        if (response.status === 404) {
+          console.log('🔧 Settings not found, returning defaults');
+          return this.getDefaultSettings();
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
+      console.log('🔧 Settings API result:', result);
       
       if (result.success && result.settings) {
         return this.mapServerToClient(result.settings);
       } else {
-        // Return default settings if none exist
+        console.log('🔧 No settings in response, returning defaults');
         return this.getDefaultSettings();
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error('❌ Error fetching settings:', error);
       // Return default settings on error
       return this.getDefaultSettings();
     }
@@ -82,10 +90,11 @@ class SettingsAPI {
   async saveSettings(settings: UserSettings): Promise<SettingsAPIResponse> {
     try {
       const clerkUserId = await this.getClerkUserId();
+      console.log('🔧 Saving settings for user:', clerkUserId, settings);
       
       const mappedSettings = this.mapClientToServer(settings);
 
-      const response = await fetch(`${this.baseURL}/settings/${clerkUserId}`, {
+      const response = await fetch(`${this.baseURL}/api/settings/${clerkUserId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -93,13 +102,17 @@ class SettingsAPI {
         body: JSON.stringify({ settings: mappedSettings })
       });
 
+      console.log('🔧 Save response status:', response.status);
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log('🔧 Save settings result:', result);
+      return result;
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('❌ Error saving settings:', error);
       throw error;
     }
   }
@@ -108,7 +121,7 @@ class SettingsAPI {
     try {
       const clerkUserId = await this.getClerkUserId();
       
-      const response = await fetch(`${this.baseURL}/settings/${clerkUserId}/category/${category}`, {
+      const response = await fetch(`${this.baseURL}/api/settings/${clerkUserId}/category/${category}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +144,7 @@ class SettingsAPI {
     try {
       const clerkUserId = await this.getClerkUserId();
       
-      const response = await fetch(`${this.baseURL}/settings/${clerkUserId}/reset`, {
+      const response = await fetch(`${this.baseURL}/api/settings/${clerkUserId}/reset`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -150,6 +163,7 @@ class SettingsAPI {
   }
 
   private mapServerToClient(serverData: any): UserSettings {
+    console.log('🔧 Mapping server data to client:', serverData);
     return {
       // Display & Accessibility
       darkMode: serverData.dark_mode || false,
