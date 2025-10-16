@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // app/(app)/(tabs)/profile/settings.tsx
 import React, { useState, useEffect } from "react";
 import {
