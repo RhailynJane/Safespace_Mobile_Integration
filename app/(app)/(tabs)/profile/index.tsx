@@ -221,47 +221,50 @@ export default function ProfileScreen() {
     }
   };
 
-  const API_BASE_URL =
-    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
   const handleLogout = async (user: any) => {
     try {
-      console.log("Signout initiated...");
-
+      console.log('Signout initiated...');
+      
       // Get current user info before signing out
       const clerkUserId = user?.id;
-
-      // Update logout timestamp in database
-      if (clerkUserId) {
-        try {
-          await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/logout`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-          console.log("Logout timestamp updated in database");
-        } catch (dbError) {
-          console.error("Failed to update logout timestamp:", dbError);
-          // Continue with logout even if DB update fails
-        }
+    
+    // Update logout timestamp in database
+    if (clerkUserId) {
+      try {
+        await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('Logout timestamp updated in database');
+      } catch (dbError) {
+        console.error('Failed to update logout timestamp:', dbError);
+        // Continue with logout even if DB update fails
       }
-
-      await AsyncStorage.clear();
-      console.log("AsyncStorage cleared");
-
-      if (signOut) {
-        await signOut();
-        console.log("Clerk signout successful");
-      }
-
-      router.navigate("/(auth)/login");
-      console.log("Navigation to login completed");
-    } catch (error) {
-      console.error("Signout error:", error);
-      router.navigate("/(auth)/login");
     }
+    
+    await AsyncStorage.clear();
+    console.log('AsyncStorage cleared');
+    
+    if (signOut) {
+      await signOut();
+      console.log('Clerk signout successful');
+    }
+    
+    router.navigate("/(auth)/login");
+    console.log('Navigation to login completed');
+    
+  } catch (error) {
+    console.error("Signout error:", error);
+    router.navigate("/(auth)/login");
+  }
+
+
   };
+
 
   const getFullName = () => {
     if (profileData.firstName && profileData.lastName) {
