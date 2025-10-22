@@ -266,9 +266,8 @@ export default function MessagesScreen() {
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading messages...</Text>
-        <Text style={[styles.statusText, { color: theme.colors.textSecondary }]}>{sendbirdStatus}</Text>
       </View>
     );
   }
@@ -294,7 +293,7 @@ export default function MessagesScreen() {
               colors={["#5296EA", "#489EEA", "#459EEA", "#4896EA"]}
               style={styles.newMessageButtonGradient}
             >
-              <Text style={styles.newMessageButtonText}>+ New Message</Text>
+              <Text style={[styles.newMessageButtonText, { color: '#FFF' }]}>+ New Message</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -335,43 +334,22 @@ export default function MessagesScreen() {
               }
             </Text>
             <TouchableOpacity onPress={clearSearch}>
-              <Text style={styles.clearSearchText}>Clear</Text>
+              <Text style={[styles.clearSearchText, { color: theme.colors.primary }]}>Clear</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Connection Status */}
-        <View
-          style={[
-            styles.statusIndicator,
-            {
-              backgroundColor: messagingService.isSendBirdEnabled()
-                ? "#4CAF50"
-                : "#FF9800",
-            },
-          ]}
-        >
-          <Ionicons
-            name={
-              messagingService.isSendBirdEnabled()
-                ? "checkmark-circle"
-                : "warning"
-            }
-            size={16}
-            color="#FFF"
-          />
-          <Text style={styles.statusIndicatorText}>{sendbirdStatus}</Text>
-        </View>
+        {/* Connection Status removed per request */}
 
         {/* Conversation List */}
-        <View style={styles.conversationContainer}>
+  <View style={[styles.conversationContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <ScrollView
             style={styles.conversationList}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                colors={["#4CAF50"]}
+                colors={[theme.colors.primary]}
               />
             }
           >
@@ -380,15 +358,15 @@ export default function MessagesScreen() {
                 <Ionicons 
                   name={searchQuery.trim() ? "search-outline" : "chatbubble-outline"} 
                   size={64} 
-                  color="#CCCCCC" 
+                  color={theme.colors.iconDisabled} 
                 />
-                <Text style={styles.emptyStateText}>
+                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                   {searchQuery.trim() 
                     ? "No conversations found" 
                     : "No conversations yet"
                   }
                 </Text>
-                <Text style={styles.emptyStateSubtext}>
+                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
                   {searchQuery.trim() 
                     ? "Try adjusting your search terms"
                     : "Start a new conversation to begin messaging"
@@ -396,14 +374,14 @@ export default function MessagesScreen() {
                 </Text>
                 {searchQuery.trim() ? (
                   <TouchableOpacity
-                    style={styles.retryButton}
+                    style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
                     onPress={clearSearch}
                   >
                     <Text style={styles.retryButtonText}>Clear Search</Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
-                    style={styles.retryButton}
+                    style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
                     onPress={loadConversations}
                   >
                     <Text style={styles.retryButtonText}>Refresh</Text>
@@ -414,7 +392,7 @@ export default function MessagesScreen() {
               filteredConversations.map((conversation) => (
                 <TouchableOpacity
                   key={conversation.id}
-                  style={styles.conversationItem}
+                  style={[styles.conversationItem, { borderBottomColor: theme.colors.borderLight }]}
                   onPress={() => {
                     if (!userId) {
                       Alert.alert("Error", "Please sign in to view messages");
@@ -443,7 +421,7 @@ export default function MessagesScreen() {
                         );
                       } else {
                         return (
-                          <View style={styles.initialsAvatar}>
+                          <View style={[styles.initialsAvatar, { backgroundColor: theme.colors.primary }]}>
                             <Text style={styles.initialsText}>
                               {avatar.value}
                             </Text>
@@ -466,9 +444,12 @@ export default function MessagesScreen() {
                         <View
                           style={[
                             styles.onlineIndicator,
-                            isOnline
-                              ? styles.onlineIndicator
-                              : styles.offlineIndicator,
+                            {
+                              backgroundColor: isOnline
+                                ? theme.colors.primary
+                                : theme.colors.iconDisabled,
+                              borderColor: theme.colors.surface,
+                            },
                           ]}
                         />
                       );
@@ -476,30 +457,31 @@ export default function MessagesScreen() {
                   </View>
                   <View style={styles.conversationContent}>
                     <View style={styles.conversationHeader}>
-                      <Text style={styles.conversationName}>
+                      <Text style={[styles.conversationName, { color: theme.colors.text }]}>
                         {getDisplayName(conversation)}
                       </Text>
-                      <Text style={styles.conversationTime}>
+                      <Text style={[styles.conversationTime, { color: theme.colors.textSecondary }]}>
                         {formatTime(conversation.updated_at)}
                       </Text>
                     </View>
                     <Text
                       style={[
                         styles.conversationMessage,
-                        conversation.unread_count > 0 && styles.unreadMessage,
+                        { color: theme.colors.textSecondary },
+                        conversation.unread_count > 0 && { color: theme.colors.text },
                       ]}
                       numberOfLines={1}
                     >
                       {conversation.last_message || "No messages yet"}
                     </Text>
-                    <Text style={styles.participantsText}>
+                    <Text style={[styles.participantsText, { color: theme.colors.textSecondary }]}>
                       {conversation.participants.length === 1
                         ? conversation.participants[0]?.email ?? "Unknown Email"
                         : `${conversation.participants.length} participants`}
                     </Text>
                   </View>
                   {conversation.unread_count > 0 && (
-                    <View style={styles.unreadBadge}>
+                    <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
                       <Text style={styles.unreadCount}>
                         {conversation.unread_count > 99
                           ? "99+"
@@ -618,7 +600,7 @@ const styles = StyleSheet.create({
   },
   conversationContainer: {
     flex: 1,
-    backgroundColor: "rgba(250, 250, 250, 0.8)",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderWidth: 1,
     margin: 15,
     padding: 10,
@@ -628,7 +610,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
     borderRadius: 10,
-    borderColor: "rgba(0, 0, 0, 0.1)",
+    // borderColor moved to theme.colors.borderLight via inline override
     marginBottom: 100,
     marginTop: 5,
   },
@@ -643,13 +625,13 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: "#666",
+    // color moved to theme.colors.text via inline override
     marginTop: 16,
     fontWeight: "600",
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: "#999",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 8,
     textAlign: "center",
     marginHorizontal: 20,
@@ -658,7 +640,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: "#4CAF50",
+    // backgroundColor moved to theme.colors.primary via inline override
     borderRadius: 20,
   },
   retryButtonText: {
@@ -672,7 +654,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     paddingTop: 3,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0, 0, 0, 0.1)",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
     width: "100%",
   },
   avatarContainer: {
@@ -707,28 +689,28 @@ const styles = StyleSheet.create({
   conversationName: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#333",
+    // color moved to theme.colors.text via inline override
   },
   conversationTime: {
     fontSize: 12,
     fontStyle: "italic",
-    color: "#000",
+    // color moved to theme.colors.textSecondary via inline override
   },
   conversationMessage: {
     fontSize: 14,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
     marginBottom: 2,
   },
   unreadMessage: {
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     fontWeight: "500",
   },
   participantsText: {
     fontSize: 12,
-    color: "#999",
+    // color moved to theme.colors.textSecondary via inline override
   },
   unreadBadge: {
-    backgroundColor: "#4CAF50",
+    // backgroundColor moved to theme.colors.primary via inline override
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -763,7 +745,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   newMessageButtonText: {
-    color: "#000",
+    // color moved to inline override for better contrast on gradient
     fontSize: 16,
     fontWeight: "800",
   },
@@ -771,7 +753,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 60,
-    backgroundColor: "#4CAF50",
+    // backgroundColor moved to theme.colors.primary via inline override
     justifyContent: "center",
     alignItems: "center",
   },
@@ -787,8 +769,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#9E9E9E",
+    // colors moved to inline override using theme.colors.iconDisabled and theme.colors.surface
     borderWidth: 2,
-    borderColor: "#FFF",
   },
 });

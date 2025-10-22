@@ -72,6 +72,7 @@ interface ExtendedMessage extends Message {
 }
 
 export default function ChatScreen() {
+  const { theme } = useTheme();
   const { userId } = useAuth();
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
@@ -175,9 +176,9 @@ export default function ChatScreen() {
       // Update user's activity
       await updateUserActivity();
 
-      console.log(
-        `💬 Loading messages for conversation ${conversationId}, user ${userId}`
-      );
+      // console.log(
+      //   `💬 Loading messages for conversation ${conversationId}, user ${userId}`
+      // );
 
       // Use direct backend API instead of messagingService
       const response = await fetch(
@@ -186,7 +187,7 @@ export default function ChatScreen() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log(`💬 Loaded ${result.data.length} messages`);
+        // console.log(`💬 Loaded ${result.data.length} messages`);
         setMessages(result.data);
 
         // Get conversation details to find the other participant with online status
@@ -424,7 +425,7 @@ export default function ChatScreen() {
       const emoji = fileType === "image" ? "🖼️" : "📄";
       const description = fileType === "image" ? "Image" : "File";
 
-      console.log(`📤 Sharing ${description}: ${actualFileName}`);
+      // console.log(`📤 Sharing ${description}: ${actualFileName}`);
 
       // Send message using your working messages API
       const messageResponse = await fetch(
@@ -470,7 +471,7 @@ export default function ChatScreen() {
 
     try {
       setSending(true);
-      console.log(`💬 Sending message: "${newMessage}"`);
+      // console.log(`💬 Sending message: "${newMessage}"`);
 
       // Update activity when sending message
       await updateUserActivity();
@@ -491,7 +492,7 @@ export default function ChatScreen() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log("💬 Message sent successfully");
+        // console.log("💬 Message sent successfully");
         setMessages((prev) => [...prev, result.data]);
         setNewMessage("");
 
@@ -548,7 +549,7 @@ export default function ChatScreen() {
     try {
       setDownloading(true);
 
-      console.log("Downloading file:", { remoteUri, fileName });
+      // console.log("Downloading file:", { remoteUri, fileName });
 
       // Extract file extension
       const urlWithoutParams = remoteUri.split("?")[0];
@@ -560,7 +561,7 @@ export default function ChatScreen() {
       const file = new FSFile(Paths.cache, `${safeFileName}.${fileExtension}`);
       const localUri = file.uri;
 
-      console.log("Download details:", { localUri, fileExtension });
+      // console.log("Download details:", { localUri, fileExtension });
 
       // Download file using fetch and write to file
       const response = await fetch(remoteUri);
@@ -568,7 +569,7 @@ export default function ChatScreen() {
       const arrayBuffer = await blob.arrayBuffer();
       await file.write(new Uint8Array(arrayBuffer));
 
-      console.log("Download complete:", { localUri, fileExtension });
+      // console.log("Download complete:", { localUri, fileExtension });
 
       // Check if sharing is available
       const canShare = await Sharing.isAvailableAsync();
@@ -809,7 +810,7 @@ export default function ChatScreen() {
       const fileUri = message.attachment_url;
       const fileName = message.file_name || `file_${Date.now()}`;
 
-      console.log("Starting download:", { fileUri, fileName });
+      // console.log("Starting download:", { fileUri, fileName });
 
       // Show download confirmation
       Alert.alert(
@@ -871,7 +872,7 @@ export default function ChatScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Loading messages...</Text>
         </View>
       </SafeAreaView>
@@ -890,7 +891,7 @@ export default function ChatScreen() {
           <View style={[styles.headerWrapper, { height: headerHeight }]}>
             <View style={styles.header}>
               <TouchableOpacity onPress={() => router.back()}>
-                <Ionicons name="arrow-back" size={24} color="#2E7D32" />
+                <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
               </TouchableOpacity>
 
               <View style={styles.contactInfo}>
@@ -926,7 +927,7 @@ export default function ChatScreen() {
               <TouchableOpacity
                 onPress={() => router.push("../appointments/book")}
               >
-                <Ionicons name="call-outline" size={24} color="#2E7D32" />
+                <Ionicons name="call-outline" size={24} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -940,9 +941,9 @@ export default function ChatScreen() {
           >
             {messages.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="chatbubble-outline" size={64} color="#CCCCCC" />
-                <Text style={styles.emptyStateText}>No messages yet</Text>
-                <Text style={styles.emptyStateSubtext}>
+                <Ionicons name="chatbubble-outline" size={64} color={theme.colors.iconDisabled} />
+                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No messages yet</Text>
+                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
                   Start the conversation by sending a message
                 </Text>
               </View>
@@ -1014,22 +1015,22 @@ export default function ChatScreen() {
           </ScrollView>
 
           {/* Message Input */}
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
+          <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.borderLight }] }>
+            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background }] }>
               <TouchableOpacity
                 style={styles.attachmentButton}
                 onPress={() => setAttachmentModalVisible(true)}
                 disabled={uploading}
               >
                 {uploading ? (
-                  <ActivityIndicator size="small" color="#4CAF50" />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : (
-                  <Ionicons name="attach" size={24} color="#4CAF50" />
+                  <Ionicons name="attach" size={24} color={theme.colors.primary} />
                 )}
               </TouchableOpacity>
 
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: theme.colors.text }]}
                 placeholder="Type a message..."
                 value={newMessage}
                 onChangeText={setNewMessage}
@@ -1038,13 +1039,14 @@ export default function ChatScreen() {
                 editable={!sending && !uploading}
                 onSubmitEditing={handleSendMessage}
                 returnKeyType="send"
+                placeholderTextColor={theme.colors.textDisabled}
               />
 
               <TouchableOpacity
                 style={[
                   styles.sendButton,
-                  (newMessage.trim() === "" || sending || uploading) &&
-                    styles.sendButtonDisabled,
+                  { backgroundColor: theme.colors.primary },
+                  (newMessage.trim() === "" || sending || uploading) && { backgroundColor: theme.colors.borderLight },
                 ]}
                 onPress={handleSendMessage}
                 disabled={
@@ -1057,7 +1059,7 @@ export default function ChatScreen() {
                   <Ionicons
                     name="send"
                     size={24}
-                    color={newMessage.trim() === "" ? "#9E9E9E" : "#FFFFFF"}
+                    color={newMessage.trim() === "" ? theme.colors.iconDisabled : "#FFFFFF"}
                   />
                 )}
               </TouchableOpacity>
@@ -1213,12 +1215,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    // backgroundColor moved to theme via inline override
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: "#666",
+    // color moved to theme via inline override
   },
   // Dynamic header wrapper
   headerWrapper: {
@@ -1381,14 +1383,14 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     padding: 15,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme via inline override
     borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    // borderTopColor moved to theme via inline override
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
+    // backgroundColor moved to theme via inline override
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 8,
@@ -1402,19 +1404,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     maxHeight: 100,
     fontSize: 16,
-    color: "#333",
+    // color moved to theme via inline override
   },
   sendButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#4CAF50",
+    // backgroundColor moved to theme via inline override
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: "#E0E0E0",
+    // backgroundColor moved to theme via inline override
   },
   // Attachment styles
   imageAttachment: {

@@ -86,7 +86,7 @@ export default function QuoteScreen() {
         >
           {/* Inspirational quote text */}
           <Text style={[styles.quote, { color: theme.colors.text }]}>
-            "Healing takes time, and asking for help is a courageous step."
+            &quot;Healing takes time, and asking for help is a courageous step.&quot;
           </Text>
           {/* Quote author attribution */}
           <Text style={[styles.author, { color: theme.colors.textSecondary }]}>— Mariska Hargitay</Text>

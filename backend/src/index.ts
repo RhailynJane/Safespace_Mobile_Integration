@@ -2286,7 +2286,7 @@ app.get(
     try {
       const { clerkUserId } = req.params;
 
-      console.log("💬 Fetching conversations for user:", clerkUserId);
+      // console.log("💬 Fetching conversations for user:", clerkUserId);
 
       const conversations = await prisma.conversation.findMany({
         where: {
@@ -2384,7 +2384,7 @@ app.get(
         })
       );
 
-      console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
+      // console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
 
       res.json({
         success: true,
@@ -2416,7 +2416,7 @@ app.get(
       const page = typeof pageStr === "string" ? pageStr : "1";
       const limit = typeof limitStr === "string" ? limitStr : "50";
 
-      console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
+      // console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
 
       const pageNum = Number.parseInt(page) || 1;
       const limitNum = Number.parseInt(limit) || 50;
@@ -2863,7 +2863,7 @@ app.post("/api/users/:clerkUserId/activity", async (req: Request, res: Response)
       }
     });
 
-    console.log(`👤 Updated activity for user ${clerkUserId}`);
+    // console.log(`👤 Updated activity for user ${clerkUserId}`);
 
     res.json({ 
       success: true, 
@@ -2902,7 +2902,7 @@ app.get(
     try {
       const { clerkUserId } = req.params;
 
-      console.log("💬 Fetching conversations for user:", clerkUserId);
+      // console.log("💬 Fetching conversations for user:", clerkUserId);
 
       const conversations = await prisma.conversation.findMany({
         where: {
@@ -2965,7 +2965,7 @@ app.get(
         }
       });
 
-      console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
+      // console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
 
       const formattedConversations = conversations.map(conversation => {
         const lastMessage = conversation.messages[0];
@@ -2982,7 +2982,7 @@ app.get(
           last_active_at: p.user.last_active_at
         }));
 
-        console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
+        // console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
 
         return {
           id: conversation.id.toString(),

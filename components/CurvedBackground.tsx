@@ -1,6 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Dimensions, Text } from "react-native";
 import Svg, { Path, Defs, LinearGradient, Stop } from "react-native-svg";
+import { useTheme } from "../contexts/ThemeContext";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -30,8 +31,19 @@ const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
   children,
   style,
 }) => {
+  const { theme, isDarkMode } = useTheme();
+  const g1 = isDarkMode
+    ? ["#1a1a1a", "#141414", "#101010"]
+    : ["#f8f9fa", "#e9ecef", "#dee2e6"];
+  const g2 = isDarkMode
+    ? ["#161616", "#0f0f0f"]
+    : ["#f1f3f4", "#ffffff"];
+  const g3 = isDarkMode
+    ? ["#1a1a1a", "#121212"]
+    : ["#e9ecef", "#dee2e6"];
+
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }, style]}>
       <Svg
         width={screenWidth}
         height={screenHeight}
@@ -39,23 +51,23 @@ const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
         style={StyleSheet.absoluteFillObject}
       >
         <Defs>
-          {/* First gradient - diagonal light gray to medium gray */}
+          {/* First gradient - diagonal light gray to medium gray (dark adjusts) */}
           <LinearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#f8f9fa" stopOpacity="0.5" />
-            <Stop offset="50%" stopColor="#e9ecef" stopOpacity="0.6" />
-            <Stop offset="100%" stopColor="#dee2e6" stopOpacity="0.4" />
+            <Stop offset="0%" stopColor={g1[0]} stopOpacity={isDarkMode ? 0.6 : 0.5} />
+            <Stop offset="50%" stopColor={g1[1]} stopOpacity={0.6} />
+            <Stop offset="100%" stopColor={g1[2]} stopOpacity={isDarkMode ? 0.5 : 0.4} />
           </LinearGradient>
           
-          {/* Second gradient - bottom to top with lighter colors */}
+          {/* Second gradient - bottom to top with lighter colors (dark adjusts) */}
           <LinearGradient id="gradient2" x1="0%" y1="100%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor="#f1f3f4" stopOpacity="0.7" />
-            <Stop offset="100%" stopColor="#ffffff" stopOpacity="0.3" />
+            <Stop offset="0%" stopColor={g2[0]} stopOpacity={0.7} />
+            <Stop offset="100%" stopColor={g2[1]} stopOpacity={0.3} />
           </LinearGradient>
           
-          {/* Third gradient - reverse diagonal with subtle grays */}
+          {/* Third gradient - reverse diagonal with subtle grays (dark adjusts) */}
           <LinearGradient id="gradient3" x1="100%" y1="100%" x2="0%" y2="0%">
-            <Stop offset="0%" stopColor="#e9ecef" stopOpacity="0.5" />
-            <Stop offset="100%" stopColor="#dee2e6" stopOpacity="0.2" />
+            <Stop offset="0%" stopColor={g3[0]} stopOpacity={0.5} />
+            <Stop offset="100%" stopColor={g3[1]} stopOpacity={0.2} />
           </LinearGradient>
         </Defs>
 
@@ -104,7 +116,7 @@ const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#dee2e6",
+    // backgroundColor moved to theme via inline override
   },
 });
 
