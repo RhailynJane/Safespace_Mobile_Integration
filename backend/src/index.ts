@@ -16,7 +16,9 @@ import { PrismaClient } from "@prisma/client";
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Increase body size limit for base64 images (50MB)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -3564,21 +3566,24 @@ app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) 
 app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
-    const { profileImageUrl } = req.body;
+    const { profileImageBase64 } = req.body;
 
-    if (!profileImageUrl) {
+    if (!profileImageBase64) {
       return res.status(400).json({
         success: false,
-        message: "profileImageUrl is required"
+        message: "profileImageBase64 is required"
       });
     }
 
+    console.log('📸 Storing base64 profile image for user:', clerkUserId);
+
+    // Store the base64 image directly in the database
     const result = await pool.query(
       `UPDATE users 
        SET profile_image_url = $1, updated_at = CURRENT_TIMESTAMP
        WHERE clerk_user_id = $2
        RETURNING profile_image_url`,
-      [profileImageUrl, clerkUserId]
+      [profileImageBase64, clerkUserId]
     );
 
     if (result.rows.length === 0) {
@@ -3587,6 +3592,8 @@ app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, r
         message: "User not found"
       });
     }
+
+    console.log('✅ Profile image stored in database successfully');
 
     res.json({
       success: true,

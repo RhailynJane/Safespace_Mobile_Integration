@@ -130,6 +130,8 @@ export default function EditProfileScreen() {
   const [showCanadaDatePicker, setShowCanadaDatePicker] = useState(false);
   const [tempCanadaDate, setTempCanadaDate] = useState(new Date());
   const [canadaDateDisplay, setCanadaDateDisplay] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   // Add a ref for debouncing
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -629,10 +631,10 @@ export default function EditProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.5, // Reduced from 0.8 to compress more
       });
 
       if (!result.canceled && result.assets?.[0]?.uri) {
@@ -640,14 +642,15 @@ export default function EditProfileScreen() {
         const imageUri = result.assets[0].uri;
 
         try {
-          // Upload image to backend
-          const uploadedImageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
+          // Upload image to backend (now stored as base64 in database)
+          const base64ImageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
           
-          // Save to local storage for immediate display
-          await AsyncStorage.setItem("profileImage", uploadedImageUrl);
-          setProfileImage(uploadedImageUrl);
+          // Save to local storage for immediate display and offline access
+          await AsyncStorage.setItem("profileImage", base64ImageUrl);
+          setProfileImage(base64ImageUrl);
 
-          Alert.alert("Success", "Profile picture updated successfully!");
+          setSuccessMessage("Profile picture updated!");
+          setShowSuccessModal(true);
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
           Alert.alert(
@@ -783,8 +786,13 @@ export default function EditProfileScreen() {
           }
           // ✅ END OF NEW CODE
 
-          Alert.alert("Success", "Profile updated successfully!");
-          router.back();
+          setSuccessMessage("Profile updated successfully!");
+          setShowSuccessModal(true);
+          
+          // Navigate back after a short delay
+          setTimeout(() => {
+            router.back();
+          }, 1500);
         } else {
           throw new Error(result.message);
         }
@@ -822,8 +830,13 @@ export default function EditProfileScreen() {
         }
         // ✅ END OF NEW CODE
 
-        Alert.alert("Success", "Profile updated locally!");
-        router.back();
+        setSuccessMessage("Profile updated locally!");
+        setShowSuccessModal(true);
+        
+        // Navigate back after a short delay
+        setTimeout(() => {
+          router.back();
+        }, 1500);
       }
     } catch (error) {
       console.error("Error in handleSaveChanges:", error);
@@ -1731,6 +1744,31 @@ export default function EditProfileScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        {/* Success Modal */}
+        <Modal
+          visible={showSuccessModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.successModal}>
+              <View style={styles.successIconContainer}>
+                <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+              </View>
+              <Text style={styles.successTitle}>Success!</Text>
+              <Text style={styles.successMessage}>{successMessage}</Text>
+              <TouchableOpacity
+                style={styles.successButton}
+                onPress={() => setShowSuccessModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -2060,5 +2098,65 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F8F8",
     fontSize: 16,
     color: "#333",
+  },
+  // Success Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  successModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 32,
+    width: "90%",
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  successIconContainer: {
+    marginBottom: 20,
+    transform: [{ scale: 1 }],
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  successMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 28,
+    color: "#6B7280",
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  successButton: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  successButtonText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });

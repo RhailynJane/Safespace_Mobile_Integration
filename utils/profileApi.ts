@@ -64,39 +64,46 @@ export const profileApi = {
     try {
       console.log('📸 Uploading profile image for user:', clerkUserId);
       
-      // Create form data for image upload
-      const formData = new FormData();
+      // Read the image file and convert to base64
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
       
-      // Get file extension from URI
-      const uriParts = imageUri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
+      console.log('📊 Image blob size:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
       
-      // Append the image file
-      formData.append('profileImage', {
-        uri: imageUri,
-        type: `image/${fileType}`,
-        name: `profile_${clerkUserId}.${fileType}`,
-      } as any);
-
-      const response = await fetch(`${API_BASE_URL}/api/upload/profile-image/${clerkUserId}`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      // Convert blob to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result as string;
+          console.log('📊 Base64 size:', (base64String.length / 1024 / 1024).toFixed(2), 'MB');
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
+      // Send base64 image to backend
+      const apiResponse = await fetch(`${API_BASE_URL}/api/client-profile/${clerkUserId}/profile-image`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileImageBase64: base64,
+        }),
+      });
+
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
         console.error('❌ Upload error:', errorText);
-        throw new Error(`Failed to upload image: ${response.status}`);
+        throw new Error(`Failed to upload image: ${apiResponse.status}`);
       }
 
-      const result = await response.json();
+      const result = await apiResponse.json();
       console.log('✅ Image uploaded successfully:', result);
       
       if (result.success) {
-        return result.data.imageUrl;
+        return result.data.profileImageUrl;
       } else {
         throw new Error(result.message);
       }
