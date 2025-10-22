@@ -27,9 +27,7 @@ const HelpSupportScreen: React.FC = () => {
   const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [helpSections, setHelpSections] = useState<HelpSection[]>([]);
-  const [expandedSections, setExpandedSections] = useState<string[]>([
-    "getting_started",
-  ]);
+  const [expandedSections, setExpandedSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -87,9 +85,17 @@ const HelpSupportScreen: React.FC = () => {
   };
 
   const renderHelpItem = (item: HelpItem, index: number) => (
-    <View key={index} style={styles.helpItem}>
-      <Text style={styles.helpItemTitle}>{item.title}</Text>
-      <Text style={styles.helpItemContent}>
+    <View 
+      key={index} 
+      style={[
+        styles.helpItem,
+        { borderBottomColor: theme.colors.borderLight }
+      ]}
+    >
+      <Text style={[styles.helpItemTitle, { color: theme.colors.text }]}>
+        {item.title}
+      </Text>
+      <Text style={[styles.helpItemContent, { color: theme.colors.textSecondary }]}>
         {item.content.split("\n").map((line, i) => (
           <Text key={i}>
             {line}
@@ -104,13 +110,26 @@ const HelpSupportScreen: React.FC = () => {
     const isExpanded = expandedSections.includes(section.id);
 
     return (
-      <View key={section.id} style={styles.sectionContainer}>
+      <View 
+        key={section.id} 
+        style={[
+          styles.sectionContainer,
+          { 
+            backgroundColor: theme.colors.surface,
+            shadowColor: theme.isDark ? "#000" : "#000",
+          }
+        ]}
+      >
         <TouchableOpacity
           style={styles.sectionHeader}
           onPress={() => toggleSection(section.id)}
         >
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-          <Text style={styles.expandIcon}>{isExpanded ? "−" : "+"}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            {section.title}
+          </Text>
+          <Text style={[styles.expandIcon, { color: theme.colors.textSecondary }]}>
+            {isExpanded ? "−" : "+"}
+          </Text>
         </TouchableOpacity>
 
         {isExpanded && (
@@ -128,8 +147,10 @@ const HelpSupportScreen: React.FC = () => {
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Help & Support" showBack={true} />
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.loadingText}>Loading help content...</Text>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+              Loading help content...
+            </Text>
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -143,21 +164,26 @@ const HelpSupportScreen: React.FC = () => {
         <ScrollView
           style={styles.scrollView}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
           }
         >
-          <Text style={styles.screenSubtitle}>
+          <Text style={[styles.screenSubtitle, { color: theme.colors.textSecondary }]}>
             Find answers to common questions and get the help you need
           </Text>
 
           {helpSections.map(renderSection)}
 
           <View style={styles.footerSection}>
-            <Text style={styles.footerText}>
+            <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
               Still need help? Our support team is here for you.
             </Text>
             <TouchableOpacity
-              style={styles.contactButton}
+              style={[styles.contactButton, { backgroundColor: theme.colors.primary }]}
               onPress={() =>
                 Linking.openURL("mailto:safespace.dev.app@gmail.com")
               }
@@ -180,7 +206,6 @@ const HelpSupportScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginTop: -30,
   },
   scrollView: {
     paddingHorizontal: 16,
@@ -190,20 +215,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 8,
     textAlign: "center",
-    color: "#2E7D32",
   },
   screenSubtitle: {
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 24,
   },
   sectionContainer: {
-    backgroundColor: "white",
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -218,13 +239,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     flex: 1,
   },
   expandIcon: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#666",
     width: 24,
     textAlign: "center",
   },
@@ -235,18 +254,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f3f4",
   },
   helpItemTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 8,
   },
   helpItemContent: {
     fontSize: 14,
     lineHeight: 20,
-    color: "#666",
   },
   footerSection: {
     alignItems: "center",
@@ -255,13 +271,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
     marginBottom: 16,
     lineHeight: 24,
   },
   contactButton: {
-    backgroundColor: "#4CAF50",
     paddingHorizontal: 24,
     paddingVertical: 15,
     borderRadius: 30,
@@ -283,7 +297,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
   },
 });
