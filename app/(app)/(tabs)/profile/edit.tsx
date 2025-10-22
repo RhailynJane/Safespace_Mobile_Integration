@@ -1062,6 +1062,10 @@ export default function EditProfileScreen() {
             key={option}
             style={[
               styles.optionButton,
+              { 
+                backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8',
+                borderColor: theme.colors.border
+              },
               selectedValue === option && styles.optionButtonSelected,
             ]}
             onPress={() => onSelect(option)}
@@ -1069,6 +1073,7 @@ export default function EditProfileScreen() {
             <Text
               style={[
                 styles.optionText,
+                { color: theme.colors.textSecondary },
                 selectedValue === option && styles.optionTextSelected,
               ]}
             >
@@ -1170,21 +1175,21 @@ export default function EditProfileScreen() {
           </View>
 
           {/* Personal Information Section */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Personal Information</Text>
 
             {/* First Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>First Name *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>First Name *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="person-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.firstName}
                   onChangeText={(text) => {
                     setFormData({ ...formData, firstName: text });
@@ -1192,6 +1197,7 @@ export default function EditProfileScreen() {
                   }}
                   onBlur={() => validateField("firstName", formData.firstName)}
                   placeholder="Enter your first name"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {validationErrors.firstName ? (
@@ -1201,16 +1207,16 @@ export default function EditProfileScreen() {
 
             {/* Last Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Last Name *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Last Name *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="person-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.lastName}
                   onChangeText={(text) => {
                     setFormData({ ...formData, lastName: text });
@@ -1218,6 +1224,7 @@ export default function EditProfileScreen() {
                   }}
                   onBlur={() => validateField("lastName", formData.lastName)}
                   placeholder="Enter your last name"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {validationErrors.lastName ? (
@@ -1227,16 +1234,16 @@ export default function EditProfileScreen() {
 
             {/* Email Address */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Email Address *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="mail-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.email}
                   onChangeText={(text) => {
                     setFormData({ ...formData, email: text });
@@ -1246,6 +1253,7 @@ export default function EditProfileScreen() {
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {validationErrors.email ? (
@@ -1255,16 +1263,16 @@ export default function EditProfileScreen() {
 
             {/* Phone Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phone Number *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Phone Number *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="call-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.phoneNumber}
                   onChangeText={(text) => {
                     setFormData({ ...formData, phoneNumber: text });
@@ -1273,6 +1281,7 @@ export default function EditProfileScreen() {
                   onBlur={() => validateField("phoneNumber", formData.phoneNumber)}
                   placeholder="Enter your phone number"
                   keyboardType="phone-pad"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {validationErrors.phoneNumber ? (
@@ -1282,19 +1291,19 @@ export default function EditProfileScreen() {
 
             {/* Date of Birth */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Date of Birth *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Date of Birth *</Text>
               <TouchableOpacity
-                style={styles.inputContainer}
+                style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
                 onPress={handleDatePress}
               >
                 <Ionicons
                   name="calendar-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <Text
-                  style={[styles.input, !dateDisplay && styles.placeholderText]}
+                  style={[styles.input, { color: dateDisplay ? theme.colors.text : theme.colors.textSecondary }]}
                 >
                   {dateDisplay || "Tap to select date"}
                 </Text>
@@ -1354,12 +1363,12 @@ export default function EditProfileScreen() {
           </View>
 
           {/* Demographics Section */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Demographics</Text>
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Demographics</Text>
 
             {/* Gender */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Gender *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Gender *</Text>
               {renderOptionButtons(GENDER_OPTIONS, formData.gender, (value) =>
                 setFormData({ ...formData, gender: value })
               )}
@@ -1367,28 +1376,29 @@ export default function EditProfileScreen() {
 
             {/* Pronouns */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Pronouns *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Pronouns *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="person-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.pronouns}
                   onChangeText={(text) =>
                     setFormData({ ...formData, pronouns: text })
                   }
                   placeholder="e.g., they/them, he/him, she/her"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
             </View>
 
             {/* LGBTQ+ Identification */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Do you identify as LGBTQ+? *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Do you identify as LGBTQ+? *</Text>
               {renderOptionButtons(
                 ["Yes", "No", "I do not know", "Prefer not to answer"],
                 formData.isLGBTQ,
@@ -1398,26 +1408,26 @@ export default function EditProfileScreen() {
 
             {/* Primary Language */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Primary Language *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Primary Language *</Text>
               <TouchableOpacity
-                style={styles.inputContainer}
+                style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
                 onPress={() => setShowLanguagePicker(true)}
               >
                 <Ionicons
                   name="language-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <Text
                   style={[
                     styles.input,
-                    !formData.primaryLanguage && styles.placeholderText,
+                    { color: formData.primaryLanguage ? theme.colors.text : theme.colors.textSecondary }
                   ]}
                 >
                   {formData.primaryLanguage || "Select your primary language"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#666" />
+                <Ionicons name="chevron-down" size={16} color={theme.colors.icon} />
               </TouchableOpacity>
 
               {/* Language Picker Modal */}
@@ -1479,26 +1489,26 @@ export default function EditProfileScreen() {
           </View>
 
           {/* Address Information */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Address Information</Text>
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Address Information</Text>
 
             {/* Street Address */}
             {/* Street Address */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Street Address *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Street Address *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="home-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.streetAddress}
                   onChangeText={handleStreetSearch}
                   placeholder="Enter your street address"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {showStreetSuggestions && streetSuggestions.length > 0 && (
@@ -1531,20 +1541,20 @@ export default function EditProfileScreen() {
 
             {/* Location/City */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>City *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>City *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="location-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={locationQuery || formData.location}
                   onChangeText={handleLocationSearch}
                   placeholder="Enter your city"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {/* Location Suggestions Dropdown */}
@@ -1553,16 +1563,16 @@ export default function EditProfileScreen() {
 
             {/* Postal Code */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Postal Code *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Postal Code *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="navigate-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.postalCode}
                   onChangeText={(text) => {
                     handlePostalSearch(text);
@@ -1570,7 +1580,7 @@ export default function EditProfileScreen() {
                   }}
                   onBlur={() => validateField("postalCode", formData.postalCode)}
                   placeholder="Enter your postal code"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {validationErrors.postalCode ? (
@@ -1607,63 +1617,65 @@ export default function EditProfileScreen() {
           </View>
 
           {/* Emergency Contact Section */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Emergency Contact</Text>
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Emergency Contact</Text>
 
             {/* Emergency Contact Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Emergency Contact Name *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Emergency Contact Name *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="person-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.emergencyContactName}
                   onChangeText={(text) =>
                     setFormData({ ...formData, emergencyContactName: text })
                   }
                   placeholder="Enter emergency contact name"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
             </View>
 
             {/* Emergency Contact Relationship */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Relationship *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Relationship *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="people-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.emergencyContactRelationship}
                   onChangeText={(text) =>
                     setFormData({ ...formData, emergencyContactRelationship: text })
                   }
                   placeholder="e.g., Parent, Sibling, Friend"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
             </View>
 
             {/* Emergency Contact Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Emergency Contact Number *</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Emergency Contact Number *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
                 <Ionicons
                   name="call-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.emergencyContactNumber}
                   onChangeText={(text) => {
                     setFormData({ ...formData, emergencyContactNumber: text });
@@ -1672,6 +1684,7 @@ export default function EditProfileScreen() {
                   onBlur={() => validateField("emergencyContactNumber", formData.emergencyContactNumber)}
                   placeholder="Emergency contact phone number"
                   keyboardType="phone-pad"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {validationErrors.emergencyContactNumber ? (
@@ -1681,12 +1694,12 @@ export default function EditProfileScreen() {
           </View>
 
           {/* Health Information Section */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Health Information</Text>
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Health Information</Text>
 
             {/* Mental Health/Medical Concerns */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Mental Health/Medical Concerns *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Mental Health/Medical Concerns *</Text>
               {renderOptionButtons(
                 HEALTH_CONCERNS_OPTIONS,
                 formData.mentalHealthConcerns,
@@ -1697,9 +1710,17 @@ export default function EditProfileScreen() {
 
             {/* Support Needed */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Support Needed *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Support Needed *</Text>
               <TextInput
-                style={[styles.textArea, styles.borderedInput]}
+                style={[
+                  styles.textArea,
+                  styles.borderedInput,
+                  { 
+                    backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8',
+                    color: theme.colors.text,
+                    borderColor: theme.colors.border
+                  }
+                ]}
                 value={formData.supportNeeded}
                 onChangeText={(text) =>
                   setFormData({ ...formData, supportNeeded: text })
@@ -1708,38 +1729,38 @@ export default function EditProfileScreen() {
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.colors.textSecondary}
               />
             </View>
           </View>
 
           {/* Additional Information */}
-          <View style={styles.formSection}>
-            <Text style={styles.sectionTitle}>Additional Information</Text>
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Additional Information</Text>
 
             {/* Ethnocultural Background */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ethnocultural Background *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Ethnocultural Background *</Text>
               <TouchableOpacity
-                style={styles.inputContainer}
+                style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
                 onPress={() => setShowEthnoculturalPicker(true)}
               >
                 <Ionicons
                   name="globe-outline"
                   size={20}
-                  color="#666"
+                  color={theme.colors.icon}
                   style={styles.inputIcon}
                 />
                 <Text
                   style={[
                     styles.input,
-                    !formData.ethnoculturalBackground && styles.placeholderText,
+                    { color: formData.ethnoculturalBackground ? theme.colors.text : theme.colors.textSecondary }
                   ]}
                 >
                   {formData.ethnoculturalBackground ||
                     "Select ethnocultural background"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#666" />
+                <Ionicons name="chevron-down" size={16} color={theme.colors.icon} />
               </TouchableOpacity>
 
               {/* Ethnocultural Picker Modal */}
@@ -1804,7 +1825,7 @@ export default function EditProfileScreen() {
 
             {/* Status in Canada */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Status in Canada *</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Status in Canada *</Text>
               {renderOptionButtons(
                 CANADA_STATUS_OPTIONS,
                 formData.canadaStatus,
@@ -1820,21 +1841,21 @@ export default function EditProfileScreen() {
                 formData.canadaStatus !== "Prefer not to answer"
             ) && (
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Date Came to Canada *</Text>
+                <Text style={[styles.label, { color: theme.colors.text }]}>Date Came to Canada *</Text>
                 <TouchableOpacity
-                  style={styles.inputContainer}
+                  style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
                   onPress={handleCanadaDatePress}
                 >
                   <Ionicons
                     name="calendar-outline"
                     size={20}
-                    color="#666"
+                    color={theme.colors.icon}
                     style={styles.inputIcon}
                   />
                   <Text
                     style={[
                       styles.input,
-                      !canadaDateDisplay && styles.placeholderText,
+                      { color: canadaDateDisplay ? theme.colors.text : theme.colors.textSecondary }
                     ]}
                   >
                     {canadaDateDisplay || "Tap to select date"}
@@ -1907,14 +1928,14 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
 
           {/* Privacy Settings Section */}
-          <View style={styles.notificationSection}>
-            <Text style={styles.sectionTitle}>Privacy Settings</Text>
+          <View style={[styles.notificationSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Privacy Settings</Text>
             <View style={styles.notificationItem}>
               <View style={styles.notificationLeft}>
                 <View style={styles.notificationIcon}>
                   <Ionicons name="shield-outline" size={16} color="#4CAF50" />
                 </View>
-                <Text style={styles.notificationText}>
+                <Text style={[styles.notificationText, { color: theme.colors.text }]}>
                   Share info with support worker
                 </Text>
               </View>
@@ -2050,7 +2071,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   formSection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
@@ -2059,7 +2080,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
+    // color removed - now uses theme.colors.text via inline override
     marginBottom: 15,
   },
   inputGroup: {
@@ -2068,7 +2089,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#333",
+    // color removed - now uses theme.colors.text via inline override
     marginBottom: 8,
   },
   errorText: {
@@ -2080,7 +2101,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8F8F8",
+    // backgroundColor removed - now uses theme via inline override
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -2091,7 +2112,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    // color removed - now uses theme.colors.text via inline override
   },
   optionsContainer: {
     flexDirection: "row",
@@ -2101,10 +2122,10 @@ const styles = StyleSheet.create({
   optionButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#F8F8F8",
+    // backgroundColor removed - now uses theme via inline override
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    // borderColor removed - now uses theme via inline override
   },
   optionButtonSelected: {
     backgroundColor: "#4CAF50",
@@ -2112,7 +2133,7 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 12,
-    color: "#666",
+    // color removed - now uses theme.colors.textSecondary via inline override
   },
   optionTextSelected: {
     color: "#FFFFFF",
@@ -2135,7 +2156,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   notificationSection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
@@ -2161,7 +2182,7 @@ const styles = StyleSheet.create({
   },
   notificationText: {
     fontSize: 14,
-    color: "#333",
+    // color removed - now uses theme.colors.text via inline override
   },
   suggestionsContainer: {
     position: "relative",

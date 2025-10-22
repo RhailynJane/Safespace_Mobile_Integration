@@ -98,7 +98,7 @@ export default function CrisisScreen() {
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -116,7 +116,7 @@ export default function CrisisScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Emergency Help Card - High visibility for immediate assistance */}
-          <View style={styles.emergencyCard}>
+          <View style={[styles.emergencyCard, { backgroundColor: theme.isDark ? '#B71C1C' : '#E53935' }]}>
             <View style={styles.emergencyHeader}>
               <Ionicons name="warning" size={28} color="#FFFFFF" />
               <Text style={styles.emergencyTitle}>Need Immediate Help?</Text>
@@ -133,7 +133,7 @@ export default function CrisisScreen() {
           {/* Emergency Action Buttons */}
           <View style={styles.emergencyButtons}>
             <TouchableOpacity
-              style={[styles.emergencyButton, styles.emergency911]}
+              style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#C62828' : '#E53935' }]}
               onPress={() => handleEmergencyCall("911")}
             >
               <View style={styles.buttonIconContainer}>
@@ -147,7 +147,7 @@ export default function CrisisScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.emergencyButton, styles.crisisHotline]}
+              style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#388E3C' : '#4CAF50' }]}
               onPress={() => handleEmergencyCall("988")}
             >
               <View style={styles.buttonIconContainer}>
@@ -161,7 +161,7 @@ export default function CrisisScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.emergencyButton, styles.distressCenter]}
+              style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#1976D2' : '#2196F3' }]}
               onPress={() => handleEmergencyCall("403-266-4357")}
             >
               <View style={styles.buttonIconContainer}>
@@ -175,125 +175,148 @@ export default function CrisisScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.emergencyButton, styles.websiteButton]}
+              style={[styles.emergencyButton, styles.websiteButton, { 
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.primary 
+              }]}
               onPress={handleDistressCenter}
             >
-              <View style={styles.buttonIconContainer}>
-                <Ionicons name="globe" size={24} color="#2196F3" />
+              <View style={[styles.buttonIconContainer, { backgroundColor: theme.isDark ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.1)' }]}>
+                <Ionicons name="globe" size={24} color={theme.colors.primary} />
               </View>
               <View style={styles.buttonTextContainer}>
-                <Text style={[styles.emergencyButtonMainText, styles.websiteText]}>
+                <Text style={[styles.emergencyButtonMainText, { color: theme.colors.primary }]}>
                   Visit Website
                 </Text>
-                <Text style={[styles.emergencyButtonSubText, styles.websiteSubText]}>
+                <Text style={[styles.emergencyButtonSubText, { color: theme.colors.primary, opacity: 0.8 }]}>
                   distresscentre.com
                 </Text>
               </View>
-              <Ionicons name="open-outline" size={20} color="#2196F3" style={styles.buttonArrow} />
+              <Ionicons name="open-outline" size={20} color={theme.colors.primary} style={styles.buttonArrow} />
             </TouchableOpacity>
           </View>
 
           {/* Immediate Coping Strategies Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="flash" size={24} color="#4CAF50" />
-              <Text style={styles.sectionTitle}>Immediate Coping Strategies</Text>
+              <Ionicons name="flash" size={24} color={theme.colors.primary} />
+              <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Immediate Coping Strategies</Text>
             </View>
             <View style={styles.strategiesGrid}>
-              <View style={styles.strategyCard}>
-                <View style={[styles.strategyIcon, { backgroundColor: '#FFEBEE' }]}>
+              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#FFCDD2' : '#FFEBEE' }]}>
                   <Ionicons name="water" size={20} color="#E53935" />
                 </View>
-                <Text style={styles.strategyText}>Take slow, deep breaths</Text>
+                <Text style={[styles.strategyText, { color: theme.colors.text }]}>Take slow, deep breaths</Text>
               </View>
 
-              <View style={styles.strategyCard}>
-                <View style={[styles.strategyIcon, { backgroundColor: '#E8F5E8' }]}>
+              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#C8E6C9' : '#E8F5E8' }]}>
                   <Ionicons name="shield-checkmark" size={20} color="#4CAF50" />
                 </View>
-                <Text style={styles.strategyText}>Go to a safe public place</Text>
+                <Text style={[styles.strategyText, { color: theme.colors.text }]}>Go to a safe public place</Text>
               </View>
 
-              <View style={styles.strategyCard}>
-                <View style={[styles.strategyIcon, { backgroundColor: '#E3F2FD' }]}>
+              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#BBDEFB' : '#E3F2FD' }]}>
                   <Ionicons name="time" size={20} color="#2196F3" />
                 </View>
-                <Text style={styles.strategyText}>Focus on the next hour only</Text>
+                <Text style={[styles.strategyText, { color: theme.colors.text }]}>Focus on the next hour only</Text>
               </View>
 
-              <View style={styles.strategyCard}>
-                <View style={[styles.strategyIcon, { backgroundColor: '#FFF3E0' }]}>
+              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#FFE0B2' : '#FFF3E0' }]}>
                   <Ionicons name="people" size={20} color="#FF9800" />
                 </View>
-                <Text style={styles.strategyText}>Reach out to someone you trust</Text>
+                <Text style={[styles.strategyText, { color: theme.colors.text }]}>Reach out to someone you trust</Text>
               </View>
 
-              <View style={styles.strategyCard}>
-                <View style={[styles.strategyIcon, { backgroundColor: '#F3E5F5' }]}>
+              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#E1BEE7' : '#F3E5F5' }]}>
                   <Ionicons name="remove-circle" size={20} color="#9C27B0" />
                 </View>
-                <Text style={styles.strategyText}>Remove means of self-harm</Text>
+                <Text style={[styles.strategyText, { color: theme.colors.text }]}>Remove means of self-harm</Text>
               </View>
 
-              <View style={styles.strategyCard}>
-                <View style={[styles.strategyIcon, { backgroundColor: '#E0F2F1' }]}>
+              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#B2DFDB' : '#E0F2F1' }]}>
                   <Ionicons name="leaf" size={20} color="#009688" />
                 </View>
-                <Text style={styles.strategyText}>Use grounding techniques</Text>
+                <Text style={[styles.strategyText, { color: theme.colors.text }]}>Use grounding techniques</Text>
               </View>
             </View>
           </View>
 
           {/* Grounding Technique Section */}
-          <View style={styles.groundingSection}>
+          <View style={[styles.groundingSection, { 
+            backgroundColor: theme.isDark ? '#1B5E20' : '#E8F5E9' 
+          }]}>
             <View style={styles.groundingHeader}>
-              <Ionicons name="compass" size={24} color="#2E7D32" />
-              <Text style={styles.groundingTitle}>5-4-3-2-1 Grounding Technique</Text>
+              <Ionicons name="compass" size={24} color={theme.isDark ? '#81C784' : '#2E7D32'} />
+              <Text style={[styles.groundingTitle, { color: theme.isDark ? '#81C784' : '#2E7D32' }]}>
+                5-4-3-2-1 Grounding Technique
+              </Text>
             </View>
-            <Text style={styles.groundingDescription}>
+            <Text style={[styles.groundingDescription, { 
+              color: theme.isDark ? '#E8F5E9' : '#5D4037' 
+            }]}>
               When feeling overwhelmed, use your senses to ground yourself in the present moment.
             </Text>
             <View style={styles.groundingSteps}>
               <View style={styles.groundingStep}>
-                <View style={styles.stepNumber}>
+                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
                   <Text style={styles.stepNumberText}>5</Text>
                 </View>
-                <Text style={styles.stepText}>things you can see around you</Text>
+                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
+                  things you can see around you
+                </Text>
               </View>
               <View style={styles.groundingStep}>
-                <View style={styles.stepNumber}>
+                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
                   <Text style={styles.stepNumberText}>4</Text>
                 </View>
-                <Text style={styles.stepText}>things you can touch and feel</Text>
+                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
+                  things you can touch and feel
+                </Text>
               </View>
               <View style={styles.groundingStep}>
-                <View style={styles.stepNumber}>
+                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
                   <Text style={styles.stepNumberText}>3</Text>
                 </View>
-                <Text style={styles.stepText}>things you can hear right now</Text>
+                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
+                  things you can hear right now
+                </Text>
               </View>
               <View style={styles.groundingStep}>
-                <View style={styles.stepNumber}>
+                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
                   <Text style={styles.stepNumberText}>2</Text>
                 </View>
-                <Text style={styles.stepText}>things you can smell nearby</Text>
+                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
+                  things you can smell nearby
+                </Text>
               </View>
               <View style={styles.groundingStep}>
-                <View style={styles.stepNumber}>
+                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
                   <Text style={styles.stepNumberText}>1</Text>
                 </View>
-                <Text style={styles.stepText}>thing you can taste or would like to taste</Text>
+                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
+                  thing you can taste or would like to taste
+                </Text>
               </View>
             </View>
           </View>
 
           {/* Additional Support Section */}
-          <View style={styles.supportSection}>
+          <View style={[styles.supportSection, { 
+            backgroundColor: theme.isDark ? '#5D4037' : '#FFF3E0' 
+          }]}>
             <View style={styles.supportHeader}>
-              <Ionicons name="information-circle" size={24} color="#5D4037" />
-              <Text style={styles.supportTitle}>Remember</Text>
+              <Ionicons name="information-circle" size={24} color={theme.isDark ? '#FFCCBC' : '#5D4037'} />
+              <Text style={[styles.supportTitle, { color: theme.isDark ? '#FFCCBC' : '#5D4037' }]}>
+                Remember
+              </Text>
             </View>
-            <Text style={styles.supportText}>
+            <Text style={[styles.supportText, { color: theme.isDark ? '#FFCCBC' : '#5D4037' }]}>
               You are not alone. Reaching out for help is a sign of strength. These feelings are temporary, and with support, things can get better.
             </Text>
           </View>
@@ -328,7 +351,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   emergencyCard: {
-    backgroundColor: "#E53935",
     borderRadius: 20,
     padding: 24,
     marginBottom: 24,
@@ -381,25 +403,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  emergency911: {
-    backgroundColor: "#E53935",
-  },
-  crisisHotline: {
-    backgroundColor: "#4CAF50",
-  },
-  distressCenter: {
-    backgroundColor: "#2196F3",
-  },
   websiteButton: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: "#2196F3",
   },
   buttonIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -408,22 +418,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emergencyButtonMainText: {
-    color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 4,
   },
   emergencyButtonSubText: {
-    color: "#FFFFFF",
     fontSize: 14,
     opacity: 0.9,
-  },
-  websiteText: {
-    color: "#2196F3",
-  },
-  websiteSubText: {
-    color: "#2196F3",
-    opacity: 0.8,
   },
   buttonArrow: {
     opacity: 0.8,
@@ -439,7 +440,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#4CAF50",
     marginLeft: 12,
   },
   strategiesGrid: {
@@ -449,7 +449,6 @@ const styles = StyleSheet.create({
   },
   strategyCard: {
     width: "48%",
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -470,13 +469,11 @@ const styles = StyleSheet.create({
   },
   strategyText: {
     fontSize: 14,
-    color: "#333",
     textAlign: "center",
     fontWeight: "500",
     lineHeight: 18,
   },
   groundingSection: {
-    backgroundColor: "#E8F5E9",
     borderRadius: 20,
     padding: 24,
     marginBottom: 32,
@@ -494,12 +491,10 @@ const styles = StyleSheet.create({
   groundingTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#2E7D32",
     marginLeft: 12,
   },
   groundingDescription: {
     fontSize: 15,
-    color: "#5D4037",
     lineHeight: 20,
     marginBottom: 20,
     opacity: 0.8,
@@ -516,7 +511,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#2E7D32",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -528,12 +522,10 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 16,
-    color: "#5D4037",
     flex: 1,
     fontWeight: "500",
   },
   supportSection: {
-    backgroundColor: "#FFF3E0",
     borderRadius: 20,
     padding: 24,
     marginBottom: 32,
@@ -551,12 +543,10 @@ const styles = StyleSheet.create({
   supportTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#5D4037",
     marginLeft: 12,
   },
   supportText: {
     fontSize: 16,
-    color: "#5D4037",
     lineHeight: 22,
     textAlign: "center",
     opacity: 0.9,
