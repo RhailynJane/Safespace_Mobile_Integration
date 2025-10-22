@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "dev": "nodemon src/index.ts",
     "update-ip": "node scripts/update-ip.js",
-    "start:auto": "npm run update-ip && expo start"
+    "start:auto": "npm run update-ip && expo start --clear"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",

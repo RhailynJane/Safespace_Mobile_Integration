@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS clients (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- Constraints
-    CONSTRAINT chk_legal_status CHECK (legal_status IN ('independent', 'guardianship', 'co-decision-making')),
+    CONSTRAINT chk_legal_status CHECK (legal_status IN ('independent', 'guardianship', 'co_decision_making')),
     CONSTRAINT unique_client_user_id UNIQUE (user_id)
 );
 

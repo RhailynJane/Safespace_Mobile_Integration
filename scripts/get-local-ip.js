@@ -1,4 +1,4 @@
-const os = require('os');
+import os from 'os';
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
@@ -15,5 +15,5 @@ function getLocalIP() {
   return 'localhost';
 }
 
-const ip = getLocalIP();
+console.log(getLocalIP());
 console.log(ip);

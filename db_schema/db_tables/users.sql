@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     age INTEGER,
     gender VARCHAR(30),
     profile_image_url TEXT,
+    last_active_at TIMESTAMP,
     address TEXT,
     city VARCHAR(100),
     state VARCHAR(100),
@@ -47,7 +48,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_login_at TIMESTAMP,
     last_logout_at TIMESTAMP,
     
-    CONSTRAINT chk_role CHECK (role IN ('admin', 'team-leader', 'support-worker', 'client', 'family-member')),
+    CONSTRAINT chk_role CHECK (role IN ('admin', 'team_leader', 'support_worker', 'client', 'family_member')),
     CONSTRAINT chk_status CHECK (status IN ('active', 'inactive', 'suspended', 'pending')),
     CONSTRAINT chk_gender CHECK (gender IN (
         'Agender',
