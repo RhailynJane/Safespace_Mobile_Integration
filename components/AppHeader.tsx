@@ -523,10 +523,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 11,
-    paddingVertical: 2,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     marginBottom: 8,
-    height: 42,
+    height: 56,
     // backgroundColor removed - now uses theme.colors.surface
   },
   emptyTitle: {

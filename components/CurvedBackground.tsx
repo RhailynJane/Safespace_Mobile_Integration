@@ -53,21 +53,21 @@ const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
         <Defs>
           {/* First gradient - diagonal light gray to medium gray (dark adjusts) */}
           <LinearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={g1[0]} stopOpacity={isDarkMode ? 0.6 : 0.5} />
-            <Stop offset="50%" stopColor={g1[1]} stopOpacity={0.6} />
-            <Stop offset="100%" stopColor={g1[2]} stopOpacity={isDarkMode ? 0.5 : 0.4} />
+            <Stop offset="0%" stopColor={g1[0]} stopOpacity={isDarkMode ? 0.6 : 0.8} />
+            <Stop offset="50%" stopColor={g1[1]} stopOpacity={isDarkMode ? 0.6 : 0.9} />
+            <Stop offset="100%" stopColor={g1[2]} stopOpacity={isDarkMode ? 0.5 : 0.7} />
           </LinearGradient>
           
           {/* Second gradient - bottom to top with lighter colors (dark adjusts) */}
           <LinearGradient id="gradient2" x1="0%" y1="100%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor={g2[0]} stopOpacity={0.7} />
-            <Stop offset="100%" stopColor={g2[1]} stopOpacity={0.3} />
+            <Stop offset="0%" stopColor={g2[0]} stopOpacity={isDarkMode ? 0.7 : 0.85} />
+            <Stop offset="100%" stopColor={g2[1]} stopOpacity={isDarkMode ? 0.3 : 0.6} />
           </LinearGradient>
           
           {/* Third gradient - reverse diagonal with subtle grays (dark adjusts) */}
           <LinearGradient id="gradient3" x1="100%" y1="100%" x2="0%" y2="0%">
-            <Stop offset="0%" stopColor={g3[0]} stopOpacity={0.5} />
-            <Stop offset="100%" stopColor={g3[1]} stopOpacity={0.2} />
+            <Stop offset="0%" stopColor={g3[0]} stopOpacity={isDarkMode ? 0.5 : 0.75} />
+            <Stop offset="100%" stopColor={g3[1]} stopOpacity={isDarkMode ? 0.2 : 0.5} />
           </LinearGradient>
         </Defs>
 
@@ -93,7 +93,7 @@ const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
               L ${screenWidth} ${screenHeight}
               L 0 ${screenHeight} Z`}
           fill="url(#gradient2)"
-          opacity="0.85"
+          opacity={isDarkMode ? 0.85 : 0.95}
         />
 
         {/* Lower curve - grounds the design at the bottom */}

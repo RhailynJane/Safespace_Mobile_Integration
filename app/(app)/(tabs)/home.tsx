@@ -373,7 +373,7 @@ const fetchProfileImage = useCallback(async () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={["top"]}>
         {/* Use AppHeader component - handles all navigation and menu */}
         <AppHeader showBack={false} showMenu={true} showNotifications={true} />
 
@@ -508,7 +508,7 @@ const fetchProfileImage = useCallback(async () => {
                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Moods</Text>
               </TouchableOpacity>
               {recentMoods.length > 0 ? (
-                <View style={styles.recentMoods}>
+                <View style={[styles.recentMoods, { backgroundColor: theme.colors.surface }]}>
                   {recentMoods.map((mood) => (
                     <View key={mood.id} style={[styles.moodItem, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
                       <Text style={styles.moodEmoji}>
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   recentMoods: {
-    backgroundColor: "#EDE7EC",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",
