@@ -25,8 +25,11 @@ import {
   Conversation,
   Participant,
 } from "../../../../utils/sendbirdService";
+import activityApi from "../../../../utils/activityApi";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { useRef } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
@@ -39,6 +42,7 @@ export default function MessagesScreen() {
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [sendbirdStatus, setSendbirdStatus] =
     useState<string>("Initializing...");
+  const openedConversationIdsRef = useRef<Set<string>>(new Set());
   const API_BASE_URL =
     process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -82,6 +86,23 @@ export default function MessagesScreen() {
   useEffect(() => {
     initializeMessaging();
   }, [initializeMessaging]);
+
+  // Load opened conversation ids from storage to keep unread cleared across refreshes
+  useEffect(() => {
+    if (!userId) return;
+    const key = `openedConversations:${userId}`;
+    (async () => {
+      try {
+        const val = await AsyncStorage.getItem(key);
+        if (val) {
+          const arr: string[] = JSON.parse(val);
+          openedConversationIdsRef.current = new Set(arr);
+        }
+      } catch (_e) {
+        // ignore
+      }
+    })();
+  }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -146,21 +167,47 @@ export default function MessagesScreen() {
       if (response.ok) {
         const result = await response.json();
         console.log(`💬 Setting ${result.data.length} conversations`);
-        setConversations(result.data);
-        setFilteredConversations(result.data); // Initialize filtered conversations
+        let convs: Conversation[] = result.data;
 
-        // DEBUG: Check what online status is being returned
-        console.log(
-          "🔍 Online status debug:",
-          result.data.map((conv: any) => ({
-            id: conv.id,
-            participants: conv.participants.map((p: any) => ({
-              name: `${p.first_name} ${p.last_name}`,
-              online: p.online,
-              last_active_at: p.last_active_at,
-            })),
-          }))
-        );
+        // Keep unread cleared for conversations the user already opened in this session
+        const opened = openedConversationIdsRef.current;
+        if (opened.size > 0) {
+          convs = convs.map((c) =>
+            opened.has(c.id) ? { ...c, unread_count: 0 } : c
+          );
+        }
+
+        // After conversations load, refresh presence using batch status for other participants
+        try {
+          const otherIds = Array.from(
+            new Set(
+              convs
+                .flatMap((c) => c.participants)
+                .filter((p) => p.clerk_user_id !== userId)
+                .map((p) => p.clerk_user_id)
+                .filter(Boolean)
+            )
+          );
+
+          if (otherIds.length > 0) {
+            const statusMap = await activityApi.statusBatch(otherIds);
+            convs = convs.map((c) => ({
+              ...c,
+              participants: c.participants.map((p) => {
+                if (p.clerk_user_id === userId) return p;
+                const s = statusMap[p.clerk_user_id];
+                return s
+                  ? { ...p, online: !!s.online, last_active_at: s.last_active_at }
+                  : p;
+              }),
+            }));
+          }
+        } catch (e) {
+          console.log("Presence batch update failed:", e);
+        }
+
+        setConversations(convs);
+        setFilteredConversations(convs); // Initialize filtered conversations
       } else {
         console.log("💬 Failed to load conversations from backend");
         setConversations([]);
@@ -175,6 +222,53 @@ export default function MessagesScreen() {
       setRefreshing(false);
     }
   };
+
+  // Periodically refresh presence on the list so online status feels live
+  useEffect(() => {
+    if (!userId || conversations.length === 0) return;
+    const interval = setInterval(async () => {
+      try {
+        const otherIds = Array.from(
+          new Set(
+            conversations
+              .flatMap((c) => c.participants)
+              .filter((p) => p.clerk_user_id !== userId)
+              .map((p) => p.clerk_user_id)
+              .filter(Boolean)
+          )
+        );
+        if (otherIds.length === 0) return;
+        const statusMap = await activityApi.statusBatch(otherIds);
+        setConversations((prev) =>
+          prev.map((c) => ({
+            ...c,
+            participants: c.participants.map((p) => {
+              if (p.clerk_user_id === userId) return p;
+              const s = statusMap[p.clerk_user_id];
+              return s
+                ? { ...p, online: !!s.online, last_active_at: s.last_active_at }
+                : p;
+            }),
+          }))
+        );
+        setFilteredConversations((prev) =>
+          prev.map((c) => ({
+            ...c,
+            participants: c.participants.map((p) => {
+              if (p.clerk_user_id === userId) return p;
+              const s = statusMap[p.clerk_user_id];
+              return s
+                ? { ...p, online: !!s.online, last_active_at: s.last_active_at }
+                : p;
+            }),
+          }))
+        );
+      } catch (e) {
+        // ignore transient errors
+      }
+    }, 20000); // 20s
+    return () => clearInterval(interval);
+  }, [userId, conversations.length]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -398,11 +492,30 @@ export default function MessagesScreen() {
                       Alert.alert("Error", "Please sign in to view messages");
                       return;
                     }
+                    // Optimistically clear unread count for this conversation
+                    setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+                    setFilteredConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+                    // Track opened conversation locally to keep unread cleared
+                    openedConversationIdsRef.current.add(conversation.id);
+                    // Persist opened conversations so they stay cleared after refresh
+                    (async () => {
+                      try {
+                        if (userId) {
+                          const key = `openedConversations:${userId}`;
+                          await AsyncStorage.setItem(
+                            key,
+                            JSON.stringify(Array.from(openedConversationIdsRef.current))
+                          );
+                        }
+                      } catch (_e) { /* ignore */ }
+                    })();
+
                     router.push({
                       pathname: "../messages/message-chat-screen",
                       params: {
                         id: conversation.id,
                         title: getDisplayName(conversation),
+                        channelUrl: conversation.channel_url || "",
                       },
                     });
                   }}

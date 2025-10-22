@@ -55,7 +55,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { Message, Participant } from "../../../../utils/sendbirdService";
+import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
 import { Paths, File as FSFile } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
@@ -77,6 +77,7 @@ export default function ChatScreen() {
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
+  const channelUrl = (params.channelUrl as string) || "";
   const API_BASE_URL =
     process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -93,6 +94,11 @@ export default function ChatScreen() {
   const [currentAttachment, setCurrentAttachment] =
     useState<ExtendedMessage | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [userNearBottom, setUserNearBottom] = useState(true);
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+  const didMarkReadRef = useRef(false);
+  const [manualScrolling, setManualScrolling] = useState(false);
+  const scrollIdleTimerRef = useRef<any>(null);
 
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
@@ -190,6 +196,16 @@ export default function ChatScreen() {
         // console.log(`💬 Loaded ${result.data.length} messages`);
         setMessages(result.data);
 
+      // If SendBird is enabled and we have a channel URL, mark messages as read once
+      try {
+        if (!didMarkReadRef.current && channelUrl && messagingService.isSendBirdEnabled()) {
+          await messagingService.markAsRead(channelUrl);
+          didMarkReadRef.current = true;
+        }
+      } catch (_e) {
+        // ignore SB errors
+      }
+
         // Get conversation details to find the other participant with online status
         const conversationsResponse = await fetch(
           `${API_BASE_URL}/api/messages/conversations/${userId}`
@@ -245,6 +261,7 @@ export default function ChatScreen() {
     API_BASE_URL,
     contact,
     updateUserActivity,
+    channelUrl,
   ]);
 
   // Load messages with 60-second polling
@@ -287,13 +304,17 @@ export default function ChatScreen() {
   }, [contact, isOnline]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
-    setTimeout(() => {
-      if (scrollViewRef.current) {
-        scrollViewRef.current.scrollToEnd({ animated: true });
-      }
-    }, 100);
-  }, [messages]);
+    // Only auto-scroll if user is near bottom or last message is mine
+    const last = messages[messages.length - 1];
+    const lastIsMine = last ? last.sender.clerk_user_id === userId : false;
+    if (!manualScrolling && (userNearBottom || lastIsMine)) {
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
+    }
+  }, [messages, userNearBottom, userId, manualScrolling]);
 
   // Handle image selection from gallery
   const pickImage = async () => {
@@ -938,6 +959,35 @@ export default function ChatScreen() {
             ref={scrollViewRef}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
+            onScroll={(e) => {
+              const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+              const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+              const near = distanceFromBottom < 300; // px threshold
+              if (near !== userNearBottom) setUserNearBottom(near);
+              setShowScrollToLatest(!near && messages.length > 0);
+              // If user is not near, assume manual scrolling is happening
+              if (!near) {
+                setManualScrolling(true);
+              }
+            }}
+            scrollEventThrottle={100}
+            onContentSizeChange={() => {
+              if (!manualScrolling && userNearBottom && scrollViewRef.current) {
+                scrollViewRef.current.scrollToEnd({ animated: true });
+              }
+            }}
+            onScrollBeginDrag={() => {
+              setManualScrolling(true);
+              if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+            }}
+            onScrollEndDrag={() => {
+              if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+              scrollIdleTimerRef.current = setTimeout(() => setManualScrolling(false), 1200);
+            }}
+            onMomentumScrollEnd={() => {
+              if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+              scrollIdleTimerRef.current = setTimeout(() => setManualScrolling(false), 800);
+            }}
           >
             {messages.length === 0 ? (
               <View style={styles.emptyState}>
@@ -1013,6 +1063,21 @@ export default function ChatScreen() {
               })
             )}
           </ScrollView>
+
+          {showScrollToLatest && (
+            <TouchableOpacity
+              style={styles.scrollToLatestButton}
+              onPress={() => {
+                if (scrollViewRef.current) {
+                  scrollViewRef.current.scrollToEnd({ animated: true });
+                }
+                setShowScrollToLatest(false);
+                setUserNearBottom(true);
+              }}
+            >
+              <Ionicons name="arrow-down" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
 
           {/* Message Input */}
           <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.borderLight }] }>
@@ -1579,6 +1644,22 @@ const styles = StyleSheet.create({
   viewerFooterText: {
     color: "#CCCCCC",
     fontSize: 12,
+  },
+  scrollToLatestButton: {
+    position: "absolute",
+    right: 16,
+    bottom: 90,
+    backgroundColor: "#4CAF50",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
 });
 
