@@ -26,12 +26,13 @@ import {
   Participant,
 } from "../../../../utils/sendbirdService";
 import activityApi from "../../../../utils/activityApi";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { useRef } from "react";
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
+  const isFocused = useIsFocused();
   const { userId } = useAuth(); // Get actual Clerk user ID
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -209,7 +210,7 @@ export default function MessagesScreen() {
 
   // Periodically refresh presence on the list so online status feels live
   useEffect(() => {
-    if (!userId || conversations.length === 0) return;
+    if (!isFocused || !userId || conversations.length === 0) return;
     const interval = setInterval(async () => {
       try {
         const otherIds = Array.from(
@@ -252,11 +253,11 @@ export default function MessagesScreen() {
       }
     }, 20000); // 20s
     return () => clearInterval(interval);
-  }, [userId, conversations.length]);
+  }, [isFocused, userId, conversations.length]);
 
   // Poll for new messages and update unread counts every 10 seconds
   useEffect(() => {
-    if (!userId) return;
+    if (!isFocused || !userId) return;
     
     const pollMessages = async () => {
       try {
@@ -296,7 +297,7 @@ export default function MessagesScreen() {
     
     const pollInterval = setInterval(pollMessages, 10000); // Poll every 10 seconds
     return () => clearInterval(pollInterval);
-  }, [userId, searchQuery]);
+  }, [isFocused, userId, searchQuery]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -305,11 +306,8 @@ export default function MessagesScreen() {
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
-    if (tabId === "home") {
-      router.replace("/(app)/(tabs)/home");
-    } else {
-      router.push(`/(app)/(tabs)/${tabId}`);
-    }
+    // Use replace for all tab switches to avoid stacking screens and off-tab renders
+    router.replace(`/(app)/(tabs)/${tabId}`);
   };
 
   const getDisplayName = (conversation: Conversation) => {
@@ -512,7 +510,6 @@ export default function MessagesScreen() {
               </View>
             ) : (
               filteredConversations.map((conversation) => {
-                console.log(`🔍 Rendering conversation ${conversation.id}: unread=${conversation.unread_count}, title="${getDisplayName(conversation)}"`);
                 return (
                 <TouchableOpacity
                   key={conversation.id}

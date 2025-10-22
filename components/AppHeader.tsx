@@ -151,7 +151,6 @@ export const AppHeader = ({
       // Priority 1: Check AsyncStorage "profileImage" (set by edit screen)
       const savedImage = await AsyncStorage.getItem("profileImage");
       if (savedImage) {
-        console.log("📸 AppHeader: Found profile image in AsyncStorage");
         
         // ✅ FIX: If it's base64 (starts with data:image), it's too large - remove it
         if (savedImage.startsWith('data:image')) {
@@ -169,7 +168,6 @@ export const AppHeader = ({
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
         if (parsedData.profileImageUrl) {
-          console.log("📸 AppHeader: Found profile image in profileData");
           setProfileImage(parsedData.profileImageUrl);
           return;
         }
@@ -181,7 +179,6 @@ export const AppHeader = ({
           `profileImage_${user.id}`
         );
         if (userSpecificImage) {
-          console.log("📸 AppHeader: Found user-specific profile image");
           setProfileImage(userSpecificImage);
           return;
         }
@@ -189,12 +186,10 @@ export const AppHeader = ({
 
       // Priority 4: Use Clerk image as fallback
       if (user?.imageUrl) {
-        console.log("📸 AppHeader: Using Clerk profile image");
         setProfileImage(user.imageUrl);
         return;
       }
 
-      console.log("📸 AppHeader: No profile image found");
       setProfileImage(null);
     } catch (error) {
       console.log("Error loading profile image:", error);
@@ -210,7 +205,6 @@ export const AppHeader = ({
 
   useFocusEffect(
     useCallback(() => {
-      console.log("🔄 AppHeader: Screen focused, reloading profile image");
       if (user?.id) {
         loadProfileImage();
       }
@@ -218,18 +212,11 @@ export const AppHeader = ({
   );
 
   const getInitials = () => {
-    console.log("User data:", {
-      firstName: user?.firstName,
-      lastName: user?.lastName,
-      fullName: user?.fullName,
-      email: user?.primaryEmailAddress?.emailAddress,
-    });
 
     if (user?.firstName && user?.lastName) {
       const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(
         0
       )}`.toUpperCase();
-      console.log("Using first+last name initials:", initials);
       return initials;
     }
     if (user?.fullName) {
@@ -240,10 +227,8 @@ export const AppHeader = ({
               names[names.length - 1]?.charAt(0) ?? ""
             }`.toUpperCase()
           : (names[0]?.charAt(0) ?? "").toUpperCase();
-      console.log("Using full name initials:", initials);
       return initials;
     }
-    console.log("Using fallback 'U'");
     return "U";
   };
 

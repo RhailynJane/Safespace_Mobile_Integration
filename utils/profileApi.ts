@@ -67,14 +67,12 @@ export const profileApi = {
       const response = await fetch(imageUri);
       const blob = await response.blob();
       
-      console.log('📊 Image blob size:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
       
       // Convert blob to base64
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64String = reader.result as string;
-          console.log('📊 Base64 size:', (base64String.length / 1024 / 1024).toFixed(2), 'MB');
           resolve(base64String);
         };
         reader.onerror = reject;
@@ -99,7 +97,6 @@ export const profileApi = {
       }
 
       const result = await apiResponse.json();
-      console.log('✅ Image uploaded successfully:', result);
       
       if (result.success) {
         return result.data.profileImageUrl;
@@ -115,7 +112,6 @@ export const profileApi = {
   async updateClientProfile(clerkUserId: string, profileData: Partial<ClientProfileData>): Promise<any> {
     try {
       console.log('🔄 Updating profile for user:', clerkUserId);
-      console.log('📦 Full profile data being sent:', JSON.stringify(profileData, null, 2));
       
       const API_URL = `${API_BASE_URL}/api/client-profile/${clerkUserId}`;
       console.log('🌐 Making request to:', API_URL);

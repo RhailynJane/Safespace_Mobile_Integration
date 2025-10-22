@@ -62,6 +62,7 @@ import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import * as MediaLibrary from "expo-media-library";
+import { useIsFocused } from "@react-navigation/native";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -74,6 +75,7 @@ interface ExtendedMessage extends Message {
 
 export default function ChatScreen() {
   const { theme } = useTheme();
+  const isFocused = useIsFocused();
   const { userId } = useAuth();
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
@@ -273,7 +275,7 @@ export default function ChatScreen() {
 
   // Load messages with 60-second polling
   useEffect(() => {
-    if (!conversationId || !userId) return;
+    if (!isFocused || !conversationId || !userId) return;
 
     loadMessages(); // Load immediately
 
@@ -283,11 +285,11 @@ export default function ChatScreen() {
     }, 60000); // 60 seconds
 
     return () => clearInterval(pollInterval);
-  }, [conversationId, userId, loadMessages]);
+  }, [isFocused, conversationId, userId, loadMessages]);
 
   // Update online status based on last activity (every 10 seconds)
   useEffect(() => {
-    if (!contact || !contact.clerk_user_id || contact.clerk_user_id === "unknown") return;
+    if (!isFocused || !contact || !contact.clerk_user_id || contact.clerk_user_id === "unknown") return;
 
     const updateOnlineStatus = async () => {
       try {
@@ -314,7 +316,7 @@ export default function ChatScreen() {
       clearInterval(statusInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contact?.clerk_user_id]); // Only re-run if clerk_user_id changes (not isOnline to avoid loops)
+  }, [isFocused, contact?.clerk_user_id]); // Only re-run if clerk_user_id changes (not isOnline to avoid loops)
 
   useEffect(() => {
     // Only auto-scroll if user is near bottom or last message is mine

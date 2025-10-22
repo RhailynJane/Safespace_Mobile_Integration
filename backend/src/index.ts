@@ -20,6 +20,21 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Lightweight request timing/logger to inspect slow endpoints and payload sizes
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const end = process.hrtime.bigint();
+    const ms = Number(end - start) / 1_000_000;
+    const len = res.getHeader('Content-Length');
+    // Only log API calls
+    if (req.path.startsWith('/api/')) {
+      console.log(`➡️  ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms.toFixed(1)}ms` + (len ? ` ${len}b` : ''));
+    }
+  });
+  next();
+});
+
 // PostgreSQL connection
 const pool = new Pool({
   user: "postgres",
@@ -97,8 +112,9 @@ app.get("/", (req: Request, res: Response) => {
 // Get all users endpoint
 app.get("/api/users", async (req: Request, res: Response) => {
   try {
+    // Do not return profile_image_url raw to avoid sending base64 blobs
     const result = await pool.query(
-      "SELECT * FROM users ORDER BY created_at DESC"
+      "SELECT id, clerk_user_id, first_name, last_name, email, role, status, created_at, updated_at FROM users ORDER BY created_at DESC"
     );
     res.json(result.rows);
   } catch (error: any) {
@@ -1041,6 +1057,22 @@ process.on("SIGINT", async () => {
   console.log("\nShutting down server...");
   await pool.end();
   process.exit(0);
+});
+
+// Extra diagnostics: do not silently exit on unexpected errors
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught exception:', err);
+  // Do not exit; let nodemon restart only if necessary
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled rejection at:', promise, 'reason:', reason);
+});
+process.on('SIGTERM', () => {
+  console.warn('⚠️ Received SIGTERM');
+});
+// Nodemon sends SIGUSR2 on restart
+process.once('SIGUSR2', () => {
+  console.warn('♻️  Received SIGUSR2 (nodemon restart)');
 });
 
 //Mood Tracking Interfaces and Endpoints
@@ -2535,40 +2567,61 @@ app.get(
       });
 
       // Get online status for all participants
-      const conversationsWithOnlineStatus = await Promise.all(
-        conversations.map(async (conversation) => {
-          const lastMessage = conversation.messages[0];
-          
-          // Get participants with real online status
-          const participantsWithStatus = await Promise.all(
-            conversation.participants.map(async (p) => {
-              const online = await getUserOnlineStatus(p.user.clerk_user_id);
-              return {
-                id: p.user.id,
-                clerk_user_id: p.user.clerk_user_id,
-                first_name: p.user.first_name,
-                last_name: p.user.last_name,
-                email: p.user.email,
-                profile_image_url: p.user.profile_image_url,
-                online,
-                last_active_at: p.user.last_active_at
-              };
-            })
-          );
-
-          return {
-            id: conversation.id.toString(),
-            title: conversation.title,
-            conversation_type: conversation.conversation_type,
-            updated_at: conversation.updated_at.toISOString(),
-            created_at: conversation.created_at.toISOString(),
-            last_message: lastMessage?.message_text || '',
-            last_message_time: lastMessage?.created_at.toISOString(),
-            unread_count: conversation._count.messages,
-            participants: participantsWithStatus
-          };
-        })
+      // Build a unique set of participant Clerk IDs to fetch status in batch
+      const allClerkIds = Array.from(
+        new Set(
+          conversations
+            .flatMap((c) => c.participants.map((p) => p.user.clerk_user_id))
+            .filter(Boolean)
+        )
       );
+
+      const usersStatus = await prisma.user.findMany({
+        where: { clerk_user_id: { in: allClerkIds } },
+        select: { clerk_user_id: true, last_active_at: true },
+      });
+      const statusMap = new Map<string, { online: boolean; last_active_at: Date | null }>();
+      const now = new Date();
+      usersStatus.forEach((u) => {
+        let online = false;
+        if (u.last_active_at) {
+          const lastActive = new Date(u.last_active_at);
+          const minutes = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+          online = minutes <= 3; // consistent with getUserOnlineStatus
+        }
+        statusMap.set(u.clerk_user_id, { online, last_active_at: u.last_active_at });
+      });
+
+      const conversationsWithOnlineStatus = conversations.map((conversation) => {
+        const lastMessage = conversation.messages[0];
+
+        const participantsWithStatus = conversation.participants.map((p) => {
+          const s = statusMap.get(p.user.clerk_user_id);
+          return {
+            id: p.user.id,
+            clerk_user_id: p.user.clerk_user_id,
+            first_name: p.user.first_name,
+            last_name: p.user.last_name,
+            email: p.user.email,
+            // Avoid sending base64 blobs in JSON, provide an endpoint URL instead
+            profile_image_url: sanitizeProfileImageRef(p.user.profile_image_url, p.user.clerk_user_id),
+            online: s ? s.online : false,
+            last_active_at: s ? s.last_active_at : p.user.last_active_at,
+          };
+        });
+
+        return {
+          id: conversation.id.toString(),
+          title: conversation.title,
+          conversation_type: conversation.conversation_type,
+          updated_at: conversation.updated_at.toISOString(),
+          created_at: conversation.created_at.toISOString(),
+          last_message: lastMessage?.message_text || '',
+          last_message_time: lastMessage?.created_at.toISOString(),
+          unread_count: conversation._count.messages,
+          participants: participantsWithStatus,
+        };
+      });
 
       console.log(`💬 Returning ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
       conversationsWithOnlineStatus.forEach(c => {
@@ -2680,7 +2733,8 @@ app.get(
           clerk_user_id: message.sender.clerk_user_id,
           first_name: message.sender.first_name,
           last_name: message.sender.last_name,
-          profile_image_url: message.sender.profile_image_url,
+          // Avoid sending base64 blobs in JSON, provide an endpoint URL instead
+          profile_image_url: sanitizeProfileImageRef(message.sender.profile_image_url, message.sender.clerk_user_id),
           online: false
         }
       }));
@@ -3139,7 +3193,14 @@ app.get(
       });
 
       const formattedUsers = users.map(user => ({
-        ...user,
+        id: user.id,
+        clerk_user_id: user.clerk_user_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        role: user.role,
+        // Avoid sending base64 blobs in JSON, provide an endpoint URL instead
+        profile_image_url: sanitizeProfileImageRef(user.profile_image_url, user.clerk_user_id),
         online: false,
         has_existing_conversation: false
       }));
@@ -3382,6 +3443,54 @@ const upload = multer({
   }
 });
 
+// Helper: sanitize profile image reference to avoid sending base64 blobs in JSON
+function sanitizeProfileImageRef(profileImageUrl: string | null | undefined, clerkUserId: string): string | null {
+  if (!profileImageUrl) return null;
+  // If it's a base64 data URI, return a lightweight API URL instead
+  if (profileImageUrl.startsWith('data:image')) {
+    return `/api/users/${encodeURIComponent(clerkUserId)}/profile-image`;
+  }
+  return profileImageUrl;
+}
+
+// Serve profile image (stored as base64 in DB) as a binary response to reduce JSON payload size
+app.get('/api/users/:clerkUserId/profile-image', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const result = await pool.query(
+      'SELECT profile_image_url FROM users WHERE clerk_user_id = $1 LIMIT 1',
+      [clerkUserId]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].profile_image_url) {
+      return res.status(404).send('Not found');
+    }
+
+    const dataUri: string = result.rows[0].profile_image_url as string;
+    if (!dataUri.startsWith('data:image')) {
+      // Not a base64 data URI; redirect to the URL (could be remote URL)
+      return res.redirect(dataUri);
+    }
+
+    // data:[<mediatype>][;base64],<data>
+    const match = dataUri.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+    if (!match) {
+      return res.status(400).send('Invalid image data');
+    }
+    const mime = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    res.setHeader('Content-Type', mime);
+    // Simple caching to avoid repeated large transfers
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error('❌ Error serving profile image:', err.message);
+    return res.status(500).send('Server error');
+  }
+});
+
 app.post('/api/messages/upload-attachment', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -3504,8 +3613,6 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
       // Don't fail the entire request if this fails
     }
 
-    console.log(`📁 File uploaded successfully: ${req.file.originalname}`);
-
     res.json({
       success: true,
       message: 'File uploaded successfully',
@@ -3546,7 +3653,6 @@ app.post('/api/upload/profile-image/:clerkUserId', upload.single('profileImage')
       });
     }
 
-    console.log('📸 Uploading profile image for user:', clerkUserId);
 
     // Verify user exists
     const user = await prisma.user.findUnique({
@@ -3574,7 +3680,6 @@ app.post('/api/upload/profile-image/:clerkUserId', upload.single('profileImage')
       }
     });
 
-    console.log('✅ Profile image updated successfully:', imageUrl);
 
     res.json({
       success: true,
