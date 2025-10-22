@@ -225,14 +225,22 @@ export default function JournalHistoryScreen() {
     <TouchableOpacity
       style={[
         styles.filterButton,
-        activeFilter === filter && styles.filterButtonActive,
+        { backgroundColor: theme.colors.borderLight },
+        activeFilter === filter && [
+          styles.filterButtonActive,
+          { backgroundColor: theme.colors.surface }
+        ],
       ]}
       onPress={() => handleFilterChange(filter)}
     >
       <Text
         style={[
           styles.filterText,
-          activeFilter === filter && styles.filterTextActive,
+          { color: theme.colors.textSecondary },
+          activeFilter === filter && [
+            styles.filterTextActive,
+            { color: theme.colors.text }
+          ],
         ]}
       >
         {label}
@@ -246,13 +254,13 @@ export default function JournalHistoryScreen() {
     return (
       <TouchableOpacity
         key={entry.id}
-        style={styles.entryCard}
+        style={[styles.entryCard, { backgroundColor: theme.colors.surface }]}
         onPress={() => handleEntryPress(entry.id)}
       >
         <View style={styles.entryHeader}>
           <View style={styles.entryInfo}>
-            <Text style={styles.entryTitle}>{entry.title}</Text>
-            <Text style={styles.entryDate}>{formatDate(entry.created_at)}</Text>
+            <Text style={[styles.entryTitle, { color: theme.colors.text }]}>{entry.title}</Text>
+            <Text style={[styles.entryDate, { color: theme.colors.textSecondary }]}>{formatDate(entry.created_at)}</Text>
           </View>
           <View style={styles.entryMeta}>
             {entry.emoji ? (
@@ -261,14 +269,14 @@ export default function JournalHistoryScreen() {
             <Ionicons
               name={isExpanded ? "chevron-up" : "chevron-down"}
               size={20}
-              color={Colors.textSecondary}
+              color={theme.colors.textSecondary}
               style={styles.expandIcon}
             />
           </View>
         </View>
 
         <Text
-          style={styles.entryContent}
+          style={[styles.entryContent, { color: theme.colors.textSecondary }]}
           numberOfLines={isExpanded ? undefined : 3}
         >
           {entry.content}
@@ -277,22 +285,25 @@ export default function JournalHistoryScreen() {
         {entry.tags && entry.tags.length > 0 && (
           <View style={styles.tagsContainer}>
             {entry.tags.map((tag: string, index: number) => (
-              <View key={`${entry.id}-${tag}-${index}`} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
+              <View 
+                key={`${entry.id}-${tag}-${index}`} 
+                style={[styles.tag, { backgroundColor: theme.colors.primary + '20' }]}
+              >
+                <Text style={[styles.tagText, { color: theme.colors.primary }]}>{tag}</Text>
               </View>
             ))}
           </View>
         )}
 
         {entry.share_with_support_worker && (
-          <View style={styles.sharedBadge}>
-            <Ionicons name="people" size={12} color={Colors.primary} />
-            <Text style={styles.sharedText}>Shared with Support Worker</Text>
+          <View style={[styles.sharedBadge, { backgroundColor: theme.colors.primary + '20' }]}>
+            <Ionicons name="people" size={12} color={theme.colors.primary} />
+            <Text style={[styles.sharedText, { color: theme.colors.primary }]}>Shared with Support Worker</Text>
           </View>
         )}
 
         {!isExpanded && entry.content.length > 150 && (
-          <Text style={styles.readMore}>Read more...</Text>
+          <Text style={[styles.readMore, { color: theme.colors.primary }]}>Read more...</Text>
         )}
       </TouchableOpacity>
     );
@@ -303,36 +314,36 @@ export default function JournalHistoryScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entries" showBack={true} showMenu={true} />
         <ScrollView style={styles.content}>
-          <Text style={styles.pageTitle}>My Journal Entries</Text>
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>My Journal Entries</Text>
 
           {/* Search Bar */}
-          <View style={styles.searchContainer}>
+          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
             <Ionicons
               name="search"
               size={20}
-              color={Colors.textSecondary}
+              color={theme.colors.textSecondary}
               style={styles.searchIcon}
             />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: theme.colors.text }]}
               placeholder="Search by title, content, or tags..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={theme.colors.textSecondary}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={handleClearSearch}>
                 <Ionicons
                   name="close-circle"
                   size={20}
-                  color={Colors.textSecondary}
+                  color={theme.colors.textSecondary}
                 />
               </TouchableOpacity>
             )}
           </View>
 
           {/* Date Filter Buttons */}
-          <View style={styles.filterContainer}>
+          <View style={[styles.filterContainer, { backgroundColor: theme.colors.borderLight }]}>
             {renderFilterButton("all", "All")}
             {renderFilterButton("week", "Week")}
             {renderFilterButton("month", "Month")}
@@ -341,21 +352,21 @@ export default function JournalHistoryScreen() {
 
           {/* Active Custom Date Filter Display */}
           {activeFilter === "custom" && customStartDate && (
-            <View style={styles.activeDateFilter}>
-              <Text style={styles.activeDateText}>
+            <View style={[styles.activeDateFilter, { backgroundColor: theme.colors.primary + '20' }]}>
+              <Text style={[styles.activeDateText, { color: theme.colors.primary }]}>
                 {formatDateForDisplay(customStartDate)}
                 {customEndDate && ` - ${formatDateForDisplay(customEndDate)}`}
                 {!customEndDate && " (Single Day)"}
               </Text>
               <TouchableOpacity onPress={handleClearDateFilter}>
-                <Ionicons name="close-circle" size={20} color={Colors.primary} />
+                <Ionicons name="close-circle" size={20} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
           )}
 
           {/* Results Count */}
           {!loading && (
-            <Text style={styles.resultsCount}>
+            <Text style={[styles.resultsCount, { color: theme.colors.textSecondary }]}>
               {filteredEntries.length}{" "}
               {filteredEntries.length === 1 ? "entry" : "entries"} found
             </Text>
@@ -364,8 +375,8 @@ export default function JournalHistoryScreen() {
           <View style={styles.entriesContainer}>
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.loadingText}>Loading entries...</Text>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading entries...</Text>
               </View>
             ) : filteredEntries.length > 0 ? (
               filteredEntries.map(renderJournalEntry)
@@ -374,16 +385,16 @@ export default function JournalHistoryScreen() {
                 <Ionicons
                   name={searchQuery ? "search" : "book-outline"}
                   size={64}
-                  color={Colors.textTertiary}
+                  color={theme.colors.textSecondary}
                 />
-                <Text style={styles.emptyStateText}>
+                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                   {searchQuery
                     ? "No entries match your search"
                     : activeFilter === "custom" 
                     ? "No entries found for selected date range"
                     : "No journal entries yet"}
                 </Text>
-                <Text style={styles.emptyStateSubtext}>
+                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
                   {searchQuery
                     ? "Try a different search term"
                     : activeFilter === "custom"
@@ -392,10 +403,10 @@ export default function JournalHistoryScreen() {
                 </Text>
                 {!searchQuery && activeFilter !== "custom" && (
                   <TouchableOpacity
-                    style={styles.addEntryButton}
+                    style={[styles.addEntryButton, { backgroundColor: theme.colors.primary }]}
                     onPress={() => router.push("/(app)/journal/journal-create")}
                   >
-                    <Text style={styles.addEntryButtonText}>
+                    <Text style={[styles.addEntryButtonText, { color: theme.colors.surface }]}>
                       Write First Entry
                     </Text>
                   </TouchableOpacity>
@@ -406,10 +417,10 @@ export default function JournalHistoryScreen() {
 
           {filteredEntries.length > 0 && (
             <TouchableOpacity
-              style={styles.floatingAddButton}
+              style={[styles.floatingAddButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => router.push("/(app)/journal/journal-create")}
             >
-              <Ionicons name="add" size={28} color={Colors.surface} />
+              <Ionicons name="add" size={28} color={theme.colors.surface} />
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -422,64 +433,67 @@ export default function JournalHistoryScreen() {
           onRequestClose={() => setShowDatePicker(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Select Date Range</Text>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Select Date Range</Text>
 
               <View style={styles.dateInputContainer}>
-                <Text style={styles.dateLabel}>Start Date *</Text>
+                <Text style={[styles.dateLabel, { color: theme.colors.text }]}>Start Date *</Text>
                 <TouchableOpacity 
-                  style={styles.dateInput}
+                  style={[styles.dateInput, { backgroundColor: theme.colors.primary + '20' }]}
                   onPress={() => setShowStartDatePicker(true)}
                 >
                   <Text style={[
                     styles.dateInputText,
-                    !customStartDate && styles.dateInputPlaceholder
+                    { color: theme.colors.text },
+                    !customStartDate && [styles.dateInputPlaceholder, { color: theme.colors.textSecondary }]
                   ]}>
                     {customStartDate ? formatDateForDisplay(customStartDate) : "Select start date"}
                   </Text>
-                  <Ionicons name="calendar" size={20} color={Colors.textSecondary} />
+                  <Ionicons name="calendar" size={20} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.dateInputContainer}>
-                <Text style={styles.dateLabel}>End Date (Optional)</Text>
-                <Text style={styles.dateHint}>
+                <Text style={[styles.dateLabel, { color: theme.colors.text }]}>End Date (Optional)</Text>
+                <Text style={[styles.dateHint, { color: theme.colors.textSecondary }]}>
                   Leave empty to search for a single day
                 </Text>
                 <TouchableOpacity 
-                  style={styles.dateInput}
+                  style={[styles.dateInput, { backgroundColor: theme.colors.primary + '20' }]}
                   onPress={() => setShowEndDatePicker(true)}
                 >
                   <Text style={[
                     styles.dateInputText,
-                    !customEndDate && styles.dateInputPlaceholder
+                    { color: theme.colors.text },
+                    !customEndDate && [styles.dateInputPlaceholder, { color: theme.colors.textSecondary }]
                   ]}>
                     {customEndDate ? formatDateForDisplay(customEndDate) : "Select end date (optional)"}
                   </Text>
-                  <Ionicons name="calendar" size={20} color={Colors.textSecondary} />
+                  <Ionicons name="calendar" size={20} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.modalButtons}>
                 <TouchableOpacity
-                  style={styles.modalCancelButton}
+                  style={[styles.modalCancelButton, { backgroundColor: theme.colors.borderLight }]}
                   onPress={() => {
                     setShowDatePicker(false);
                     setActiveFilter("all");
                   }}
                 >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
+                  <Text style={[styles.modalCancelText, { color: theme.colors.textSecondary }]}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
                     styles.modalApplyButton,
-                    !customStartDate && styles.modalApplyButtonDisabled
+                    { backgroundColor: theme.colors.primary },
+                    !customStartDate && [styles.modalApplyButtonDisabled, { backgroundColor: theme.colors.borderLight }]
                   ]}
                   onPress={handleApplyCustomDate}
                   disabled={!customStartDate}
                 >
-                  <Text style={styles.modalApplyText}>Apply</Text>
+                  <Text style={[styles.modalApplyText, { color: theme.colors.surface }]}>Apply</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -539,7 +553,6 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
@@ -556,11 +569,9 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     ...Typography.body,
-    color: Colors.textPrimary,
   },
   filterContainer: {
     flexDirection: "row",
-    backgroundColor: Colors.surfaceSecondary,
     borderRadius: 25,
     padding: 4,
     marginBottom: Spacing.md,
@@ -572,7 +583,6 @@ const styles = StyleSheet.create({
     borderRadius: 21,
   },
   filterButtonActive: {
-    backgroundColor: Colors.surface,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -581,31 +591,26 @@ const styles = StyleSheet.create({
   },
   filterText: {
     ...Typography.body,
-    color: Colors.textSecondary,
     fontWeight: "500",
     fontSize: 13,
   },
   filterTextActive: {
-    color: Colors.textPrimary,
     fontWeight: "600",
   },
   activeDateFilter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.md,
   },
   activeDateText: {
     ...Typography.caption,
-    color: Colors.primary,
     fontWeight: "600",
   },
   resultsCount: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginBottom: Spacing.lg,
   },
   entriesContainer: {
@@ -617,11 +622,9 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: Spacing.md,
   },
   entryCard: {
-    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.xl,
     marginBottom: Spacing.lg,
@@ -647,7 +650,6 @@ const styles = StyleSheet.create({
   },
   entryDate: {
     ...Typography.caption,
-    color: Colors.textSecondary,
   },
   entryMeta: {
     flexDirection: "row",
@@ -663,11 +665,9 @@ const styles = StyleSheet.create({
   entryContent: {
     ...Typography.body,
     lineHeight: 22,
-    color: Colors.textSecondary,
   },
   readMore: {
     ...Typography.caption,
-    color: Colors.primary,
     marginTop: Spacing.sm,
     fontWeight: "500",
   },
@@ -678,20 +678,17 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   tag: {
-    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
   },
   tagText: {
     ...Typography.caption,
-    color: Colors.primary,
   },
   sharedBadge: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: Spacing.sm,
-    backgroundColor: Colors.primary + "20",
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: 8,
@@ -699,7 +696,6 @@ const styles = StyleSheet.create({
   },
   sharedText: {
     ...Typography.caption,
-    color: Colors.primary,
     marginLeft: 4,
     fontSize: 10,
   },
@@ -717,10 +713,8 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     textAlign: "center",
     marginBottom: Spacing.xl,
-    color: Colors.textSecondary,
   },
   addEntryButton: {
-    backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
@@ -735,7 +729,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -751,7 +744,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.xl,
     width: "85%",
@@ -774,20 +766,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     padding: Spacing.lg,
   },
   dateInputText: {
     ...Typography.body,
-    color: Colors.textPrimary,
   },
   dateInputPlaceholder: {
     color: Colors.textTertiary,
   },
   dateHint: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginBottom: Spacing.sm,
     fontStyle: 'italic',
   },
@@ -797,18 +786,15 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     flex: 1,
-    backgroundColor: Colors.disabled,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
     alignItems: "center",
   },
   modalCancelText: {
     ...Typography.button,
-    color: Colors.textSecondary,
   },
   modalApplyButton: {
     flex: 1,
-    backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
     alignItems: "center",

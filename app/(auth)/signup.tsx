@@ -21,6 +21,7 @@ import EmailVerificationStep from "../../components/EmailVerificationStep";
 import SuccessStep from "../../components/SuccessStep";
 import { CaptchaHandler } from "../../utils/captcha-handler";
 import { apiService } from "../../utils/api";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -37,6 +38,7 @@ export interface SignupData {
 }
 
 export default function SignupScreen() {
+  const { theme } = useTheme();
   // Clerk signup hook
   const { isLoaded, signUp, setActive } = useSignUp();
   const [captchaReady, setCaptchaReady] = useState(false);
@@ -361,15 +363,15 @@ export default function SignupScreen() {
         return (
           <View>
             <View style={styles.headerContainer}>
-              <Text style={styles.title}>Sign Up To SafeSpace</Text>
-              <View style={styles.toggleContainer}>
+              <Text style={[styles.title, { color: theme.colors.text }]}>Sign Up To SafeSpace</Text>
+              <View style={[styles.toggleContainer, { backgroundColor: theme.colors.surface }]}>
                 <TouchableOpacity
                   style={styles.toggleButton}
                   onPress={() => router.push("/(auth)/login")}
                 >
-                  <Text style={styles.inactiveToggleText}>Sign In</Text>
+                  <Text style={[styles.inactiveToggleText, { color: theme.colors.textSecondary }]}>Sign In</Text>
                 </TouchableOpacity>
-                <View style={[styles.toggleButton, styles.activeToggle]}>
+                <View style={[styles.toggleButton, styles.activeToggle, { backgroundColor: theme.colors.primary }]}>
                   <Text style={styles.activeToggleText}>Sign Up</Text>
                 </View>
               </View>
@@ -381,14 +383,14 @@ export default function SignupScreen() {
               stepNumber={getStepNumber()}
             />
             {errorMessage && (
-              <Text style={styles.errorText}>{errorMessage}</Text>
+              <Text style={[styles.errorText, { color: theme.colors.error }]}>{errorMessage}</Text>
             )}
             <TouchableOpacity
               style={styles.footerContainer}
               onPress={() => router.push("/(auth)/login")}
             >
-              <Text style={styles.footerText}>
-                Already signed up? <Text style={styles.linkText}>Sign In</Text>
+              <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
+                Already signed up? <Text style={[styles.linkText, { color: theme.colors.error }]}>Sign In</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -451,7 +453,7 @@ export default function SignupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
       <KeyboardAvoidingView

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { syncUserToDatabase } from "../lib/api";
+import { useTheme } from "../contexts/ThemeContext";
 
 interface SuccessStepProps {
   onContinue: () => void;
@@ -10,6 +11,7 @@ interface SuccessStepProps {
 }
 
 export default function SuccessStep({ onContinue, onSignIn }: SuccessStepProps) {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [syncing, setSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -56,27 +58,27 @@ export default function SuccessStep({ onContinue, onSignIn }: SuccessStepProps) 
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text style={styles.title}>Account Created Successfully! 🎉</Text>
+    <View style={styles.container}>
+      <Text style={[styles.title, { color: theme.colors.text }]}>Account Created Successfully! 🎉</Text>
       
       {syncing ? (
         <View style={styles.syncContainer}>
-          <ActivityIndicator size="large" color="#7BB8A8" />
-          <Text style={styles.syncText}>Syncing with database...</Text>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.syncText, { color: theme.colors.textSecondary }]}>Syncing with database...</Text>
         </View>
       ) : syncError ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Database Sync Issue</Text>
-          <Text style={styles.errorHelp}>{syncError}</Text>
+        <View style={[styles.errorContainer, { backgroundColor: theme.isDark ? 'rgba(255, 0, 0, 0.1)' : '#FFE6E6' }]}>
+          <Text style={[styles.errorText, { color: theme.colors.error }]}>Database Sync Issue</Text>
+          <Text style={[styles.errorHelp, { color: theme.colors.textSecondary }]}>{syncError}</Text>
         </View>
       ) : (
-        <Text style={styles.successText}>
+        <Text style={[styles.successText, { color: theme.colors.textSecondary }]}>
           Your account has been synced with the database successfully!
         </Text>
       )}
 
       <TouchableOpacity
-        style={[styles.button, syncing && styles.disabledButton]}
+        style={[styles.button, { backgroundColor: theme.colors.primary }, syncing && styles.disabledButton]}
         onPress={handleContinue}
         disabled={syncing}
       >

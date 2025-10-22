@@ -541,6 +541,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 12,
     textAlign: "center",
+    // color applied inline via theme
   },
   emojiGrid: {
     flexDirection: "row",
@@ -587,6 +588,7 @@ const styles = StyleSheet.create({
   chatTitle: {
     fontSize: 18,
     fontWeight: "600",
+    // color applied inline via theme
   },
   messagesContainer: {
     flex: 1,
@@ -607,10 +609,12 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 14,
     marginBottom: 4,
+    // color applied inline via theme
   },
   messageTime: {
     fontSize: 10,
     alignSelf: "flex-end",
+    // color applied inline via theme
   },
   messageInputContainer: {
     flexDirection: "row",

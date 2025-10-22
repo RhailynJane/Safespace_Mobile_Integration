@@ -106,7 +106,7 @@ export default function VideoCallScreen() {
 
         {/* Main meeting content */}
         <View style={styles.meetingContent}>
-          <Text style={styles.meetingWith}>
+          <Text style={[styles.meetingWith, { color: theme.colors.textSecondary }]}>
             Meeting with {currentAppointment?.supportWorker ?? ""}
           </Text>
 
@@ -118,20 +118,24 @@ export default function VideoCallScreen() {
             </View>
 
             <View style={styles.profileTextContainer}>
-              <Text style={styles.avatarName}>{getDisplayName()}</Text>
+              <Text style={[styles.avatarName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
             </View>
           </View>
         </View>
 
         {/* Audio Options (UI only) */}
         <View style={styles.audioOptions}>
-          <Text style={styles.audioTitle}>Audio Options</Text>
+          <Text style={[styles.audioTitle, { color: theme.colors.text }]}>Audio Options</Text>
 
           {/* Phone Audio Option */}
           <TouchableOpacity
             style={[
               styles.audioOption,
-              audioOption === "phone" && styles.audioOptionSelected,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+              audioOption === "phone" && [styles.audioOptionSelected, { 
+                borderColor: theme.colors.primary,
+                backgroundColor: theme.isDark ? 'rgba(76, 175, 80, 0.2)' : '#F1F8E9'
+              }],
             ]}
             onPress={() => setAudioOption("phone")}
             accessibilityRole="button"
@@ -139,11 +143,11 @@ export default function VideoCallScreen() {
             <Ionicons
               name={audioOption === "phone" ? "radio-button-on" : "radio-button-off"}
               size={24}
-              color={audioOption === "phone" ? "#4CAF50" : "#757575"}
+              color={audioOption === "phone" ? theme.colors.primary : theme.colors.icon}
             />
             <View style={styles.audioOptionText}>
-              <Text style={styles.audioOptionTitle}>Phone Audio</Text>
-              <Text style={styles.audioOptionDesc}>Call in with your phone</Text>
+              <Text style={[styles.audioOptionTitle, { color: theme.colors.text }]}>Phone Audio</Text>
+              <Text style={[styles.audioOptionDesc, { color: theme.colors.textSecondary }]}>Call in with your phone</Text>
             </View>
           </TouchableOpacity>
 
@@ -151,7 +155,11 @@ export default function VideoCallScreen() {
           <TouchableOpacity
             style={[
               styles.audioOption,
-              audioOption === "none" && styles.audioOptionSelected,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+              audioOption === "none" && [styles.audioOptionSelected, { 
+                borderColor: theme.colors.primary,
+                backgroundColor: theme.isDark ? 'rgba(76, 175, 80, 0.2)' : '#F1F8E9'
+              }],
             ]}
             onPress={() => setAudioOption("none")}
             accessibilityRole="button"
@@ -159,11 +167,11 @@ export default function VideoCallScreen() {
             <Ionicons
               name={audioOption === "none" ? "radio-button-on" : "radio-button-off"}
               size={24}
-              color={audioOption === "none" ? "#4CAF50" : "#757575"}
+              color={audioOption === "none" ? theme.colors.primary : theme.colors.icon}
             />
             <View style={styles.audioOptionText}>
-              <Text style={styles.audioOptionTitle}>Don&apos;t Use Audio</Text>
-              <Text style={styles.audioOptionDesc}>Join without audio</Text>
+              <Text style={[styles.audioOptionTitle, { color: theme.colors.text }]}>Don&apos;t Use Audio</Text>
+              <Text style={[styles.audioOptionDesc, { color: theme.colors.textSecondary }]}>Join without audio</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -172,16 +180,19 @@ export default function VideoCallScreen() {
         <View style={styles.meetingActions}>
           {/* Cancel simply navigates back */}
           <TouchableOpacity
-            style={styles.cancelButton}
+            style={[styles.cancelButton, { 
+              borderColor: theme.colors.borderLight,
+              backgroundColor: theme.colors.surface 
+            }]}
             onPress={() => router.back()}
             accessibilityRole="button"
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
 
           {/* Join Now triggers navigation to the meeting flow */}
           <TouchableOpacity
-            style={styles.joinNowButton}
+            style={[styles.joinNowButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleStartMeeting}
             accessibilityRole="button"
           >
@@ -232,8 +243,8 @@ const styles = StyleSheet.create({
   },
   meetingWith: {
     fontSize: 16,
-    color: "#757575",
     marginBottom: 30,
+    // color applied inline via theme
   },
   avatarContainer: {
     alignItems: "center",
@@ -251,8 +262,8 @@ const styles = StyleSheet.create({
   avatarName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
     marginBottom: 5,
+    // color applied inline via theme
   },
   avatarStatus: {
     fontSize: 14,
@@ -273,22 +284,20 @@ const styles = StyleSheet.create({
   audioTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#212121",
     marginBottom: 15,
+    // color applied inline via theme
   },
   audioOption: {
     flexDirection: "row",
     alignItems: "center",
     padding: 10,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
     borderRadius: 8,
     marginBottom: 15,
-    backgroundColor: "transparent",
+    // backgroundColor and borderColor applied inline via theme
   },
   audioOptionSelected: {
-    borderColor: "#4CAF50",
-    backgroundColor: "#F1F8E9",
+    // borderColor and backgroundColor applied inline via theme
   },
   audioOptionText: {
     marginLeft: 15,
@@ -297,12 +306,12 @@ const styles = StyleSheet.create({
   audioOptionTitle: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#212121",
     marginBottom: 4,
+    // color applied inline via theme
   },
   audioOptionDesc: {
     fontSize: 10,
-    color: "#757575",
+    // color applied inline via theme
   },
   meetingActions: {
     flexDirection: "row",
@@ -320,24 +329,23 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
     borderRadius: 20,
     alignItems: "center",
     marginRight: 10,
-    backgroundColor: "transparent",
+    // backgroundColor and borderColor applied inline via theme
   },
   cancelButtonText: {
-    color: "#757575",
     fontSize: 13,
     fontWeight: "600",
+    // color applied inline via theme
   },
   joinNowButton: {
     flex: 1,
     padding: 15,
-    backgroundColor: "#4CAF50",
     borderRadius: 20,
     alignItems: "center",
     marginLeft: 10,
+    // backgroundColor applied inline via theme
   },
   joinNowButtonText: {
     color: "#FFFFFF",
