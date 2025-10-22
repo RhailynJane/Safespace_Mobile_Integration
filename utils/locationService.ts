@@ -1,16 +1,59 @@
 // utils/locationService.ts
+
+// Get Mapbox token from environment variables
+const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
+
 export const locationService = {
   async searchLocations(query: string): Promise<any[]> {
     if (query.length < 2) return [];
 
     try {
-      // Try OpenStreetMap first (no API key needed)
+      // Try Mapbox first if token is available
+      if (MAPBOX_ACCESS_TOKEN) {
+        return await this.searchWithMapbox(query);
+      }
+      // Fallback to OpenStreetMap (no API key needed)
       return await this.searchWithOpenStreetMap(query);
     } catch (error) {
-      console.log('OpenStreetMap failed, trying fallback...', error);
+      console.log('Location search failed, trying fallback...', error);
       
       // Fallback to sample data
       return this.getSampleLocations(query);
+    }
+  },
+
+  async searchWithMapbox(query: string): Promise<any[]> {
+    try {
+      const encodedQuery = encodeURIComponent(query);
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?` +
+        `access_token=${MAPBOX_ACCESS_TOKEN}&` +
+        `country=ca,us&` +
+        `limit=10&` +
+        `types=place,locality,address`;
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Mapbox API error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      return data.features.map((item: any) => ({
+        id: item.id,
+        description: item.place_name,
+        address: {
+          street: item.address || '',
+          city: item.context?.find((c: any) => c.id.includes('place'))?.text || '',
+          state: item.context?.find((c: any) => c.id.includes('region'))?.text || '',
+          country: item.context?.find((c: any) => c.id.includes('country'))?.text || '',
+          postalCode: item.context?.find((c: any) => c.id.includes('postcode'))?.text || '',
+        },
+        coordinates: item.geometry.coordinates
+      }));
+    } catch (error) {
+      console.error('Mapbox search error:', error);
+      throw error;
     }
   },
 
@@ -25,7 +68,12 @@ export const locationService = {
     });
 
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?${params}`
+      `https://nominatim.openstreetmap.org/search?${params}`,
+      {
+        headers: {
+          'User-Agent': 'SafeSpace-App/1.0'
+        }
+      }
     );
 
     if (!response.ok) {
@@ -65,6 +113,28 @@ export const locationService = {
   },
   async searchAddresses(query: string): Promise<any[]> {
     try {
+      // Use Mapbox for address search if token available
+      if (MAPBOX_ACCESS_TOKEN) {
+        const encodedQuery = encodeURIComponent(query + ', Canada');
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?` +
+          `access_token=${MAPBOX_ACCESS_TOKEN}&` +
+          `country=ca&` +
+          `limit=5&` +
+          `types=address`;
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const data = await response.json();
+        
+        return data.features.map((item: any) => ({
+          id: item.id,
+          description: item.place_name,
+          address: item.properties?.address || item.address || ''
+        }));
+      }
+
+      // Fallback to OpenStreetMap
       const params = new URLSearchParams({
         q: query + ', Canada',
         format: 'json',
@@ -75,7 +145,12 @@ export const locationService = {
       });
 
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?${params}`
+        `https://nominatim.openstreetmap.org/search?${params}`,
+        {
+          headers: {
+            'User-Agent': 'SafeSpace-App/1.0'
+          }
+        }
       );
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);

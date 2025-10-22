@@ -12,7 +12,6 @@ import {
   Switch,
   Alert,
   Image,
-  FlatList,
   ActivityIndicator,
   Modal,
   Platform,
@@ -932,11 +931,10 @@ export default function EditProfileScreen() {
               <Text style={styles.loadingText}>Searching locations...</Text>
             </View>
           ) : (
-            <FlatList
-              data={locationSuggestions}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
+            <View style={styles.suggestionsContainer}>
+              {locationSuggestions.map((item) => (
                 <TouchableOpacity
+                  key={item.id.toString()}
                   style={styles.suggestionItem}
                   onPress={() => selectLocation(item)}
                 >
@@ -945,10 +943,8 @@ export default function EditProfileScreen() {
                     {item.description}
                   </Text>
                 </TouchableOpacity>
-              )}
-              style={styles.suggestionsFlatList}
-              nestedScrollEnabled={true}
-            />
+              ))}
+            </View>
           )}
         </View>
       </View>
@@ -1241,11 +1237,10 @@ export default function EditProfileScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    <FlatList
-                      data={LANGUAGE_OPTIONS}
-                      keyExtractor={(item) => item}
-                      renderItem={({ item }) => (
+                    <ScrollView style={styles.optionsList}>
+                      {LANGUAGE_OPTIONS.map((item) => (
                         <TouchableOpacity
+                          key={item}
                           style={[
                             styles.optionItem,
                             formData.primaryLanguage === item &&
@@ -1273,9 +1268,8 @@ export default function EditProfileScreen() {
                             />
                           )}
                         </TouchableOpacity>
-                      )}
-                      style={styles.optionsList}
-                    />
+                      ))}
+                    </ScrollView>
                   </View>
                 </View>
               </Modal>
@@ -1307,32 +1301,28 @@ export default function EditProfileScreen() {
               </View>
               {showStreetSuggestions && streetSuggestions.length > 0 && (
                 <View style={styles.suggestionsContainer}>
-                  <FlatList
-                    data={streetSuggestions}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.suggestionItem}
-                        onPress={() => {
-                          setFormData({
-                            ...formData,
-                            streetAddress: item.description.split(",")[0], // Get just the street part
-                          });
-                          setShowStreetSuggestions(false);
-                        }}
-                      >
-                        <Ionicons
-                          name="location-outline"
-                          size={16}
-                          color="#666"
-                        />
-                        <Text style={styles.suggestionText} numberOfLines={2}>
-                          {item.description}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    style={styles.suggestionsList}
-                  />
+                  {streetSuggestions.map((item) => (
+                    <TouchableOpacity
+                      key={item.id.toString()}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setFormData({
+                          ...formData,
+                          streetAddress: item.description.split(",")[0], // Get just the street part
+                        });
+                        setShowStreetSuggestions(false);
+                      }}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={16}
+                        color="#666"
+                      />
+                      <Text style={styles.suggestionText} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               )}
             </View>
@@ -1379,32 +1369,28 @@ export default function EditProfileScreen() {
               </View>
               {showPostalSuggestions && postalSuggestions.length > 0 && (
                 <View style={styles.suggestionsContainer}>
-                  <FlatList
-                    data={postalSuggestions}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        style={styles.suggestionItem}
-                        onPress={() => {
-                          setFormData({
-                            ...formData,
-                            postalCode: item.postalCode,
-                          });
-                          setShowPostalSuggestions(false);
-                        }}
-                      >
-                        <Ionicons
-                          name="location-outline"
-                          size={16}
-                          color="#666"
-                        />
-                        <Text style={styles.suggestionText} numberOfLines={2}>
-                          {item.description}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    style={styles.suggestionsList}
-                  />
+                  {postalSuggestions.map((item) => (
+                    <TouchableOpacity
+                      key={item.id.toString()}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setFormData({
+                          ...formData,
+                          postalCode: item.postalCode,
+                        });
+                        setShowPostalSuggestions(false);
+                      }}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={16}
+                        color="#666"
+                      />
+                      <Text style={styles.suggestionText} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               )}
             </View>
@@ -1541,11 +1527,10 @@ export default function EditProfileScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    <FlatList
-                      data={ETHNOCULTURAL_OPTIONS}
-                      keyExtractor={(item) => item}
-                      renderItem={({ item }) => (
+                    <ScrollView style={styles.optionsList}>
+                      {ETHNOCULTURAL_OPTIONS.map((item) => (
                         <TouchableOpacity
+                          key={item}
                           style={[
                             styles.optionItem,
                             formData.ethnoculturalBackground === item &&
@@ -1576,9 +1561,8 @@ export default function EditProfileScreen() {
                             />
                           )}
                         </TouchableOpacity>
-                      )}
-                      style={styles.optionsList}
-                    />
+                      ))}
+                    </ScrollView>
                   </View>
                 </View>
               </Modal>
@@ -1955,9 +1939,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     maxHeight: 200,
-  },
-  suggestionsFlatList: {
-    borderRadius: 10,
   },
   suggestionItem: {
     flexDirection: "row",
