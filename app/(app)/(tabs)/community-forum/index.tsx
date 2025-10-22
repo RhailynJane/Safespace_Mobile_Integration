@@ -48,7 +48,6 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -97,6 +96,18 @@ function useCommunityMainScreenState() {
   const [categories, setCategories] = useState<any[]>([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isSigningOut, setIsSigningOut] = useState(false);
+  
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [successCallback, setSuccessCallback] = useState<(() => void) | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
 
   return {
     selectedCategory,
@@ -122,6 +133,26 @@ function useCommunityMainScreenState() {
     fadeAnim,
     isSigningOut,
     setIsSigningOut,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
   };
 }
 
@@ -150,6 +181,26 @@ function CommunityMainScreenLogic() {
     fadeAnim,
     isSigningOut,
     setIsSigningOut,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
   } = useCommunityMainScreenState();
 
   const { signOut, isSignedIn } = useAuth();
@@ -182,6 +233,26 @@ function CommunityMainScreenLogic() {
     signOut,
     isSignedIn,
     user,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
   };
 }
 
@@ -214,6 +285,26 @@ export default function CommunityMainScreen() {
     signOut,
     isSignedIn,
     user,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
   } = CommunityMainScreenLogic();
 
   /**
@@ -246,7 +337,9 @@ export default function CommunityMainScreen() {
       await Promise.all([loadCategories(), loadPosts()]);
     } catch (error) {
       console.error("Error loading initial data:", error);
-      Alert.alert("Error", "Failed to load community data");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load community data");
+      setShowErrorModal(true);
     }
   };
 
@@ -276,7 +369,9 @@ export default function CommunityMainScreen() {
       // Special handling for bookmark category
       if (selectedCategory === "Bookmark") {
         if (!user?.id) {
-          Alert.alert("Sign In Required", "Please sign in to view bookmarked posts");
+          setErrorTitle("Sign In Required");
+          setErrorMessage("Please sign in to view bookmarked posts");
+          setShowErrorModal(true);
           setPosts([]);
           return;
         }
@@ -302,7 +397,9 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error loading posts:", error);
-      Alert.alert("Error", "Failed to load posts");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load posts");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -315,7 +412,9 @@ export default function CommunityMainScreen() {
    */
   const loadMyPosts = async () => {
     if (!user?.id) {
-      Alert.alert("Sign In Required", "Please sign in to view your posts");
+      setErrorTitle("Sign In Required");
+      setErrorMessage("Please sign in to view your posts");
+      setShowErrorModal(true);
       setMyPosts([]);
       setLoading(false);
       return;
@@ -327,7 +426,9 @@ export default function CommunityMainScreen() {
       setMyPosts(response.posts || []);
     } catch (error) {
       console.error("Error loading user posts:", error);
-      Alert.alert("Error", "Failed to load your posts");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load your posts");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -388,7 +489,9 @@ export default function CommunityMainScreen() {
    */
   const handleReactionPress = async (postId: number, emoji: string) => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to react to posts");
+      setErrorTitle("Sign In Required");
+      setErrorMessage("Please sign in to react to posts");
+      setShowErrorModal(true);
       return;
     }
 
@@ -423,7 +526,9 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error reacting to post:", error);
-      Alert.alert("Error", "Failed to update reaction");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update reaction");
+      setShowErrorModal(true);
     }
   };
 
@@ -433,7 +538,9 @@ export default function CommunityMainScreen() {
    */
   const handleBookmarkPress = async (postId: number) => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to bookmark posts");
+      setErrorTitle("Sign In Required");
+      setErrorMessage("Please sign in to bookmark posts");
+      setShowErrorModal(true);
       return;
     }
 
@@ -453,7 +560,9 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error toggling bookmark:", error);
-      Alert.alert("Error", "Failed to update bookmark");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update bookmark");
+      setShowErrorModal(true);
     }
   };
 
@@ -484,11 +593,14 @@ export default function CommunityMainScreen() {
 
     try {
       await communityApi.updatePost(postId, { isDraft: false });
-      Alert.alert("Success", "Post published successfully!");
-      loadMyPosts(); // Refresh the list to show updated state
+      setSuccessMessage("Post published successfully!");
+      setSuccessCallback(() => () => loadMyPosts());
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("Error publishing draft:", error);
-      Alert.alert("Error", "Failed to publish post");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to publish post");
+      setShowErrorModal(true);
     }
   };
 
@@ -497,35 +609,28 @@ export default function CommunityMainScreen() {
    * Updates UI immediately after successful deletion
    */
   const handleDeletePost = async (postId: number) => {
-    Alert.alert(
-      "Delete Post",
-      "Are you sure you want to delete this post? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            (async () => {
-              try {
-                await communityApi.deletePost(postId);
-                Alert.alert("Success", "Post deleted successfully!");
+    setConfirmTitle("Delete Post");
+    setConfirmMessage("Are you sure you want to delete this post? This action cannot be undone.");
+    setConfirmCallback(() => async () => {
+      try {
+        await communityApi.deletePost(postId);
+        setSuccessMessage("Post deleted successfully!");
+        setShowSuccessModal(true);
 
-                // Update the UI immediately for better UX
-                if (activeView === "my-posts") {
-                  setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-                } else {
-                  setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-                }
-              } catch (error) {
-                console.error("Error deleting post:", error);
-                Alert.alert("Error", "Failed to delete post");
-              }
-            })();
-          },
-        },
-      ]
-    );
+        // Update the UI immediately for better UX
+        if (activeView === "my-posts") {
+          setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+        } else {
+          setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+        }
+      } catch (error) {
+        console.error("Error deleting post:", error);
+        setErrorTitle("Error");
+        setErrorMessage("Failed to delete post");
+        setShowErrorModal(true);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   /**
@@ -568,20 +673,22 @@ export default function CommunityMainScreen() {
       }
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      setErrorTitle("Logout Failed");
+      setErrorMessage("Unable to sign out. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setIsSigningOut(false);
     }
   };
 
   /**
-   * Confirm sign-out with alert dialog
+   * Confirm sign-out with confirm modal
    */
   const confirmSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: () => { handleLogout(); } },
-    ]);
+    setConfirmTitle("Sign Out");
+    setConfirmMessage("Are you sure you want to sign out?");
+    setConfirmCallback(() => () => { handleLogout(); });
+    setShowConfirmModal(true);
   };
 
   /**
@@ -1134,6 +1241,100 @@ export default function CommunityMainScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
       />
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+            </View>
+            <Text style={styles.successTitle}>Success!</Text>
+            <Text style={styles.successMessage}>{successMessage}</Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                if (successCallback) {
+                  successCallback();
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal
+        visible={showErrorModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowErrorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.errorIconContainer}>
+              <Ionicons name="close-circle" size={80} color="#FF3B30" />
+            </View>
+            <Text style={styles.errorTitle}>{errorTitle}</Text>
+            <Text style={styles.successMessage}>{errorMessage}</Text>
+            <TouchableOpacity
+              style={styles.errorButton}
+              onPress={() => setShowErrorModal(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Modal */}
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.confirmIconContainer}>
+              <Ionicons name="alert-circle" size={80} color="#FFA000" />
+            </View>
+            <Text style={styles.confirmTitle}>{confirmTitle}</Text>
+            <Text style={styles.successMessage}>{confirmMessage}</Text>
+            <View style={styles.confirmButtonsContainer}>
+              <TouchableOpacity
+                style={styles.confirmCancelButton}
+                onPress={() => setShowConfirmModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.confirmCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => {
+                  setShowConfirmModal(false);
+                  if (confirmCallback) {
+                    confirmCallback();
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1498,6 +1699,101 @@ const styles = StyleSheet.create({
   // Bottom Spacing - Scroll view padding
   bottomSpacing: {
     height: 30,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    width: '80%',
+    maxWidth: 400,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  errorIconContainer: {
+    marginBottom: 16,
+  },
+  confirmIconContainer: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginBottom: 8,
+  },
+  confirmTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFA000',
+    marginBottom: 8,
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  successButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    width: '100%',
+  },
+  errorButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    width: '100%',
+  },
+  confirmButton: {
+    backgroundColor: '#FFA000',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    flex: 1,
+  },
+  confirmCancelButton: {
+    backgroundColor: '#E0E0E0',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    flex: 1,
+  },
+  confirmButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  successButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  confirmCancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 
   // Side Menu Styles - Navigation overlay
