@@ -171,7 +171,7 @@ export default function NotificationsScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Notifications" showBack={true} />
 
         {/* Top bar showing unread count & "Mark all as read" action */}

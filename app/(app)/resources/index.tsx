@@ -309,7 +309,7 @@ export default function ResourcesScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Resources" showBack={true} />
 
         {/* Main Scrollable Content Area */}

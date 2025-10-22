@@ -105,7 +105,7 @@ export default function CrisisScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Header */}
         <AppHeader title="Crisis Support" showBack={true} />
 

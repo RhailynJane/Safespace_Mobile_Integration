@@ -119,8 +119,8 @@ export default function VideoScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader title="Video Session" showBack={true} />
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <AppHeader title="Video Consultations" showBack={true} />
 
         {/* Main Content */}
         <ScrollView style={styles.scrollContent}>

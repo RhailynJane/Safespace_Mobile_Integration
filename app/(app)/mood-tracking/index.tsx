@@ -207,7 +207,7 @@ const MoodTrackingScreen = () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Header with navigation controls */}
         <AppHeader title="Mood Tracker" showBack={true} />
 

@@ -125,8 +125,8 @@ export default function PreSurveyScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader title="Pre-Self Assessment Test" showBack={true} />
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <AppHeader title="Self Assessment" showBack={true} />
 
         <ScrollView
           style={styles.scrollContent}
