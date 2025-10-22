@@ -110,7 +110,7 @@ export default function VideoScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <CurvedBackground>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
           </View>
         </CurvedBackground>
       </SafeAreaView>
@@ -125,7 +125,7 @@ export default function VideoScreen() {
         {/* Main Content */}
         <ScrollView style={styles.scrollContent}>
           <View style={styles.content}>
-            <View style={styles.appointmentCard}>
+            <View style={[styles.appointmentCard, { backgroundColor: theme.colors.surface }]}>
               {/* Support Worker Profile */}
               <View style={styles.profileContainer}>
                 <Image
@@ -133,69 +133,88 @@ export default function VideoScreen() {
                   style={styles.avatar}
                 />
                 <View style={styles.nameContainer}>
-                  <Text style={styles.name}>
+                  <Text style={[styles.name, { color: theme.colors.text }]}>
                     {appointments[0]?.supportWorker ?? ""}
                   </Text>
-                  <Text style={styles.date}>{appointments[0]?.date ?? ""}</Text>
-                  <Text style={styles.time}>{appointments[0]?.time ?? ""}</Text>
+                  <Text style={[styles.date, { color: theme.colors.textSecondary }]}>
+                    {appointments[0]?.date ?? ""}
+                  </Text>
+                  <Text style={[styles.time, { color: theme.colors.textSecondary }]}>
+                    {appointments[0]?.time ?? ""}
+                  </Text>
                 </View>
                 <View
                   style={[
                     styles.statusBadge,
                     appointments[0]?.status === "Upcoming"
-                      ? styles.upcomingBadge
+                      ? [styles.upcomingBadge, { backgroundColor: theme.isDark ? '#FFB74D' : '#FFECB3' }]
                       : appointments[0]?.status === "Completed"
-                      ? styles.completedBadge
-                      : styles.canceledBadge,
+                      ? [styles.completedBadge, { backgroundColor: theme.isDark ? '#388E3C' : '#C8E6C9' }]
+                      : [styles.canceledBadge, { backgroundColor: theme.isDark ? '#D32F2F' : '#FFCDD2' }],
                   ]}
                 >
-                  <Text style={styles.statusText}>
+                  <Text style={[
+                    styles.statusText, 
+                    { 
+                      color: appointments[0]?.status === "Upcoming" 
+                        ? theme.isDark ? '#FFF' : '#5D4037'
+                        : appointments[0]?.status === "Completed"
+                        ? theme.isDark ? '#FFF' : '#1B5E20'
+                        : theme.isDark ? '#FFF' : '#C62828'
+                    }
+                  ]}>
                     {appointments[0]?.status ?? ""}
                   </Text>
                 </View>
               </View>
 
-              <View style={styles.divider} />
+              <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
               {/* Technical Requirements Section */}
-              <Text style={styles.sectionTitle}>Technical Requirements</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>
+                Technical Requirements
+              </Text>
 
-              <Text style={styles.subsectionTitle}>System Requirements</Text>
+              <Text style={[styles.subsectionTitle, { color: theme.colors.text }]}>
+                System Requirements
+              </Text>
               <View style={styles.requirementItem}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.requirementText}>
+                <View style={[styles.bulletPoint, { backgroundColor: theme.colors.primary }]} />
+                <Text style={[styles.requirementText, { color: theme.colors.text }]}>
                   Stable internet connection (min 1 Mbps)
                 </Text>
               </View>
               <View style={styles.requirementItem}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.requirementText}>
+                <View style={[styles.bulletPoint, { backgroundColor: theme.colors.primary }]} />
+                <Text style={[styles.requirementText, { color: theme.colors.text }]}>
                   Speakers or headphones
                 </Text>
               </View>
 
-              <Text style={styles.subsectionTitle}>Privacy & Security</Text>
+              <Text style={[styles.subsectionTitle, { color: theme.colors.text }]}>
+                Privacy & Security
+              </Text>
               <View style={styles.requirementItem}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.requirementText}>
+                <View style={[styles.bulletPoint, { backgroundColor: theme.colors.primary }]} />
+                <Text style={[styles.requirementText, { color: theme.colors.text }]}>
                   End to end encrypted video calls
                 </Text>
               </View>
               <View style={styles.requirementItem}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.requirementText}>
+                <View style={[styles.bulletPoint, { backgroundColor: theme.colors.primary }]} />
+                <Text style={[styles.requirementText, { color: theme.colors.text }]}>
                   HIPAA/PIPEDA compliant platform
                 </Text>
               </View>
               <View style={styles.requirementItem}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.requirementText}>
+                <View style={[styles.bulletPoint, { backgroundColor: theme.colors.primary }]} />
+                <Text style={[styles.requirementText, { color: theme.colors.text }]}>
                   No recordings without consent
                 </Text>
               </View>
               <View style={styles.requirementItem}>
-                <View style={styles.bulletPoint} />
-                <Text style={styles.requirementText}>
+                <View style={[styles.bulletPoint, { backgroundColor: theme.colors.primary }]} />
+                <Text style={[styles.requirementText, { color: theme.colors.text }]}>
                   Secure data transmission
                 </Text>
               </View>
@@ -203,7 +222,7 @@ export default function VideoScreen() {
               {/* Join Meeting Button (only for upcoming appointments) */}
               {appointments[0] && appointments[0].status === "Upcoming" && (
                 <TouchableOpacity
-                  style={styles.joinButton}
+                  style={[styles.joinButton, { backgroundColor: theme.colors.primary }]}
                   onPress={handleJoinMeeting}
                 >
                   <Ionicons name="videocam" size={20} color="#FFFFFF" />
@@ -247,13 +266,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#FFFFFF",
     zIndex: 10,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#2E7D32",
   },
   content: {
     flex: 1,
@@ -264,13 +281,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 12,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
     lineHeight: 24,
   },
@@ -284,13 +299,11 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "#FFFFFF",
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
     alignItems: "center",
   },
   menuProfileImage: {
@@ -302,12 +315,10 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
   },
   sideMenuContent: {
     padding: 10,
@@ -318,18 +329,15 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
     marginLeft: 15,
   },
   scrollContent: {
     flex: 1,
   },
   appointmentCard: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 20,
     shadowColor: "#000",
@@ -346,15 +354,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#212121",
   },
   date: {
     fontSize: 13,
-    color: "#757575",
   },
   time: {
     fontSize: 13,
-    color: "#757575",
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -364,13 +369,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   upcomingBadge: {
-    backgroundColor: "#FFECB3",
+    // backgroundColor applied via inline style
   },
   completedBadge: {
-    backgroundColor: "#C8E6C9",
+    // backgroundColor applied via inline style
   },
   canceledBadge: {
-    backgroundColor: "#FFCDD2",
+    // backgroundColor applied via inline style
   },
   statusText: {
     fontWeight: "600",
@@ -378,7 +383,6 @@ const styles = StyleSheet.create({
   },
   joinButton: {
     flexDirection: "row",
-    backgroundColor: "#4CAF50",
     padding: 16,
     borderRadius: 8,
     justifyContent: "center",
@@ -401,19 +405,16 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#E0E0E0",
     marginVertical: 20,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#2E7D32",
     marginBottom: 16,
   },
   subsectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
     marginTop: 16,
     marginBottom: 12,
   },
@@ -426,13 +427,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#4CAF50",
     marginTop: 8,
     marginRight: 12,
   },
   requirementText: {
     fontSize: 16,
-    color: "#424242",
     flex: 1,
     lineHeight: 24,
   },
