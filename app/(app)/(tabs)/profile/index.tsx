@@ -90,7 +90,6 @@ export default function ProfileScreen() {
       }
 
       const result = await response.json();
-      console.log("Profile API result:", result);
 
       if (result.success) {
         return result.data;

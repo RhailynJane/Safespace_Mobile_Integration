@@ -51,7 +51,6 @@ export async function syncUserWithDatabase(clerkUser: User, authToken?: string) 
     }
 
     const result = await response.json();
-    console.log('User synced successfully:', result);
     return result;
     
   } catch (error) {

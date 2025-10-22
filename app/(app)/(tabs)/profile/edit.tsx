@@ -131,8 +131,35 @@ export default function EditProfileScreen() {
   const [canadaDateDisplay, setCanadaDateDisplay] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
   // Add a ref for debouncing
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    dateOfBirth: "",
+    gender: "",
+    pronouns: "",
+    isLGBTQ: "",
+    primaryLanguage: "",
+    ethnoculturalBackground: "",
+    mentalHealthConcerns: "",
+    supportNeeded: "",
+    canadaStatus: "",
+    dateCameToCanada: "",
+    streetAddress: "",
+    location: "",
+    postalCode: "",
+    emergencyContactName: "",
+    emergencyContactNumber: "",
+    emergencyContactRelationship: "",
+  });
 
   // Get user data from Clerk
   const { user } = useUser();
@@ -387,7 +414,9 @@ export default function EditProfileScreen() {
       }
     } catch (error) {
       console.log("Error loading profile data:", error);
-      Alert.alert("Error", "Failed to load profile data");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load profile data");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -613,7 +642,9 @@ export default function EditProfileScreen() {
    */
   const handleSelectImage = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "User not available");
+      setErrorTitle("Error");
+      setErrorMessage("User not available");
+      setShowErrorModal(true);
       return;
     }
 
@@ -622,10 +653,9 @@ export default function EditProfileScreen() {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permissionResult.granted) {
-        Alert.alert(
-          "Permission Required",
-          "Sorry, we need camera roll permissions to change your profile picture."
-        );
+        setErrorTitle("Permission Required");
+        setErrorMessage("Sorry, we need camera roll permissions to change your profile picture.");
+        setShowErrorModal(true);
         return;
       }
 
@@ -652,10 +682,9 @@ export default function EditProfileScreen() {
           setShowSuccessModal(true);
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
-          Alert.alert(
-            "Error",
-            "Failed to upload profile picture. Please try again."
-          );
+          setErrorTitle("Error");
+          setErrorMessage("Failed to upload profile picture. Please try again.");
+          setShowErrorModal(true);
         } finally {
           setUploadingImage(false);
         }
@@ -663,10 +692,9 @@ export default function EditProfileScreen() {
     } catch (error) {
       console.error("Error selecting image:", error);
       setUploadingImage(false);
-      Alert.alert(
-        "Error",
-        "Failed to update profile picture. Please try again."
-      );
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update profile picture. Please try again.");
+      setShowErrorModal(true);
     }
   };
 
@@ -699,16 +727,81 @@ export default function EditProfileScreen() {
    */
   const handleSaveChanges = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "User not available");
+      setErrorTitle("Error");
+      setErrorMessage("User not available");
+      setShowErrorModal(true);
       return;
     }
 
     try {
       setSaving(true);
 
-      // Validate required fields
-      if (!formData.firstName || !formData.email) {
-        Alert.alert("Error", "Please fill in First Name and Email Address");
+      // Comprehensive validation for all required fields
+      const missingFields: string[] = [];
+
+      // Personal Information
+      if (!formData.firstName?.trim()) missingFields.push("First Name");
+      if (!formData.lastName?.trim()) missingFields.push("Last Name");
+      if (!formData.email?.trim()) missingFields.push("Email Address");
+      if (!formData.phoneNumber?.trim()) missingFields.push("Phone Number");
+      if (!formData.dateOfBirth?.trim()) missingFields.push("Date of Birth");
+
+      // Demographics
+      if (!formData.gender?.trim()) missingFields.push("Gender");
+      if (!formData.pronouns?.trim()) missingFields.push("Pronouns");
+      if (!formData.isLGBTQ?.trim()) missingFields.push("LGBTQ+ Identification");
+      if (!formData.primaryLanguage?.trim()) missingFields.push("Primary Language");
+
+      // CMHA Demographics
+      if (!formData.ethnoculturalBackground?.trim()) missingFields.push("Ethnocultural Background");
+      if (!formData.mentalHealthConcerns?.trim()) missingFields.push("Mental Health/Medical Concerns");
+      if (!formData.supportNeeded?.trim()) missingFields.push("Support Needed");
+      if (!formData.canadaStatus?.trim()) missingFields.push("Status in Canada");
+      if (!formData.dateCameToCanada?.trim()) missingFields.push("Date Came to Canada");
+
+      // Address
+      if (!formData.streetAddress?.trim()) missingFields.push("Street Address");
+      if (!formData.location?.trim()) missingFields.push("City");
+      if (!formData.postalCode?.trim()) missingFields.push("Postal Code");
+
+      // Emergency Contact
+      if (!formData.emergencyContactName?.trim()) missingFields.push("Emergency Contact Name");
+      if (!formData.emergencyContactNumber?.trim()) missingFields.push("Emergency Contact Phone");
+      if (!formData.emergencyContactRelationship?.trim()) missingFields.push("Emergency Contact Relationship");
+
+      if (missingFields.length > 0) {
+        const fieldsList = missingFields.join("\n• ");
+        setErrorTitle("Required Fields Missing");
+        setErrorMessage(`Please fill in all required fields:\n\n• ${fieldsList}`);
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        setErrorTitle("Invalid Email");
+        setErrorMessage("Please enter a valid email address");
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Phone number validation (basic)
+      const phoneRegex = /^\d{10}$/;
+      const cleanedPhone = formData.phoneNumber.replace(/\D/g, '');
+      if (!phoneRegex.test(cleanedPhone)) {
+        setErrorTitle("Invalid Phone Number");
+        setErrorMessage("Please enter a valid 10-digit phone number");
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Postal code validation (Canadian format)
+      const postalRegex = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i;
+      if (!postalRegex.test(formData.postalCode.trim())) {
+        setErrorTitle("Invalid Postal Code");
+        setErrorMessage("Please enter a valid Canadian postal code (e.g., A1A 1A1)");
+        setShowErrorModal(true);
         return;
       }
 
@@ -839,7 +932,9 @@ export default function EditProfileScreen() {
       }
     } catch (error) {
       console.error("Error in handleSaveChanges:", error);
-      Alert.alert("Error", "Failed to update profile. Please try again.");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update profile. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setSaving(false);
     }
@@ -878,7 +973,76 @@ export default function EditProfileScreen() {
   const getFullName = () => {
     const firstName = formData.firstName || "";
     const lastName = formData.lastName || "";
-    return `${firstName} ${lastName}`.trim() || "User";
+    return `${firstName} ${lastName}`.trim();
+  };
+
+  /**
+   * Validate individual field
+   */
+  const validateField = (fieldName: string, value: string) => {
+    let error = "";
+
+    switch (fieldName) {
+      case "firstName":
+      case "lastName":
+        if (!value.trim()) {
+          error = "This field is required";
+        }
+        break;
+      case "email":
+        if (!value.trim()) {
+          error = "Email is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          error = "Please enter a valid email address";
+        }
+        break;
+      case "phoneNumber":
+        if (!value.trim()) {
+          error = "Phone number is required";
+        } else if (!/^\d{10}$/.test(value.replace(/\D/g, ""))) {
+          error = "Phone number must be 10 digits";
+        }
+        break;
+      case "postalCode":
+        if (!value.trim()) {
+          error = "Postal code is required";
+        } else if (!/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(value)) {
+          error = "Invalid postal code format (e.g., A1A 1A1)";
+        }
+        break;
+      case "emergencyContactNumber":
+        if (!value.trim()) {
+          error = "Emergency contact number is required";
+        } else if (!/^\d{10}$/.test(value.replace(/\D/g, ""))) {
+          error = "Phone number must be 10 digits";
+        }
+        break;
+      case "dateOfBirth":
+      case "gender":
+      case "pronouns":
+      case "isLGBTQ":
+      case "primaryLanguage":
+      case "ethnoculturalBackground":
+      case "mentalHealthConcerns":
+      case "supportNeeded":
+      case "canadaStatus":
+      case "dateCameToCanada":
+      case "streetAddress":
+      case "location":
+      case "emergencyContactName":
+      case "emergencyContactRelationship":
+        if (!value.trim()) {
+          error = "This field is required";
+        }
+        break;
+    }
+
+    setValidationErrors((prev) => ({
+      ...prev,
+      [fieldName]: error,
+    }));
+
+    return error === "";
   };
 
   /**
@@ -1007,9 +1171,9 @@ export default function EditProfileScreen() {
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Personal Information</Text>
 
-            {/* Full Name */}
+            {/* First Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name *</Text>
+              <Text style={styles.label}>First Name *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="person-outline"
@@ -1019,18 +1183,44 @@ export default function EditProfileScreen() {
                 />
                 <TextInput
                   style={styles.input}
-                  value={getFullName()}
+                  value={formData.firstName}
                   onChangeText={(text) => {
-                    const names = text.split(" ");
-                    setFormData({
-                      ...formData,
-                      firstName: names[0] || "",
-                      lastName: names.slice(1).join(" ") || "",
-                    });
+                    setFormData({ ...formData, firstName: text });
+                    validateField("firstName", text);
                   }}
-                  placeholder="Enter your full name"
+                  onBlur={() => validateField("firstName", formData.firstName)}
+                  placeholder="Enter your first name"
                 />
               </View>
+              {validationErrors.firstName ? (
+                <Text style={styles.errorText}>{validationErrors.firstName}</Text>
+              ) : null}
+            </View>
+
+            {/* Last Name */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Last Name *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  value={formData.lastName}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, lastName: text });
+                    validateField("lastName", text);
+                  }}
+                  onBlur={() => validateField("lastName", formData.lastName)}
+                  placeholder="Enter your last name"
+                />
+              </View>
+              {validationErrors.lastName ? (
+                <Text style={styles.errorText}>{validationErrors.lastName}</Text>
+              ) : null}
             </View>
 
             {/* Email Address */}
@@ -1046,19 +1236,24 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.email}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, email: text })
-                  }
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, email: text });
+                    validateField("email", text);
+                  }}
+                  onBlur={() => validateField("email", formData.email)}
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
               </View>
+              {validationErrors.email ? (
+                <Text style={styles.errorText}>{validationErrors.email}</Text>
+              ) : null}
             </View>
 
             {/* Phone Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phone Number</Text>
+              <Text style={styles.label}>Phone Number *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="call-outline"
@@ -1069,18 +1264,23 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.phoneNumber}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, phoneNumber: text })
-                  }
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, phoneNumber: text });
+                    validateField("phoneNumber", text);
+                  }}
+                  onBlur={() => validateField("phoneNumber", formData.phoneNumber)}
                   placeholder="Enter your phone number"
                   keyboardType="phone-pad"
                 />
               </View>
+              {validationErrors.phoneNumber ? (
+                <Text style={styles.errorText}>{validationErrors.phoneNumber}</Text>
+              ) : null}
             </View>
 
             {/* Date of Birth */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Date of Birth</Text>
+              <Text style={styles.label}>Date of Birth *</Text>
               <TouchableOpacity
                 style={styles.inputContainer}
                 onPress={handleDatePress}
@@ -1157,7 +1357,7 @@ export default function EditProfileScreen() {
 
             {/* Gender */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Gender</Text>
+              <Text style={styles.label}>Gender *</Text>
               {renderOptionButtons(GENDER_OPTIONS, formData.gender, (value) =>
                 setFormData({ ...formData, gender: value })
               )}
@@ -1165,7 +1365,7 @@ export default function EditProfileScreen() {
 
             {/* Pronouns */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Pronouns</Text>
+              <Text style={styles.label}>Pronouns *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="person-outline"
@@ -1186,7 +1386,7 @@ export default function EditProfileScreen() {
 
             {/* LGBTQ+ Identification */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Do you identify as LGBTQ+?</Text>
+              <Text style={styles.label}>Do you identify as LGBTQ+? *</Text>
               {renderOptionButtons(
                 ["Yes", "No", "I do not know", "Prefer not to answer"],
                 formData.isLGBTQ,
@@ -1196,7 +1396,7 @@ export default function EditProfileScreen() {
 
             {/* Primary Language */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Primary Language</Text>
+              <Text style={styles.label}>Primary Language *</Text>
               <TouchableOpacity
                 style={styles.inputContainer}
                 onPress={() => setShowLanguagePicker(true)}
@@ -1283,7 +1483,7 @@ export default function EditProfileScreen() {
             {/* Street Address */}
             {/* Street Address */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Street Address</Text>
+              <Text style={styles.label}>Street Address *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="home-outline"
@@ -1329,7 +1529,7 @@ export default function EditProfileScreen() {
 
             {/* Location/City */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>City</Text>
+              <Text style={styles.label}>City *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="location-outline"
@@ -1351,7 +1551,7 @@ export default function EditProfileScreen() {
 
             {/* Postal Code */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Postal Code</Text>
+              <Text style={styles.label}>Postal Code *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="navigate-outline"
@@ -1362,11 +1562,18 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.postalCode}
-                  onChangeText={handlePostalSearch}
+                  onChangeText={(text) => {
+                    handlePostalSearch(text);
+                    validateField("postalCode", text);
+                  }}
+                  onBlur={() => validateField("postalCode", formData.postalCode)}
                   placeholder="Enter your postal code"
                   placeholderTextColor="#999"
                 />
               </View>
+              {validationErrors.postalCode ? (
+                <Text style={styles.errorText}>{validationErrors.postalCode}</Text>
+              ) : null}
               {showPostalSuggestions && postalSuggestions.length > 0 && (
                 <View style={styles.suggestionsContainer}>
                   {postalSuggestions.map((item) => (
@@ -1378,6 +1585,7 @@ export default function EditProfileScreen() {
                           ...formData,
                           postalCode: item.postalCode,
                         });
+                        validateField("postalCode", item.postalCode);
                         setShowPostalSuggestions(false);
                       }}
                     >
@@ -1400,11 +1608,9 @@ export default function EditProfileScreen() {
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Emergency Contact</Text>
 
-            {/* Emergency Contact Name & Relationship */}
+            {/* Emergency Contact Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                Emergency Contact Name & Relationship
-              </Text>
+              <Text style={styles.label}>Emergency Contact Name *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="person-outline"
@@ -1418,14 +1624,35 @@ export default function EditProfileScreen() {
                   onChangeText={(text) =>
                     setFormData({ ...formData, emergencyContactName: text })
                   }
-                  placeholder="Name and relationship"
+                  placeholder="Enter emergency contact name"
+                />
+              </View>
+            </View>
+
+            {/* Emergency Contact Relationship */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Relationship *</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons
+                  name="people-outline"
+                  size={20}
+                  color="#666"
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  value={formData.emergencyContactRelationship}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, emergencyContactRelationship: text })
+                  }
+                  placeholder="e.g., Parent, Sibling, Friend"
                 />
               </View>
             </View>
 
             {/* Emergency Contact Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Emergency Contact Number</Text>
+              <Text style={styles.label}>Emergency Contact Number *</Text>
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="call-outline"
@@ -1436,13 +1663,18 @@ export default function EditProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={formData.emergencyContactNumber}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, emergencyContactNumber: text })
-                  }
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, emergencyContactNumber: text });
+                    validateField("emergencyContactNumber", text);
+                  }}
+                  onBlur={() => validateField("emergencyContactNumber", formData.emergencyContactNumber)}
                   placeholder="Emergency contact phone number"
                   keyboardType="phone-pad"
                 />
               </View>
+              {validationErrors.emergencyContactNumber ? (
+                <Text style={styles.errorText}>{validationErrors.emergencyContactNumber}</Text>
+              ) : null}
             </View>
           </View>
 
@@ -1452,7 +1684,7 @@ export default function EditProfileScreen() {
 
             {/* Mental Health/Medical Concerns */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Mental Health/Medical Concerns</Text>
+              <Text style={styles.label}>Mental Health/Medical Concerns *</Text>
               {renderOptionButtons(
                 HEALTH_CONCERNS_OPTIONS,
                 formData.mentalHealthConcerns,
@@ -1463,7 +1695,7 @@ export default function EditProfileScreen() {
 
             {/* Support Needed */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Support Needed</Text>
+              <Text style={styles.label}>Support Needed *</Text>
               <TextInput
                 style={[styles.textArea, styles.borderedInput]}
                 value={formData.supportNeeded}
@@ -1485,7 +1717,7 @@ export default function EditProfileScreen() {
 
             {/* Ethnocultural Background */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ethnocultural Background</Text>
+              <Text style={styles.label}>Ethnocultural Background *</Text>
               <TouchableOpacity
                 style={styles.inputContainer}
                 onPress={() => setShowEthnoculturalPicker(true)}
@@ -1570,7 +1802,7 @@ export default function EditProfileScreen() {
 
             {/* Status in Canada */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Status in Canada</Text>
+              <Text style={styles.label}>Status in Canada *</Text>
               {renderOptionButtons(
                 CANADA_STATUS_OPTIONS,
                 formData.canadaStatus,
@@ -1586,7 +1818,7 @@ export default function EditProfileScreen() {
                 formData.canadaStatus !== "Prefer not to answer"
             ) && (
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Date Came to Canada</Text>
+                <Text style={styles.label}>Date Came to Canada *</Text>
                 <TouchableOpacity
                   style={styles.inputContainer}
                   onPress={handleCanadaDatePress}
@@ -1672,33 +1904,6 @@ export default function EditProfileScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Notification Section */}
-          <View style={styles.notificationSection}>
-            <Text style={styles.sectionTitle}>Notification</Text>
-            <View style={styles.notificationItem}>
-              <View style={styles.notificationLeft}>
-                <View style={styles.notificationIcon}>
-                  <Ionicons
-                    name="notifications-outline"
-                    size={16}
-                    color="#4CAF50"
-                  />
-                </View>
-                <Text style={styles.notificationText}>
-                  Sign up for Notifications
-                </Text>
-              </View>
-              <Switch
-                value={formData.notifications}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, notifications: value })
-                }
-                trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-          </View>
-
           {/* Privacy Settings Section */}
           <View style={styles.notificationSection}>
             <Text style={styles.sectionTitle}>Privacy Settings</Text>
@@ -1749,6 +1954,31 @@ export default function EditProfileScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={styles.successButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Error Modal */}
+        <Modal
+          visible={showErrorModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowErrorModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.successModal}>
+              <View style={styles.errorIconContainer}>
+                <Ionicons name="close-circle" size={80} color="#FF3B30" />
+              </View>
+              <Text style={styles.errorTitle}>{errorTitle}</Text>
+              <Text style={styles.successMessage}>{errorMessage}</Text>
+              <TouchableOpacity
+                style={styles.errorButton}
+                onPress={() => setShowErrorModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>OK</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1835,9 +2065,15 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "700",
     color: "#333",
     marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#FF3B30",
+    marginTop: 5,
+    marginLeft: 5,
   },
   inputContainer: {
     flexDirection: "row",
@@ -2105,7 +2341,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     transform: [{ scale: 1 }],
   },
+  errorIconContainer: {
+    marginBottom: 20,
+    transform: [{ scale: 1 }],
+  },
   successTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  errorTitle: {
     fontSize: 28,
     fontWeight: "700",
     color: "#1F2937",
@@ -2129,6 +2377,19 @@ const styles = StyleSheet.create({
     minWidth: 140,
     alignItems: "center",
     shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  errorButton: {
+    backgroundColor: "#FF3B30",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowColor: "#FF3B30",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
