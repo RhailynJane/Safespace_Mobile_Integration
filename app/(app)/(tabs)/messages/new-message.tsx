@@ -68,10 +68,8 @@ export default function NewMessagesScreen() {
 
     try {
       setLoading(true);
-      const initialized = await messagingService.initializeSendBird(userId);
-      if (initialized) {
-        await loadConversationsAndContacts();
-      }
+      // For new-message, we rely on backend only (no SendBird init needed)
+      await loadConversationsAndContacts();
     } catch (error) {
       console.error("Failed to initialize messaging:", error);
       Alert.alert("Error", "Failed to load messages");

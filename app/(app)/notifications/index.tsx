@@ -171,18 +171,23 @@ export default function NotificationsScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Notifications" showBack={true} />
 
         {/* Top bar showing unread count & "Mark all as read" action */}
-        <View style={styles.headerActions}>
+        <View style={[styles.headerActions, { 
+          borderBottomColor: theme.colors.border,
+          backgroundColor: theme.colors.surface 
+        }]}>
           <Text style={[styles.unreadText, { color: theme.colors.text }]}>
             {unreadCount} unread{" "}
             {unreadCount === 1 ? "notification" : "notifications"}
           </Text>
           {unreadCount > 0 && (
             <TouchableOpacity onPress={markAllAsRead}>
-              <Text style={styles.markAllText}>Mark all as read</Text>
+              <Text style={[styles.markAllText, { color: theme.colors.primary }]}>
+                Mark all as read
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -191,7 +196,12 @@ export default function NotificationsScreen() {
         <ScrollView
           style={styles.notificationsList}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
           }
         >
           {/* Empty state when no notifications are available */}
@@ -200,10 +210,12 @@ export default function NotificationsScreen() {
               <Ionicons
                 name="notifications-off-outline"
                 size={64}
-                color="#E0E0E0"
+                color={theme.colors.textSecondary}
               />
-              <Text style={styles.emptyStateText}>No notifications yet</Text>
-              <Text style={styles.emptyStateSubtext}>
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                No notifications yet
+              </Text>
+              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
                 You&apos;ll see important updates here
               </Text>
             </View>
@@ -214,12 +226,22 @@ export default function NotificationsScreen() {
                 key={notification.id}
                 style={[
                   styles.notificationItem,
-                  !notification.isRead && styles.unreadNotification,
+                  { 
+                    backgroundColor: theme.colors.surface,
+                    borderBottomColor: theme.colors.borderLight 
+                  },
+                  !notification.isRead && [
+                    styles.unreadNotification,
+                    { backgroundColor: theme.isDark ? theme.colors.primary + '10' : '#F8F9FF' }
+                  ],
                 ]}
                 onPress={() => markAsRead(notification.id)}
               >
                 {/* Left: Notification Icon */}
-                <View style={styles.notificationIconContainer}>
+                <View style={[
+                  styles.notificationIconContainer,
+                  { backgroundColor: theme.colors.borderLight }
+                ]}>
                   <Ionicons
                     name={getNotificationIcon(notification.type)}
                     size={20}
@@ -229,20 +251,23 @@ export default function NotificationsScreen() {
 
                 {/* Middle: Notification details (title, message, time) */}
                 <View style={styles.notificationContent}>
-                  <Text style={styles.notificationTitle}>
+                  <Text style={[styles.notificationTitle, { color: theme.colors.text }]}>
                     {notification.title}
                   </Text>
-                  <Text style={styles.notificationMessage}>
+                  <Text style={[styles.notificationMessage, { color: theme.colors.textSecondary }]}>
                     {notification.message}
                   </Text>
-                  <Text style={styles.notificationTime}>
+                  <Text style={[styles.notificationTime, { color: theme.colors.textDisabled }]}>
                     {notification.time}
                   </Text>
                 </View>
 
                 {/* Right: Green dot indicator for unread notifications */}
                 {!notification.isRead && (
-                  <View style={styles.unreadIndicator} />
+                  <View style={[
+                    styles.unreadIndicator,
+                    { backgroundColor: theme.colors.primary }
+                  ]} />
                 )}
               </TouchableOpacity>
             ))
@@ -260,7 +285,6 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
   headerActions: {
     flexDirection: "row",
@@ -269,15 +293,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
   },
   unreadText: {
     fontSize: 14,
-    color: "#757575",
   },
   markAllText: {
     fontSize: 14,
-    color: "#4CAF50",
     fontWeight: "500",
   },
   notificationsList: {
@@ -292,13 +313,11 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#9E9E9E",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: "#BDBDBD",
     textAlign: "center",
   },
   notificationItem: {
@@ -306,17 +325,14 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
-    backgroundColor: "#FFFFFF",
   },
   unreadNotification: {
-    backgroundColor: "#F8F9FF",
+    // backgroundColor applied via inline style
   },
   notificationIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -327,24 +343,20 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#212121",
     marginBottom: 4,
   },
   notificationMessage: {
     fontSize: 14,
-    color: "#616161",
     marginBottom: 4,
     lineHeight: 20,
   },
   notificationTime: {
     fontSize: 12,
-    color: "#9E9E9E",
   },
   unreadIndicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#4CAF50",
     marginLeft: 8,
     marginTop: 8,
   },

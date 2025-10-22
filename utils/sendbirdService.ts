@@ -145,12 +145,17 @@ class SendBirdService {
     profile_url?: string;
   }): Promise<{ success: boolean; data?: any }> {
     try {
+      // Ensure profile_url is always provided to avoid 400105
+      const safeProfileUrl =
+        userData.profile_url ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.nickname || userData.user_id)}&background=666&color=fff&size=60`;
+
       const result = await this.sendbirdApiRequest("/users", {
         method: "POST",
         body: JSON.stringify({
           user_id: userData.user_id,
           nickname: userData.nickname,
-          profile_url: userData.profile_url,
+          profile_url: safeProfileUrl,
           issue_access_token: true,
         }),
       });
@@ -320,6 +325,7 @@ class MessagingService {
         await this.sendbirdService.createOrUpdateUser({
           user_id: userId,
           nickname: `User ${userId}`, // You can customize this
+          profile_url: profileUrl,
         });
       }
 

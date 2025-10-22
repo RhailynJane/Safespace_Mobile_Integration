@@ -2962,7 +2962,7 @@ app.get(
           clerk_user_id: {
             not: clerkUserId
           },
-          status: 'active'
+          // Note: Filtering by status removed to avoid enum/text mismatch in DB
         },
         select: {
           id: true,
@@ -3040,8 +3040,8 @@ app.get(
   "/api/messages/search-users/:clerkUserId",
   async (req: Request, res: Response) => {
     try {
-      const { clerkUserId } = req.params;
-      const { q: searchQuery } = req.query;
+  const { clerkUserId } = req.params;
+  const { q: searchQuery } = req.query;
 
       console.log(`🔍 Searching users for ${clerkUserId}, query: "${searchQuery}"`);
 
@@ -3052,20 +3052,27 @@ app.get(
         });
       }
 
-      const searchTerm = `%${searchQuery.trim()}%`;
+      const q = searchQuery.trim();
+      const isEmailQuery = q.includes("@") && !q.includes(" ");
+
+      // Exact match by email when the query looks like an email
+      const whereClause: any = {
+        clerk_user_id: { not: clerkUserId },
+        // Note: Filtering by status removed to avoid enum/text mismatch in DB
+      };
+
+      if (isEmailQuery) {
+        whereClause.email = { equals: q, mode: 'insensitive' };
+      } else {
+        whereClause.OR = [
+          { first_name: { contains: q, mode: 'insensitive' } },
+          { last_name: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } }
+        ];
+      }
 
       const users = await prisma.user.findMany({
-        where: {
-          clerk_user_id: {
-            not: clerkUserId
-          },
-          status: 'active',
-          OR: [
-            { first_name: { contains: searchTerm, mode: 'insensitive' } },
-            { last_name: { contains: searchTerm, mode: 'insensitive' } },
-            { email: { contains: searchTerm, mode: 'insensitive' } }
-          ]
-        },
+        where: whereClause,
         select: {
           id: true,
           clerk_user_id: true,
