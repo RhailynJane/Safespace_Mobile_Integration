@@ -834,7 +834,7 @@ export default function CommunityMainScreen() {
                 <Text style={styles.addPostButtonText}>Add Post</Text>
               </TouchableOpacity>
 
-              <Text style={styles.browseBySectionTitle}>Browse By</Text>
+              <Text style={[styles.browseBySectionTitle, { color: theme.colors.text }]}>Browse By</Text>
 
               <ScrollView
                 horizontal
@@ -847,6 +847,7 @@ export default function CommunityMainScreen() {
                       key={category}
                       style={[
                         styles.categoryButton,
+                        { backgroundColor: theme.colors.surface },
                         selectedCategory === category && styles.categoryButtonActive,
                       ]}
                       onPress={() => setSelectedCategory(category)}
@@ -854,6 +855,7 @@ export default function CommunityMainScreen() {
                       <Text
                         style={[
                           styles.categoryText,
+                          { color: theme.colors.text },
                           selectedCategory === category && styles.categoryTextActive,
                         ]}
                       >
@@ -871,8 +873,8 @@ export default function CommunityMainScreen() {
             <View style={styles.myPostsHeader}>
               <View style={styles.myPostsHeaderContent}>
                 <Ionicons name="document-text" size={24} color="#7CB9A9" />
-                <Text style={styles.myPostsTitle}>My Posts</Text>
-                <Text style={styles.myPostsSubtitle}>
+                <Text style={[styles.myPostsTitle, { color: theme.colors.text }]}>My Posts</Text>
+                <Text style={[styles.myPostsSubtitle, { color: theme.colors.textSecondary }]}>
                   Manage your published posts and drafts
                 </Text>
               </View>
@@ -891,7 +893,7 @@ export default function CommunityMainScreen() {
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#7CB9A9" />
-                <Text style={styles.loadingText}>
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
                   {activeView === "newsfeed"
                     ? "Loading posts..."
                     : "Loading your posts..."}
@@ -908,14 +910,14 @@ export default function CommunityMainScreen() {
                   size={64}
                   color="#E0E0E0"
                 />
-                <Text style={styles.emptyText}>
+                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
                   {activeView === "newsfeed"
                     ? selectedCategory === "Trending"
                       ? "Be the first to share something with the community!"
                       : `No posts in ${selectedCategory} category yet`
                     : "You haven't created any posts yet"}
                 </Text>
-                <Text style={styles.emptySubtext}>
+                <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                   {activeView === "my-posts" &&
                     "Create your first post to share with the community!"}
                 </Text>
@@ -937,15 +939,16 @@ export default function CommunityMainScreen() {
                     key={post.id}
                     style={[
                       styles.postCard,
+                      { backgroundColor: theme.colors.surface },
                       post.is_draft && styles.draftPostCard,
                     ]}
                     onPress={() => !post.is_draft && handlePostPress(post.id)}
                   >
                     {/* Draft Badge - Only show for draft posts */}
                     {post.is_draft && (
-                      <View style={styles.draftBadge}>
-                        <Ionicons name="time" size={12} color="#666" />
-                        <Text style={styles.draftBadgeText}>Draft</Text>
+                      <View style={[styles.draftBadge, { backgroundColor: theme.isDark ? 'rgba(255, 167, 38, 0.2)' : '#FFF3CD' }]}>
+                        <Ionicons name="time" size={12} color={theme.isDark ? '#FFB74D' : '#856404'} />
+                        <Text style={[styles.draftBadgeText, { color: theme.isDark ? '#FFB74D' : '#856404' }]}>Draft</Text>
                       </View>
                     )}
 
@@ -957,10 +960,10 @@ export default function CommunityMainScreen() {
                           </Text>
                         </View>
                         <View style={styles.postTitleContainer}>
-                          <Text style={styles.postTitle} numberOfLines={2}>
+                          <Text style={[styles.postTitle, { color: theme.colors.text }]} numberOfLines={2}>
                             {post.title}
                           </Text>
-                          <Text style={styles.postAuthor}>
+                          <Text style={[styles.postAuthor, { color: theme.colors.textSecondary }]}>
                             {post.author_name} •{" "}
                             {new Date(post.created_at).toLocaleDateString()}
                             {post.is_draft && " • Draft"}
@@ -974,13 +977,13 @@ export default function CommunityMainScreen() {
                           {post.is_draft ? (
                             <>
                               <TouchableOpacity
-                                style={styles.postActionButton}
+                                style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                                 onPress={() => handleEditPost(post.id)}
                               >
-                                <Ionicons name="create" size={18} color="#666" />
+                                <Ionicons name="create" size={18} color={theme.colors.textSecondary} />
                               </TouchableOpacity>
                               <TouchableOpacity
-                                style={styles.postActionButton}
+                                style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                                 onPress={() => handlePublishDraft(post.id)}
                               >
                                 <Ionicons name="send" size={18} color="#4CAF50" />
@@ -988,14 +991,14 @@ export default function CommunityMainScreen() {
                             </>
                           ) : (
                             <TouchableOpacity
-                              style={styles.postActionButton}
+                              style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                               onPress={() => handlePostPress(post.id)}
                             >
-                              <Ionicons name="eye" size={18} color="#666" />
+                              <Ionicons name="eye" size={18} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                           )}
                           <TouchableOpacity
-                            style={styles.postActionButton}
+                            style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                             onPress={() => handleDeletePost(post.id)}
                           >
                             <Ionicons name="trash" size={18} color="#FF6B6B" />
@@ -1004,7 +1007,7 @@ export default function CommunityMainScreen() {
                       )}
                     </View>
 
-                    <Text style={styles.postContent} numberOfLines={4}>
+                    <Text style={[styles.postContent, { color: theme.colors.textSecondary }]} numberOfLines={4}>
                       {post.content}
                     </Text>
 
@@ -1082,13 +1085,13 @@ export default function CommunityMainScreen() {
       >
         <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
           <Pressable style={StyleSheet.absoluteFillObject} onPress={hideSideMenu} />
-          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
-            <View style={styles.sideMenuHeader}>
+          <Animated.View style={[styles.sideMenu, { backgroundColor: theme.colors.surface, opacity: fadeAnim }]}>
+            <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View style={styles.profileAvatar}>
                 <Text style={styles.profileAvatarText}>{getInitials()}</Text>
               </View>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+              <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+              <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
@@ -1096,6 +1099,7 @@ export default function CommunityMainScreen() {
                   key={item.title}
                   style={[
                     styles.sideMenuItem,
+                    { borderBottomColor: theme.colors.borderLight },
                     item.disabled && styles.sideMenuItemDisabled,
                   ]}
                   onPress={item.onPress}
@@ -1104,13 +1108,14 @@ export default function CommunityMainScreen() {
                   <Ionicons
                     name={item.icon as any}
                     size={20}
-                    color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                    color={item.disabled ? "#CCCCCC" : item.title === "Sign Out" ? theme.colors.error : "#4CAF50"}
                   />
                   <Text
                     style={[
                       styles.sideMenuItemText,
+                      { color: theme.colors.text },
                       item.disabled && styles.sideMenuItemTextDisabled,
-                      item.title === "Sign Out" && styles.signOutText,
+                      item.title === "Sign Out" && { color: theme.colors.error, fontWeight: "600" },
                     ]}
                   >
                     {item.title}
@@ -1236,7 +1241,7 @@ const styles = StyleSheet.create({
   browseBySectionTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     marginBottom: 12,
   },
   categoriesContainer: {
@@ -1248,7 +1253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     justifyContent: "center",
     alignItems: "center",
     minWidth: 80,
@@ -1258,7 +1263,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 14,
-    color: "#000",
+    // color moved to theme.colors.text via inline override
     fontWeight: "500",
     textAlign: "center",
   },
@@ -1280,12 +1285,12 @@ const styles = StyleSheet.create({
   myPostsTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     marginTop: 8,
   },
   myPostsSubtitle: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 4,
   },
 
@@ -1302,7 +1307,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
   },
   emptyContainer: {
     alignItems: "center",
@@ -1311,21 +1316,21 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 16,
     fontWeight: "600",
     textAlign: "center",
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#999",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 8,
     textAlign: "center",
   },
 
   // Post Cards - Individual post containers
   postCard: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -1342,13 +1347,13 @@ const styles = StyleSheet.create({
   draftPostCard: {
     borderColor: "#FFA726",
     borderWidth: 1,
-    backgroundColor: "#FFFBF0",
+    // backgroundColor removed - uses theme override in JSX instead
   },
   draftBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: "#FFF3CD",
+    // backgroundColor moved to theme override in JSX
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -1357,7 +1362,7 @@ const styles = StyleSheet.create({
   },
   draftBadgeText: {
     fontSize: 12,
-    color: "#856404",
+    // color moved to theme override in JSX
     fontWeight: "500",
   },
 
@@ -1393,12 +1398,12 @@ const styles = StyleSheet.create({
   postTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     lineHeight: 20,
   },
   postAuthor: {
     fontSize: 12,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 4,
   },
 
@@ -1410,13 +1415,13 @@ const styles = StyleSheet.create({
   postActionButton: {
     padding: 6,
     borderRadius: 6,
-    backgroundColor: "#F8F9FA",
+    // backgroundColor moved to theme override in JSX
   },
 
   // Post Content - Main post text
   postContent: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -1515,13 +1520,13 @@ const styles = StyleSheet.create({
   sideMenu: {
     paddingTop: 60,
     width: width * 0.75,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
+    // borderBottomColor moved to theme.colors.borderLight via inline override
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
     alignItems: "center",
   },
   profileAvatar: {
@@ -1541,12 +1546,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
   },
   sideMenuContent: {
     padding: 10,
@@ -1557,11 +1562,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     marginLeft: 15,
   },
 });

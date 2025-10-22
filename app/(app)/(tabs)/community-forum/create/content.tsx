@@ -185,8 +185,8 @@ export default function CreatePostScreen() {
 
             {/* Author Profile */}
             <View style={styles.authorSection}>
-              <Text style={styles.sectionLabel}>Author</Text>
-              <View style={styles.authorCard}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Author</Text>
+              <View style={[styles.authorCard, { backgroundColor: theme.colors.surface }]}>
                 <View style={styles.authorInfo}>
                   <View style={styles.avatarContainer}>
                     <View style={styles.avatar}>
@@ -194,8 +194,8 @@ export default function CreatePostScreen() {
                     </View>
                   </View>
                   <View style={styles.authorDetails}>
-                    <Text style={styles.authorName}>{getDisplayName()}</Text>
-                    <Text style={styles.authorRole}>Community Member</Text>
+                    <Text style={[styles.authorName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                    <Text style={[styles.authorRole, { color: theme.colors.textSecondary }]}>Community Member</Text>
                   </View>
                 </View>
                 <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
@@ -204,20 +204,24 @@ export default function CreatePostScreen() {
 
             {/* Post Content Section */}
             <View style={styles.contentSection}>
-              <Text style={styles.sectionLabel}>Post Details</Text>
+              <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Post Details</Text>
               
               {/* Title Input */}
               <View style={styles.inputGroup}>
                 <View style={styles.inputHeader}>
-                  <Text style={styles.inputLabel}>Post Title</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Post Title</Text>
                   <Text style={[styles.charCount, { color: getCharacterColor(postTitle.length, 100) }]}>
                     {postTitle.length}/100
                   </Text>
                 </View>
                 <TextInput
-                  style={styles.titleInput}
+                  style={[styles.titleInput, { 
+                    backgroundColor: theme.colors.surface,
+                    color: theme.colors.text,
+                    borderColor: theme.colors.borderLight
+                  }]}
                   placeholder="Give your post a meaningful title..."
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.colors.textSecondary}
                   value={postTitle}
                   onChangeText={setPostTitle}
                   maxLength={100}
@@ -227,23 +231,26 @@ export default function CreatePostScreen() {
               {/* Content Input */}
               <View style={styles.inputGroup}>
                 <View style={styles.inputHeader}>
-                  <Text style={styles.inputLabel}>Your Story</Text>
+                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Your Story</Text>
                   <Text style={[styles.charCount, { color: getCharacterColor(postContent.length, 1000) }]}>
                     {postContent.length}/1000
                   </Text>
                 </View>
-                <View style={styles.contentInputContainer}>
+                <View style={[styles.contentInputContainer, { 
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.borderLight
+                }]}>
                   <TextInput
-                    style={styles.contentInput}
+                    style={[styles.contentInput, { color: theme.colors.text }]}
                     multiline
                     placeholder="Share your experiences, ask questions, or offer support to others..."
-                    placeholderTextColor="#999"
+                    placeholderTextColor={theme.colors.textSecondary}
                     value={postContent}
                     onChangeText={setPostContent}
                     textAlignVertical="top"
                     maxLength={1000}
                   />
-                  <View style={styles.contentTips}>
+                  <View style={[styles.contentTips, { borderTopColor: theme.colors.borderLight }]}>
                     <Ionicons name="bulb-outline" size={16} color="#7CB9A9" />
                     <Text style={styles.tipsText}>
                       Be authentic and respectful in your sharing
@@ -255,8 +262,8 @@ export default function CreatePostScreen() {
 
             {/* Privacy Settings */}
             <View style={styles.settingsSection}>
-              <Text style={styles.sectionLabel}>Privacy Settings</Text>
-              <View style={styles.privacyCard}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Privacy Settings</Text>
+              <View style={[styles.privacyCard, { backgroundColor: theme.colors.surface }]}>
                 <View style={styles.privacyInfo}>
                   <Ionicons 
                     name={isPrivate ? "lock-closed" : "earth"} 
@@ -264,10 +271,10 @@ export default function CreatePostScreen() {
                     color={isPrivate ? "#FF6B6B" : "#4CAF50"} 
                   />
                   <View style={styles.privacyTextContainer}>
-                    <Text style={styles.privacyTitle}>
+                    <Text style={[styles.privacyTitle, { color: theme.colors.text }]}>
                       {isPrivate ? "Private Post" : "Public Post"}
                     </Text>
-                    <Text style={styles.privacyDescription}>
+                    <Text style={[styles.privacyDescription, { color: theme.colors.textSecondary }]}>
                       {isPrivate 
                         ? "Only visible to you and support workers" 
                         : "Visible to all community members"
@@ -290,17 +297,18 @@ export default function CreatePostScreen() {
               <TouchableOpacity
                 style={[
                   styles.draftButton,
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
                   (loading || !postTitle.trim() || !postContent.trim()) && styles.buttonDisabled
                 ]}
                 onPress={handleSaveDraft}
                 disabled={loading || !postTitle.trim() || !postContent.trim()}
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#666" />
+                  <ActivityIndicator size="small" color={theme.colors.textSecondary} />
                 ) : (
                   <>
-                    <Ionicons name="save-outline" size={20} color="#666" />
-                    <Text style={styles.draftButtonText}>Save Draft</Text>
+                    <Ionicons name="save-outline" size={20} color={theme.colors.textSecondary} />
+                    <Text style={[styles.draftButtonText, { color: theme.colors.textSecondary }]}>Save Draft</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -406,14 +414,14 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     marginBottom: 12,
   },
   authorCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     padding: 16,
     borderRadius: 16,
     shadowColor: "#000",
@@ -454,12 +462,12 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     marginBottom: 2,
   },
   authorRole: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
   },
   
   // Content Section
@@ -478,21 +486,21 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
   },
   charCount: {
     fontSize: 12,
     fontWeight: "500",
   },
   titleInput: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     padding: 16,
     borderRadius: 12,
     fontSize: 16,
     fontWeight: "500",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     borderWidth: 2,
-    borderColor: "#F0F0F0",
+    // borderColor moved to theme.colors.borderLight via inline override
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -500,10 +508,10 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   contentInputContainer: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#F0F0F0",
+    // borderColor moved to theme.colors.borderLight via inline override
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -516,7 +524,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 15,
     lineHeight: 22,
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     textAlignVertical: "top",
   },
   contentTips: {
@@ -525,7 +533,7 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: "rgba(124, 185, 169, 0.05)",
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    // borderTopColor moved to theme.colors.borderLight via inline override
     gap: 8,
   },
   tipsText: {
@@ -543,7 +551,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     padding: 16,
     borderRadius: 16,
     shadowColor: "#000",
@@ -564,12 +572,12 @@ const styles = StyleSheet.create({
   privacyTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     marginBottom: 2,
   },
   privacyDescription: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     lineHeight: 18,
   },
   
@@ -582,12 +590,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F8F9FA",
+    // backgroundColor moved to theme.colors.surface via inline override
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: "#E9ECEF",
+    // borderColor moved to theme.colors.border via inline override
     gap: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -598,7 +606,7 @@ const styles = StyleSheet.create({
   draftButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
   },
   publishButton: {
     flexDirection: "row",

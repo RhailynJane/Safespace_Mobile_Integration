@@ -241,7 +241,7 @@ export default function PostDetailScreen() {
         <AppHeader title="Post Detail" showBack={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#7CB9A9" />
-          <Text style={styles.loadingText}>Loading post...</Text>
+          <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading post...</Text>
         </View>
       </SafeAreaView>
     );
@@ -255,7 +255,7 @@ export default function PostDetailScreen() {
         <AppHeader title="Post Detail" showBack={true} />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#E0E0E0" />
-          <Text style={styles.errorText}>Post not found</Text>
+          <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Post not found</Text>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
@@ -281,7 +281,7 @@ export default function PostDetailScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Main Post Card Container */}
-          <View style={styles.postCard}>
+          <View style={[styles.postCard, { backgroundColor: theme.colors.surface }]}>
             {/* Post Header with Author Info */}
             <View style={styles.postHeader}>
               <View style={styles.avatarContainer}>
@@ -290,8 +290,8 @@ export default function PostDetailScreen() {
                 </Text>
               </View>
               <View style={styles.userInfo}>
-                <Text style={styles.userName}>{post.author_name || 'Anonymous User'}</Text>
-                <Text style={styles.postMeta}>
+                <Text style={[styles.userName, { color: theme.colors.text }]}>{post.author_name || 'Anonymous User'}</Text>
+                <Text style={[styles.postMeta, { color: theme.colors.textSecondary }]}>
                   {formatTimestamp(post.created_at)}
                 </Text>
               </View>
@@ -315,13 +315,13 @@ export default function PostDetailScreen() {
             )}
 
             {/* Post Title */}
-            <Text style={styles.postTitle}>{post.title}</Text>
+            <Text style={[styles.postTitle, { color: theme.colors.text }]}>{post.title}</Text>
 
             {/* Post Content Body */}
-            <Text style={styles.postContent}>{post.content}</Text>
+            <Text style={[styles.postContent, { color: theme.colors.textSecondary }]}>{post.content}</Text>
 
             {/* Reaction Statistics Bar */}
-            <View style={styles.reactionStats}>
+            <View style={[styles.reactionStats, { borderColor: theme.colors.borderLight }]}>
               {Object.entries(allReactions).map(([emoji, count]) => (
                 <TouchableOpacity
                   key={emoji}
@@ -368,8 +368,8 @@ export default function PostDetailScreen() {
 
             {/* Expandable Reaction Picker */}
             {reactionPickerVisible && (
-              <View style={styles.reactionPicker}>
-                <Text style={styles.reactionPickerTitle}>Add Reaction</Text>
+              <View style={[styles.reactionPicker, { backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.reactionPickerTitle, { color: theme.colors.text }]}>Add Reaction</Text>
                 <View style={styles.reactionPickerEmojis}>
                   {EMOJI_REACTIONS.map((emoji) => (
                     <TouchableOpacity
@@ -391,12 +391,12 @@ export default function PostDetailScreen() {
 
           {/* Related Posts Section */}
           {relatedPosts.length > 0 && (
-            <View style={styles.relatedSection}>
-              <Text style={styles.relatedTitle}>Related Posts</Text>
+            <View style={[styles.relatedSection, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.relatedTitle, { color: theme.colors.text }]}>Related Posts</Text>
               {relatedPosts.map((relatedPost) => (
                 <TouchableOpacity
                   key={relatedPost.id}
-                  style={styles.relatedPost}
+                  style={[styles.relatedPost, { borderTopColor: theme.colors.borderLight }]}
                   onPress={() =>
                     router.push({
                       pathname: "/community-forum/post-detail",
@@ -410,10 +410,10 @@ export default function PostDetailScreen() {
                     </Text>
                   </View>
                   <View style={styles.relatedContent}>
-                    <Text style={styles.relatedPostTitle} numberOfLines={2}>
+                    <Text style={[styles.relatedPostTitle, { color: theme.colors.text }]} numberOfLines={2}>
                       {relatedPost.title}
                     </Text>
-                    <Text style={styles.relatedPostMeta}>
+                    <Text style={[styles.relatedPostMeta, { color: theme.colors.textSecondary }]}>
                       by {relatedPost.author_name} • {getTotalReactions(relatedPost.reactions)} reactions
                     </Text>
                   </View>
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 12,
   },
   errorContainer: {
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 16,
     marginBottom: 24,
   },
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   postCard: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -539,12 +539,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 2,
   },
   postMeta: {
     fontSize: 12,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
   },
   bookmarkButton: {
     padding: 4,
@@ -565,13 +565,13 @@ const styles = StyleSheet.create({
   postTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 12,
     lineHeight: 28,
   },
   postContent: {
     fontSize: 15,
-    color: "#424242",
+    // color moved to theme.colors.textSecondary via inline override
     lineHeight: 24,
     marginBottom: 20,
   },
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: "#E0E0E0",
+    // borderColor moved to theme.colors.borderLight via inline override
     marginBottom: 16,
     alignItems: "center",
   },
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
   reactionPicker: {
     marginTop: 12,
     padding: 16,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 12,
     shadowColor: "#000",
     shadowOffset: {
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   reactionPickerTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 12,
     textAlign: "center",
   },
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   relatedSection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 12,
     padding: 20,
     shadowColor: "grey",
@@ -695,7 +695,7 @@ const styles = StyleSheet.create({
   relatedTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 16,
   },
   relatedPost: {
@@ -703,7 +703,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    // borderTopColor moved to theme.colors.borderLight via inline override
   },
   relatedAvatar: {
     width: 40,
@@ -725,12 +725,12 @@ const styles = StyleSheet.create({
   relatedPostTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   relatedPostMeta: {
     fontSize: 12,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
   },
   bottomSpacing: {
     height: 30,
