@@ -56,7 +56,7 @@ export default function SuccessStep({ onContinue, onSignIn }: SuccessStepProps) 
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Text style={styles.title}>Account Created Successfully! 🎉</Text>
       
       {syncing ? (

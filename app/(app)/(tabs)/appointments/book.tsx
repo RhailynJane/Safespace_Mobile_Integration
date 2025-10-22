@@ -264,10 +264,10 @@ export default function BookAppointment() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Book Appointment" showBack={true} />
 
-        <ScrollView style={styles.container}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <Text style={styles.title}>
             Schedule a session with a support worker
           </Text>

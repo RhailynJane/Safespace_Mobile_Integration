@@ -206,7 +206,7 @@ export default function EditPostScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Edit Post" showBack={true} />
 

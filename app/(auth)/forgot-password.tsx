@@ -17,8 +17,10 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSignIn } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ForgotPasswordScreen() {
+  const { theme } = useTheme();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -88,7 +90,7 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
       <KeyboardAvoidingView

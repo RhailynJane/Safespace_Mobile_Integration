@@ -91,7 +91,7 @@ export default function SelectCategoryScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
           <AppHeader title="Community Forum" showBack={true} />   
           

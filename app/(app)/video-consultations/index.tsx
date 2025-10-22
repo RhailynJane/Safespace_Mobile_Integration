@@ -107,7 +107,7 @@ export default function VideoScreen() {
   // Show loading state while data is being fetched
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <CurvedBackground>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
@@ -119,7 +119,7 @@ export default function VideoScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Video Session" showBack={true} />
 
         {/* Main Content */}

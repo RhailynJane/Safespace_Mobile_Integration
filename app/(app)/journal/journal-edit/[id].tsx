@@ -225,7 +225,7 @@ export default function JournalEditScreen() {
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Edit Journal" showBack={true} showMenu={true} />
           <View style={styles.centered}>
             <ActivityIndicator size="large" color={Colors.primary} />
@@ -238,9 +238,9 @@ export default function JournalEditScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          style={styles.container}
+          style={[styles.container, { backgroundColor: theme.colors.background }]}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <AppHeader title="Edit Journal" showBack={true} showMenu={true} />

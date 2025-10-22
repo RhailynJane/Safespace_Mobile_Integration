@@ -125,7 +125,7 @@ const HelpSupportScreen: React.FC = () => {
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Help & Support" showBack={true} />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
@@ -138,7 +138,7 @@ const HelpSupportScreen: React.FC = () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Help & Support" showBack={true} />
         <ScrollView
           style={styles.scrollView}

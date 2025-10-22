@@ -137,7 +137,7 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
   // Render personal information step
   if (step === "personal") {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <Text style={styles.title}>Personal Information</Text>
         <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
 
@@ -271,7 +271,7 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
 
   // Render password setup step
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Text style={styles.title}>Account Setup</Text>
       <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
 

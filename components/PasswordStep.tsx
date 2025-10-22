@@ -98,7 +98,7 @@ export default function PasswordStep({
   const passwordsDontMatch = data.password && data.confirmPassword && data.password !== data.confirmPassword;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Text style={styles.title}>Account Setup</Text>
       <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
 

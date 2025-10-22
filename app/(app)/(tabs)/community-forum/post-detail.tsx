@@ -236,7 +236,7 @@ export default function PostDetailScreen() {
   // Loading state UI
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <CurvedBackground style={styles.curvedBackground} />
         <AppHeader title="Post Detail" showBack={true} />
         <View style={styles.loadingContainer}>
@@ -250,7 +250,7 @@ export default function PostDetailScreen() {
   // Error state UI for missing post
   if (!post) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <CurvedBackground style={styles.curvedBackground} />
         <AppHeader title="Post Detail" showBack={true} />
         <View style={styles.errorContainer}>
@@ -270,7 +270,7 @@ export default function PostDetailScreen() {
   const allReactions = getAllReactions();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Post Detail" showBack={true} />
 

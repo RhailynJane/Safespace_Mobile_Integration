@@ -141,7 +141,7 @@ export default function VideoCallScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Main Video Content */}
       <View style={styles.videoContainer}>
         {/* Participant Video */}

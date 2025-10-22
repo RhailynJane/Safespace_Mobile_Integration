@@ -160,7 +160,7 @@ export default function CreatePostScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Create Post" showBack={true} />
         
         <Animated.View style={[styles.content, { opacity: fadeAnim }]}>

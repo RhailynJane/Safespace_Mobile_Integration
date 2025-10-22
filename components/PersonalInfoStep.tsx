@@ -95,7 +95,7 @@ export default function PersonalInfoStep({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Step header */}
       <Text style={styles.title}>Personal Information</Text>
       <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>

@@ -117,7 +117,7 @@ export default function JournalEntryScreen() {
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.primary} />
@@ -131,7 +131,7 @@ export default function JournalEntryScreen() {
   if (!entry) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
           <View style={styles.notFoundContainer}>
             <Ionicons
@@ -154,7 +154,7 @@ export default function JournalEntryScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
 
         <ScrollView 

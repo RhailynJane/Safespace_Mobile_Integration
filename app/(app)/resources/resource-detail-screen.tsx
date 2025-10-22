@@ -113,7 +113,7 @@ export default function ResourceDetailScreen() {
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Resource" showBack={true} />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
@@ -125,7 +125,7 @@ export default function ResourceDetailScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Resource" showBack={true} />
 
         {/* Main Content Scroll Area */}

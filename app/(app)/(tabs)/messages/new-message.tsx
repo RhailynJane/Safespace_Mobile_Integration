@@ -394,7 +394,7 @@ export default function NewMessagesScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader 
           title="Messages" 
           showBack={true}

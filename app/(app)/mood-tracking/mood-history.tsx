@@ -304,7 +304,7 @@ export default function MoodHistoryScreen() {
   if (loading && offset === 0) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Mood History" showBack={true} />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
@@ -316,7 +316,7 @@ export default function MoodHistoryScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Mood History" showBack={true} />
 
         {/* Search and Filter Bar */}

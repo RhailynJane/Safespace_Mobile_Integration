@@ -62,6 +62,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     loadThemePreference();
@@ -70,17 +71,23 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const loadThemePreference = async () => {
     try {
       const savedTheme = await AsyncStorage.getItem('appDarkMode');
+      console.log('📱 Loading theme preference from AsyncStorage:', savedTheme);
       if (savedTheme !== null) {
-        setIsDarkMode(JSON.parse(savedTheme));
+        const isDark = JSON.parse(savedTheme);
+        setIsDarkMode(isDark);
+        console.log('📱 Theme loaded and applied:', isDark ? 'Dark' : 'Light');
       }
     } catch (error) {
       console.log('Error loading theme preference:', error);
+    } finally {
+      setIsLoaded(true);
     }
   };
 
   const saveThemePreference = async (value: boolean) => {
     try {
       await AsyncStorage.setItem('appDarkMode', JSON.stringify(value));
+      console.log('📱 Theme preference saved to AsyncStorage:', value ? 'Dark' : 'Light');
     } catch (error) {
       console.log('Error saving theme preference:', error);
     }
@@ -88,11 +95,13 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const toggleDarkMode = () => {
     const newValue = !isDarkMode;
+    console.log('📱 Toggling dark mode:', newValue ? 'Dark' : 'Light');
     setIsDarkMode(newValue);
     saveThemePreference(newValue);
   };
 
   const setDarkMode = (value: boolean) => {
+    console.log('📱 Setting dark mode:', value ? 'Dark' : 'Light');
     setIsDarkMode(value);
     saveThemePreference(value);
   };

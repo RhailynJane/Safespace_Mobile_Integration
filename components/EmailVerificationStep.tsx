@@ -78,7 +78,7 @@ export default function EmailVerificationStep({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Text style={styles.title}>Verify Your Email</Text>
       <Text style={styles.subtitle}>Step {stepNumber} of 4</Text>
 

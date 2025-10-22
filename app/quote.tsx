@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 import { Animated, StyleSheet, Text, View, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../contexts/ThemeContext";
 /**
  * LLM Prompt: how to make a splash screen in react native that shows my logo and a quote, then automatically goes to the next screen after a few seconds?
  * Reference; chat.deepseek.com
@@ -13,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
  * Automatically transitions to the onboarding flow after a brief display period
  */
 export default function QuoteScreen() {
+  const { theme } = useTheme();
   // Animation control values for entrance effects
   const fadeAnim = new Animated.Value(0);        // Controls opacity (0 = invisible, 1 = fully visible)
   const slideAnim = new Animated.Value(20);      // Controls vertical slide distance (pixels)
@@ -52,7 +54,7 @@ export default function QuoteScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
         {/* Animated SafeSpace Logo Container */}
         <Animated.View
@@ -83,11 +85,11 @@ export default function QuoteScreen() {
           ]}
         >
           {/* Inspirational quote text */}
-          <Text style={styles.quote}>
+          <Text style={[styles.quote, { color: theme.colors.text }]}>
             "Healing takes time, and asking for help is a courageous step."
           </Text>
           {/* Quote author attribution */}
-          <Text style={styles.author}>— Mariska Hargitay</Text>
+          <Text style={[styles.author, { color: theme.colors.textSecondary }]}>— Mariska Hargitay</Text>
         </Animated.View>
       </View>
     </SafeAreaView>

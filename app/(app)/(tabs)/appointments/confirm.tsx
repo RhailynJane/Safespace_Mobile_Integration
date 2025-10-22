@@ -92,7 +92,7 @@ export default function ConfirmAppointment() {
   if (!supportWorker) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <Text style={styles.errorText}>Support worker not found</Text>
         </SafeAreaView>
       </CurvedBackground>
@@ -284,9 +284,9 @@ export default function ConfirmAppointment() {
   // Show loading indicator if data is being fetched
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <CurvedBackground style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
         </CurvedBackground>
       </SafeAreaView>
     );
@@ -296,11 +296,11 @@ export default function ConfirmAppointment() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Confirm Appointment" showBack={true} />
 
         <ScrollView style={styles.scrollContainer}>
-          <Text style={styles.title}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>
 
@@ -308,81 +308,81 @@ export default function ConfirmAppointment() {
           <View style={styles.stepsContainer}>
             <View style={styles.stepRow}>
               {/* Step 1 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>1</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 2 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>2</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 3 - Active (Current Step) */}
-              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
                 <Text style={[styles.stepNumber, styles.stepNumberActive]}>
                   3
                 </Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 4 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>4</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>4</Text>
               </View>
             </View>
           </View>
 
           {/* Booking Details Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Booking Details</Text>
-            <Text style={styles.subSectionTitle}>Appointment Summary</Text>
+          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Booking Details</Text>
+            <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>Appointment Summary</Text>
 
             {appointment ? (
               <View style={styles.summaryContainer}>
                 {/* Support Worker Details */}
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Support Worker:</Text>
-                  <Text style={styles.summaryValue}>
+                  <Text style={[styles.summaryLabel, { color: theme.colors.text } ]}>Support Worker:</Text>
+                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
                     {appointment.supportWorker}
                   </Text>
                 </View>
 
                 {/* Appointment Date */}
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Date:</Text>
-                  <Text style={styles.summaryValue}>{appointment.date}</Text>
+                  <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Date:</Text>
+                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>{appointment.date}</Text>
                 </View>
 
                 {/* Appointment Time */}
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Time:</Text>
-                  <Text style={styles.summaryValue}>{appointment.time}</Text>
+                  <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Time:</Text>
+                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>{appointment.time}</Text>
                 </View>
 
                 {/* Session Type */}
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Session Type:</Text>
-                  <Text style={styles.summaryValue}>{appointment.type}</Text>
+                  <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Session Type:</Text>
+                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>{appointment.type}</Text>
                 </View>
               </View>
             ) : (
               <Text>No appointment data available</Text>
             )}
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 
             {/* Optional Notes Section */}
-            <Text style={styles.subSectionTitle}>
+            <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>
               Notes for Support Worker (Optional)
             </Text>
             <TextInput
-              style={styles.notesInput}
+              style={[styles.notesInput, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text }]}
               multiline
               numberOfLines={4}
               placeholder="Share any specific concerns or topics you'd like to discuss..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textDisabled}
               value={appointmentNotes}
               onChangeText={setAppointmentNotes}
             />
@@ -391,15 +391,15 @@ export default function ConfirmAppointment() {
             <View style={styles.buttonRow}>
               {/* Back Button */}
               <TouchableOpacity
-                style={styles.backButton}
+                style={[styles.backButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary }]}
                 onPress={() => router.back()}
               >
-                <Text style={styles.backButtonText}>Back</Text>
+                <Text style={[styles.backButtonText, { color: theme.colors.primary }]}>Back</Text>
               </TouchableOpacity>
 
               {/* Confirm Booking Button */}
               <TouchableOpacity
-                style={styles.bookButton}
+                style={[styles.bookButton, { backgroundColor: theme.colors.primary }]}
                 onPress={handleConfirmBooking}
               >
                 <Text style={styles.bookButtonText}>Book Appointment</Text>
@@ -420,10 +420,10 @@ export default function ConfirmAppointment() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -431,6 +431,7 @@ export default function ConfirmAppointment() {
                     key={index}
                     style={[
                       styles.sideMenuItem,
+                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -439,13 +440,14 @@ export default function ConfirmAppointment() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.primary}
                     />
                     <Text
                       style={[
                         styles.sideMenuItemText,
+                        { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && styles.signOutText,
+                        item.title === "Sign Out" && { color: theme.colors.error },
                       ]}
                     >
                       {item.title}

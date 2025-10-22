@@ -300,7 +300,7 @@ export default function JournalHistoryScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entries" showBack={true} showMenu={true} />
         <ScrollView style={styles.content}>
           <Text style={styles.pageTitle}>My Journal Entries</Text>

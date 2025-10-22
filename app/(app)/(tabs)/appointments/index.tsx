@@ -221,7 +221,7 @@ export default function AppointmentsScreen() {
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -249,7 +249,7 @@ export default function AppointmentsScreen() {
       <View style={styles.buttonContainer}>
         {/* Primary action button - Book Appointment */}
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
           onPress={handleBookAppointment}
         >
           <Text style={styles.buttonText}>Book Appointment</Text>
@@ -257,10 +257,10 @@ export default function AppointmentsScreen() {
 
         {/* Secondary action button - View Scheduled Appointments */}
         <TouchableOpacity
-          style={styles.secondaryButton}
+          style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
           onPress={handleViewScheduled}
         >
-          <Text style={styles.secondaryButtonText}>
+          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }] }>
             Check Scheduled Appointments
           </Text>
         </TouchableOpacity>
@@ -321,7 +321,7 @@ export default function AppointmentsScreen() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : theme.colors.icon}
+                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.icon}
                     />
                     <Text
                       style={[

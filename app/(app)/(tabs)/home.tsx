@@ -366,7 +366,7 @@ const fetchProfileImage = useCallback(async () => {
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -414,7 +414,7 @@ const fetchProfileImage = useCallback(async () => {
             {isAssessmentDue && (
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={styles.pendingTaskCard}
+                  style={[styles.pendingTaskCard, { backgroundColor: theme.colors.surface }]}
                   onPress={() => router.push("../self-assessment")}
                 >
                   <View style={styles.pendingTaskHeader}>
@@ -432,16 +432,16 @@ const fetchProfileImage = useCallback(async () => {
                     </View>
                   </View>
 
-                  <Text style={styles.pendingTaskTitle}>
+                  <Text style={[styles.pendingTaskTitle, { color: theme.colors.text }]}>
                     Complete Your Assessment
                   </Text>
-                  <Text style={styles.pendingTaskDescription}>
+                  <Text style={[styles.pendingTaskDescription, { color: theme.colors.textSecondary }]}>
                     Please complete your mental wellbeing assessment. This helps
                     your support worker provide better care.
                   </Text>
 
                   <View style={styles.pendingTaskFooter}>
-                    <Text style={styles.pendingTaskTime}>
+                    <Text style={[styles.pendingTaskTime, { color: theme.colors.textSecondary }]}>
                       Takes 5-7 minutes
                     </Text>
                     <Ionicons
@@ -456,7 +456,7 @@ const fetchProfileImage = useCallback(async () => {
 
             {/* Quick Actions Grid */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
               <View style={styles.actionsGrid}>
                 {quickActions.map((action) => (
                   <TouchableOpacity
@@ -464,8 +464,8 @@ const fetchProfileImage = useCallback(async () => {
                     style={[
                       styles.actionCard,
                       {
-                        backgroundColor: action.color,
-                        borderColor: action.borderColor,
+                          backgroundColor: theme.colors.surface,
+                          borderColor: theme.colors.borderLight,
                       },
                     ]}
                     onPress={action.onPress}
@@ -473,7 +473,7 @@ const fetchProfileImage = useCallback(async () => {
                     <View
                       style={[
                         styles.iconContainer,
-                        { backgroundColor: action.borderColor },
+                          { backgroundColor: action.color },
                       ]}
                     >
                       {action.image ? (
@@ -493,7 +493,7 @@ const fetchProfileImage = useCallback(async () => {
                         />
                       )}
                     </View>
-                    <Text style={styles.actionTitle}>{action.title}</Text>
+                      <Text style={[styles.actionTitle, { color: theme.colors.text }]}>{action.title}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -505,20 +505,20 @@ const fetchProfileImage = useCallback(async () => {
                 onPress={() => router.push("/mood-history")}
                 style={styles.sectionTitleContainer}
               >
-                <Text style={styles.sectionTitle}>Recent Moods</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Moods</Text>
               </TouchableOpacity>
               {recentMoods.length > 0 ? (
                 <View style={styles.recentMoods}>
                   {recentMoods.map((mood) => (
-                    <View key={mood.id} style={styles.moodItem}>
+                    <View key={mood.id} style={[styles.moodItem, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
                       <Text style={styles.moodEmoji}>
                         {getEmojiForMood(mood.mood_type)}
                       </Text>
                       <View style={styles.moodDetails}>
-                        <Text style={styles.moodDate}>
+                        <Text style={[styles.moodDate, { color: theme.colors.textSecondary }]}>
                           {formatDate(mood.created_at)}
                         </Text>
-                        <Text style={styles.moodText}>
+                        <Text style={[styles.moodText, { color: theme.colors.text }]}>
                           {getLabelForMood(mood.mood_type)}
                         </Text>
                       </View>
@@ -526,9 +526,9 @@ const fetchProfileImage = useCallback(async () => {
                   ))}
                 </View>
               ) : (
-                <View style={styles.noDataContainer}>
-                  <Text style={styles.noDataText}>No mood entries yet</Text>
-                  <Text style={styles.noDataSubtext}>
+                <View style={[styles.noDataContainer, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>No mood entries yet</Text>
+                  <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
                     Start tracking your mood to see insights here
                   </Text>
                 </View>
@@ -537,12 +537,12 @@ const fetchProfileImage = useCallback(async () => {
 
             {/* Resources Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recommended Resources</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recommended Resources</Text>
               {resources.length > 0 ? (
                 resources.map((resource) => (
                   <TouchableOpacity
                     key={resource.id}
-                    style={styles.resourceCard}
+                    style={[styles.resourceCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}
                     onPress={() => handleResourcePress(resource)}
                   >
                     <View style={styles.resourceHeader}>
@@ -557,7 +557,7 @@ const fetchProfileImage = useCallback(async () => {
                         </Text>
                       </View>
                       <View style={styles.resourceInfo}>
-                        <Text style={styles.resourceTitle} numberOfLines={2}>
+                        <Text style={[styles.resourceTitle, { color: theme.colors.text }]} numberOfLines={2}>
                           {resource.title}
                         </Text>
                         <View style={styles.resourceMeta}>
@@ -577,19 +577,19 @@ const fetchProfileImage = useCallback(async () => {
                             </Text>
                           </View>
                           <View style={styles.resourceDot} />
-                          <Text style={styles.resourceDuration}>
+                          <Text style={[styles.resourceDuration, { color: theme.colors.textSecondary }]}>
                             {resource.duration}
                           </Text>
                         </View>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#999" />
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
                   </TouchableOpacity>
                 ))
               ) : (
-                <View style={styles.noDataContainer}>
-                  <Text style={styles.noDataText}>No resources available</Text>
-                  <Text style={styles.noDataSubtext}>
+                <View style={[styles.noDataContainer, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>No resources available</Text>
+                  <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
                     Check back later for new content
                   </Text>
                 </View>
@@ -598,11 +598,11 @@ const fetchProfileImage = useCallback(async () => {
               {/* View All Resources Button */}
               {resources.length > 0 && (
                 <TouchableOpacity
-                  style={styles.viewAllButton}
+                    style={[styles.viewAllButton, { borderColor: theme.colors.primary }]}
                   onPress={() => router.push("/resources")}
                 >
-                  <Text style={styles.viewAllButtonText}>View All Resources</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#4CAF50" />
+                    <Text style={[styles.viewAllButtonText, { color: theme.colors.primary }]}>View All Resources</Text>
+                    <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
                 </TouchableOpacity>
               )}
             </View>

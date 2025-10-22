@@ -205,8 +205,8 @@ export default function MoodLoggingScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <StatusBar
             barStyle="dark-content"
             backgroundColor="#FFFFFF"

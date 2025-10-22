@@ -869,7 +869,7 @@ export default function ChatScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4CAF50" />
           <Text style={styles.loadingText}>Loading messages...</Text>
@@ -882,10 +882,10 @@ export default function ChatScreen() {
     <CurvedBackground>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           {/* Fixed Header with dynamic height based on screen size */}
           <View style={[styles.headerWrapper, { height: headerHeight }]}>
             <View style={styles.header}>

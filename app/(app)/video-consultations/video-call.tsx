@@ -101,7 +101,7 @@ export default function VideoCallScreen() {
 
   return (
    <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Safespace Meeting" showBack={true} />
 
         {/* Main meeting content */}
@@ -198,7 +198,7 @@ export default function VideoCallScreen() {
 
 /* Styles for the VideoCallScreen */
 const styles = StyleSheet.create({
-  // container added to match usage in JSX (SafeAreaView style={styles.container})
+  // container added to match usage in JSX (SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]})
   container: {
     flex: 1,
     backgroundColor: "transparent", 

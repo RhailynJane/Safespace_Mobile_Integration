@@ -66,8 +66,9 @@ export default function SettingsScreen() {
       setIsLoading(true);
       const settings = await settingsAPI.fetchSettings();
       
-      // Apply all saved settings
-      setGlobalDarkMode(settings.darkMode);
+      // Apply all saved settings EXCEPT dark mode (it's managed by ThemeContext)
+      // Dark mode is already loaded from AsyncStorage by ThemeContext
+      // We only update it here if the user explicitly changes it
       setTextSize(settings.textSize);
       setAutoLockTimer(settings.autoLockTimer);
       setNotificationsEnabled(settings.notificationsEnabled);

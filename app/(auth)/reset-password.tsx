@@ -174,7 +174,7 @@ export default function ResetPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
       <KeyboardAvoidingView

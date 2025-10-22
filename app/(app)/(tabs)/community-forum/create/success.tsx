@@ -92,7 +92,7 @@ export default function PostSuccessScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Success" showBack={false} />
 
         <View style={styles.content}>

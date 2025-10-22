@@ -1120,7 +1120,7 @@ export default function EditProfileScreen() {
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Edit Profile" showBack={true} />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
@@ -1133,7 +1133,7 @@ export default function EditProfileScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Edit Profile" showBack={true} />
 
         <ScrollView

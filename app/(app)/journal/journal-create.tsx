@@ -439,9 +439,9 @@ export default function JournalCreateScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          style={styles.container}
+          style={[styles.container, { backgroundColor: theme.colors.background }]}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <AppHeader title="Journal" showBack={true} showMenu={true} />

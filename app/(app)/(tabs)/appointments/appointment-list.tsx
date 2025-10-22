@@ -247,7 +247,7 @@ export default function AppointmentList() {
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -264,7 +264,7 @@ export default function AppointmentList() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="My Appointments" showBack={true} />
 
         {/* Appointments Tabs - Switch between Upcoming and Past appointments */}
@@ -324,7 +324,7 @@ export default function AppointmentList() {
                         <Ionicons
                           name="calendar-outline"
                           size={16}
-                          color="#666"
+                    color={theme.colors.icon}
                         />
                         <Text style={styles.detailText}>
                           {appointment.date}
@@ -332,6 +332,7 @@ export default function AppointmentList() {
                       </View>
                       <View style={styles.detailRow}>
                         <Ionicons name="time-outline" size={16} color="#666" />
+                          <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
                         <Text style={styles.detailText}>
                           {appointment.time}
                         </Text>
@@ -339,6 +340,7 @@ export default function AppointmentList() {
                     </View>
                     <View style={styles.sessionType}>
                       <Ionicons name="videocam" size={14} color="#4CAF50" />
+                        <Ionicons name="videocam" size={14} color={theme.colors.primary} />
                       <Text style={styles.sessionTypeText}>
                         {appointment.type} Session
                       </Text>
@@ -348,6 +350,7 @@ export default function AppointmentList() {
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="calendar-outline" size={48} color="#CCC" />
+                  <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
                 <Text style={styles.emptyStateText}>
                   No upcoming appointments
                 </Text>
@@ -370,17 +373,19 @@ export default function AppointmentList() {
                       <Ionicons
                         name="calendar-outline"
                         size={16}
-                        color="#666"
+                  color={theme.colors.icon}
                       />
                       <Text style={styles.detailText}>{appointment.date}</Text>
                     </View>
                     <View style={styles.detailRow}>
                       <Ionicons name="time-outline" size={16} color="#666" />
+                        <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
                       <Text style={styles.detailText}>{appointment.time}</Text>
                     </View>
                   </View>
                   <View style={styles.sessionType}>
                     <Ionicons name="videocam" size={14} color="#4CAF50" />
+                      <Ionicons name="videocam" size={14} color={theme.colors.primary} />
                     <Text style={styles.sessionTypeText}>
                       {appointment.type} Session
                     </Text>
@@ -390,6 +395,7 @@ export default function AppointmentList() {
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={48} color="#CCC" />
+                <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
               <Text style={styles.emptyStateText}>No past appointments</Text>
             </View>
           )}
@@ -398,10 +404,10 @@ export default function AppointmentList() {
         {/* Schedule New Appointment Button */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={styles.scheduleButton}
+              style={[styles.scheduleButton, { backgroundColor: theme.colors.primary }]}
             onPress={() => router.push("/appointments/book")}
           >
-            <Ionicons name="add" size={24} color="#FFF" />
+              <Ionicons name="add" size={24} color={theme.colors.text} />
             <Text style={styles.scheduleButtonText}>
               Schedule New Appointment
             </Text>
@@ -439,7 +445,7 @@ export default function AppointmentList() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                 color={item.disabled ? theme.colors.iconDisabled : theme.colors.primary}
                     />
                     <Text
                       style={[
