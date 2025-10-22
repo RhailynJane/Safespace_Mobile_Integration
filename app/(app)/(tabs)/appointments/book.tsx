@@ -24,6 +24,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
  * BookAppointment Component
@@ -36,6 +37,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
  * Features an elegant curved background and intuitive interface.
  */
 export default function BookAppointment() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);

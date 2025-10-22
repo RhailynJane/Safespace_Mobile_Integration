@@ -20,10 +20,12 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
+import { useTheme } from "../../../../../contexts/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 
 export default function PostSuccessScreen() {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("community-forum");
   const [scaleAnim] = useState(new Animated.Value(0.8));
   const [fadeAnim] = useState(new Animated.Value(0));

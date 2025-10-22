@@ -24,6 +24,7 @@ import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { messagingService, Contact } from "../../../../utils/sendbirdService";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -34,6 +35,7 @@ const { width } = Dimensions.get("window");
  * contact list with online status indicators, and navigation to individual chat screens.
  */
 export default function NewMessagesScreen() {
+  const { theme } = useTheme();
   const { userId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("messages");

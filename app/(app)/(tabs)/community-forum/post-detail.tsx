@@ -38,6 +38,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import { useState, useEffect } from "react";
 import { communityApi } from "../../../../utils/communityForumApi";
 import { useUser } from "@clerk/clerk-expo";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -46,6 +47,7 @@ const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
  * Main component for displaying post details with interactive features
  */
 export default function PostDetailScreen() {
+  const { theme } = useTheme();
   // Extract post ID from navigation parameters
   const params = useLocalSearchParams();
   const postId = parseInt(params.id as string, 10);

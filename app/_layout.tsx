@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ThemeProvider } from "../contexts/ThemeContext";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -125,8 +126,10 @@ export default function RootLayout() {
       tokenCache={tokenCache}
     >
       <SafeAreaProvider>
-        <UserSyncHandler />
-        <RootLayoutNav />
+        <ThemeProvider>
+          <UserSyncHandler />
+          <RootLayoutNav />
+        </ThemeProvider>
       </SafeAreaProvider>
     </ClerkProvider>
   );

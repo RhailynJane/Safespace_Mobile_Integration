@@ -56,6 +56,7 @@ import { communityApi } from "../../../../utils/communityForumApi";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 // Available categories for post organization and filtering
 const CATEGORIES = [

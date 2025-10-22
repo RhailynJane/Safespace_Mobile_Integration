@@ -22,6 +22,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalTemplate } from "../../../utils/journalApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 type CreateStep = "create" | "success";
@@ -60,6 +61,7 @@ const tabs = [
 const MAX_CHARACTERS = 1000;
 
 export default function JournalCreateScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");

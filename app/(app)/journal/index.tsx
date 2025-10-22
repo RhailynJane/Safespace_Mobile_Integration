@@ -17,6 +17,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -27,6 +28,7 @@ const tabs = [
 ];
 
 export default function JournalScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,12 +91,12 @@ export default function JournalScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal" showBack={true} showMenu={true} />
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.content}>
-            <Text style={styles.subText}>
+            <Text style={[styles.subText, { color: theme.colors.textSecondary }]}>
               Express your thoughts and feelings
             </Text>
 

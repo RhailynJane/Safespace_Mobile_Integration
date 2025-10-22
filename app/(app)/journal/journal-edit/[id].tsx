@@ -21,6 +21,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../../utils/journalApi";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 
@@ -49,6 +50,7 @@ const tabs = [
 const MAX_CHARACTERS = 2000;
 
 export default function JournalEditScreen() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams();
   const [journalData, setJournalData] = useState({
     title: "",

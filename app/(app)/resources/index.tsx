@@ -64,6 +64,7 @@ import {
   getDailyAffirmation,
   getRandomQuote,
 } from "../../../utils/resourcesApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 /**
  * Category interface defining the structure for resource categorization
@@ -126,6 +127,7 @@ const CATEGORIES: Category[] = [
  * with advanced filtering, search, and quick access features
  */
 export default function ResourcesScreen() {
+  const { theme } = useTheme();
   // State management for UI and data
   const [loading, setLoading] = useState(true); // Initial loading state
   const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh state
@@ -307,7 +309,7 @@ export default function ResourcesScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Resources" showBack={true} />
 
         {/* Main Scrollable Content Area */}

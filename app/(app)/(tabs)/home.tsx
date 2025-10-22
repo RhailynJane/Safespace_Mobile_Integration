@@ -24,6 +24,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { 
   Resource, 
   fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 type MoodEntry = {
   id: string;
@@ -48,6 +49,7 @@ export default function HomeScreen() {
 const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const { user } = useUser();
+  const { theme } = useTheme();
 
   // Bottom navigation configuration
   const tabs = [
@@ -363,7 +365,7 @@ const fetchProfileImage = useCallback(async () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color="#4CAF50" />
       </View>
     );
@@ -371,7 +373,7 @@ const fetchProfileImage = useCallback(async () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top"]}>
         {/* Use AppHeader component - handles all navigation and menu */}
         <AppHeader showBack={false} showMenu={true} showNotifications={true} />
 
@@ -387,11 +389,11 @@ const fetchProfileImage = useCallback(async () => {
           >
             {/* Greeting Section */}
             <View style={styles.greetingSection}>
-              <Text style={styles.greetingText}>
+              <Text style={[styles.greetingText, { color: theme.colors.text }]}>
                 {getGreeting()},{" "}
-                <Text style={styles.nameText}>{getGreetingName()}!</Text>
+                <Text style={[styles.nameText, { color: theme.colors.text }]}>{getGreetingName()}!</Text>
               </Text>
-              <Text style={styles.subGreetingText}>
+              <Text style={[styles.subGreetingText, { color: theme.colors.textSecondary }]}>
                 How are you feeling today?
               </Text>
             </View>

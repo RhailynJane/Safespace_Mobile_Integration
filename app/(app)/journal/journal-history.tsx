@@ -21,6 +21,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTheme } from "../../../contexts/ThemeContext";
 
 type FilterType = "all" | "week" | "month" | "custom";
 
@@ -33,6 +34,7 @@ const tabs = [
 ];
 
 export default function JournalHistoryScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);

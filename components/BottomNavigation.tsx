@@ -5,6 +5,7 @@
 
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 
 interface Tab {
   id: string;
@@ -23,8 +24,10 @@ export default function BottomNavigation({
   activeTab,
   onTabPress,
 }: BottomNavigationProps) {
+  const { theme } = useTheme();
+  
   return (
-    <View style={styles.bottomNav}>
+    <View style={[styles.bottomNav, { backgroundColor: theme.colors.surface }]}>
       {tabs.map((tab) => (
         <TouchableOpacity
           key={tab.id}
@@ -40,7 +43,7 @@ export default function BottomNavigation({
             <Ionicons
               name={tab.icon as any}
               size={24}
-              color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"} // Active/inactive colors
+              color={activeTab === tab.id ? "#2EA78F" : theme.colors.icon} // Active/inactive colors
             />
           </View>
         </TouchableOpacity>
@@ -56,7 +59,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,      
     paddingBottom: 14,       // Extra bottom padding for safe area
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface
     position: "absolute",      // Fixed at bottom
     bottom: 0,
     left: 0,

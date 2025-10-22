@@ -251,8 +251,6 @@ export default function SignupScreen() {
             phoneNumber: signupData.phoneNumber,
           });
 
-          console.log("User synced successfully:", syncResult);
-
           // Create client record
           if (syncResult.user?.id) {
             try {

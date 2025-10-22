@@ -18,6 +18,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { syncUserWithDatabase } from "../../../../utils/userSync";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -43,6 +44,7 @@ export default function ProfileScreen() {
 
   const { signOut } = useAuth();
   const { user } = useUser();
+  const { theme } = useTheme();
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -136,7 +138,6 @@ export default function ProfileScreen() {
       // Try to load from backend API using direct function call
       try {
         const backendProfile = await fetchClientProfile(user.id);
-        console.log("Backend profile data:", backendProfile);
 
         if (backendProfile) {
           setProfileData((prev) => ({
@@ -288,10 +289,10 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.loadingText}>Loading profile...</Text>
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading profile...</Text>
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -300,10 +301,10 @@ export default function ProfileScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Profile Information Section */}
-          <View style={styles.profileSection}>
+          <View style={[styles.profileSection, { backgroundColor: theme.colors.surface }]}>
             {profileData.profileImageUrl ? (
               <Image
                 source={{ uri: profileData.profileImageUrl }}
@@ -314,43 +315,43 @@ export default function ProfileScreen() {
                 <Text style={styles.initialsText}>{getInitials()}</Text>
               </View>
             )}
-            <Text style={styles.name}>{getFullName()}</Text>
-            <Text style={styles.email}>{profileData.email}</Text>
+            <Text style={[styles.name, { color: theme.colors.text }]}>{getFullName()}</Text>
+            <Text style={[styles.email, { color: theme.colors.textSecondary }]}>{profileData.email}</Text>
             {profileData.location && (
               <View style={styles.locationContainer}>
-                <Ionicons name="location-outline" size={14} color="#666" />
-                <Text style={styles.location}>{profileData.location}</Text>
+                <Ionicons name="location-outline" size={14} color={theme.colors.icon} />
+                <Text style={[styles.location, { color: theme.colors.textSecondary }]}>{profileData.location}</Text>
               </View>
             )}
           </View>
 
           {/* Menu Items Section */}
-          <View style={styles.menuSection}>
+          <View style={[styles.menuSection, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: theme.colors.borderLight }]}
               onPress={() => router.push("/profile/edit")}
             >
-              <Ionicons name="person-outline" size={24} color="#666" />
-              <Text style={styles.menuText}>Edit Profile</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
+              <Ionicons name="person-outline" size={24} color={theme.colors.icon} />
+              <Text style={[styles.menuText, { color: theme.colors.text }]}>Edit Profile</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: theme.colors.borderLight }]}
               onPress={() => router.push("/profile/settings")}
             >
-              <Ionicons name="settings-outline" size={24} color="#666" />
-              <Text style={styles.menuText}>Settings</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
+              <Ionicons name="settings-outline" size={24} color={theme.colors.icon} />
+              <Text style={[styles.menuText, { color: theme.colors.text }]}>Settings</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: theme.colors.borderLight }]}
               onPress={() => router.push("/profile/help-support")}
             >
-              <Ionicons name="help-circle-outline" size={24} color="#666" />
-              <Text style={styles.menuText}>Help & Support</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
+              <Ionicons name="help-circle-outline" size={24} color={theme.colors.icon} />
+              <Text style={[styles.menuText, { color: theme.colors.text }]}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
 
             <TouchableOpacity

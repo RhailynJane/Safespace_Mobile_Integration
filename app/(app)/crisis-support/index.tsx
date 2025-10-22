@@ -15,6 +15,7 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -29,6 +30,7 @@ const { width } = Dimensions.get("window");
  * Features an elegant curved background and urgent, clear interface design.
  */
 export default function CrisisScreen() {
+  const { theme } = useTheme();
   // State management
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("crisis");
@@ -103,7 +105,7 @@ export default function CrisisScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
         <AppHeader title="Crisis Support" showBack={true} />
 

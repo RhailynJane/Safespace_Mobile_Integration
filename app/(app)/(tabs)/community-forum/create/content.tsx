@@ -27,10 +27,12 @@ import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../../utils/communityForumApi";
+import { useTheme } from "../../../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
 export default function CreatePostScreen() {
+  const { theme } = useTheme();
   const params = useLocalSearchParams();
   const { user } = useUser();
   const selectedCategory = params.category as string;

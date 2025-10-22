@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
  * SettingsScreen Component
@@ -28,9 +29,9 @@ import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
+  const { theme, isDarkMode, setDarkMode: setGlobalDarkMode } = useTheme();
 
   // Settings state
-  const [darkMode, setDarkMode] = useState(false);
   const [textSize, setTextSize] = useState("Medium");
   const [autoLockTimer, setAutoLockTimer] = useState("5 minutes");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -55,7 +56,7 @@ export default function SettingsScreen() {
   // Apply settings when they change
   useEffect(() => {
     applySettings();
-  }, [darkMode, textSize, autoLockTimer]);
+  }, [isDarkMode, textSize, autoLockTimer]);
 
   /**
    * Loads settings from backend API
@@ -66,7 +67,7 @@ export default function SettingsScreen() {
       const settings = await settingsAPI.fetchSettings();
       
       // Apply all saved settings
-      setDarkMode(settings.darkMode);
+      setGlobalDarkMode(settings.darkMode);
       setTextSize(settings.textSize);
       setAutoLockTimer(settings.autoLockTimer);
       setNotificationsEnabled(settings.notificationsEnabled);
@@ -89,7 +90,7 @@ export default function SettingsScreen() {
   const saveSettings = async () => {
     try {
       const settings: UserSettings = {
-        darkMode,
+        darkMode: isDarkMode,
         textSize,
         autoLockTimer,
         notificationsEnabled,
@@ -114,7 +115,7 @@ export default function SettingsScreen() {
   const applySettings = async () => {
     try {
       // Apply dark mode globally
-      await applyDarkMode(darkMode);
+      await applyDarkMode(isDarkMode);
       
       // Apply text size globally
       await applyTextSize(textSize);
@@ -218,7 +219,7 @@ export default function SettingsScreen() {
    * Handles dark mode toggle with immediate feedback
    */
   const handleDarkModeToggle = (value: boolean) => {
-    setDarkMode(value);
+    setGlobalDarkMode(value);
     // Apply immediately
     applyDarkMode(value);
   };
@@ -262,24 +263,6 @@ export default function SettingsScreen() {
   const textSizeOptions = ["Small", "Medium", "Large", "Extra Large"];
   const autoLockOptions = ["Immediate", "1 minute", "5 minutes", "15 minutes", "Never"];
   const reminderFrequencyOptions = ["Never", "Daily", "Twice daily", "Weekly"];
-
-  // Define theme colors based on dark mode
-  const theme = {
-    colors: {
-      background: darkMode ? "#121212" : "#F5F5F5",
-      surface: darkMode ? "#1E1E1E" : "#FFFFFF",
-      text: darkMode ? "#FFFFFF" : "#333",
-      textSecondary: darkMode ? "#B3B3B3" : "#666",
-      textDisabled: darkMode ? "#666" : "#999",
-      border: darkMode ? "#333" : "#E0E0E0",
-      borderLight: darkMode ? "#2A2A2A" : "#F0F0F0",
-      icon: darkMode ? "#B3B3B3" : "#666",
-      iconDisabled: darkMode ? "#666" : "#999",
-      primary: "#4CAF50",
-      accent: "#7FDBDA",
-      error: "#FF6B6B",
-    }
-  };
 
   /**
    * Renders a toggle switch row
@@ -422,7 +405,7 @@ export default function SettingsScreen() {
             {renderToggleRow(
               "Dark Mode",
               "Switch between light and dark themes for the entire app",
-              darkMode,
+              isDarkMode,
               handleDarkModeToggle,
               "moon"
             )}

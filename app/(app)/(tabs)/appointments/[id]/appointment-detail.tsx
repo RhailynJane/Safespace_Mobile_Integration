@@ -22,6 +22,7 @@ import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useTheme } from "../../../../../contexts/ThemeContext";
 
 /**
  * AppointmentDetail Component
@@ -34,6 +35,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
  * Features modals for confirmation actions and elegant curved background.
  */
 export default function AppointmentList() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);

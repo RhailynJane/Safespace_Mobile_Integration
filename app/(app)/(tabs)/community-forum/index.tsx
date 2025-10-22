@@ -58,6 +58,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../utils/communityForumApi";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 
@@ -185,6 +186,7 @@ function CommunityMainScreenLogic() {
 }
 
 export default function CommunityMainScreen() {
+  const { theme } = useTheme();
   const {
     selectedCategory,
     setSelectedCategory,
@@ -761,7 +763,7 @@ export default function CommunityMainScreen() {
   const displayPosts = activeView === "newsfeed" ? posts : myPosts;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Community Forum" showBack={true} />
 
@@ -775,7 +777,7 @@ export default function CommunityMainScreen() {
           }
         >
           {/* View Tabs - Switch between Newsfeed and My Posts */}
-          <View style={styles.viewTabsContainer}>
+          <View style={[styles.viewTabsContainer, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity
               style={[
                 styles.viewTab,
@@ -1138,7 +1140,7 @@ export default function CommunityMainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "transparent",
+    // backgroundColor removed - now uses theme.colors.background
   },
   curvedBackground: {
     position: "absolute",
@@ -1164,7 +1166,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 16,
     marginBottom: 20,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface
     borderRadius: 12,
     padding: 4,
     shadowColor: "#000",

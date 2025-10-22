@@ -24,6 +24,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
  * ConfirmAppointment Component
@@ -33,6 +34,7 @@ import { Alert } from "react-native";
  * Features a multi-step progress indicator and elegant curved background.
  */
 export default function ConfirmAppointment() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);

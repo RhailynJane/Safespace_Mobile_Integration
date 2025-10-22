@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -52,6 +53,7 @@ const appointments = [
  * - Contains selectable audio options and actions to join/cancel the meeting.
  */
 export default function VideoCallScreen() {
+  const { theme } = useTheme();
   // Local UI state for audio selection
   const [audioOption, setAudioOption] = useState<"phone" | "none">("phone");
 
@@ -160,7 +162,7 @@ export default function VideoCallScreen() {
               color={audioOption === "none" ? "#4CAF50" : "#757575"}
             />
             <View style={styles.audioOptionText}>
-              <Text style={styles.audioOptionTitle}>Don't Use Audio</Text>
+              <Text style={styles.audioOptionTitle}>Don&apos;t Use Audio</Text>
               <Text style={styles.audioOptionDesc}>Join without audio</Text>
             </View>
           </TouchableOpacity>

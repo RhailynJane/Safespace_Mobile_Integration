@@ -22,6 +22,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import { BlurView } from "expo-blur";
 import { assessmentTracker } from "../../../utils/assessmentTracker";
 import { useUser } from "@clerk/clerk-expo";
+import { useTheme } from "../../../contexts/ThemeContext";
 const { width } = Dimensions.get("window");
 
 // Survey questions based on Short Warwick-Edinburgh Mental Wellbeing Scale
@@ -45,6 +46,7 @@ const responseOptions = [
 ];
 
 export default function PreSurveyScreen() {
+  const { theme } = useTheme();
   // Store responses for all questions (question id -> selected value)
   const [responses, setResponses] = useState<{ [key: number]: number }>({});
   const [activeTab, setActiveTab] = useState("assessment");
@@ -123,7 +125,7 @@ export default function PreSurveyScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Pre-Self Assessment Test" showBack={true} />
 
         <ScrollView
@@ -131,10 +133,10 @@ export default function PreSurveyScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: theme.colors.text }]}>
               Short Warwick-Edinburgh Mental Wellbeing Scale
             </Text>
-            <Text style={styles.instructions}>
+            <Text style={[styles.instructions, { color: theme.colors.textSecondary }]}>
               Please rate how you&apos;ve been feeling over the last 2 weeks.
             </Text>
 

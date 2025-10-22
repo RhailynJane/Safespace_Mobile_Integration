@@ -23,6 +23,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { moodApi, MoodEntry } from "../../../utils/moodApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -39,6 +40,7 @@ interface MoodOption {
 }
 
 const MoodTrackingScreen = () => {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [activeEmoji, setActiveEmoji] = useState<MoodType | null>(null);
   const [activeTab, setActiveTab] = useState("mood");
@@ -205,7 +207,7 @@ const MoodTrackingScreen = () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header with navigation controls */}
         <AppHeader title="Mood Tracker" showBack={true} />
 

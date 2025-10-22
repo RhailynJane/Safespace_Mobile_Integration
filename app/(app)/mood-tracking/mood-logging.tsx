@@ -26,6 +26,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { moodApi } from "../../../utils/moodApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -66,6 +67,7 @@ const tabs = [
 ];
 
 export default function MoodLoggingScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
 

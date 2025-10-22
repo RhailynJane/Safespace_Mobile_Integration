@@ -22,6 +22,7 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -44,6 +45,7 @@ const mockProfile = {
  * Features a beautiful curved background and comprehensive navigation.
  */
 export default function VideoScreen() {
+  const { theme } = useTheme();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("video");

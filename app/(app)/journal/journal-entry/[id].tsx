@@ -16,6 +16,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../../utils/journalApi";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -26,6 +27,7 @@ const tabs = [
 ];
 
 export default function JournalEntryScreen() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams();
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);

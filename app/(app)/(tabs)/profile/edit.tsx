@@ -27,6 +27,7 @@ import BottomNavigation from "../../../../components/BottomNavigation";
 import profileAPI, { ClientProfileData } from "../../../../utils/profileApi";
 import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 // Gender options for the form
 const GENDER_OPTIONS = [
@@ -108,6 +109,7 @@ const HEALTH_CONCERNS_OPTIONS = [
 ];
 
 export default function EditProfileScreen() {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [locationQuery, setLocationQuery] = useState("");

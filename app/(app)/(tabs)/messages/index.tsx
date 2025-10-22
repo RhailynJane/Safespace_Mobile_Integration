@@ -26,8 +26,10 @@ import {
   Participant,
 } from "../../../../utils/sendbirdService";
 import { useFocusEffect } from "@react-navigation/native";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 export default function MessagesScreen() {
+  const { theme } = useTheme();
   const { userId } = useAuth(); // Get actual Clerk user ID
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -263,16 +265,16 @@ export default function MessagesScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading messages...</Text>
-        <Text style={styles.statusText}>{sendbirdStatus}</Text>
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading messages...</Text>
+        <Text style={[styles.statusText, { color: theme.colors.textSecondary }]}>{sendbirdStatus}</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
 
@@ -298,24 +300,24 @@ export default function MessagesScreen() {
         </View>
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
           <Ionicons
             name="search"
             size={20}
-            color="#666"
+            color={theme.colors.icon}
             style={styles.searchIcon}
           />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.colors.text }]}
             placeholder="Search conversations..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#9E9E9E"
+            placeholderTextColor={theme.colors.textSecondary}
             returnKeyType="search"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color="#999" />
+              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
           )}
         </View>
@@ -323,7 +325,7 @@ export default function MessagesScreen() {
         {/* Search Results Info */}
         {!!searchQuery.trim() && (
           <View style={styles.searchResultsInfo}>
-            <Text style={styles.searchResultsText}>
+            <Text style={[styles.searchResultsText, { color: theme.colors.textSecondary }]}>
               {filteredConversations.length === 0 
                 ? "No conversations found" 
                 : (() => {
@@ -524,17 +526,18 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // backgroundColor removed - now uses theme.colors.background
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    // backgroundColor removed - now uses theme.colors.background
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: "#666",
+    // color removed - now uses theme.colors.text
   },
   statusContainer: {
     alignItems: "center",
@@ -554,7 +557,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 30,
-    backgroundColor: "#fff",
+    // backgroundColor removed - now uses theme.colors.surface
     marginTop: 10,
     margin: 15,
     paddingHorizontal: 15,
@@ -574,7 +577,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    // color removed - now uses theme.colors.text
   },
   clearButton: {
     padding: 4,

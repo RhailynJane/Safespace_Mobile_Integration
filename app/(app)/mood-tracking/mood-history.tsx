@@ -22,6 +22,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { moodApi, MoodEntry, MoodFilters } from "../../../utils/moodApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -40,6 +41,7 @@ const moodTypes = [
 ];
 
 export default function MoodHistoryScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const [allFactors, setAllFactors] = useState<string[]>([]);

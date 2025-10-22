@@ -56,9 +56,10 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { Message, Participant } from "../../../../utils/sendbirdService";
-import * as FileSystem from "expo-file-system";
+import { Paths, File as FSFile } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
+import { useTheme } from "../../../../contexts/ThemeContext";
 import * as MediaLibrary from "expo-media-library";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -554,39 +555,36 @@ export default function ChatScreen() {
       const fileExtension =
         (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
       const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
-      const localUri = `${FileSystem.documentDirectory}${safeFileName}.${fileExtension}`;
+      
+      // Create file in cache directory
+      const file = new FSFile(Paths.cache, `${safeFileName}.${fileExtension}`);
+      const localUri = file.uri;
 
       console.log("Download details:", { localUri, fileExtension });
 
-      // Download file
-      const downloadResult = await FileSystem.downloadAsync(
-        remoteUri,
-        localUri
-      );
+      // Download file using fetch and write to file
+      const response = await fetch(remoteUri);
+      const blob = await response.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      await file.write(new Uint8Array(arrayBuffer));
 
-      console.log("Download result:", downloadResult);
+      console.log("Download complete:", { localUri, fileExtension });
 
-      if (downloadResult.status === 200) {
-        // Check if sharing is available
-        const canShare = await Sharing.isAvailableAsync();
+      // Check if sharing is available
+      const canShare = await Sharing.isAvailableAsync();
 
-        if (canShare) {
-          await Sharing.shareAsync(downloadResult.uri, {
-            mimeType: getMimeType(fileExtension),
-            dialogTitle: `Download ${fileName}`,
-            UTI: getUTI(fileExtension), // For iOS
-          });
+      if (canShare) {
+        await Sharing.shareAsync(localUri, {
+          mimeType: getMimeType(fileExtension),
+          dialogTitle: `Download ${fileName}`,
+          UTI: getUTI(fileExtension), // For iOS
+        });
 
-          Alert.alert("Success", "File downloaded and shared successfully!");
-        } else {
-          Alert.alert("Success", "File downloaded successfully!");
-          // If sharing not available, open the file directly
-          await WebBrowser.openBrowserAsync(remoteUri);
-        }
+        Alert.alert("Success", "File downloaded and shared successfully!");
       } else {
-        throw new Error(
-          `Download failed with status: ${downloadResult.status}`
-        );
+        Alert.alert("Success", "File downloaded successfully!");
+        // If sharing not available, open the file directly
+        await WebBrowser.openBrowserAsync(remoteUri);
       }
     } catch (error) {
       console.error("Download error:", error);
@@ -650,16 +648,15 @@ export default function ChatScreen() {
       // If it's a remote URL, download it first
       if (imageUri.startsWith("http")) {
         const fileName = `image_${Date.now()}.jpg`;
-        const localUri = `${FileSystem.documentDirectory}${fileName}`;
-        const downloadResult = await FileSystem.downloadAsync(
-          imageUri,
-          localUri
-        );
-
-        if (downloadResult.status !== 200) {
-          throw new Error("Failed to download image");
-        }
-        finalUri = downloadResult.uri;
+        const imageFile = new FSFile(Paths.cache, fileName);
+        
+        // Download using fetch
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        await imageFile.write(new Uint8Array(arrayBuffer));
+        
+        finalUri = imageFile.uri;
       }
 
       // Save to gallery

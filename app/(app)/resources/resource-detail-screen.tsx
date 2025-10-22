@@ -48,6 +48,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 /**
  * ResourceDetailScreen Component
@@ -56,6 +57,7 @@ import { AppHeader } from "../../../components/AppHeader";
  * with enhanced visual presentation and user engagement features
  */
 export default function ResourceDetailScreen() {
+  const { theme } = useTheme();
   const params = useLocalSearchParams();
   
   const [loading, setLoading] = useState(false); // Loading state for future enhancements

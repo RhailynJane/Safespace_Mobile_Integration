@@ -19,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { assessmentTracker } from "../utils/assessmentTracker";
 import { useFocusEffect } from "@react-navigation/native";
+import { useTheme } from "../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -38,6 +39,7 @@ export const AppHeader = ({
   showNotifications = true,
   rightActions,
 }: AppHeaderProps) => {
+  const { theme } = useTheme();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -367,23 +369,23 @@ export const AppHeader = ({
 
   if (!user && isSignedIn) {
     return (
-      <SafeAreaView edges={["top"]} style={styles.safeArea}>
-        <View style={styles.header}>
-          <Text>Loading...</Text>
+      <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+          <Text style={{ color: theme.colors.text }}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={styles.safeArea}>
-      <View style={styles.header}>
+    <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
         {showBack ? (
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Ionicons name="arrow-undo-sharp" size={24} color="black" />
+            <Ionicons name="arrow-undo-sharp" size={24} color={theme.colors.icon} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile/edit")}>
@@ -407,7 +409,7 @@ export const AppHeader = ({
 
         <View style={styles.titleContainer}>
           {title ? (
-            <Text style={styles.headerTitle}>{title}</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{title}</Text>
           ) : (
             <View style={styles.emptyTitle} />
           )}
@@ -418,13 +420,13 @@ export const AppHeader = ({
 
           {showNotifications && (
             <TouchableOpacity onPress={() => router.push("/notifications")}>
-              <Ionicons name="notifications-outline" size={24} color="#666" />
+              <Ionicons name="notifications-outline" size={24} color={theme.colors.icon} />
             </TouchableOpacity>
           )}
 
           {showMenu && (
             <TouchableOpacity style={styles.menuButton} onPress={showSideMenu}>
-              <Ionicons name="grid" size={24} color="#666" />
+              <Ionicons name="grid" size={24} color={theme.colors.icon} />
               {isAssessmentDue && <View style={styles.notificationDot} />}
             </TouchableOpacity>
           )}
@@ -446,9 +448,9 @@ export const AppHeader = ({
             onPress={hideSideMenu}
           />
 
-          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
+          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim, backgroundColor: theme.colors.surface }]}>
             {/* FIXED: Added avatar with initials to side menu header */}
-            <View style={styles.sideMenuHeader}>
+            <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View
                 style={[
                   styles.profileAvatar,
@@ -469,8 +471,8 @@ export const AppHeader = ({
                   <Text style={styles.profileAvatarText}>{getInitials()}</Text>
                 )}
               </View>
-              <Text style={styles.profileName}>{getGreetingName()}</Text>
-              <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+              <Text style={[styles.profileName, { color: theme.colors.text }]}>{getGreetingName()}</Text>
+              <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
             </View>
 
             <ScrollView style={styles.sideMenuContent}>
@@ -479,6 +481,7 @@ export const AppHeader = ({
                   key={index}
                   style={[
                     styles.sideMenuItem,
+                    { borderBottomColor: theme.colors.borderLight },
                     item.disabled && styles.sideMenuItemDisabled,
                   ]}
                   onPress={item.onPress}
@@ -487,11 +490,12 @@ export const AppHeader = ({
                   <Ionicons
                     name={item.icon as any}
                     size={20}
-                    color={item.disabled ? "#CCCCCC" : "#757575"}
+                    color={item.disabled ? "#CCCCCC" : theme.colors.icon}
                   />
                   <Text
                     style={[
                       styles.sideMenuItemText,
+                      { color: theme.colors.text },
                       item.disabled && styles.sideMenuItemTextDisabled,
                       item.title === "Sign Out" && styles.signOutText,
                     ]}
@@ -523,6 +527,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginBottom: 8,
     height: 42,
+    // backgroundColor removed - now uses theme.colors.surface
   },
   emptyTitle: {
     flex: 1,
@@ -534,6 +539,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginLeft: 10,
     flex: 1,
+    // color removed - now uses theme.colors.text
   },
   backButton: {
     width: 40,
@@ -594,14 +600,14 @@ const styles = StyleSheet.create({
   sideMenu: {
     paddingTop: 40,
     width: width * 0.75,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface
     height: "100%",
   },
   // FIXED: Updated sideMenuHeader to include avatar
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    // borderBottomColor removed - now uses theme.colors.borderLight
     alignItems: "center",
   },
   // NEW: Styles for the profile avatar in side menu
@@ -627,12 +633,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    // color removed - now uses theme.colors.text
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
+    // color removed - now uses theme.colors.textSecondary
   },
   sideMenuContent: {
     padding: 10,
@@ -643,14 +649,14 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor removed - now uses theme.colors.borderLight
   },
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
+    // color removed - now uses theme.colors.text
     marginLeft: 15,
     flex: 1,
   },

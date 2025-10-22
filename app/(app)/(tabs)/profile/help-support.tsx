@@ -21,8 +21,10 @@ import {
   HelpSection,
   HelpItem,
 } from "../../../../utils/helpService";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const HelpSupportScreen: React.FC = () => {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [helpSections, setHelpSections] = useState<HelpSection[]>([]);
   const [expandedSections, setExpandedSections] = useState<string[]>([

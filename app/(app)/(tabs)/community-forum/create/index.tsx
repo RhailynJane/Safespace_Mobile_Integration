@@ -18,6 +18,7 @@ import BottomNavigation from "../../../../../components/BottomNavigation";
 import { AppHeader } from "../../../../../components/AppHeader";
 import Svg, { Path } from 'react-native-svg';
 import CurvedBackground from "../../../../../components/CurvedBackground";
+import { useTheme } from "../../../../../contexts/ThemeContext";
 
 const CATEGORIES = [
   "Self Care",
@@ -57,6 +58,7 @@ const getCategoryIcon = (category: string) => {
 };
 
 export default function SelectCategoryScreen() {
+  const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
 
