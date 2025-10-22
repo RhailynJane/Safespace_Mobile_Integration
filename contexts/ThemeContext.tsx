@@ -29,14 +29,14 @@ interface ThemeContextType {
 }
 
 const lightTheme: ThemeColors = {
-  background: "#F5F5F5",
+  background: "#E8E8E8",
   surface: "#FFFFFF",
-  text: "#333",
-  textSecondary: "#666",
+  text: "#1A1A1A",
+  textSecondary: "#555",
   textDisabled: "#999",
-  border: "#E0E0E0",
-  borderLight: "#F0F0F0",
-  icon: "#666",
+  border: "#D0D0D0",
+  borderLight: "#E5E5E5",
+  icon: "#555",
   iconDisabled: "#999",
   primary: "#4CAF50",
   accent: "#7FDBDA",

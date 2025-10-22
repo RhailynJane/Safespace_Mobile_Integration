@@ -106,7 +106,7 @@ export default function ResourceDetailScreen() {
       motivation: "#FFB74D",  // Energetic orange
       mindfulness: "#BA68C8", // Spiritual purple
     };
-    return colors[resource.category] || "#4CAF50"; // Default brand green
+    return colors[resource.category] || theme.colors.primary; // Use theme primary as default
   };
 
   // Loading state UI - Currently minimal as data comes from params
@@ -116,7 +116,7 @@ export default function ResourceDetailScreen() {
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Resource" showBack={true} />
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -159,42 +159,54 @@ export default function ResourceDetailScreen() {
             </View>
 
             {/* Resource Title - Primary content identifier */}
-            <Text style={styles.title}>{resource.title}</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]}>{resource.title}</Text>
 
             {/* Author Attribution - For quotes and authored content */}
             {resource.author && resource.author !== "Unknown" && (
-              <Text style={styles.author}>By {resource.author}</Text>
+              <Text style={[styles.author, { color: theme.colors.textSecondary }]}>By {resource.author}</Text>
             )}
 
             {/* Metadata - Resource type and additional info */}
             <View style={styles.meta}>
               <View style={styles.metaItem}>
-                <Ionicons name="document-text" size={16} color="#666" />
-                <Text style={styles.metaText}>{resource.type}</Text>
+                <Ionicons name="document-text" size={16} color={theme.colors.textSecondary} />
+                <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{resource.type}</Text>
               </View>
             </View>
           </View>
 
           {/* Action Bar - User interactions with the resource */}
-          <View style={styles.actionBar}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-              <Ionicons name="share-outline" size={24} color="#666" />
-              <Text style={styles.actionButtonText}>Share</Text>
+          <View style={[styles.actionBar, { 
+            backgroundColor: theme.colors.borderLight,
+            borderColor: theme.colors.border 
+          }]}>
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: theme.colors.surface }]} 
+              onPress={handleShare}
+            >
+              <Ionicons name="share-outline" size={24} color={theme.colors.textSecondary} />
+              <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Share</Text>
             </TouchableOpacity>
           </View>
 
           {/* Resource Content Section - Main reading area */}
           <View style={styles.contentContainer}>
-            <Text style={styles.contentTitle}>Content</Text>
-            <View style={styles.contentCard}>
-              <Text style={styles.contentText}>{resource.content}</Text>
+            <Text style={[styles.contentTitle, { color: theme.colors.text }]}>Content</Text>
+            <View style={[styles.contentCard, { 
+              backgroundColor: theme.colors.surface,
+              borderLeftColor: theme.colors.primary 
+            }]}>
+              <Text style={[styles.contentText, { color: theme.colors.text }]}>{resource.content}</Text>
             </View>
           </View>
 
           {/* Reflection Section - Prompts for user engagement */}
-          <View style={styles.reflectionSection}>
-            <Text style={styles.reflectionTitle}>💭 Take a Moment</Text>
-            <Text style={styles.reflectionText}>
+          <View style={[styles.reflectionSection, { 
+            backgroundColor: theme.isDark ? '#FFF3E0' : '#FFF9E6',
+            borderColor: theme.isDark ? '#FFE0B2' : '#FFE082'
+          }]}>
+            <Text style={[styles.reflectionTitle, { color: theme.isDark ? '#E65100' : '#F57C00' }]}>💭 Take a Moment</Text>
+            <Text style={[styles.reflectionText, { color: theme.isDark ? '#5D4037' : '#666' }]}>
               Reflect on how this resonates with you. Consider journaling your
               thoughts or discussing with someone you trust.
             </Text>
@@ -202,40 +214,40 @@ export default function ResourceDetailScreen() {
 
           {/* Related Actions Section - Navigation suggestions */}
           <View style={styles.relatedActions}>
-            <Text style={styles.relatedTitle}>What&apos;s Next?</Text>
+            <Text style={[styles.relatedTitle, { color: theme.colors.text }]}>What&apos;s Next?</Text>
             
             {/* Return to Home Action */}
             <TouchableOpacity
-              style={styles.relatedCard}
+              style={[styles.relatedCard, { backgroundColor: theme.colors.surface }]}
               onPress={() => router.push("/(app)/(tabs)/home")}
             >
-              <View style={styles.relatedIconContainer}>
+              <View style={[styles.relatedIconContainer, { backgroundColor: theme.colors.borderLight }]}>
                 <Text style={styles.relatedIcon}>🏠</Text>
               </View>
               <View style={styles.relatedContent}>
-                <Text style={styles.relatedCardTitle}>Return to Home</Text>
-                <Text style={styles.relatedCardText}>
+                <Text style={[styles.relatedCardTitle, { color: theme.colors.text }]}>Return to Home</Text>
+                <Text style={[styles.relatedCardText, { color: theme.colors.textSecondary }]}>
                   Continue your wellness journey
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
 
             {/* Explore More Resources Action */}
             <TouchableOpacity
-              style={styles.relatedCard}
+              style={[styles.relatedCard, { backgroundColor: theme.colors.surface }]}
               onPress={() => router.back()}
             >
-              <View style={styles.relatedIconContainer}>
+              <View style={[styles.relatedIconContainer, { backgroundColor: theme.colors.borderLight }]}>
                 <Text style={styles.relatedIcon}>📚</Text>
               </View>
               <View style={styles.relatedContent}>
-                <Text style={styles.relatedCardTitle}>Explore More</Text>
-                <Text style={styles.relatedCardText}>
+                <Text style={[styles.relatedCardTitle, { color: theme.colors.text }]}>Explore More</Text>
+                <Text style={[styles.relatedCardText, { color: theme.colors.textSecondary }]}>
                   Browse other resources
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -302,13 +314,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: "700",
-    color: "#333",
-    marginBottom: 10,
     lineHeight: 34, // Improved readability for longer titles
   },
   author: {
     fontSize: 16,
-    color: "#666",
     fontStyle: "italic",
     marginBottom: 15,
   },
@@ -324,7 +333,6 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 14,
-    color: "#666",
   },
   
   // Action Bar - User interaction controls
@@ -335,8 +343,6 @@ const styles = StyleSheet.create({
     gap: 15,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: "#F0F0F0",
-    backgroundColor: "#FAFAFA", // Subtle background for action area
     justifyContent: "center", // Center the single button
   },
   actionButton: {
@@ -345,7 +351,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 12,
     paddingHorizontal: 24,
-    backgroundColor: "#FFF",
     borderRadius: 12,
     gap: 8,
     shadowColor: "#000",
@@ -357,7 +362,6 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#666",
   },
   
   // Content Section - Main reading area
@@ -368,11 +372,9 @@ const styles = StyleSheet.create({
   contentTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#333",
     marginBottom: 15,
   },
   contentCard: {
-    backgroundColor: "#FFF",
     borderRadius: 15,
     padding: 20,
     shadowColor: "#000",
@@ -381,12 +383,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50", // Accent border for visual emphasis
   },
   contentText: {
     fontSize: 16,
     lineHeight: 26, // Enhanced readability for longer content
-    color: "#333",
     letterSpacing: 0.3, // Improved text rendering
   },
   
@@ -395,21 +395,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 25,
     padding: 20,
-    backgroundColor: "#FFF9E6", // Warm yellow background for reflection
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: "#FFE082", // Subtle border for definition
   },
   reflectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#F57C00", // Warm orange for attention
     marginBottom: 10,
   },
   reflectionText: {
     fontSize: 14,
     lineHeight: 22,
-    color: "#666",
   },
   
   // Related Actions Section - Navigation suggestions
@@ -420,13 +416,11 @@ const styles = StyleSheet.create({
   relatedTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#333",
     marginBottom: 15,
   },
   relatedCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF",
     borderRadius: 15,
     padding: 15,
     marginBottom: 12,
@@ -440,7 +434,6 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 12,
-    backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 15,
@@ -454,11 +447,9 @@ const styles = StyleSheet.create({
   relatedCardTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 3,
   },
   relatedCardText: {
     fontSize: 13,
-    color: "#666",
   },
 });

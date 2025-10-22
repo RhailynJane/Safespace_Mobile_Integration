@@ -320,19 +320,22 @@ export default function ResourcesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={["#4CAF50"]}
-              tintColor="#4CAF50"
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
             />
           }
         >
           {/* Featured Resource Section - Only shows when no category filter is active */}
           {featuredResource && selectedCategory === "" && (
             <View style={styles.featuredContainer}>
-              <View style={styles.featuredCard}>
-                <Text style={styles.featuredLabel}>✨ Featured</Text>
-                <Text style={styles.featuredText}>&quot;{featuredResource.content}&quot;</Text>
+              <View style={[styles.featuredCard, { 
+                backgroundColor: theme.colors.surface,
+                borderLeftColor: theme.colors.primary
+              }]}>
+                <Text style={[styles.featuredLabel, { color: theme.colors.primary }]}>✨ Featured</Text>
+                <Text style={[styles.featuredText, { color: theme.colors.text }]}>&quot;{featuredResource.content}&quot;</Text>
                 {featuredResource.author && (
-                  <Text style={styles.featuredAuthor}>— {featuredResource.author}</Text>
+                  <Text style={[styles.featuredAuthor, { color: theme.colors.textSecondary }]}>— {featuredResource.author}</Text>
                 )}
               </View>
             </View>
@@ -340,50 +343,50 @@ export default function ResourcesScreen() {
 
           {/* Quick Actions Section - Instant access to popular features */}
           <View style={styles.quickActions}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
             <View style={styles.actionsRow}>
               <TouchableOpacity
-                style={styles.quickAction}
+                style={[styles.quickAction, { backgroundColor: theme.colors.surface }]}
                 onPress={handleDailyAffirmation}
               >
-                <View style={[styles.actionIcon, { backgroundColor: '#E8F5E8' }]}>
+                <View style={[styles.actionIcon, { backgroundColor: theme.isDark ? 'rgba(76, 175, 80, 0.2)' : '#E8F5E8' }]}>
                   <Text style={styles.actionEmoji}>🌟</Text>
                 </View>
-                <Text style={styles.actionText}>Daily Affirmation</Text>
+                <Text style={[styles.actionText, { color: theme.colors.text }]}>Daily Affirmation</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.quickAction}
+                style={[styles.quickAction, { backgroundColor: theme.colors.surface }]}
                 onPress={handleRandomQuote}
               >
-                <View style={[styles.actionIcon, { backgroundColor: '#FFF3E0' }]}>
+                <View style={[styles.actionIcon, { backgroundColor: theme.isDark ? 'rgba(255, 152, 0, 0.2)' : '#FFF3E0' }]}>
                   <Text style={styles.actionEmoji}>💭</Text>
                 </View>
-                <Text style={styles.actionText}>Random Quote</Text>
+                <Text style={[styles.actionText, { color: theme.colors.text }]}>Random Quote</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Search Bar Section - Global resource search */}
           <View style={styles.searchContainer}>
-            <View style={styles.searchBar}>
+            <View style={[styles.searchBar, { backgroundColor: theme.colors.surface }]}>
               <Ionicons
                 name="search"
                 size={20}
-                color="#999"
+                color={theme.colors.icon}
                 style={styles.searchIcon}
               />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: theme.colors.text }]}
                 placeholder="Search resources..."
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
               {/* Clear search button - Only shows when there's text */}
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={20} color="#999" />
+                  <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
                 </TouchableOpacity>
               )}
             </View>
@@ -392,9 +395,9 @@ export default function ResourcesScreen() {
           {/* Categories Section - Horizontal scrolling category filters */}
           <View style={styles.categoriesSection}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Categories</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Categories</Text>
               <TouchableOpacity onPress={() => setSelectedCategory("")}>
-                <Text style={styles.seeAllButton}>
+                <Text style={[styles.seeAllButton, { color: theme.colors.primary }]}>
                   {selectedCategory ? "Clear" : "All"}
                 </Text>
               </TouchableOpacity>
@@ -411,12 +414,12 @@ export default function ResourcesScreen() {
                   style={[
                     styles.categoryButton,
                     { backgroundColor: category.color },
-                    selectedCategory === category.id && styles.selectedCategory,
+                    selectedCategory === category.id && [styles.selectedCategory, { borderColor: theme.colors.primary }],
                   ]}
                   onPress={() => handleCategoryPress(category.id)}
                 >
                   <Text style={styles.categoryIcon}>{category.icon}</Text>
-                  <Text style={styles.categoryName}>{category.name}</Text>
+                  <Text style={[styles.categoryName, { color: theme.colors.text }]}>{category.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -424,7 +427,7 @@ export default function ResourcesScreen() {
 
           {/* Resources List Section - Dynamic content based on filters */}
           <View style={styles.resourcesSection}>
-            <Text style={styles.resourcesSectionTitle}>
+            <Text style={[styles.resourcesSectionTitle, { color: theme.colors.text }]}>
               {selectedCategory
                 ? `${CATEGORIES.find((c) => c.id === selectedCategory)?.name} Resources`
                 : "All Resources"}
@@ -433,15 +436,15 @@ export default function ResourcesScreen() {
             {loading ? (
               // Loading State
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#4CAF50" />
-                <Text style={styles.loadingText}>Loading resources...</Text>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading resources...</Text>
               </View>
             ) : resources.length === 0 ? (
               // Empty State
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>🔍</Text>
-                <Text style={styles.emptyText}>No resources found</Text>
-                <Text style={styles.emptySubtext}>
+                <Text style={[styles.emptyText, { color: theme.colors.text }]}>No resources found</Text>
+                <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                   Try adjusting your search or filters
                 </Text>
               </View>
@@ -451,7 +454,7 @@ export default function ResourcesScreen() {
                 {resources.map((resource) => (
                   <TouchableOpacity
                     key={resource.id}
-                    style={styles.resourceCard}
+                    style={[styles.resourceCard, { backgroundColor: theme.colors.surface }]}
                     onPress={() => handleResourcePress(resource)}
                     activeOpacity={0.7}
                   >
@@ -467,18 +470,18 @@ export default function ResourcesScreen() {
 
                     {/* Resource Content Details */}
                     <View style={styles.resourceContent}>
-                      <Text style={styles.resourceTitle} numberOfLines={2}>
+                      <Text style={[styles.resourceTitle, { color: theme.colors.text }]} numberOfLines={2}>
                         {resource.title}
                       </Text>
                       <View style={styles.resourceMeta}>
-                        <Text style={styles.resourceType}>{resource.type}</Text>
-                        <View style={styles.resourceDot} />
-                        <Text style={styles.resourceDuration}>
+                        <Text style={[styles.resourceType, { color: theme.colors.textSecondary }]}>{resource.type}</Text>
+                        <View style={[styles.resourceDot, { backgroundColor: theme.colors.textSecondary }]} />
+                        <Text style={[styles.resourceDuration, { color: theme.colors.textSecondary }]}>
                           {resource.duration}
                         </Text>
                       </View>
                       {resource.author && (
-                        <Text style={styles.resourceAuthor} numberOfLines={1}>
+                        <Text style={[styles.resourceAuthor, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                           By {resource.author}
                         </Text>
                       )}
@@ -488,7 +491,7 @@ export default function ResourcesScreen() {
                     <Ionicons
                       name="chevron-forward"
                       size={20}
-                      color="#999"
+                      color={theme.colors.icon}
                       style={styles.resourceChevron}
                     />
                   </TouchableOpacity>
