@@ -377,6 +377,8 @@ export default function EditProfileScreen() {
 
           if (profileData.profileImage) {
             setProfileImage(profileData.profileImage);
+            // Also save to local storage for offline access
+            await AsyncStorage.setItem("profileImage", profileData.profileImage);
           }
         }
       } catch (apiError) {
@@ -638,16 +640,19 @@ export default function EditProfileScreen() {
         const imageUri = result.assets[0].uri;
 
         try {
-          // Save to local storage immediately
-          await AsyncStorage.setItem("profileImage", imageUri);
-          setProfileImage(imageUri);
+          // Upload image to backend
+          const uploadedImageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
+          
+          // Save to local storage for immediate display
+          await AsyncStorage.setItem("profileImage", uploadedImageUrl);
+          setProfileImage(uploadedImageUrl);
 
           Alert.alert("Success", "Profile picture updated successfully!");
         } catch (uploadError) {
-          console.error("Error saving image:", uploadError);
+          console.error("Error uploading image:", uploadError);
           Alert.alert(
             "Error",
-            "Failed to save profile picture. Please try again."
+            "Failed to upload profile picture. Please try again."
           );
         } finally {
           setUploadingImage(false);

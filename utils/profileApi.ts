@@ -60,6 +60,52 @@ export const profileApi = {
     }
   },
 
+  async uploadProfileImage(clerkUserId: string, imageUri: string): Promise<string> {
+    try {
+      console.log('📸 Uploading profile image for user:', clerkUserId);
+      
+      // Create form data for image upload
+      const formData = new FormData();
+      
+      // Get file extension from URI
+      const uriParts = imageUri.split('.');
+      const fileType = uriParts[uriParts.length - 1];
+      
+      // Append the image file
+      formData.append('profileImage', {
+        uri: imageUri,
+        type: `image/${fileType}`,
+        name: `profile_${clerkUserId}.${fileType}`,
+      } as any);
+
+      const response = await fetch(`${API_BASE_URL}/api/upload/profile-image/${clerkUserId}`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Upload error:', errorText);
+        throw new Error(`Failed to upload image: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Image uploaded successfully:', result);
+      
+      if (result.success) {
+        return result.data.imageUrl;
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Error uploading profile image:', error);
+      throw error;
+    }
+  },
+
   async updateClientProfile(clerkUserId: string, profileData: Partial<ClientProfileData>): Promise<any> {
     try {
       console.log('🔄 Updating profile for user:', clerkUserId);

@@ -3218,6 +3218,75 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // =============================================
+// PROFILE IMAGE UPLOAD ENDPOINT
+// =============================================
+
+app.post('/api/upload/profile-image/:clerkUserId', upload.single('profileImage'), async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No image uploaded' 
+      });
+    }
+
+    console.log('📸 Uploading profile image for user:', clerkUserId);
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { clerk_user_id: clerkUserId }
+    });
+
+    if (!user) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Construct image URL
+    const imageUrl = `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001'}/uploads/${req.file.filename}`;
+
+    // Update user's profile image URL in database
+    await prisma.user.update({
+      where: { clerk_user_id: clerkUserId },
+      data: { 
+        profile_image_url: imageUrl,
+        updated_at: new Date()
+      }
+    });
+
+    console.log('✅ Profile image updated successfully:', imageUrl);
+
+    res.json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      data: {
+        imageUrl: imageUrl
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Profile image upload error:', error);
+    
+    // Clean up file if upload failed
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Profile image upload failed',
+      error: (error as any).message
+    });
+  }
+});
+
+// =============================================
 // PROFILE ENDPOINTS - UPDATED FOR client_profiles TABLE
 // =============================================
 
