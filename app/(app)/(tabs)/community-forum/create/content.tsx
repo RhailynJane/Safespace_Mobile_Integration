@@ -1,6 +1,7 @@
 /**
  * Enhanced Create Post Screen with Modern UI Design
  * Features improved typography, better spacing, and visual enhancements
+ * Uses modal system for user feedback instead of Alert
  * LLM Prompt: Add comprehensive comments to this React Native component.
  * Reference: chat.deepseek.com
  */
@@ -12,13 +13,13 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Alert,
   Image,
   TextInput,
   Switch,
   ActivityIndicator,
   Dimensions,
   Animated,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -44,6 +45,18 @@ export default function CreatePostScreen() {
   const [isDraft, setIsDraft] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [successCallback, setSuccessCallback] = useState<(() => void) | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -72,14 +85,26 @@ export default function CreatePostScreen() {
     return displayName.charAt(0).toUpperCase();
   };
 
+  const showError = (title: string, message: string) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
+
+  const showSuccess = (message: string, callback?: () => void) => {
+    setSuccessMessage(message);
+    setSuccessCallback(() => callback || null);
+    setShowSuccessModal(true);
+  };
+
   const handleSaveDraft = async () => {
     if (!user?.id) {
-      Alert.alert("Sign In Required", "Please sign in to save drafts");
+      showError("Sign In Required", "Please sign in to save drafts");
       return;
     }
 
     if (!postTitle.trim() || !postContent.trim()) {
-      Alert.alert("Missing Information", "Please add a title and content for your post");
+      showError("Missing Information", "Please add a title and content for your post");
       return;
     }
 
@@ -94,11 +119,12 @@ export default function CreatePostScreen() {
         isDraft: true,
       });
       
-      Alert.alert("✅ Draft Saved", "Your post has been saved as a draft. You can find it in your profile.");
-      router.push("/community-forum");
+      showSuccess("Your post has been saved as a draft. You can find it in your profile.", () => {
+        router.push("/community-forum");
+      });
     } catch (error) {
       console.error('Error saving draft:', error);
-      Alert.alert("Save Failed", "Unable to save draft. Please try again.");
+      showError("Save Failed", "Unable to save draft. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -106,12 +132,12 @@ export default function CreatePostScreen() {
 
   const handlePublish = async () => {
     if (!user?.id) {
-      Alert.alert("Sign In Required", "Please sign in to create posts");
+      showError("Sign In Required", "Please sign in to create posts");
       return;
     }
 
     if (!postTitle.trim() || !postContent.trim()) {
-      Alert.alert("Missing Information", "Please add a title and content for your post");
+      showError("Missing Information", "Please add a title and content for your post");
       return;
     }
 
@@ -129,7 +155,7 @@ export default function CreatePostScreen() {
       router.push("/community-forum/create/success");
     } catch (error) {
       console.error('Error creating post:', error);
-      Alert.alert("Post Failed", "Unable to publish post. Please check your connection and try again.");
+      showError("Post Failed", "Unable to publish post. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -342,6 +368,61 @@ export default function CreatePostScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        {/* Success Modal */}
+        <Modal
+          visible={showSuccessModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.successModal}>
+              <View style={styles.successIconContainer}>
+                <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+              </View>
+              <Text style={styles.successTitle}>Success!</Text>
+              <Text style={styles.successMessage}>{successMessage}</Text>
+              <TouchableOpacity
+                style={styles.successButton}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  if (successCallback) {
+                    successCallback();
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Error Modal */}
+        <Modal
+          visible={showErrorModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowErrorModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.successModal}>
+              <View style={styles.errorIconContainer}>
+                <Ionicons name="close-circle" size={80} color="#FF3B30" />
+              </View>
+              <Text style={styles.errorTitle}>{errorTitle}</Text>
+              <Text style={styles.successMessage}>{errorMessage}</Text>
+              <TouchableOpacity
+                style={styles.errorButton}
+                onPress={() => setShowErrorModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -414,14 +495,12 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 18,
     fontWeight: "700",
-    // color moved to theme.colors.text via inline override
     marginBottom: 12,
   },
   authorCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // backgroundColor moved to theme.colors.surface via inline override
     padding: 16,
     borderRadius: 16,
     shadowColor: "#000",
@@ -462,12 +541,10 @@ const styles = StyleSheet.create({
   authorName: {
     fontSize: 16,
     fontWeight: "600",
-    // color moved to theme.colors.text via inline override
     marginBottom: 2,
   },
   authorRole: {
     fontSize: 14,
-    // color moved to theme.colors.textSecondary via inline override
   },
   
   // Content Section
@@ -486,21 +563,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: "600",
-    // color moved to theme.colors.text via inline override
   },
   charCount: {
     fontSize: 12,
     fontWeight: "500",
   },
   titleInput: {
-    // backgroundColor moved to theme.colors.surface via inline override
     padding: 16,
     borderRadius: 12,
     fontSize: 16,
     fontWeight: "500",
-    // color moved to theme.colors.text via inline override
     borderWidth: 2,
-    // borderColor moved to theme.colors.borderLight via inline override
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -508,10 +581,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   contentInputContainer: {
-    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 12,
     borderWidth: 2,
-    // borderColor moved to theme.colors.borderLight via inline override
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -524,7 +595,6 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 15,
     lineHeight: 22,
-    // color moved to theme.colors.text via inline override
     textAlignVertical: "top",
   },
   contentTips: {
@@ -533,7 +603,6 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: "rgba(124, 185, 169, 0.05)",
     borderTopWidth: 1,
-    // borderTopColor moved to theme.colors.borderLight via inline override
     gap: 8,
   },
   tipsText: {
@@ -551,7 +620,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // backgroundColor moved to theme.colors.surface via inline override
     padding: 16,
     borderRadius: 16,
     shadowColor: "#000",
@@ -572,12 +640,10 @@ const styles = StyleSheet.create({
   privacyTitle: {
     fontSize: 16,
     fontWeight: "600",
-    // color moved to theme.colors.text via inline override
     marginBottom: 2,
   },
   privacyDescription: {
     fontSize: 14,
-    // color moved to theme.colors.textSecondary via inline override
     lineHeight: 18,
   },
   
@@ -590,12 +656,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    // backgroundColor moved to theme.colors.surface via inline override
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 16,
     borderWidth: 2,
-    // borderColor moved to theme.colors.border via inline override
     gap: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -606,7 +670,6 @@ const styles = StyleSheet.create({
   draftButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    // color moved to theme.colors.textSecondary via inline override
   },
   publishButton: {
     flexDirection: "row",
@@ -638,5 +701,66 @@ const styles = StyleSheet.create({
   
   bottomSpacing: {
     height: 20,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    width: '80%',
+    maxWidth: 400,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  errorIconContainer: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginBottom: 8,
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  successButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    width: '100%',
+  },
+  errorButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    width: '100%',
+  },
+  successButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
