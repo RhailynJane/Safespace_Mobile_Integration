@@ -110,6 +110,30 @@ app.get("/api/users", async (req: Request, res: Response) => {
   }
 });
 
+// Get a specific user by their Clerk ID
+app.get("/api/users/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    
+    const result = await pool.query(
+      "SELECT * FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error("Error fetching user:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch user",
+      details: error.message,
+    });
+  }
+});
+
 // Sync user endpoint
 app.post(
   "/api/sync-user",
@@ -288,6 +312,43 @@ app.post(
     }
   }
 );
+
+// Get client emergency contact info
+app.get("/api/clients/by-clerk/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    
+    // First get the user's internal ID
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    const userId = userResult.rows[0].id;
+    
+    // Get client info
+    const clientResult = await pool.query(
+      "SELECT * FROM clients WHERE user_id = $1",
+      [userId]
+    );
+    
+    if (clientResult.rows.length === 0) {
+      return res.json({ client: null });
+    }
+    
+    res.json(clientResult.rows[0]);
+  } catch (error: any) {
+    console.error("Error fetching client:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch client",
+      details: error.message,
+    });
+  }
+});
 
 // =============================================
 // ASSESSMENT ENDPOINTS
@@ -4054,6 +4115,7 @@ app.get('/api/help-sections/:sectionId/items', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 app.get('/api/help/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -4099,10 +4161,93 @@ app.get('/api/help/search', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to search help content',
       details: error instanceof Error ? error.message : 'Unknown error'
+=======
+// =============================================
+// APPOINTMENTS ENDPOINTS
+// =============================================
+
+// Get all appointments for a user
+app.get("/api/appointments", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.query;
+
+    if (!clerkUserId) {
+      return res.status(400).json({ error: "clerkUserId is required" });
+    }
+
+    // Get user's internal ID
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Get all appointments for this user
+    const query = `
+      SELECT 
+        a.id,
+        a.appointment_date,
+        a.appointment_time,
+        a.duration_minutes,
+        a.session_type,
+        a.status,
+        a.meeting_link,
+        a.notes,
+        a.created_at,
+        a.updated_at,
+        sw.id as support_worker_id,
+        sw.first_name as support_worker_first_name,
+        sw.last_name as support_worker_last_name,
+        sw.specialization,
+        sw.avatar_url
+      FROM appointments a
+      LEFT JOIN support_workers sw ON a.support_worker_id = sw.id
+      WHERE a.user_id = $1
+      ORDER BY a.appointment_date DESC, a.appointment_time DESC
+    `;
+
+    const result = await pool.query(query, [userId]);
+
+    // Format appointments for frontend
+    const appointments = result.rows.map(row => ({
+      id: row.id,
+      supportWorker: `${row.support_worker_first_name} ${row.support_worker_last_name}`,
+      supportWorkerId: row.support_worker_id,
+      date: row.appointment_date,
+      time: row.appointment_time,
+      duration: row.duration_minutes,
+      type: row.session_type,
+      status: row.status,
+      meetingLink: row.meeting_link,
+      notes: row.notes,
+      specialization: row.specialization,
+      avatarUrl: row.avatar_url,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+
+    res.json({
+      success: true,
+      appointments: appointments,
+      count: appointments.length
+    });
+
+  } catch (error: any) {
+    console.error("Error fetching appointments:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch appointments",
+      details: error.message,
+>>>>>>> backend/appointments
     });
   }
 });
 
+<<<<<<< HEAD
 app.post('/api/help-sections/:sectionId/view', async (req, res) => {
   try {
     const { sectionId } = req.params;
@@ -4173,10 +4318,147 @@ app.post('/api/users/:clerkUserId/logout', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to update logout timestamp',
       details: error instanceof Error ? error.message : 'Unknown error'
+=======
+// Create a new appointment
+app.post("/api/appointments", async (req: Request, res: Response) => {
+  try {
+    const {
+      clerkUserId,
+      supportWorkerId,
+      appointmentDate,
+      appointmentTime,
+      sessionType,
+      notes,
+      duration = 60
+    } = req.body;
+
+    // Validate required fields
+    if (!clerkUserId || !supportWorkerId || !appointmentDate || !appointmentTime || !sessionType) {
+      return res.status(400).json({ 
+        error: "Missing required fields",
+        required: ["clerkUserId", "supportWorkerId", "appointmentDate", "appointmentTime", "sessionType"]
+      });
+    }
+
+    // Validate session type
+    const validSessionTypes = ['video', 'phone', 'in_person'];
+    if (!validSessionTypes.includes(sessionType.toLowerCase().replace(' ', '_'))) {
+      return res.status(400).json({ 
+        error: "Invalid session type. Must be one of: video, phone, in_person" 
+      });
+    }
+
+    // Get user's internal ID
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Check if support worker exists
+    const supportWorkerCheck = await pool.query(
+      "SELECT id FROM support_workers WHERE id = $1",
+      [supportWorkerId]
+    );
+
+    if (supportWorkerCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Support worker not found" });
+    }
+
+    // Check for time slot conflicts
+    const conflictCheck = await pool.query(
+      `SELECT id FROM appointments 
+       WHERE support_worker_id = $1 
+       AND appointment_date = $2 
+       AND appointment_time = $3 
+       AND status IN ('scheduled', 'confirmed')`,
+      [supportWorkerId, appointmentDate, appointmentTime]
+    );
+
+    if (conflictCheck.rows.length > 0) {
+      return res.status(409).json({ 
+        error: "Time slot already booked",
+        message: "This time slot is not available. Please select another time."
+      });
+    }
+
+    // Generate meeting link for video sessions
+    let meetingLink = null;
+    if (sessionType.toLowerCase() === 'video' || sessionType.toLowerCase() === 'video call') {
+      const randomId = Math.random().toString(36).substring(2, 15);
+      meetingLink = `https://meet.safespace.com/${randomId}`;
+    }
+
+    // Create the appointment
+    const insertQuery = `
+      INSERT INTO appointments (
+        user_id, 
+        support_worker_id, 
+        appointment_date, 
+        appointment_time,
+        duration_minutes,
+        session_type, 
+        status,
+        meeting_link,
+        notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *
+    `;
+
+    const formattedSessionType = sessionType.toLowerCase().replace(' ', '_');
+
+    const result = await pool.query(insertQuery, [
+      userId,
+      supportWorkerId,
+      appointmentDate,
+      appointmentTime,
+      duration,
+      formattedSessionType,
+      'scheduled',
+      meetingLink,
+      notes
+    ]);
+
+    // Get support worker details for response
+    const swResult = await pool.query(
+      "SELECT first_name, last_name, specialization, avatar_url FROM support_workers WHERE id = $1",
+      [supportWorkerId]
+    );
+
+    const appointment = result.rows[0];
+    const supportWorker = swResult.rows[0];
+
+    res.status(201).json({
+      success: true,
+      message: "Appointment booked successfully",
+      appointment: {
+        id: appointment.id,
+        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
+        date: appointment.appointment_date,
+        time: appointment.appointment_time,
+        type: appointment.session_type,
+        status: appointment.status,
+        meetingLink: appointment.meeting_link,
+        notes: appointment.notes
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Error creating appointment:", error.message);
+    res.status(500).json({
+      error: "Failed to create appointment",
+      details: error.message,
+>>>>>>> backend/appointments
     });
   }
 });
 
+<<<<<<< HEAD
 app.post('/api/users/:clerkUserId/login', async (req, res) => {
   try {
     const { clerkUserId } = req.params;
@@ -4215,3 +4497,182 @@ app.post('/api/users/:clerkUserId/login', async (req, res) => {
     });
   }
 });
+=======
+// Reschedule an appointment
+app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { newDate, newTime, reason } = req.body;
+
+    if (!newDate || !newTime) {
+      return res.status(400).json({ 
+        error: "newDate and newTime are required" 
+      });
+    }
+
+    // Check if appointment exists
+    const appointmentCheck = await pool.query(
+      "SELECT * FROM appointments WHERE id = $1",
+      [id]
+    );
+
+    if (appointmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Appointment not found" });
+    }
+
+    const currentAppointment = appointmentCheck.rows[0];
+
+    // Check if appointment can be rescheduled (not completed or cancelled)
+    if (['completed', 'cancelled'].includes(currentAppointment.status)) {
+      return res.status(400).json({ 
+        error: `Cannot reschedule ${currentAppointment.status} appointment` 
+      });
+    }
+
+    // Check for time slot conflicts with the new time
+    const conflictCheck = await pool.query(
+      `SELECT id FROM appointments 
+       WHERE support_worker_id = $1 
+       AND appointment_date = $2 
+       AND appointment_time = $3 
+       AND status IN ('scheduled', 'confirmed')
+       AND id != $4`,
+      [currentAppointment.support_worker_id, newDate, newTime, id]
+    );
+
+    if (conflictCheck.rows.length > 0) {
+      return res.status(409).json({ 
+        error: "Time slot already booked",
+        message: "The new time slot is not available. Please select another time."
+      });
+    }
+
+    // Update the appointment
+    const updateQuery = `
+      UPDATE appointments 
+      SET 
+        appointment_date = $1, 
+        appointment_time = $2,
+        notes = CASE 
+          WHEN notes IS NULL THEN $3
+          ELSE notes || E'\\n\\nRescheduled: ' || $3
+        END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $4
+      RETURNING *
+    `;
+
+    const reschedulingNote = reason || `Rescheduled from ${currentAppointment.appointment_date} at ${currentAppointment.appointment_time}`;
+
+    const result = await pool.query(updateQuery, [
+      newDate,
+      newTime,
+      reschedulingNote,
+      id
+    ]);
+
+    // Get support worker details for response
+    const swResult = await pool.query(
+      "SELECT first_name, last_name FROM support_workers WHERE id = $1",
+      [currentAppointment.support_worker_id]
+    );
+
+    const appointment = result.rows[0];
+    const supportWorker = swResult.rows[0];
+
+    res.json({
+      success: true,
+      message: "Appointment rescheduled successfully",
+      appointment: {
+        id: appointment.id,
+        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
+        date: appointment.appointment_date,
+        time: appointment.appointment_time,
+        type: appointment.session_type,
+        status: appointment.status,
+        notes: appointment.notes
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Error rescheduling appointment:", error.message);
+    res.status(500).json({
+      error: "Failed to reschedule appointment",
+      details: error.message,
+    });
+  }
+});
+
+// Cancel an appointment
+app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { cancellationReason } = req.body;
+
+    // Check if appointment exists
+    const appointmentCheck = await pool.query(
+      "SELECT * FROM appointments WHERE id = $1",
+      [id]
+    );
+
+    if (appointmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Appointment not found" });
+    }
+
+    const currentAppointment = appointmentCheck.rows[0];
+
+    // Check if appointment can be cancelled
+    if (['completed', 'cancelled'].includes(currentAppointment.status)) {
+      return res.status(400).json({ 
+        error: `Cannot cancel ${currentAppointment.status} appointment` 
+      });
+    }
+
+    // Update the appointment status to cancelled
+    const updateQuery = `
+      UPDATE appointments 
+      SET 
+        status = 'cancelled',
+        cancellation_reason = $1,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING *
+    `;
+
+    const result = await pool.query(updateQuery, [
+      cancellationReason || 'Cancelled by user',
+      id
+    ]);
+
+    const appointment = result.rows[0];
+
+    res.json({
+      success: true,
+      message: "Appointment cancelled successfully",
+      appointment: {
+        id: appointment.id,
+        status: appointment.status,
+        cancellationReason: appointment.cancellation_reason,
+        cancelledAt: appointment.updated_at
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Error cancelling appointment:", error.message);
+    res.status(500).json({
+      error: "Failed to cancel appointment",
+      details: error.message,
+    });
+  }
+});
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`SafeSpace API server running on http://localhost:${PORT}`);
+  console.log(`API documentation: http://localhost:${PORT}/`);
+  console.log('Press Ctrl+C to stop the server');
+});
+
+
+
+>>>>>>> backend/appointments
