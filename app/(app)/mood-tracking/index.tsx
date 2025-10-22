@@ -197,7 +197,7 @@ const MoodTrackingScreen = () => {
           ]}
         >
           <Text style={styles.emoji}>{mood.emoji}</Text>
-          <Text style={[styles.emojiLabel, { color: "#000" }]}>
+          <Text style={[styles.emojiLabel, { color: theme.colors.text }]}>
             {mood.label}
           </Text>
         </Animated.View>
@@ -219,8 +219,10 @@ const MoodTrackingScreen = () => {
         >
           {/* Mood selection section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>How are you feeling?</Text>
-            <Text style={styles.sectionSubtitle}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              How are you feeling?
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
               Tap an emoji to log your mood
             </Text>
 
@@ -237,21 +239,34 @@ const MoodTrackingScreen = () => {
           {/* Recent moods section - Limited to 5 entries */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Moods</Text>
-              <Text style={styles.entriesCount}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                Recent Moods
+              </Text>
+              <Text style={[styles.entriesCount, { color: theme.colors.textSecondary }]}>
                 {recentEntries.length}/5 entries
               </Text>
             </View>
 
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={Colors.primary} />
-                <Text style={styles.loadingText}>Loading your moods...</Text>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+                  Loading your moods...
+                </Text>
               </View>
             ) : recentEntries.length > 0 ? (
               <View style={styles.recentMoodsContainer}>
                 {recentEntries.slice(0, 5).map((entry, index) => ( // Ensure max 5 entries
-                  <View key={entry.id || index} style={styles.moodCard}>
+                  <View 
+                    key={entry.id || index} 
+                    style={[
+                      styles.moodCard,
+                      { 
+                        backgroundColor: theme.colors.surface,
+                        shadowColor: theme.isDark ? "#000" : "#000",
+                      }
+                    ]}
+                  >
                     <Text
                       style={[
                         styles.moodCardEmoji,
@@ -264,8 +279,10 @@ const MoodTrackingScreen = () => {
                       {entry.mood_emoji}
                     </Text>
                     <View style={styles.moodCardContent}>
-                      <Text style={styles.moodCardTitle}>{entry.mood_label}</Text>
-                      <Text style={styles.moodCardDate}>
+                      <Text style={[styles.moodCardTitle, { color: theme.colors.text }]}>
+                        {entry.mood_label}
+                      </Text>
+                      <Text style={[styles.moodCardDate, { color: theme.colors.textSecondary }]}>
                         {new Date(entry.created_at).toLocaleString("en-US", {
                           month: "short",
                           day: "numeric",
@@ -278,10 +295,16 @@ const MoodTrackingScreen = () => {
                 ))}
               </View>
             ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="happy-outline" size={48} color="#CCC" />
-                <Text style={styles.emptyStateText}>No recent entries</Text>
-                <Text style={styles.emptyStateSubtext}>
+              <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
+                <Ionicons 
+                  name="happy-outline" 
+                  size={48} 
+                  color={theme.colors.textSecondary} 
+                />
+                <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
+                  No recent entries
+                </Text>
+                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
                   Start tracking your mood by selecting an emoji above
                 </Text>
               </View>
@@ -290,11 +313,19 @@ const MoodTrackingScreen = () => {
 
           {/* Navigation to view full mood history */}
           <TouchableOpacity
-            style={styles.historyLink}
+            style={[
+              styles.historyLink,
+              { 
+                backgroundColor: theme.colors.surface,
+                shadowColor: theme.isDark ? "#000" : "#000",
+              }
+            ]}
             onPress={() => router.push("../mood-tracking/mood-history")}
           >
-            <Text style={styles.historyLinkText}>View Mood History</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.primary} />
+            <Text style={[styles.historyLinkText, { color: theme.colors.primary }]}>
+              View Mood History
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
           </TouchableOpacity>
 
           {/* Extra bottom padding for better scrolling */}
@@ -341,12 +372,10 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     ...Typography.body,
-    color: Colors.textSecondary,
     marginBottom: Spacing.lg,
   },
   entriesCount: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     fontSize: 12,
   },
   moodGrid: {
@@ -371,7 +400,6 @@ const styles = StyleSheet.create({
   emojiLabel: {
     ...Typography.caption,
     fontWeight: "500",
-    color: "#000",
   },
   loadingContainer: {
     padding: Spacing.lg,
@@ -380,20 +408,17 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: Spacing.sm,
   },
   recentMoodsContainer: {
     // Container for recent moods cards
   },
   moodCard: {
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
@@ -413,10 +438,8 @@ const styles = StyleSheet.create({
   },
   moodCardDate: {
     ...Typography.caption,
-    color: Colors.textSecondary,
   },
   emptyState: {
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.xl,
     alignItems: "center",
@@ -424,13 +447,11 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     ...Typography.body,
-    color: Colors.textSecondary,
     marginTop: Spacing.md,
     fontWeight: "500",
   },
   emptyStateSubtext: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: Spacing.xs,
     textAlign: "center",
   },
@@ -441,9 +462,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
-    backgroundColor: Colors.surface,
     borderRadius: 12,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
@@ -452,7 +471,6 @@ const styles = StyleSheet.create({
   historyLinkText: {
     ...Typography.body,
     fontWeight: "500",
-    color: Colors.primary,
   },
   bottomPadding: {
     height: 140, 
