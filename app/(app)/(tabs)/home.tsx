@@ -153,8 +153,16 @@ const fetchProfileImage = useCallback(async () => {
     const savedImage = await AsyncStorage.getItem('profileImage');
     if (savedImage) {
       console.log('📸 Found profile image in AsyncStorage');
-      setProfileImage(savedImage);
-      return;
+      
+      // ✅ FIX: If it's base64 (starts with data:image), it's too large - remove it
+      if (savedImage.startsWith('data:image')) {
+        console.warn("⚠️ Removing large base64 image from AsyncStorage to prevent OOM");
+        await AsyncStorage.removeItem("profileImage");
+        // Fall through to use Clerk image
+      } else {
+        setProfileImage(savedImage);
+        return;
+      }
     }
 
     // Priority 2: Check profileData in AsyncStorage

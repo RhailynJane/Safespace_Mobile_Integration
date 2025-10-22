@@ -2609,7 +2609,17 @@ app.get(
       const page = typeof pageStr === "string" ? pageStr : "1";
       const limit = typeof limitStr === "string" ? limitStr : "50";
 
-      // console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
+      console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
+
+      // Validate conversationId is a valid number
+      const conversationIdNum = Number.parseInt(conversationId);
+      if (Number.isNaN(conversationIdNum)) {
+        console.error(`💬 Invalid conversation ID: "${conversationId}"`);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid conversation ID",
+        });
+      }
 
       const pageNum = Number.parseInt(page) || 1;
       const limitNum = Number.parseInt(limit) || 50;
@@ -2618,7 +2628,7 @@ app.get(
       // Verify user is participant
       const participant = await prisma.conversationParticipant.findFirst({
         where: {
-          conversation_id: Number.parseInt(conversationId),
+          conversation_id: conversationIdNum,
           user: {
             clerk_user_id: clerkUserId as string
           }
@@ -2636,7 +2646,7 @@ app.get(
       // Get messages
       const messages = await prisma.message.findMany({
         where: {
-          conversation_id: Number.parseInt(conversationId)
+          conversation_id: conversationIdNum
         },
         include: {
           sender: {
@@ -2684,11 +2694,14 @@ app.get(
           hasMore: messages.length === limitNum,
         },
       });
-  } catch (error) {
-    console.error("Get messages error:", error);
+  } catch (error: any) {
+    console.error("💬 Get messages error:", error);
+    console.error("💬 Error stack:", error.stack);
+    console.error("💬 Error message:", error.message);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch messages"
+      message: "Failed to fetch messages",
+      error: error.message
     });
   }
 });
@@ -2877,6 +2890,8 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       });
     }
 
+    let isExistingConversation = false;
+
     const result = await prisma.$transaction(async (tx) => {
       // Get creator user
       const creator = await tx.user.findUnique({
@@ -2898,6 +2913,39 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
 
       if (participants.length < 2) {
         throw new Error("At least one other valid participant is required");
+      }
+
+      // Check if a direct conversation already exists between these users
+      if (conversationType === "direct" && participants.length === 2) {
+        const participantUserIds = participants.map(p => p.id);
+        
+        // Find existing conversation with exactly these participants
+        const existingConversation = await tx.conversation.findFirst({
+          where: {
+            conversation_type: "direct",
+            AND: participantUserIds.map(userId => ({
+              participants: {
+                some: {
+                  user_id: userId
+                }
+              }
+            })),
+            participants: {
+              // Ensure exactly 2 participants (no more, no less)
+              none: {
+                user_id: {
+                  notIn: participantUserIds
+                }
+              }
+            }
+          }
+        });
+
+        if (existingConversation) {
+          console.log(`💬 Found existing conversation ${existingConversation.id}, returning it`);
+          isExistingConversation = true;
+          return existingConversation;
+        }
       }
 
       // Generate conversation title if not provided
@@ -2929,13 +2977,14 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      message: "Conversation created successfully",
+      message: isExistingConversation ? "Existing conversation found" : "Conversation created successfully",
       data: {
         id: result.id.toString(),
         title: result.title,
         conversation_type: result.conversation_type,
         created_at: result.created_at.toISOString(),
-        updated_at: result.updated_at.toISOString()
+        updated_at: result.updated_at.toISOString(),
+        isExisting: isExistingConversation
       },
     });
   } catch (error: any) {
@@ -2962,7 +3011,7 @@ app.get(
           clerk_user_id: {
             not: clerkUserId
           },
-          // Note: Filtering by status removed to avoid enum/text mismatch in DB
+          status: 'active'
         },
         select: {
           id: true,
@@ -3058,7 +3107,7 @@ app.get(
       // Exact match by email when the query looks like an email
       const whereClause: any = {
         clerk_user_id: { not: clerkUserId },
-        // Note: Filtering by status removed to avoid enum/text mismatch in DB
+        status: 'active',
       };
 
       if (isEmailQuery) {

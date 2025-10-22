@@ -93,7 +93,11 @@ export default function MessagesScreen() {
   useFocusEffect(
     useCallback(() => {
       console.log("💬 MessagesScreen focused, refreshing conversations");
-      loadConversations();
+      console.log("💬 Current userId:", userId);
+      console.log("💬 Current conversations count:", conversations.length);
+      if (userId) {
+        loadConversations();
+      }
     }, [userId])
   );
 
@@ -146,13 +150,15 @@ export default function MessagesScreen() {
       setLoading(true);
       console.log(`💬 Loading conversations for user: ${userId}`);
 
+      // Add timestamp to prevent caching
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${userId}`
+        `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
       );
 
       if (response.ok) {
         const result = await response.json();
         console.log(`💬 Setting ${result.data.length} conversations`);
+        console.log(`💬 Conversation data:`, JSON.stringify(result.data, null, 2));
         let convs: Conversation[] = result.data;
 
         // After conversations load, refresh presence using batch status for other participants
@@ -542,6 +548,7 @@ export default function MessagesScreen() {
                         initialOnline: other?.online ? "1" : "0",
                         initialLastActive: other?.last_active_at || "",
                         otherClerkId: other?.clerk_user_id || "",
+                        profileImageUrl: other?.profile_image_url || "",
                       },
                     });
                   }}

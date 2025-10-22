@@ -82,6 +82,7 @@ export default function ChatScreen() {
   const initialOnlineParam = (params.initialOnline as string) || "";
   const initialLastActiveParam = (params.initialLastActive as string) || "";
   const otherClerkIdParam = (params.otherClerkId as string) || "";
+  const profileImageUrlParam = (params.profileImageUrl as string) || "";
   const API_BASE_URL =
     process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -184,45 +185,53 @@ export default function ChatScreen() {
     }
 
     try {
-      // Update user's activity
-      await updateUserActivity();
+      console.log(`💬 [${Date.now()}] Loading messages for conversation ${conversationId}`);
 
-      // console.log(
-      //   `💬 Loading messages for conversation ${conversationId}, user ${userId}`
-      // );
+      // Start all non-blocking operations in parallel
+      const startTime = Date.now();
+      
+      // Fire and forget: update activity in background (don't await)
+      updateUserActivity().catch(() => {});
 
-      // Use direct backend API instead of messagingService
+      // Load messages (this is the critical path) - limit to 30 to reduce memory usage
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=50`
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=30`
       );
 
       if (response.ok) {
         const result = await response.json();
-        // console.log(`💬 Loaded ${result.data.length} messages`);
+        const loadTime = Date.now() - startTime;
+        console.log(`💬 [${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
         setMessages(result.data);
 
-      // If SendBird is enabled and we have a channel URL, mark messages as read once
-      try {
-        if (!didMarkReadRef.current && channelUrl && messagingService.isSendBirdEnabled()) {
-          await messagingService.markAsRead(channelUrl);
-          didMarkReadRef.current = true;
-        }
-      } catch (_e) {
-        // ignore SB errors
-      }
-
-        // Also mark as read in backend so unread counts persist correctly
-        try {
-          if (userId && conversationId) {
-            await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ clerkUserId: userId })
-            });
-          }
-        } catch (_e) {
-          // ignore transient errors
-        }
+        // Fire and forget: mark as read in background (don't block UI)
+        Promise.all([
+          // SendBird mark as read
+          (async () => {
+            try {
+              if (!didMarkReadRef.current && channelUrl && messagingService.isSendBirdEnabled()) {
+                await messagingService.markAsRead(channelUrl);
+                didMarkReadRef.current = true;
+              }
+            } catch (_e) {
+              // ignore SB errors
+            }
+          })(),
+          // Backend mark as read
+          (async () => {
+            try {
+              if (userId && conversationId) {
+                await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ clerkUserId: userId })
+                });
+              }
+            } catch (_e) {
+              // ignore transient errors
+            }
+          })()
+        ]).catch(() => {}); // Don't block on mark-read failures
 
         // Initialize contact from route params if not already set
         if (!contact && otherClerkIdParam) {
@@ -232,7 +241,7 @@ export default function ChatScreen() {
             first_name: conversationTitle?.split(" ")[0] || "User",
             last_name: conversationTitle?.split(" ").slice(1).join(" ") || "",
             email: "",
-            profile_image_url: undefined,
+            profile_image_url: profileImageUrlParam || undefined,
             online: initialOnlineParam === "0" ? false : true,
             last_active_at: initialLastActiveParam || null,
           };
@@ -253,12 +262,13 @@ export default function ChatScreen() {
     userId,
     conversationTitle,
     API_BASE_URL,
-    contact,
-    updateUserActivity,
     channelUrl,
     initialOnlineParam,
     initialLastActiveParam,
     otherClerkIdParam,
+    profileImageUrlParam,
+    contact,
+    updateUserActivity,
   ]);
 
   // Load messages with 60-second polling
@@ -295,11 +305,16 @@ export default function ChatScreen() {
       }
     };
 
-    updateOnlineStatus();
-    const statusInterval = setInterval(updateOnlineStatus, 10000); // Check every 10 seconds
+    // Delay initial status check by 2 seconds to not block initial render
+    const initialTimeout = setTimeout(updateOnlineStatus, 2000);
+    const statusInterval = setInterval(updateOnlineStatus, 15000); // Check every 15 seconds (reduced from 10)
 
-    return () => clearInterval(statusInterval);
-  }, [contact, isOnline]);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(statusInterval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact?.clerk_user_id]); // Only re-run if clerk_user_id changes (not isOnline to avoid loops)
 
   useEffect(() => {
     // Only auto-scroll if user is near bottom or last message is mine
@@ -719,6 +734,9 @@ export default function ChatScreen() {
             source={{ uri: message.attachment_url }}
             style={styles.attachmentImage}
             resizeMode="cover"
+            onError={(error) => {
+              console.log("Failed to load attachment image:", error.nativeEvent.error);
+            }}
           />
           <View style={styles.imageOverlay}>
             <Ionicons name="expand" size={20} color="#FFFFFF" />
@@ -914,10 +932,23 @@ export default function ChatScreen() {
               </TouchableOpacity>
 
               <View style={styles.contactInfo}>
-                <View style={styles.headerAvatar}>
-                  <Text style={styles.headerAvatarText}>
-                    {getUserInitials(contact?.first_name, contact?.last_name)}
-                  </Text>
+                <View style={{ position: 'relative' }}>
+                  {contact?.profile_image_url ? (
+                    <Image
+                      source={{ uri: contact.profile_image_url }}
+                      style={styles.headerAvatar}
+                      resizeMode="cover"
+                      onError={(error) => {
+                        console.log("Failed to load header profile image:", error.nativeEvent.error);
+                      }}
+                    />
+                  ) : (
+                    <View style={styles.headerAvatar}>
+                      <Text style={styles.headerAvatarText}>
+                        {getUserInitials(contact?.first_name, contact?.last_name)}
+                      </Text>
+                    </View>
+                  )}
                   {/* Online/Offline indicator in header */}
                   <View
                     style={[
@@ -1012,14 +1043,25 @@ export default function ChatScreen() {
                     {/* Other user's avatar */}
                     {!myMessage && (
                       <View style={styles.avatarContainer}>
-                        <View style={styles.avatar}>
-                          <Text style={styles.avatarText}>
-                            {getUserInitials(
-                              message.sender.first_name,
-                              message.sender.last_name
-                            )}
-                          </Text>
-                        </View>
+                        {message.sender.profile_image_url ? (
+                          <Image
+                            source={{ uri: message.sender.profile_image_url }}
+                            style={styles.avatar}
+                            resizeMode="cover"
+                            onError={(error) => {
+                              console.log("Failed to load sender avatar:", error.nativeEvent.error);
+                            }}
+                          />
+                        ) : (
+                          <View style={styles.avatar}>
+                            <Text style={styles.avatarText}>
+                              {getUserInitials(
+                                message.sender.first_name,
+                                message.sender.last_name
+                              )}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     )}
 
@@ -1046,14 +1088,25 @@ export default function ChatScreen() {
                     {/* My avatar */}
                     {myMessage && (
                       <View style={styles.avatarContainer}>
-                        <View style={[styles.avatar, styles.myAvatar]}>
-                          <Text style={styles.avatarText}>
-                            {getUserInitials(
-                              message.sender.first_name,
-                              message.sender.last_name
-                            )}
-                          </Text>
-                        </View>
+                        {message.sender.profile_image_url ? (
+                          <Image
+                            source={{ uri: message.sender.profile_image_url }}
+                            style={[styles.avatar, styles.myAvatar]}
+                            resizeMode="cover"
+                            onError={(error) => {
+                              console.log("Failed to load my avatar:", error.nativeEvent.error);
+                            }}
+                          />
+                        ) : (
+                          <View style={[styles.avatar, styles.myAvatar]}>
+                            <Text style={styles.avatarText}>
+                              {getUserInitials(
+                                message.sender.first_name,
+                                message.sender.last_name
+                              )}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>
@@ -1184,6 +1237,10 @@ export default function ChatScreen() {
                     source={{ uri: currentAttachment.attachment_url }}
                     style={styles.fullSizeImage}
                     resizeMode="contain"
+                    onError={(error) => {
+                      console.log("Failed to load full-size image:", error.nativeEvent.error);
+                      Alert.alert("Error", "Failed to load image");
+                    }}
                   />
                 )}
               </ScrollView>

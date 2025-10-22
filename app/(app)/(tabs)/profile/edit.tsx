@@ -673,12 +673,13 @@ export default function EditProfileScreen() {
         const imageUri = result.assets[0].uri;
 
         try {
-          // Upload image to backend (now stored as base64 in database)
-          const base64ImageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
+          // Upload image to backend (returns URL, not base64)
+          const imageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
           
-          // Save to local storage for immediate display and offline access
-          await AsyncStorage.setItem("profileImage", base64ImageUrl);
-          setProfileImage(base64ImageUrl);
+          // ✅ FIX: Store URL instead of base64 to prevent memory issues
+          // Base64 images can be 66MB+ causing OOM errors
+          await AsyncStorage.setItem("profileImage", imageUrl);
+          setProfileImage(imageUrl);
 
           setSuccessMessage("Profile picture updated!");
           setShowSuccessModal(true);

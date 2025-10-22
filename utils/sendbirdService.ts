@@ -70,6 +70,7 @@ export interface Contact {
   role: string;
   online: boolean;
   has_existing_conversation: boolean;
+  last_active_at?: string | null;
   city?: string;
   state?: string;
 }
@@ -502,36 +503,9 @@ class MessagingService {
       title?: string;
     }
   ): Promise<{ success: boolean; data: any }> {
-    if (!this.sendbirdInitialized) {
-      return this.createConversationInBackend(userId, data);
-    }
-
-    try {
-      // Include current user in participants
-      const allUserIds = [userId, ...data.participantIds];
-
-      const result = await this.sendbirdService.createGroupChannel(
-        allUserIds,
-        data.title,
-        data.conversationType === "direct"
-      );
-
-      if (result.success && result.data) {
-        return {
-          success: true,
-          data: {
-            id: result.data.channel_url,
-            channel_url: result.data.channel_url,
-            title: result.data.name,
-          },
-        };
-      }
-
-      throw new Error("Failed to create conversation via SendBird");
-    } catch (error) {
-      console.log("Create conversation via SendBird failed, using backend");
-      return this.createConversationInBackend(userId, data);
-    }
+    // Always use backend for conversation creation to ensure we get a database ID
+    // that works with all our endpoints. SendBird integration is optional.
+    return this.createConversationInBackend(userId, data);
   }
 
   // Backend fallback methods

@@ -285,8 +285,26 @@ export default function NewMessagesScreen() {
         setSearchQuery("");
         setSearchResults([]);
         
-        // Navigate to the new chat
-        router.push(`../messages/message-chat-screen?id=${result.data.id}&title=${encodeURIComponent(contact.first_name + ' ' + contact.last_name)}`);
+        console.log("📝 Created conversation result:", result.data);
+        
+        // Navigate to the new chat with all required parameters
+        const fullName = `${contact.first_name} ${contact.last_name}`.trim();
+        const online = contact.online ? "1" : "0";
+        const conversationId = result.data.id || result.data;
+        
+        console.log("🔗 Navigating to chat with ID:", conversationId);
+        
+        router.push({
+          pathname: `../messages/message-chat-screen`,
+          params: {
+            id: conversationId,
+            title: fullName,
+            otherClerkId: contact.clerk_user_id,
+            initialOnline: online,
+            initialLastActive: contact.last_active_at || "",
+            profileImageUrl: contact.profile_image_url || "",
+          }
+        });
         
         // Refresh conversations
         initializeMessaging();
@@ -467,13 +485,24 @@ export default function NewMessagesScreen() {
               const avatar = getAvatarDisplay(conversation.participants || []);
               const displayName = getDisplayName(conversation);
               const isOnline = isOtherParticipantOnline(conversation.participants || []);
+              const otherParticipant = (conversation.participants || []).find((p: any) => p.clerk_user_id !== userId);
 
               return (
                 <TouchableOpacity
                   key={conversation.id}
                   style={[styles.contactItem, { borderBottomColor: theme.colors.borderLight }]}
                   onPress={() =>
-                    router.push(`../messages/message-chat-screen?id=${conversation.id}&title=${encodeURIComponent(displayName)}`)
+                    router.push({
+                      pathname: `../messages/message-chat-screen`,
+                      params: {
+                        id: conversation.id,
+                        title: displayName,
+                        otherClerkId: otherParticipant?.clerk_user_id || "",
+                        initialOnline: isOnline ? "1" : "0",
+                        initialLastActive: otherParticipant?.last_active_at || "",
+                        profileImageUrl: otherParticipant?.profile_image_url || "",
+                      }
+                    })
                   }
                 >
                   <View style={styles.avatarContainer}>
