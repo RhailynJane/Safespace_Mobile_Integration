@@ -27,8 +27,8 @@ export default function AppLayout() {
     // Send initial heartbeat
     sendHeartbeat();
 
-    // Send heartbeat every 15 seconds to keep user online
-    const heartbeatInterval = setInterval(sendHeartbeat, 15000);
+    // Send heartbeat every 20 seconds to keep user online
+    const heartbeatInterval = setInterval(sendHeartbeat, 20000);
 
     // Handle app state changes (foreground/background)
     const subscription = AppState.addEventListener('change', (nextAppState) => {

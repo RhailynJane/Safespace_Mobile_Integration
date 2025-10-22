@@ -2570,6 +2570,13 @@ app.get(
         })
       );
 
+      console.log(`💬 Returning ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
+      conversationsWithOnlineStatus.forEach(c => {
+        if (c.unread_count > 0) {
+          console.log(`  📬 Conversation ${c.id}: ${c.unread_count} unread messages`);
+        }
+      });
+
       // console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
 
       res.json({
@@ -2784,6 +2791,69 @@ app.post(
         message: "Failed to send message",
         error: error.message,
       });
+    }
+  }
+);
+
+// Mark all messages in a conversation as read for the current user
+app.post(
+  "/api/messages/conversations/:conversationId/mark-read",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId } = req.body as { clerkUserId?: string };
+
+      if (!clerkUserId) {
+        return res.status(400).json({ success: false, message: "clerkUserId is required" });
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        // Find user
+        const user = await tx.user.findUnique({ where: { clerk_user_id: clerkUserId } });
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        // Verify user is a participant in this conversation
+        const participant = await tx.conversationParticipant.findFirst({
+          where: {
+            conversation_id: Number.parseInt(conversationId),
+            user_id: user.id,
+          },
+        });
+        if (!participant) {
+          throw new Error("Access denied to this conversation");
+        }
+
+        // Get IDs of messages in this conversation that were sent by others and are not yet marked as read by this user
+        const messagesToMark = await tx.message.findMany({
+          where: {
+            conversation_id: Number.parseInt(conversationId),
+            sender_id: { not: user.id },
+            read_status: { none: { user_id: user.id } },
+          },
+          select: { id: true },
+        });
+
+        if (messagesToMark.length === 0) {
+          return { created: 0 };
+        }
+
+        // Create read status entries, skipping duplicates just in case
+        const createRes = await tx.messageReadStatus.createMany({
+          data: messagesToMark.map((m) => ({ message_id: m.id, user_id: user.id })),
+          skipDuplicates: true,
+        });
+
+        return { created: createRes.count };
+      });
+
+      res.json({ success: true, message: "Messages marked as read", data: result });
+    } catch (error: any) {
+      console.error("💬 Mark-read error:", error.message || error);
+      const msg = error instanceof Error ? error.message : "Failed to mark messages as read";
+      const status = msg.includes("Access denied") ? 403 : msg.includes("User not found") ? 404 : 500;
+      res.status(status).json({ success: false, message: msg });
     }
   }
 );

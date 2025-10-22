@@ -29,7 +29,6 @@ import activityApi from "../../../../utils/activityApi";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { useRef } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
@@ -42,7 +41,7 @@ export default function MessagesScreen() {
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [sendbirdStatus, setSendbirdStatus] =
     useState<string>("Initializing...");
-  const openedConversationIdsRef = useRef<Set<string>>(new Set());
+  // Removed session-based unread suppression; rely on backend read receipts instead
   const API_BASE_URL =
     process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -87,22 +86,9 @@ export default function MessagesScreen() {
     initializeMessaging();
   }, [initializeMessaging]);
 
-  // Load opened conversation ids from storage to keep unread cleared across refreshes
-  useEffect(() => {
-    if (!userId) return;
-    const key = `openedConversations:${userId}`;
-    (async () => {
-      try {
-        const val = await AsyncStorage.getItem(key);
-        if (val) {
-          const arr: string[] = JSON.parse(val);
-          openedConversationIdsRef.current = new Set(arr);
-        }
-      } catch (_e) {
-        // ignore
-      }
-    })();
-  }, [userId]);
+  // Track opened conversations in current session only (no persistence)
+  // This clears unread counts when user taps a conversation during this session
+  // but allows unread counts to show again after app restart
 
   useFocusEffect(
     useCallback(() => {
@@ -168,14 +154,6 @@ export default function MessagesScreen() {
         const result = await response.json();
         console.log(`💬 Setting ${result.data.length} conversations`);
         let convs: Conversation[] = result.data;
-
-        // Keep unread cleared for conversations the user already opened in this session
-        const opened = openedConversationIdsRef.current;
-        if (opened.size > 0) {
-          convs = convs.map((c) =>
-            opened.has(c.id) ? { ...c, unread_count: 0 } : c
-          );
-        }
 
         // After conversations load, refresh presence using batch status for other participants
         try {
@@ -276,6 +254,7 @@ export default function MessagesScreen() {
     
     const pollMessages = async () => {
       try {
+        console.log('📬 Polling for new messages...');
         const response = await fetch(
           `${API_BASE_URL}/api/messages/conversations/${userId}`
         );
@@ -284,13 +263,9 @@ export default function MessagesScreen() {
           const result = await response.json();
           let freshConvs: Conversation[] = result.data;
           
-          // Keep unread cleared for conversations the user has open
-          const opened = openedConversationIdsRef.current;
-          if (opened.size > 0) {
-            freshConvs = freshConvs.map((c) =>
-              opened.has(c.id) ? { ...c, unread_count: 0 } : c
-            );
-          }
+          console.log(`📬 Polled ${freshConvs.length} conversations, unread counts:`, 
+            freshConvs.map(c => ({ id: c.id, unread: c.unread_count }))
+          );
           
           // Update conversations with fresh unread counts
           setConversations(freshConvs);
@@ -309,7 +284,7 @@ export default function MessagesScreen() {
           });
         }
       } catch (e) {
-        console.log('Error polling messages:', e);
+        console.log('❌ Error polling messages:', e);
       }
     };
     
@@ -530,7 +505,9 @@ export default function MessagesScreen() {
                 )}
               </View>
             ) : (
-              filteredConversations.map((conversation) => (
+              filteredConversations.map((conversation) => {
+                console.log(`🔍 Rendering conversation ${conversation.id}: unread=${conversation.unread_count}, title="${getDisplayName(conversation)}"`);
+                return (
                 <TouchableOpacity
                   key={conversation.id}
                   style={[styles.conversationItem, { borderBottomColor: theme.colors.borderLight }]}
@@ -539,23 +516,18 @@ export default function MessagesScreen() {
                       Alert.alert("Error", "Please sign in to view messages");
                       return;
                     }
-                    // Optimistically clear unread count for this conversation
-                    setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
-                    setFilteredConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
-                    // Track opened conversation locally to keep unread cleared
-                    openedConversationIdsRef.current.add(conversation.id);
-                    // Persist opened conversations so they stay cleared after refresh
+                    // Persistently clear unread via backend mark-read endpoint, and optimistically update UI
                     (async () => {
                       try {
-                        if (userId) {
-                          const key = `openedConversations:${userId}`;
-                          await AsyncStorage.setItem(
-                            key,
-                            JSON.stringify(Array.from(openedConversationIdsRef.current))
-                          );
-                        }
-                      } catch (_e) { /* ignore */ }
+                        await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}/mark-read`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ clerkUserId: userId })
+                        });
+                      } catch (_e) { /* ignore transient errors */ }
                     })();
+                    setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+                    setFilteredConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
 
                     // Determine other participant to pass initial presence
                     const otherParticipants = conversation.participants.filter((p) => p.clerk_user_id !== userId);
@@ -657,7 +629,8 @@ export default function MessagesScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
-              ))
+              );
+              })
             )}
           </ScrollView>
         </View>

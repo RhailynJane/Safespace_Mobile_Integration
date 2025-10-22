@@ -211,6 +211,19 @@ export default function ChatScreen() {
         // ignore SB errors
       }
 
+        // Also mark as read in backend so unread counts persist correctly
+        try {
+          if (userId && conversationId) {
+            await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ clerkUserId: userId })
+            });
+          }
+        } catch (_e) {
+          // ignore transient errors
+        }
+
         // Initialize contact from route params if not already set
         if (!contact && otherClerkIdParam) {
           const fallbackContact = {
