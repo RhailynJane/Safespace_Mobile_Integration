@@ -1,5 +1,6 @@
 // utils/sendbirdService.ts
 import { Platform } from "react-native";
+import activityApi from "./activityApi";
 
 const getApiBaseUrl = (): string => {
   if (process.env.EXPO_PUBLIC_API_URL) {
@@ -531,6 +532,7 @@ class MessagingService {
   private async getConversationsFromBackend(
     userId: string
   ): Promise<{ success: boolean; data: Conversation[] }> {
+    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations/${userId}`
@@ -546,7 +548,7 @@ class MessagingService {
     }
   }
 
-private async getMessagesFromBackend(
+  private async getMessagesFromBackend(
   conversationId: string,
   userId: string,
   page = 1
@@ -555,6 +557,7 @@ private async getMessagesFromBackend(
   data: Message[];
   pagination: { page: number; limit: number; hasMore: boolean };
 }> {
+  try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
   try {
     console.log(`📨 Getting messages from backend for conversation ${conversationId}`);
     
@@ -599,6 +602,7 @@ private async getMessagesFromBackend(
       messageType?: MessageType;
     }
   ): Promise<{ success: boolean; data: Message }> {
+    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
@@ -634,6 +638,7 @@ private async getMessagesFromBackend(
       title?: string;
     }
   ): Promise<{ success: boolean; data: any }> {
+    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations`,
@@ -665,6 +670,7 @@ private async getMessagesFromBackend(
   async getContacts(
     userId: string
   ): Promise<{ success: boolean; data: Contact[] }> {
+    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/contacts/${userId}`

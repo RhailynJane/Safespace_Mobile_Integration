@@ -20,6 +20,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { assessmentTracker } from "../utils/assessmentTracker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
+import activityApi from "../utils/activityApi";
 
 const { width } = Dimensions.get("window");
 
@@ -97,6 +98,16 @@ export const AppHeader = ({
     try {
       setIsSigningOut(true);
       hideSideMenu();
+      
+      // Record logout activity
+      if (user?.id) {
+        try {
+          await activityApi.recordLogout(user.id);
+        } catch (_e) {
+          // Continue with logout even if tracking fails
+        }
+      }
+      
       await AsyncStorage.clear();
       await signOut();
       router.replace("/(auth)/login");

@@ -19,6 +19,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { syncUserWithDatabase } from "../../../../utils/userSync";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import activityApi from "../../../../utils/activityApi";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -230,39 +231,32 @@ export default function ProfileScreen() {
       // Get current user info before signing out
       const clerkUserId = user?.id;
     
-    // Update logout timestamp in database
-    if (clerkUserId) {
-      try {
-        await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        console.log('Logout timestamp updated in database');
-      } catch (dbError) {
-        console.error('Failed to update logout timestamp:', dbError);
-        // Continue with logout even if DB update fails
+      // Record logout activity
+      if (clerkUserId) {
+        try {
+          await activityApi.recordLogout(clerkUserId);
+          console.log('Logout activity recorded');
+        } catch (dbError) {
+          console.error('Failed to record logout activity:', dbError);
+          // Continue with logout even if tracking fails
+        }
       }
+    
+      await AsyncStorage.clear();
+      console.log('AsyncStorage cleared');
+    
+      if (signOut) {
+        await signOut();
+        console.log('Clerk signout successful');
+      }
+    
+      router.navigate("/(auth)/login");
+      console.log('Navigation to login completed');
+    
+    } catch (error) {
+      console.error("Signout error:", error);
+      router.navigate("/(auth)/login");
     }
-    
-    await AsyncStorage.clear();
-    console.log('AsyncStorage cleared');
-    
-    if (signOut) {
-      await signOut();
-      console.log('Clerk signout successful');
-    }
-    
-    router.navigate("/(auth)/login");
-    console.log('Navigation to login completed');
-    
-  } catch (error) {
-    console.error("Signout error:", error);
-    router.navigate("/(auth)/login");
-  }
-
-
   };
 
 

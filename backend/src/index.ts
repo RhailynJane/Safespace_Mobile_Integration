@@ -240,6 +240,169 @@ app.post("/api/users/sync", async (req: Request, res: Response) => {
   }
 });
 
+// =============================================
+// USER ACTIVITY ENDPOINTS (login/logout/heartbeat/status)
+// =============================================
+
+// Record successful login (and set active)
+app.post("/api/users/login-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_login_at = CURRENT_TIMESTAMP,
+           last_login = CURRENT_TIMESTAMP,
+           last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating login activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Record logout
+app.post("/api/users/logout-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_logout_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating logout activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Heartbeat to update last_active_at
+app.post("/api/users/heartbeat", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating heartbeat:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Get single user's online status and timestamps
+app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const result = await pool.query(
+      `SELECT last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
+    const now = new Date();
+    const activeAt = last_active_at ? new Date(last_active_at) : null;
+    const logoutAt = last_logout_at ? new Date(last_logout_at) : null;
+    const onlineWindowMs = 2 * 60 * 1000; // 2 minutes
+    const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
+    const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
+    const online = activeRecently && !loggedOutAfterActive;
+
+    res.json({
+      success: true,
+      data: { online, last_active_at, last_login_at, last_logout_at }
+    });
+  } catch (error: any) {
+    console.error("Error fetching user status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Batch status for multiple users
+app.post("/api/users/status-batch", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserIds } = req.body as { clerkUserIds?: string[] };
+    if (!clerkUserIds || clerkUserIds.length === 0) {
+      return res.status(400).json({ success: false, message: "clerkUserIds[] is required" });
+    }
+
+    const params = clerkUserIds.map((_, i) => `$${i + 1}`).join(",");
+    const result = await pool.query(
+      `SELECT clerk_user_id, last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id IN (${params})`,
+      clerkUserIds
+    );
+
+    const now = new Date();
+    const onlineWindowMs = 2 * 60 * 1000; // 2 minutes
+    const statusMap: Record<string, { online: boolean; last_active_at: string | null; last_login_at: string | null; last_logout_at: string | null; }> = {};
+
+    for (const row of result.rows) {
+      const activeAt = row.last_active_at ? new Date(row.last_active_at) : null;
+      const logoutAt = row.last_logout_at ? new Date(row.last_logout_at) : null;
+      const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
+      const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
+      const online = activeRecently && !loggedOutAfterActive;
+      statusMap[row.clerk_user_id] = {
+        online,
+        last_active_at: row.last_active_at || null,
+        last_login_at: row.last_login_at || null,
+        last_logout_at: row.last_logout_at || null,
+      };
+    }
+
+    res.json({ success: true, data: statusMap });
+  } catch (error: any) {
+    console.error("Error fetching batch status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
 // Create client endpoint
 app.post(
   "/api/clients",

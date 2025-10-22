@@ -24,6 +24,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import activityApi from "../../../../utils/activityApi";
 
 /**
  * ConfirmAppointment Component
@@ -97,6 +98,15 @@ export default function ConfirmAppointment() {
     try {
       setIsSigningOut(true);
       setSideMenuVisible(false);
+
+      // Record logout activity
+      if (user?.id) {
+        try {
+          await activityApi.recordLogout(user.id);
+        } catch (_e) {
+          // Continue with logout even if tracking fails
+        }
+      }
 
       await AsyncStorage.clear();
       if (signOut) {
