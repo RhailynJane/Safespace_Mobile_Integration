@@ -349,13 +349,20 @@ app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) =>
     const activeAt = last_active_at ? new Date(last_active_at) : null;
   const loginAt = last_login_at ? new Date(last_login_at) : null;
     const logoutAt = last_logout_at ? new Date(last_logout_at) : null;
-    const onlineWindowMs = 2 * 60 * 1000; // 2 minutes
+    const onlineWindowMs = 30 * 1000; // 30 seconds for immediate online detection
     const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
-  // Ignore a logout that is at/just after login (grace period 5s) or older than login
-  const graceMs = 5000;
-  const logoutInvalid = logoutAt && loginAt ? (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
+  
+  // Check if user explicitly logged out after their last activity
   const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
-  const online = activeRecently && (!loggedOutAfterActive || logoutInvalid);
+  
+  // Grace period: only ignore logout if it happened within 5s of login AND login is recent
+  const graceMs = 5000;
+  const loginRecent = loginAt ? now.getTime() - loginAt.getTime() <= onlineWindowMs : false;
+  const logoutInGracePeriod = logoutAt && loginAt && loginRecent ? 
+    (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
+  
+  // User is online if: active recently AND (not logged out OR logout is in grace period)
+  const online = activeRecently && (!loggedOutAfterActive || logoutInGracePeriod);
 
     res.json({
       success: true,
@@ -383,7 +390,7 @@ app.post("/api/users/status-batch", async (req: Request, res: Response) => {
     );
 
     const now = new Date();
-    const onlineWindowMs = 2 * 60 * 1000; // 2 minutes
+    const onlineWindowMs = 30 * 1000; // 30 seconds for immediate online detection
     const statusMap: Record<string, { online: boolean; last_active_at: string | null; last_login_at: string | null; last_logout_at: string | null; }> = {};
 
     for (const row of result.rows) {
@@ -391,10 +398,19 @@ app.post("/api/users/status-batch", async (req: Request, res: Response) => {
       const loginAt = row.last_login_at ? new Date(row.last_login_at) : null;
       const logoutAt = row.last_logout_at ? new Date(row.last_logout_at) : null;
       const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
-      const graceMs = 5000;
-      const logoutInvalid = logoutAt && loginAt ? (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
+      
+      // Check if user explicitly logged out after their last activity
       const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
-      const online = activeRecently && (!loggedOutAfterActive || logoutInvalid);
+      
+      // Grace period: only ignore logout if it happened within 5s of login AND login is recent
+      const graceMs = 5000;
+      const loginRecent = loginAt ? now.getTime() - loginAt.getTime() <= onlineWindowMs : false;
+      const logoutInGracePeriod = logoutAt && loginAt && loginRecent ? 
+        (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
+      
+      // User is online if: active recently AND (not logged out OR logout is in grace period)
+      const online = activeRecently && (!loggedOutAfterActive || logoutInGracePeriod);
+      
       statusMap[row.clerk_user_id] = {
         online,
         last_active_at: row.last_active_at || null,

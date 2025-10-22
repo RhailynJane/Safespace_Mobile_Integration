@@ -56,6 +56,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
+import activityApi from "../../../../utils/activityApi";
 import { Paths, File as FSFile } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
@@ -78,6 +79,9 @@ export default function ChatScreen() {
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
   const channelUrl = (params.channelUrl as string) || "";
+  const initialOnlineParam = (params.initialOnline as string) || "";
+  const initialLastActiveParam = (params.initialLastActive as string) || "";
+  const otherClerkIdParam = (params.otherClerkId as string) || "";
   const API_BASE_URL =
     process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -86,7 +90,8 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [contact, setContact] = useState<Participant | null>(null);
-  const [isOnline, setIsOnline] = useState(false);
+  // Optimistic presence: default to online unless explicitly told otherwise by param
+  const [isOnline, setIsOnline] = useState(initialOnlineParam === "0" ? false : true);
   const [attachmentModalVisible, setAttachmentModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -206,43 +211,19 @@ export default function ChatScreen() {
         // ignore SB errors
       }
 
-        // Get conversation details to find the other participant with online status
-        const conversationsResponse = await fetch(
-          `${API_BASE_URL}/api/messages/conversations/${userId}`
-        );
-
-        if (conversationsResponse.ok) {
-          const conversationsResult = await conversationsResponse.json();
-          const currentConversation = conversationsResult.data.find(
-            (conv: any) => conv.id === conversationId
-          );
-
-          if (currentConversation) {
-            const otherParticipant = currentConversation.participants.find(
-              (p: Participant) => p.clerk_user_id !== userId
-            );
-            if (otherParticipant) {
-              setContact(otherParticipant);
-              // Set online status once and persist it
-              setIsOnline(otherParticipant.online || false);
-            }
-          }
-        }
-
-        // Fallback if no contact found
-        if (!contact) {
+        // Initialize contact from route params if not already set
+        if (!contact && otherClerkIdParam) {
           const fallbackContact = {
-            id: "unknown",
-            clerk_user_id: "unknown",
+            id: otherClerkIdParam,
+            clerk_user_id: otherClerkIdParam,
             first_name: conversationTitle?.split(" ")[0] || "User",
             last_name: conversationTitle?.split(" ").slice(1).join(" ") || "",
             email: "",
             profile_image_url: undefined,
-            online: false,
-            last_active_at: null,
+            online: initialOnlineParam === "0" ? false : true,
+            last_active_at: initialLastActiveParam || null,
           };
           setContact(fallbackContact);
-          setIsOnline(false);
         }
       } else {
         console.error("💬 Failed to load messages:", response.status);
@@ -262,6 +243,9 @@ export default function ChatScreen() {
     contact,
     updateUserActivity,
     channelUrl,
+    initialOnlineParam,
+    initialLastActiveParam,
+    otherClerkIdParam,
   ]);
 
   // Load messages with 60-second polling
@@ -280,20 +264,21 @@ export default function ChatScreen() {
 
   // Update online status based on last activity (every 10 seconds)
   useEffect(() => {
-    if (!contact) return;
+    if (!contact || !contact.clerk_user_id || contact.clerk_user_id === "unknown") return;
 
-    const updateOnlineStatus = () => {
-      if (contact.last_active_at) {
-        const lastActive = new Date(contact.last_active_at);
-        const now = new Date();
-        const diffMinutes =
-          (now.getTime() - lastActive.getTime()) / (1000 * 60);
-
-        // Consider online if active in last 3 minutes
-        const shouldBeOnline = diffMinutes <= 3;
-        if (isOnline !== shouldBeOnline) {
-          setIsOnline(shouldBeOnline);
+    const updateOnlineStatus = async () => {
+      try {
+        const status = await activityApi.status(contact.clerk_user_id);
+        if (status) {
+          const newOnline = !!status.online;
+          if (isOnline !== newOnline) {
+            setIsOnline(newOnline);
+          }
+          // Update contact with fresh last_active_at
+          setContact((prev) => prev ? { ...prev, online: newOnline, last_active_at: status.last_active_at } : prev);
         }
+      } catch (e) {
+        // ignore transient errors
       }
     };
 

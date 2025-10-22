@@ -1,12 +1,53 @@
 // app/(app)/_layout.tsx
 import { Stack, Redirect } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, AppState } from "react-native";
+import { useEffect, useRef } from "react";
+import activityApi from "../../utils/activityApi";
 
 export default function AppLayout() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const appState = useRef(AppState.currentState);
 
   console.log('📱 AppLayout - Auth State:', { isLoaded, isSignedIn });
+
+  // Global heartbeat to keep user online while app is active
+  useEffect(() => {
+    if (!isSignedIn || !userId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await activityApi.heartbeat(userId);
+        console.log('💓 Heartbeat sent for user:', userId);
+      } catch (error) {
+        console.error('❌ Heartbeat failed:', error);
+      }
+    };
+
+    // Send initial heartbeat
+    sendHeartbeat();
+
+    // Send heartbeat every 15 seconds to keep user online
+    const heartbeatInterval = setInterval(sendHeartbeat, 15000);
+
+    // Handle app state changes (foreground/background)
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        // App came to foreground - send immediate heartbeat
+        console.log('📱 App came to foreground - sending heartbeat');
+        sendHeartbeat();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      clearInterval(heartbeatInterval);
+      subscription.remove();
+    };
+  }, [isSignedIn, userId]);
 
   if (!isLoaded) {
     return (

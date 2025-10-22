@@ -270,6 +270,53 @@ export default function MessagesScreen() {
     return () => clearInterval(interval);
   }, [userId, conversations.length]);
 
+  // Poll for new messages and update unread counts every 10 seconds
+  useEffect(() => {
+    if (!userId) return;
+    
+    const pollMessages = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/messages/conversations/${userId}`
+        );
+        
+        if (response.ok) {
+          const result = await response.json();
+          let freshConvs: Conversation[] = result.data;
+          
+          // Keep unread cleared for conversations the user has open
+          const opened = openedConversationIdsRef.current;
+          if (opened.size > 0) {
+            freshConvs = freshConvs.map((c) =>
+              opened.has(c.id) ? { ...c, unread_count: 0 } : c
+            );
+          }
+          
+          // Update conversations with fresh unread counts
+          setConversations(freshConvs);
+          setFilteredConversations((prev) => {
+            // Maintain search filter
+            if (!searchQuery.trim()) return freshConvs;
+            return freshConvs.filter((c) => {
+              const searchLower = searchQuery.toLowerCase().trim();
+              const participantNames = c.participants
+                .filter(p => p.clerk_user_id !== userId)
+                .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
+              return participantNames.some(name => name.includes(searchLower)) ||
+                c.title?.toLowerCase().includes(searchLower) ||
+                c.last_message?.toLowerCase().includes(searchLower);
+            });
+          });
+        }
+      } catch (e) {
+        console.log('Error polling messages:', e);
+      }
+    };
+    
+    const pollInterval = setInterval(pollMessages, 10000); // Poll every 10 seconds
+    return () => clearInterval(pollInterval);
+  }, [userId, searchQuery]);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadConversations();
@@ -510,12 +557,19 @@ export default function MessagesScreen() {
                       } catch (_e) { /* ignore */ }
                     })();
 
+                    // Determine other participant to pass initial presence
+                    const otherParticipants = conversation.participants.filter((p) => p.clerk_user_id !== userId);
+                    const other = otherParticipants[0];
+
                     router.push({
                       pathname: "../messages/message-chat-screen",
                       params: {
                         id: conversation.id,
                         title: getDisplayName(conversation),
                         channelUrl: conversation.channel_url || "",
+                        initialOnline: other?.online ? "1" : "0",
+                        initialLastActive: other?.last_active_at || "",
+                        otherClerkId: other?.clerk_user_id || "",
                       },
                     });
                   }}
