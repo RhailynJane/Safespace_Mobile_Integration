@@ -81,8 +81,8 @@ function RootLayoutNav() {
     } else if (!isSignedIn && !inAuthGroup) {
       // User is signed out but not in auth group
       if (hasCompletedOnboarding) {
-        // User has an account, go to sign-in
-        router.replace("/(auth)/sign-in");
+        // User has an account, go to login
+        router.replace("/(auth)/login");
       }
     }
   }, [isLoaded, isSignedIn, segments, hasCompletedOnboarding, router]);
@@ -114,6 +114,8 @@ export default function RootLayout() {
       'useInsertionEffect must not schedule updates',
       'Non-serializable values were found in the navigation state',
       '[clerk/telemetry]',
+      'Due to changes in Androids permission requirements',
+      'Expo Go can no longer provide full access to the media library',
     ]);
   }, []);
 
