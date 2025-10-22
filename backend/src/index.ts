@@ -344,14 +344,18 @@ app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) =>
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
+  const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
     const now = new Date();
     const activeAt = last_active_at ? new Date(last_active_at) : null;
+  const loginAt = last_login_at ? new Date(last_login_at) : null;
     const logoutAt = last_logout_at ? new Date(last_logout_at) : null;
     const onlineWindowMs = 2 * 60 * 1000; // 2 minutes
     const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
-    const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
-    const online = activeRecently && !loggedOutAfterActive;
+  // Ignore a logout that is at/just after login (grace period 5s) or older than login
+  const graceMs = 5000;
+  const logoutInvalid = logoutAt && loginAt ? (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
+  const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
+  const online = activeRecently && (!loggedOutAfterActive || logoutInvalid);
 
     res.json({
       success: true,
@@ -384,10 +388,13 @@ app.post("/api/users/status-batch", async (req: Request, res: Response) => {
 
     for (const row of result.rows) {
       const activeAt = row.last_active_at ? new Date(row.last_active_at) : null;
+      const loginAt = row.last_login_at ? new Date(row.last_login_at) : null;
       const logoutAt = row.last_logout_at ? new Date(row.last_logout_at) : null;
       const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
+      const graceMs = 5000;
+      const logoutInvalid = logoutAt && loginAt ? (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
       const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
-      const online = activeRecently && !loggedOutAfterActive;
+      const online = activeRecently && (!loggedOutAfterActive || logoutInvalid);
       statusMap[row.clerk_user_id] = {
         online,
         last_active_at: row.last_active_at || null,
@@ -4311,7 +4318,6 @@ app.post('/api/users/:clerkUserId/logout', async (req, res) => {
       const updateQuery = `
         UPDATE users 
         SET last_logout_at = CURRENT_TIMESTAMP,
-            last_active_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
         WHERE clerk_user_id = $1
         RETURNING id, clerk_user_id, last_logout_at
