@@ -16,7 +16,9 @@ import { PrismaClient } from "@prisma/client";
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// Increase body size limit for base64 images (50MB)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -34,6 +36,7 @@ interface SyncUserRequest {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+  gender?: string; // Add this line
 }
 
 interface CreateClientRequest {
@@ -49,6 +52,28 @@ interface SubmitAssessmentRequest {
   totalScore: number;
   assessmentType?: string;
 }
+
+const mapGenderToDatabase = (gender: string) => {
+  const genderMap: { [key: string]: string } = {
+    'Woman': 'female',
+    'Man': 'male',
+    'Non-Binary': 'non_binary',
+    'Agender': 'other',
+    'Gender-fluid': 'other',
+    'Genderqueer': 'other',
+    'Gender Variant': 'other',
+    'Intersex': 'other',
+    'Non-Conforming': 'other',
+    'Questioning': 'other',
+    'Transgender Man': 'male',
+    'Transgender Woman': 'female',
+    'Two-Spirit': 'other',
+    'I don\'t identify with any gender': 'other',
+    'I do not know': 'prefer_not_to_say',
+    'Prefer not to answer': 'prefer_not_to_say'
+  };
+  return genderMap[gender] || 'other';
+};
 
 // Test database connection
 pool.connect((err, client, release) => {
@@ -90,7 +115,7 @@ app.post(
   "/api/sync-user",
   async (req: Request<{}, {}, SyncUserRequest>, res: Response) => {
     try {
-      const { clerkUserId, email, firstName, lastName, phoneNumber } = req.body;
+      const { clerkUserId, email, firstName, lastName, phoneNumber, gender } = req.body;
 
       if (!clerkUserId || !email) {
         return res.status(400).json({
@@ -107,6 +132,7 @@ app.post(
           last_name: lastName,
           email: email,
           phone_number: phoneNumber,
+          gender: gender ? { set: mapGenderToDatabase(gender) } : undefined,
           updated_at: new Date(), // Explicitly set updated_at
         },
         create: {
@@ -115,6 +141,7 @@ app.post(
           last_name: lastName,
           email: email,
           phone_number: phoneNumber,
+          gender: gender ? mapGenderToDatabase(gender) : undefined,
           role: 'client',
           status: 'active',
           email_verified: true,
@@ -538,15 +565,15 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
                ORDER BY cp.reaction_count DESC, cp.created_at DESC 
                LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
-    params.push(parseInt(limit), (parseInt(page) - 1) * parseInt(limit));
+    params.push(Number.parseInt(limit), (Number.parseInt(page) - 1) * Number.parseInt(limit));
 
     const result = await pool.query(query, params);
 
     res.json({
       posts: result.rows,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: Number.parseInt(page),
+        limit: Number.parseInt(limit),
         total: result.rows.length,
       },
     });
@@ -708,7 +735,7 @@ app.post(
       // Check if user already reacted with this emoji
       const existingReaction = await client.query(
         "SELECT id FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-        [parseInt(id), clerkUserId, emoji]
+        [Number.parseInt(id), clerkUserId, emoji]
       );
 
       let reactionChange = 0;
@@ -717,20 +744,20 @@ app.post(
         // Remove existing reaction
         await client.query(
           "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-          [parseInt(id), clerkUserId, emoji]
+          [Number.parseInt(id), clerkUserId, emoji]
         );
         reactionChange = -1;
       } else {
         // Remove any existing reaction from this user to this post
         await client.query(
           "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-          [parseInt(id), clerkUserId]
+          [Number.parseInt(id), clerkUserId]
         );
 
         // Add new reaction
         await client.query(
           "INSERT INTO post_reactions (post_id, user_id, emoji) VALUES ($1, $2, $3)",
-          [parseInt(id), clerkUserId, emoji]
+          [Number.parseInt(id), clerkUserId, emoji]
         );
         reactionChange = 1;
       }
@@ -738,7 +765,7 @@ app.post(
       // Update reaction count
       await client.query(
         "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count + $1) WHERE id = $2",
-        [reactionChange, parseInt(id)]
+        [reactionChange, Number.parseInt(id)]
       );
 
       // Get updated reaction counts by emoji
@@ -747,19 +774,19 @@ app.post(
        FROM post_reactions 
        WHERE post_id = $1 
        GROUP BY emoji`,
-        [parseInt(id)]
+        [Number.parseInt(id)]
       );
 
       // Convert to object format
       const reactions: { [key: string]: number } = {};
-      reactionCounts.rows.forEach((row: any) => {
-        reactions[row.emoji] = parseInt(row.count);
-      });
+      for (const row of reactionCounts.rows) {
+        reactions[row.emoji] = Number.parseInt(row.count);
+      }
 
       // Check if user has any reaction to this post
       const userReactionResult = await client.query(
         "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
+        [Number.parseInt(id), clerkUserId]
       );
 
       const userReaction =
@@ -798,7 +825,7 @@ app.get(
 
       const result = await pool.query(
         "SELECT emoji FROM post_reactions WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
+        [Number.parseInt(id), clerkUserId]
       );
 
       res.json({
@@ -863,7 +890,7 @@ app.put("/api/community/posts/:id", async (req: Request, res: Response) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $5
        RETURNING *`,
-      [title, content, isDraft, category, parseInt(id)]
+      [title, content, isDraft, category, Number.parseInt(id)]
     );
 
     if (result.rows.length === 0) {
@@ -891,7 +918,7 @@ app.delete("/api/community/posts/:id", async (req: Request, res: Response) => {
 
     const result = await pool.query(
       "DELETE FROM community_posts WHERE id = $1 RETURNING id",
-      [parseInt(id)]
+      [Number.parseInt(id)]
     );
 
     if (result.rows.length === 0) {
@@ -925,7 +952,7 @@ app.delete(
 
       const result = await pool.query(
         "DELETE FROM post_reactions WHERE post_id = $1 AND user_id = $2 AND emoji = $3",
-        [parseInt(id), clerkUserId, emoji]
+        [Number.parseInt(id), clerkUserId, emoji]
       );
 
       if (result.rowCount === 0) {
@@ -935,7 +962,7 @@ app.delete(
       // Update reaction count
       await pool.query(
         "UPDATE community_posts SET reaction_count = GREATEST(0, reaction_count - 1) WHERE id = $1",
-        [parseInt(id)]
+        [Number.parseInt(id)]
       );
 
       res.json({ success: true, message: "Reaction removed successfully" });
@@ -967,21 +994,21 @@ app.post(
       // Check if already bookmarked
       const existingBookmark = await pool.query(
         "SELECT id FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
-        [parseInt(id), clerkUserId]
+        [Number.parseInt(id), clerkUserId]
       );
 
       if (existingBookmark.rows.length > 0) {
         // Remove bookmark
         await pool.query(
           "DELETE FROM post_bookmarks WHERE post_id = $1 AND user_id = $2",
-          [parseInt(id), clerkUserId]
+          [Number.parseInt(id), clerkUserId]
         );
         res.json({ bookmarked: false, message: "Bookmark removed" });
       } else {
         // Add bookmark
         await pool.query(
           "INSERT INTO post_bookmarks (post_id, user_id) VALUES ($1, $2)",
-          [parseInt(id), clerkUserId]
+          [Number.parseInt(id), clerkUserId]
         );
         res.json({ bookmarked: true, message: "Post bookmarked" });
       }
@@ -1017,8 +1044,8 @@ app.get(
       LIMIT $2 OFFSET $3`,
         [
           clerkUserId,
-          parseInt(limit as string),
-          (parseInt(page as string) - 1) * parseInt(limit as string),
+          Number.parseInt(limit as string),
+          (Number.parseInt(page as string) - 1) * Number.parseInt(limit as string),
         ]
       );
 
@@ -1184,7 +1211,7 @@ app.get(
   async (req: Request, res: Response) => {
     try {
       const { clerkUserId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = Number.parseInt(req.query.limit as string) || 10;
 
       const result = await pool.query(
         `SELECT 
@@ -1287,7 +1314,7 @@ app.get(
       query += ` ORDER BY me.created_at DESC LIMIT $${paramIndex} OFFSET $${
         paramIndex + 1
       }`;
-      params.push(parseInt(limit), parseInt(offset));
+      params.push(Number.parseInt(limit), Number.parseInt(offset));
 
       const result = await pool.query(query, params);
 
@@ -1300,9 +1327,9 @@ app.get(
       res.json({
         moods: result.rows,
         count: result.rows.length,
-        total: parseInt(countResult.rows[0].count),
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        total: Number.parseInt(countResult.rows[0].count),
+        limit: Number.parseInt(limit),
+        offset: Number.parseInt(offset),
       });
     } catch (error: any) {
       console.error("Error fetching mood history:", error.message);
@@ -1323,7 +1350,7 @@ app.get(
       const { days = "30" } = req.query;
 
       // Convert days to string explicitly
-      const daysString = String(parseInt(days as string, 10) || 30);
+      const daysString = String(Number.parseInt(days as string, 10) || 30);
 
       const result = await pool.query(
         `SELECT 
@@ -1334,7 +1361,7 @@ app.get(
         get_mood_label(mood_type) as label
       FROM mood_entries
       WHERE clerk_user_id = $1
-        AND created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
+        AND created_at >= NOW() - INTERVAL '${Number.parseInt(daysString)} days'
       GROUP BY mood_type
       ORDER BY count DESC`,
         [clerkUserId]
@@ -1346,7 +1373,7 @@ app.get(
       FROM mood_factors mf
       JOIN mood_entries me ON mf.mood_entry_id = me.id
       WHERE me.clerk_user_id = $1
-        AND me.created_at >= NOW() - INTERVAL '${parseInt(daysString)} days'
+        AND me.created_at >= NOW() - INTERVAL '${Number.parseInt(daysString)} days'
       GROUP BY mf.factor
       ORDER BY count DESC
       LIMIT 10`,
@@ -1667,7 +1694,7 @@ app.get(
   async (req: Request, res: Response) => {
     try {
       const { clerkUserId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = Number.parseInt(req.query.limit as string) || 10;
 
       const result = await pool.query(
         `SELECT 
@@ -1764,7 +1791,7 @@ app.get(
       query += ` ORDER BY je.created_at DESC LIMIT $${paramIndex} OFFSET $${
         paramIndex + 1
       }`;
-      params.push(parseInt(limit), parseInt(offset));
+      params.push(Number.parseInt(limit), Number.parseInt(offset));
 
       const result = await pool.query(query, params);
 
@@ -1777,9 +1804,9 @@ app.get(
       res.json({
         entries: result.rows,
         count: result.rows.length,
-        total: parseInt(countResult.rows[0].count),
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        total: Number.parseInt(countResult.rows[0].count),
+        limit: Number.parseInt(limit),
+        offset: Number.parseInt(offset),
       });
     } catch (error: any) {
       console.error("Error fetching journal history:", error.message);
@@ -2246,354 +2273,6 @@ app.get("/api/external/affirmation", async (req, res) => {
   }
 });
 
-// =============================================
-// SETTINGS ENDPOINTS
-// =============================================
-
-// Interfaces for Settings
-interface UserSettings {
-  // Display & Accessibility
-  darkMode: boolean;
-  textSize: string;
-  highContrast: boolean;
-  reduceMotion: boolean;
-
-  // Privacy & Security
-  biometricLock: boolean;
-  autoLockTimer: string;
-
-  // Notifications
-  notificationsEnabled: boolean;
-  quietHoursEnabled: boolean;
-  quietStartTime: string;
-  quietEndTime: string;
-  reminderFrequency: string;
-
-  // Contacts
-  crisisContact: string;
-  therapistContact: string;
-
-  // Wellbeing
-  safeMode: boolean;
-  breakReminders: boolean;
-  breathingDuration: string;
-  breathingStyle: string;
-  offlineMode: boolean;
-}
-
-interface UpdateSettingsRequest {
-  clerkUserId: string;
-  settings: Partial<UserSettings>;
-}
-
-// Get user settings
-app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
-  try {
-    const { clerkUserId } = req.params;
-
-    // Get user's internal ID
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const userId = userResult.rows[0].id;
-
-    // Get user settings
-    const result = await pool.query(
-      `SELECT * FROM user_settings WHERE user_id = $1`,
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
-      // Return default settings if none exist
-      return res.json({
-        settings: {
-          darkMode: false,
-          textSize: "Medium",
-          highContrast: false,
-          reduceMotion: false,
-          biometricLock: false,
-          autoLockTimer: "5 minutes",
-          notificationsEnabled: true,
-          quietHoursEnabled: false,
-          quietStartTime: "22:00",
-          quietEndTime: "08:00",
-          reminderFrequency: "Daily",
-          crisisContact: "",
-          therapistContact: "",
-          safeMode: false,
-          breakReminders: true,
-          breathingDuration: "5 minutes",
-          breathingStyle: "4-7-8 Technique",
-          offlineMode: false,
-        },
-      });
-    }
-
-    res.json({ settings: result.rows[0] });
-  } catch (error: any) {
-    console.error("Error fetching settings:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch settings",
-      details: error.message,
-    });
-  }
-});
-
-// Update user settings
-app.put(
-  "/api/settings/:clerkUserId",
-  async (
-    req: Request<
-      { clerkUserId: string },
-      {},
-      { settings: Partial<UserSettings> }
-    >,
-    res: Response
-  ) => {
-    try {
-      const { clerkUserId } = req.params;
-      const { settings } = req.body;
-
-      if (!settings) {
-        return res.status(400).json({ error: "Settings data is required" });
-      }
-
-      // Get user's internal ID
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      // Upsert settings
-      const result = await pool.query(
-        `INSERT INTO user_settings (
-          user_id, clerk_user_id, 
-          dark_mode, text_size, high_contrast, reduce_motion,
-          biometric_lock, auto_lock_timer,
-          notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
-          crisis_contact, therapist_contact,
-          safe_mode, break_reminders, breathing_duration, breathing_style, offline_mode
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
-        ON CONFLICT (user_id) 
-        DO UPDATE SET 
-          dark_mode = COALESCE($3, user_settings.dark_mode),
-          text_size = COALESCE($4, user_settings.text_size),
-          high_contrast = COALESCE($5, user_settings.high_contrast),
-          reduce_motion = COALESCE($6, user_settings.reduce_motion),
-          biometric_lock = COALESCE($7, user_settings.biometric_lock),
-          auto_lock_timer = COALESCE($8, user_settings.auto_lock_timer),
-          notifications_enabled = COALESCE($9, user_settings.notifications_enabled),
-          quiet_hours_enabled = COALESCE($10, user_settings.quiet_hours_enabled),
-          quiet_start_time = COALESCE($11, user_settings.quiet_start_time),
-          quiet_end_time = COALESCE($12, user_settings.quiet_end_time),
-          reminder_frequency = COALESCE($13, user_settings.reminder_frequency),
-          crisis_contact = COALESCE($14, user_settings.crisis_contact),
-          therapist_contact = COALESCE($15, user_settings.therapist_contact),
-          safe_mode = COALESCE($16, user_settings.safe_mode),
-          break_reminders = COALESCE($17, user_settings.break_reminders),
-          breathing_duration = COALESCE($18, user_settings.breathing_duration),
-          breathing_style = COALESCE($19, user_settings.breathing_style),
-          offline_mode = COALESCE($20, user_settings.offline_mode),
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING *`,
-        [
-          userId,
-          clerkUserId,
-          settings.darkMode,
-          settings.textSize,
-          settings.highContrast,
-          settings.reduceMotion,
-          settings.biometricLock,
-          settings.autoLockTimer,
-          settings.notificationsEnabled,
-          settings.quietHoursEnabled,
-          settings.quietStartTime,
-          settings.quietEndTime,
-          settings.reminderFrequency,
-          settings.crisisContact,
-          settings.therapistContact,
-          settings.safeMode,
-          settings.breakReminders,
-          settings.breathingDuration,
-          settings.breathingStyle,
-          settings.offlineMode,
-        ]
-      );
-
-      res.json({
-        success: true,
-        message: "Settings updated successfully",
-        settings: result.rows[0],
-      });
-    } catch (error: any) {
-      console.error("Error updating settings:", error.message);
-      res.status(500).json({
-        error: "Failed to update settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Batch update specific setting categories
-app.patch(
-  "/api/settings/:clerkUserId/category/:category",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId, category } = req.params;
-      const updates = req.body;
-
-      // Validate category
-      const validCategories = [
-        "display",
-        "privacy",
-        "notifications",
-        "contacts",
-        "wellbeing",
-      ];
-      if (!validCategories.includes(category)) {
-        return res.status(400).json({ error: "Invalid settings category" });
-      }
-
-      // Get user's internal ID
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      // Build dynamic update query based on category
-      let updateFields: string[] = [];
-      let updateValues: any[] = [userId];
-      let paramIndex = 2;
-
-      Object.keys(updates).forEach((key) => {
-        const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-        updateFields.push(`${snakeKey} = $${paramIndex}`);
-        updateValues.push(updates[key]);
-        paramIndex++;
-      });
-
-      if (updateFields.length === 0) {
-        return res.status(400).json({ error: "No valid updates provided" });
-      }
-
-      const query = `
-        UPDATE user_settings 
-        SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = $1
-        RETURNING *
-      `;
-
-      const result = await pool.query(query, updateValues);
-
-      res.json({
-        success: true,
-        message: `${category} settings updated successfully`,
-        settings: result.rows[0],
-      });
-    } catch (error: any) {
-      console.error("Error updating category settings:", error.message);
-      res.status(500).json({
-        error: "Failed to update settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Reset settings to default
-app.post(
-  "/api/settings/:clerkUserId/reset",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId } = req.params;
-
-      // Get user's internal ID
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      // Delete existing settings (will trigger default values on next fetch)
-      await pool.query("DELETE FROM user_settings WHERE user_id = $1", [
-        userId,
-      ]);
-
-      res.json({
-        success: true,
-        message: "Settings reset to defaults successfully",
-      });
-    } catch (error: any) {
-      console.error("Error resetting settings:", error.message);
-      res.status(500).json({
-        error: "Failed to reset settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
-// Export settings (for backup/migration)
-app.get(
-  "/api/settings/:clerkUserId/export",
-  async (req: Request, res: Response) => {
-    try {
-      const { clerkUserId } = req.params;
-
-      const userResult = await pool.query(
-        "SELECT id FROM users WHERE clerk_user_id = $1",
-        [clerkUserId]
-      );
-
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const userId = userResult.rows[0].id;
-
-      const result = await pool.query(
-        "SELECT * FROM user_settings WHERE user_id = $1",
-        [userId]
-      );
-
-      res.json({
-        exportDate: new Date().toISOString(),
-        settings: result.rows[0] || {},
-      });
-    } catch (error: any) {
-      console.error("Error exporting settings:", error.message);
-      res.status(500).json({
-        error: "Failed to export settings",
-        details: error.message,
-      });
-    }
-  }
-);
-
 
 // =============================================
 // MESSAGING ENDPOINTS - PRISMA VERSION
@@ -2607,7 +2286,7 @@ app.get(
     try {
       const { clerkUserId } = req.params;
 
-      console.log("💬 Fetching conversations for user:", clerkUserId);
+      // console.log("💬 Fetching conversations for user:", clerkUserId);
 
       const conversations = await prisma.conversation.findMany({
         where: {
@@ -2705,7 +2384,7 @@ app.get(
         })
       );
 
-      console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
+      // console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
 
       res.json({
         success: true,
@@ -2737,16 +2416,16 @@ app.get(
       const page = typeof pageStr === "string" ? pageStr : "1";
       const limit = typeof limitStr === "string" ? limitStr : "50";
 
-      console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
+      // console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
 
-      const pageNum = parseInt(page) || 1;
-      const limitNum = parseInt(limit) || 50;
+      const pageNum = Number.parseInt(page) || 1;
+      const limitNum = Number.parseInt(limit) || 50;
       const skip = (pageNum - 1) * limitNum;
 
       // Verify user is participant
       const participant = await prisma.conversationParticipant.findFirst({
         where: {
-          conversation_id: parseInt(conversationId),
+          conversation_id: Number.parseInt(conversationId),
           user: {
             clerk_user_id: clerkUserId as string
           }
@@ -2764,7 +2443,7 @@ app.get(
       // Get messages
       const messages = await prisma.message.findMany({
         where: {
-          conversation_id: parseInt(conversationId)
+          conversation_id: Number.parseInt(conversationId)
         },
         include: {
           sender: {
@@ -2851,7 +2530,7 @@ app.post(
 
         const participant = await tx.conversationParticipant.findFirst({
           where: {
-            conversation_id: parseInt(conversationId),
+            conversation_id: Number.parseInt(conversationId),
             user_id: user.id
           }
         });
@@ -2863,7 +2542,7 @@ app.post(
         // Create message
         const message = await tx.message.create({
           data: {
-            conversation_id: parseInt(conversationId),
+            conversation_id: Number.parseInt(conversationId),
             sender_id: user.id,
             message_text: messageText.trim(),
             message_type: messageType
@@ -2883,7 +2562,7 @@ app.post(
 
         // Update conversation timestamp
         await tx.conversation.update({
-          where: { id: parseInt(conversationId) },
+          where: { id: Number.parseInt(conversationId) },
           data: { updated_at: new Date() }
         });
 
@@ -3184,7 +2863,7 @@ app.post("/api/users/:clerkUserId/activity", async (req: Request, res: Response)
       }
     });
 
-    console.log(`👤 Updated activity for user ${clerkUserId}`);
+    // console.log(`👤 Updated activity for user ${clerkUserId}`);
 
     res.json({ 
       success: true, 
@@ -3223,7 +2902,7 @@ app.get(
     try {
       const { clerkUserId } = req.params;
 
-      console.log("💬 Fetching conversations for user:", clerkUserId);
+      // console.log("💬 Fetching conversations for user:", clerkUserId);
 
       const conversations = await prisma.conversation.findMany({
         where: {
@@ -3286,7 +2965,7 @@ app.get(
         }
       });
 
-      console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
+      // console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
 
       const formattedConversations = conversations.map(conversation => {
         const lastMessage = conversation.messages[0];
@@ -3303,7 +2982,7 @@ app.get(
           last_active_at: p.user.last_active_at
         }));
 
-        console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
+        // console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
 
         return {
           id: conversation.id.toString(),
@@ -3363,8 +3042,8 @@ async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
 
 // Removed duplicate import of PrismaClient
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 
 const prisma = new PrismaClient();
 
@@ -3426,7 +3105,7 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
     // Verify participant
     const participant = await prisma.conversationParticipant.findFirst({
       where: {
-        conversation_id: parseInt(conversationId),
+        conversation_id: Number.parseInt(conversationId),
         user_id: user.id
       }
     });
@@ -3445,7 +3124,7 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
     // Create message with file attachment - FIXED VERSION
     const message = await prisma.message.create({
       data: {
-        conversation_id: parseInt(conversationId),
+        conversation_id: Number.parseInt(conversationId),
         sender_id: user.id,
         message_text: `Shared ${messageType}: ${req.file.originalname}`,
         message_type: messageType,
@@ -3468,7 +3147,7 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
 
     // Update conversation timestamp
     await prisma.conversation.update({
-      where: { id: parseInt(conversationId) },
+      where: { id: Number.parseInt(conversationId) },
       data: { updated_at: new Date() }
     });
 
@@ -3539,3 +3218,1000 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// =============================================
+// PROFILE IMAGE UPLOAD ENDPOINT
+// =============================================
+
+app.post('/api/upload/profile-image/:clerkUserId', upload.single('profileImage'), async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No image uploaded' 
+      });
+    }
+
+    console.log('📸 Uploading profile image for user:', clerkUserId);
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { clerk_user_id: clerkUserId }
+    });
+
+    if (!user) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Construct image URL
+    const imageUrl = `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001'}/uploads/${req.file.filename}`;
+
+    // Update user's profile image URL in database
+    await prisma.user.update({
+      where: { clerk_user_id: clerkUserId },
+      data: { 
+        profile_image_url: imageUrl,
+        updated_at: new Date()
+      }
+    });
+
+    console.log('✅ Profile image updated successfully:', imageUrl);
+
+    res.json({
+      success: true,
+      message: 'Profile image uploaded successfully',
+      data: {
+        imageUrl: imageUrl
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Profile image upload error:', error);
+    
+    // Clean up file if upload failed
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Profile image upload failed',
+      error: (error as any).message
+    });
+  }
+});
+
+// =============================================
+// PROFILE ENDPOINTS - UPDATED FOR client_profiles TABLE
+// =============================================
+
+// Interface for profile data
+interface ClientProfileData {
+  // From users table
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  
+  // From client_profiles table
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+  
+  // CMHA Demographics fields
+  pronouns?: string;
+  isLGBTQ?: string;
+  primaryLanguage?: string;
+  mentalHealthConcerns?: string;
+  supportNeeded?: string;
+  ethnoculturalBackground?: string;
+  canadaStatus?: string;
+  dateCameToCanada?: string;
+  
+  // Additional fields
+  profileImage?: string;
+  notifications?: boolean;
+  shareWithSupportWorker?: boolean;
+}
+
+// Get complete client profile
+app.get("/api/client-profile/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    console.log('📋 Fetching client profile for:', clerkUserId);
+
+    // Get user data from users table
+    const userResult = await pool.query(
+      `SELECT 
+        id, first_name, last_name, email, phone_number, date_of_birth, gender,
+        address, city, state, postal_code, country, profile_image_url
+       FROM users 
+       WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    // Get client profile data with all CMHA fields
+    const clientProfileResult = await pool.query(
+      `SELECT 
+        phone_number, date_of_birth,
+        emergency_contact_name, emergency_contact_phone, therapist_contact,
+        pronouns, is_lgbtq, primary_language, mental_health_concerns,
+        support_needed, ethnocultural_background, canada_status, date_came_to_canada
+       FROM client_profiles 
+       WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+
+    const clientProfile = clientProfileResult.rows[0] || {};
+
+    // Combine the data
+    const profileData: ClientProfileData = {
+      // From users table
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      phoneNumber: clientProfile.phone_number || user.phone_number,
+      dateOfBirth: clientProfile.date_of_birth || user.date_of_birth,
+      gender: user.gender,
+      address: user.address,
+      city: user.city,
+      state: user.state,
+      postalCode: user.postal_code,
+      country: user.country,
+      profileImage: user.profile_image_url,
+      
+      // Emergency contacts
+      emergencyContactName: clientProfile.emergency_contact_name,
+      emergencyContactPhone: clientProfile.emergency_contact_phone,
+      emergencyContactRelationship: clientProfile.therapist_contact,
+      
+      // CMHA Demographics
+      pronouns: clientProfile.pronouns,
+      isLGBTQ: clientProfile.is_lgbtq,
+      primaryLanguage: clientProfile.primary_language,
+      mentalHealthConcerns: clientProfile.mental_health_concerns,
+      supportNeeded: clientProfile.support_needed,
+      ethnoculturalBackground: clientProfile.ethnocultural_background,
+      canadaStatus: clientProfile.canada_status,
+      dateCameToCanada: clientProfile.date_came_to_canada
+    };
+
+    console.log('✅ Client profile fetched successfully');
+
+    res.json({
+      success: true,
+      data: profileData
+    });
+
+  } catch (error: any) {
+    console.error("❌ Error fetching client profile:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch client profile",
+      error: error.message
+    });
+  }
+});
+
+// Update client profile
+app.put("/api/client-profile/:clerkUserId", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  
+  try {
+    const { clerkUserId } = req.params;
+    const profileData: Partial<ClientProfileData> = req.body;
+
+    console.log('🔄 Updating client profile for:', clerkUserId, profileData);
+
+    await client.query('BEGIN');
+
+    // 1. Update users table
+    const updateUserQuery = `
+      UPDATE users 
+      SET 
+        first_name = COALESCE($1, first_name),
+        last_name = COALESCE($2, last_name),
+        email = COALESCE($3, email),
+        phone_number = COALESCE($4, phone_number),
+        date_of_birth = COALESCE($5, date_of_birth),
+        gender = COALESCE($6, gender),
+        address = COALESCE($7, address),
+        city = COALESCE($8, city),
+        state = COALESCE($9, state),
+        postal_code = COALESCE($10, postal_code),
+        country = COALESCE($11, country),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE clerk_user_id = $12
+      RETURNING *
+    `;
+
+    const userUpdateResult = await client.query(updateUserQuery, [
+      profileData.firstName,
+      profileData.lastName,
+      profileData.email,
+      profileData.phoneNumber,
+      profileData.dateOfBirth,
+      profileData.gender,
+      profileData.address,
+      profileData.city,
+      profileData.state,
+      profileData.postalCode,
+      profileData.country,
+      clerkUserId
+    ]);
+
+    if (userUpdateResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // 2. Update or insert into client_profiles table with all CMHA fields
+    const upsertClientProfileQuery = `
+      INSERT INTO client_profiles (
+        clerk_user_id, 
+        display_name,
+        email,
+        phone_number,
+        date_of_birth,
+        emergency_contact_name, 
+        emergency_contact_phone,
+        therapist_contact,
+        pronouns,
+        is_lgbtq,
+        primary_language,
+        mental_health_concerns,
+        support_needed,
+        ethnocultural_background,
+        canada_status,
+        date_came_to_canada,
+        updated_at
+      ) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)
+      ON CONFLICT (clerk_user_id) 
+      DO UPDATE SET
+        display_name = COALESCE(EXCLUDED.display_name, client_profiles.display_name),
+        email = COALESCE(EXCLUDED.email, client_profiles.email),
+        phone_number = COALESCE(EXCLUDED.phone_number, client_profiles.phone_number),
+        date_of_birth = COALESCE(EXCLUDED.date_of_birth, client_profiles.date_of_birth),
+        emergency_contact_name = COALESCE(EXCLUDED.emergency_contact_name, client_profiles.emergency_contact_name),
+        emergency_contact_phone = COALESCE(EXCLUDED.emergency_contact_phone, client_profiles.emergency_contact_phone),
+        therapist_contact = COALESCE(EXCLUDED.therapist_contact, client_profiles.therapist_contact),
+        pronouns = COALESCE(EXCLUDED.pronouns, client_profiles.pronouns),
+        is_lgbtq = COALESCE(EXCLUDED.is_lgbtq, client_profiles.is_lgbtq),
+        primary_language = COALESCE(EXCLUDED.primary_language, client_profiles.primary_language),
+        mental_health_concerns = COALESCE(EXCLUDED.mental_health_concerns, client_profiles.mental_health_concerns),
+        support_needed = COALESCE(EXCLUDED.support_needed, client_profiles.support_needed),
+        ethnocultural_background = COALESCE(EXCLUDED.ethnocultural_background, client_profiles.ethnocultural_background),
+        canada_status = COALESCE(EXCLUDED.canada_status, client_profiles.canada_status),
+        date_came_to_canada = COALESCE(EXCLUDED.date_came_to_canada, client_profiles.date_came_to_canada),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `;
+
+    const displayName = `${profileData.firstName} ${profileData.lastName}`.trim();
+    
+    const clientProfileUpdateResult = await client.query(upsertClientProfileQuery, [
+      clerkUserId,
+      displayName,
+      profileData.email,
+      profileData.phoneNumber,
+      profileData.dateOfBirth,
+      profileData.emergencyContactName,
+      profileData.emergencyContactPhone,
+      profileData.emergencyContactRelationship,
+      profileData.pronouns,
+      profileData.isLGBTQ,
+      profileData.primaryLanguage,
+      profileData.mentalHealthConcerns,
+      profileData.supportNeeded,
+      profileData.ethnoculturalBackground,
+      profileData.canadaStatus,
+      profileData.dateCameToCanada
+    ]);
+
+    await client.query('COMMIT');
+
+    console.log('✅ Client profile updated successfully');
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: {
+        user: userUpdateResult.rows[0],
+        clientProfile: clientProfileUpdateResult.rows[0]
+      }
+    });
+
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error("❌ Error updating client profile:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile",
+      error: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Update profile image (keep this the same)
+app.put("/api/client-profile/:clerkUserId/profile-image", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { profileImageBase64 } = req.body;
+
+    if (!profileImageBase64) {
+      return res.status(400).json({
+        success: false,
+        message: "profileImageBase64 is required"
+      });
+    }
+
+    console.log('📸 Storing base64 profile image for user:', clerkUserId);
+
+    // Store the base64 image directly in the database
+    const result = await pool.query(
+      `UPDATE users 
+       SET profile_image_url = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $2
+       RETURNING profile_image_url`,
+      [profileImageBase64, clerkUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    console.log('✅ Profile image stored in database successfully');
+
+    res.json({
+      success: true,
+      message: "Profile image updated successfully",
+      data: {
+        profileImageUrl: result.rows[0].profile_image_url
+      }
+    });
+
+  } catch (error: any) {
+    console.error("❌ Error updating profile image:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile image",
+      error: error.message
+    });
+  }
+});
+
+// =============================================
+// SETTINGS ENDPOINTS 
+// =============================================
+
+// Interfaces for Settings
+interface UserSettings {
+  // Display & Accessibility
+  darkMode: boolean;
+  textSize: string;
+  
+  // Privacy & Security
+  autoLockTimer: string;
+
+  // Notifications
+  notificationsEnabled: boolean;
+  quietHoursEnabled: boolean;
+  quietStartTime: string;
+  quietEndTime: string;
+  reminderFrequency: string;
+}
+
+// Get user settings
+app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    console.log('🔧 Fetching settings for user:', clerkUserId);
+
+    // Get user's internal ID
+    const userResult = await pool.query(
+      "SELECT id FROM users WHERE clerk_user_id = $1",
+      [clerkUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        error: "User not found" 
+      });
+    }
+
+    const userId = userResult.rows[0].id;
+
+    // Get user settings
+    const result = await pool.query(
+      `SELECT * FROM user_settings WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      // Return default settings if none exist
+      console.log('🔧 No settings found, returning defaults');
+      return res.json({
+        success: true,
+        settings: {
+          dark_mode: false,
+          text_size: "Medium",
+          auto_lock_timer: "5 minutes",
+          notifications_enabled: true,
+          quiet_hours_enabled: false,
+          quiet_start_time: "22:00",
+          quiet_end_time: "08:00",
+          reminder_frequency: "Daily",
+        },
+      });
+    }
+
+    console.log('🔧 Settings found:', result.rows[0]);
+    res.json({
+      success: true,
+      settings: result.rows[0],
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching settings:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch settings",
+      details: error.message,
+    });
+  }
+});
+
+// Update user settings
+app.put(
+  "/api/settings/:clerkUserId",
+  async (
+    req: Request<{ clerkUserId: string }, {}, { settings: Partial<UserSettings> }>,
+    res: Response
+  ) => {
+    try {
+      const { clerkUserId } = req.params;
+      const { settings } = req.body;
+
+      console.log('🔧 Updating settings for user:', clerkUserId, settings);
+
+      if (!settings) {
+        return res.status(400).json({ 
+          success: false,
+          error: "Settings data is required" 
+        });
+      }
+
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          error: "User not found" 
+        });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Check if settings already exist
+      const existingSettings = await pool.query(
+        "SELECT id FROM user_settings WHERE user_id = $1",
+        [userId]
+      );
+
+      let result;
+      
+      if (existingSettings.rows.length > 0) {
+        // UPDATE existing settings
+        result = await pool.query(
+          `UPDATE user_settings 
+           SET 
+             dark_mode = COALESCE($1, dark_mode),
+             text_size = COALESCE($2, text_size),
+             auto_lock_timer = COALESCE($3, auto_lock_timer),
+             notifications_enabled = COALESCE($4, notifications_enabled),
+             quiet_hours_enabled = COALESCE($5, quiet_hours_enabled),
+             quiet_start_time = COALESCE($6, quiet_start_time),
+             quiet_end_time = COALESCE($7, quiet_end_time),
+             reminder_frequency = COALESCE($8, reminder_frequency),
+             updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = $9
+           RETURNING *`,
+          [
+            settings.darkMode,
+            settings.textSize,
+            settings.autoLockTimer,
+            settings.notificationsEnabled,
+            settings.quietHoursEnabled,
+            settings.quietStartTime,
+            settings.quietEndTime,
+            settings.reminderFrequency,
+            userId
+          ]
+        );
+      } else {
+        // INSERT new settings
+        result = await pool.query(
+          `INSERT INTO user_settings (
+            user_id, clerk_user_id, 
+            dark_mode, text_size, auto_lock_timer,
+            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          RETURNING *`,
+          [
+            userId,
+            clerkUserId,
+            settings.darkMode ?? false,
+            settings.textSize ?? 'Medium',
+            settings.autoLockTimer ?? '5 minutes',
+            settings.notificationsEnabled ?? true,
+            settings.quietHoursEnabled ?? false,
+            settings.quietStartTime ?? '22:00',
+            settings.quietEndTime ?? '08:00',
+            settings.reminderFrequency ?? 'Daily'
+          ]
+        );
+      }
+
+      console.log('✅ Settings updated successfully:', result.rows[0]);
+      res.json({
+        success: true,
+        message: "Settings updated successfully",
+        settings: result.rows[0],
+      });
+    } catch (error: any) {
+      console.error("❌ Error updating settings:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update settings",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// Reset settings to default
+app.post(
+  "/api/settings/:clerkUserId/reset",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId } = req.params;
+      console.log('🔧 Resetting settings for user:', clerkUserId);
+
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          error: "User not found" 
+        });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Delete existing settings (will trigger default values on next fetch)
+      await pool.query("DELETE FROM user_settings WHERE user_id = $1", [
+        userId,
+      ]);
+
+      console.log('✅ Settings reset successfully');
+      res.json({
+        success: true,
+        message: "Settings reset to defaults successfully",
+      });
+    } catch (error: any) {
+      console.error("❌ Error resetting settings:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to reset settings",
+        details: error.message,
+      });
+    }
+  }
+);
+
+// Update settings category
+app.patch(
+  "/api/settings/:clerkUserId/category/:category",
+  async (req: Request, res: Response) => {
+    try {
+      const { clerkUserId, category } = req.params;
+      const updates = req.body;
+
+      console.log('🔧 Updating category:', category, 'for user:', clerkUserId, updates);
+
+      // Validate category
+      const validCategories = ["display", "privacy", "notifications"];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ 
+          success: false,
+          error: "Invalid settings category" 
+        });
+      }
+
+      // Get user's internal ID
+      const userResult = await pool.query(
+        "SELECT id FROM users WHERE clerk_user_id = $1",
+        [clerkUserId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ 
+          success: false,
+          error: "User not found" 
+        });
+      }
+
+      const userId = userResult.rows[0].id;
+
+      // Build dynamic update query based on category
+      let updateFields: string[] = [];
+      let updateValues: any[] = [userId];
+      let paramIndex = 2;
+
+      for (const key of Object.keys(updates)) {
+        const snakeKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+        updateFields.push(`${snakeKey} = $${paramIndex}`);
+        updateValues.push(updates[key]);
+        paramIndex++;
+      }
+
+      if (updateFields.length === 0) {
+        return res.status(400).json({ 
+          success: false,
+          error: "No valid updates provided" 
+        });
+      }
+
+      const query = `
+        UPDATE user_settings 
+        SET ${updateFields.join(", ")}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $1
+        RETURNING *
+      `;
+
+      const result = await pool.query(query, updateValues);
+
+      console.log('✅ Category settings updated successfully');
+      res.json({
+        success: true,
+        message: `${category} settings updated successfully`,
+        settings: result.rows[0],
+      });
+    } catch (error: any) {
+      console.error("❌ Error updating category settings:", error.message);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update settings",
+        details: error.message,
+      });
+    }
+  }
+);
+// =============================================
+// HELP ENDPOINTS
+// =============================================
+
+interface HelpItem {
+  id?: string;
+  title: string;
+  content: string;
+  type?: 'guide' | 'faq' | 'contact';
+  sort_order?: number;
+  related_features?: string[];
+  estimated_read_time?: number;
+  last_updated?: string;
+}
+
+interface HelpSection {
+  id: string;
+  title: string;
+  icon: string;
+  content: HelpItem[];
+  expanded?: boolean;
+  sort_order?: number;
+  description?: string;
+  category?: 'getting_started' | 'features' | 'support' | 'privacy' | 'troubleshooting';
+  priority?: 'high' | 'medium' | 'low';
+}
+
+// Help endpoints
+app.get('/api/help-sections', async (req, res) => {
+  try {
+    const { include } = req.query;
+    const client = await pool.connect();
+
+    try {
+      // Fetch all help sections
+      const sectionsQuery = `
+        SELECT id, title, icon, sort_order, created_at, updated_at 
+        FROM help_sections 
+        ORDER BY sort_order ASC
+      `;
+      const sectionsResult = await client.query(sectionsQuery);
+      
+      const sections: HelpSection[] = sectionsResult.rows;
+
+      // If include=items, fetch items for each section
+      if (include === 'items') {
+        for (const section of sections) {
+          const itemsQuery = `
+            SELECT id, title, content, type, sort_order, created_at, updated_at
+            FROM help_items 
+            WHERE section_id = $1 
+            ORDER BY sort_order ASC
+          `;
+          const itemsResult = await client.query(itemsQuery, [section.id]);
+          section.content = itemsResult.rows.map(item => ({
+            ...item,
+            related_features: [],
+            estimated_read_time: Math.ceil(item.content.length / 200), // ~200 chars per minute
+            last_updated: item.updated_at
+          }));
+        }
+      } else {
+        // Initialize empty content array
+        for (const section of sections) {
+          section.content = [];
+        }
+      }
+
+      res.json(sections);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error fetching help sections:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch help sections',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.get('/api/help-sections/:sectionId/items', async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      // First verify the section exists
+      const sectionCheck = await client.query(
+        'SELECT id FROM help_sections WHERE id = $1',
+        [sectionId]
+      );
+
+      if (sectionCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Help section not found' });
+      }
+
+      // Fetch items for the specific section
+      const itemsQuery = `
+        SELECT id, title, content, type, sort_order, created_at, updated_at
+        FROM help_items 
+        WHERE section_id = $1 
+        ORDER BY sort_order ASC
+      `;
+      const itemsResult = await client.query(itemsQuery, [sectionId]);
+
+      const items: HelpItem[] = itemsResult.rows.map(item => ({
+        ...item,
+        related_features: [],
+        estimated_read_time: Math.ceil(item.content.length / 200), // ~200 chars per minute
+        last_updated: item.updated_at
+      }));
+
+      res.json(items);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error fetching help items:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch help items',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.get('/api/help/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Query parameter "q" is required' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      const searchQuery = `
+        SELECT hi.id, hi.title, hi.content, hi.type, hi.section_id, hs.title as section_title
+        FROM help_items hi
+        JOIN help_sections hs ON hi.section_id = hs.id
+        WHERE hi.title ILIKE $1 OR hi.content ILIKE $1
+        ORDER BY 
+          CASE 
+            WHEN hi.title ILIKE $1 THEN 1
+            ELSE 2
+          END,
+          hi.sort_order ASC
+      `;
+      
+      const searchResult = await client.query(searchQuery, [`%${q}%`]);
+
+      const items: HelpItem[] = searchResult.rows.map(item => ({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        type: item.type,
+        related_features: [],
+        estimated_read_time: Math.ceil(item.content.length / 200),
+        last_updated: item.updated_at
+      }));
+
+      res.json(items);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error searching help content:', error);
+    res.status(500).json({ 
+      error: 'Failed to search help content',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/api/help-sections/:sectionId/view', async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      // Verify section exists
+      const sectionCheck = await client.query(
+        'SELECT id FROM help_sections WHERE id = $1',
+        [sectionId]
+      );
+
+      if (sectionCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Help section not found' });
+      }
+
+      // In a real app, you might want to:
+      // 1. Track user ID if authenticated
+      // 2. Store view timestamps
+      // 3. Update analytics
+      
+      console.log(`Help section viewed: ${sectionId}`);
+      
+      res.json({ success: true, message: 'View tracked' });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error tracking help section view:', error);
+    res.status(500).json({ 
+      error: 'Failed to track view',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/api/users/:clerkUserId/logout', async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      const updateQuery = `
+        UPDATE users 
+        SET last_logout_at = CURRENT_TIMESTAMP,
+            last_active_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE clerk_user_id = $1
+        RETURNING id, clerk_user_id, last_logout_at
+      `;
+      
+      const result = await client.query(updateQuery, [clerkUserId]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Logout timestamp updated',
+        user: result.rows[0]
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating logout timestamp:', error);
+    res.status(500).json({ 
+      error: 'Failed to update logout timestamp',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/api/users/:clerkUserId/login', async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      const updateQuery = `
+        UPDATE users 
+        SET last_login_at = CURRENT_TIMESTAMP,
+            last_login = CURRENT_TIMESTAMP,
+            last_active_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE clerk_user_id = $1
+        RETURNING id, clerk_user_id, last_login_at
+      `;
+      
+      const result = await client.query(updateQuery, [clerkUserId]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Login timestamp updated',
+        user: result.rows[0]
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating login timestamp:', error);
+    res.status(500).json({ 
+      error: 'Failed to update login timestamp',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});

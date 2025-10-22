@@ -23,6 +23,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
  * AppointmentList Component
@@ -34,6 +35,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
  * Features an elegant curved background and intuitive interface.
  */
 export default function AppointmentList() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -245,7 +247,7 @@ export default function AppointmentList() {
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -262,7 +264,7 @@ export default function AppointmentList() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="My Appointments" showBack={true} />
 
         {/* Appointments Tabs - Switch between Upcoming and Past appointments */}
@@ -311,10 +313,10 @@ export default function AppointmentList() {
                 .map((appointment) => (
                   <TouchableOpacity
                     key={appointment.id}
-                    style={styles.appointmentCard}
+                    style={[styles.appointmentCard, { backgroundColor: theme.colors.surface, borderLeftColor: theme.colors.primary }]}
                     onPress={() => handleAppointmentPress(appointment.id)}
                   >
-                    <Text style={styles.supportWorker}>
+                    <Text style={[styles.supportWorker, { color: theme.colors.text }]}>
                       {appointment.supportWorker}
                     </Text>
                     <View style={styles.appointmentDetails}>
@@ -322,22 +324,22 @@ export default function AppointmentList() {
                         <Ionicons
                           name="calendar-outline"
                           size={16}
-                          color="#666"
+                    color={theme.colors.icon}
                         />
-                        <Text style={styles.detailText}>
+                        <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
                           {appointment.date}
                         </Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <Ionicons name="time-outline" size={16} color="#666" />
-                        <Text style={styles.detailText}>
+                          <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
+                        <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
                           {appointment.time}
                         </Text>
                       </View>
                     </View>
                     <View style={styles.sessionType}>
-                      <Ionicons name="videocam" size={14} color="#4CAF50" />
-                      <Text style={styles.sessionTypeText}>
+                        <Ionicons name="videocam" size={14} color={theme.colors.primary} />
+                      <Text style={[styles.sessionTypeText, { color: theme.colors.textSecondary }]}>
                         {appointment.type} Session
                       </Text>
                     </View>
@@ -345,8 +347,8 @@ export default function AppointmentList() {
                 ))
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="calendar-outline" size={48} color="#CCC" />
-                <Text style={styles.emptyStateText}>
+                  <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
+                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                   No upcoming appointments
                 </Text>
               </View>
@@ -357,10 +359,10 @@ export default function AppointmentList() {
               .map((appointment) => (
                 <TouchableOpacity
                   key={appointment.id}
-                  style={styles.appointmentCard}
+                  style={[styles.appointmentCard, { backgroundColor: theme.colors.surface, borderLeftColor: theme.colors.primary }]}
                   onPress={() => handleAppointmentPress(appointment.id)}
                 >
-                  <Text style={styles.supportWorker}>
+                  <Text style={[styles.supportWorker, { color: theme.colors.text }]}>
                     {appointment.supportWorker}
                   </Text>
                   <View style={styles.appointmentDetails}>
@@ -368,18 +370,18 @@ export default function AppointmentList() {
                       <Ionicons
                         name="calendar-outline"
                         size={16}
-                        color="#666"
+                  color={theme.colors.icon}
                       />
-                      <Text style={styles.detailText}>{appointment.date}</Text>
+                      <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.date}</Text>
                     </View>
                     <View style={styles.detailRow}>
-                      <Ionicons name="time-outline" size={16} color="#666" />
-                      <Text style={styles.detailText}>{appointment.time}</Text>
+                        <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
+                      <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.time}</Text>
                     </View>
                   </View>
                   <View style={styles.sessionType}>
-                    <Ionicons name="videocam" size={14} color="#4CAF50" />
-                    <Text style={styles.sessionTypeText}>
+                      <Ionicons name="videocam" size={14} color={theme.colors.primary} />
+                    <Text style={[styles.sessionTypeText, { color: theme.colors.textSecondary }]}>
                       {appointment.type} Session
                     </Text>
                   </View>
@@ -387,8 +389,8 @@ export default function AppointmentList() {
               ))
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={48} color="#CCC" />
-              <Text style={styles.emptyStateText}>No past appointments</Text>
+                <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No past appointments</Text>
             </View>
           )}
         </ScrollView>
@@ -396,10 +398,10 @@ export default function AppointmentList() {
         {/* Schedule New Appointment Button */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={styles.scheduleButton}
+              style={[styles.scheduleButton, { backgroundColor: theme.colors.primary }]}
             onPress={() => router.push("/appointments/book")}
           >
-            <Ionicons name="add" size={24} color="#FFF" />
+              <Ionicons name="add" size={24} color={theme.colors.text} />
             <Text style={styles.scheduleButtonText}>
               Schedule New Appointment
             </Text>
@@ -418,10 +420,10 @@ export default function AppointmentList() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -429,6 +431,7 @@ export default function AppointmentList() {
                     key={index}
                     style={[
                       styles.sideMenuItem,
+                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -437,13 +440,14 @@ export default function AppointmentList() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                 color={item.disabled ? theme.colors.iconDisabled : (item.title === "Sign Out" ? theme.colors.error : theme.colors.icon)}
                     />
                     <Text
                       style={[
                         styles.sideMenuItemText,
+                        { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && styles.signOutText,
+                        item.title === "Sign Out" && { color: theme.colors.error },
                       ]}
                     >
                       {item.title}
@@ -511,24 +515,24 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "transparent",
+    // backgroundColor moved to theme.colors.surface via inline override
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
     alignItems: "center",
   },
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
   },
   sideMenuContent: {
     padding: 10,
@@ -539,11 +543,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     marginLeft: 15,
   },
   searchContainer: {
@@ -590,7 +594,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   appointmentCard: {
-    backgroundColor: "#F2F7F2",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -600,12 +604,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
+    // borderLeftColor moved to theme.colors.primary via inline override
   },
   supportWorker: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#2c3e50",
+    // color moved to theme.colors.text via inline override
     marginBottom: 12,
   },
   appointmentDetails: {
@@ -618,7 +622,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginLeft: 8,
   },
   sessionType: {
@@ -632,7 +636,7 @@ const styles = StyleSheet.create({
   },
   sessionTypeText: {
     fontSize: 14,
-    color: "#2c3e50",
+    // color moved to theme.colors.textSecondary via inline override
     marginLeft: 6,
   },
   emptyState: {
@@ -642,7 +646,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 16,
-    color: "#999",
+    // color moved to theme.colors.text via inline override
     marginTop: 16,
   },
   footer: {
@@ -670,10 +674,10 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   sideMenuItemTextDisabled: {
-    color: "#CCCCCC",
+    // color handled by iconDisabled in inline override
   },
   signOutText: {
-    color: "#FF6B6B",
+    // color handled by theme.colors.error in inline override
     fontWeight: "600",
   },
 });

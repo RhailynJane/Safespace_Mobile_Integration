@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
-  Alert,
   Platform,
 } from "react-native";
 import { router } from "expo-router";
@@ -22,6 +21,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { moodApi, MoodEntry, MoodFilters } from "../../../utils/moodApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -40,12 +40,18 @@ const moodTypes = [
 ];
 
 export default function MoodHistoryScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const [allFactors, setAllFactors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("mood");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [selectedMoodId, setSelectedMoodId] = useState<string>("");
+  const [modalMessage, setModalMessage] = useState("");
   
   // Filter states
   const [selectedMoodType, setSelectedMoodType] = useState<string>("");
@@ -123,10 +129,11 @@ export default function MoodHistoryScreen() {
       
       console.log('Loaded', data.moods.length, 'mood entries');
     } catch (error) {
-      console.error("Error loading mood history:", error);
+      console.error("Failed to load mood history:", error);
       if (reset && moodHistory.length === 0) {
         // Only show alert on initial load if there's an error
-        Alert.alert("Info", "Unable to load mood history. Please try again.");
+        setModalMessage("Unable to load mood history. Please try again.");
+        setShowErrorModal(true);
       }
     } finally {
       setLoading(false);
@@ -227,36 +234,31 @@ export default function MoodHistoryScreen() {
 
   // Delete mood entry
   const handleDelete = (moodId: string) => {
-    Alert.alert(
-      "Delete Entry",
-      "Are you sure you want to delete this mood entry?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await moodApi.deleteMood(moodId);
-              setMoodHistory((prev) => prev.filter((m) => m.id !== moodId));
-              Alert.alert("Success", "Mood entry deleted");
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete mood entry");
-            }
-          },
-        },
-      ]
-    );
+    setSelectedMoodId(moodId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
+    try {
+      await moodApi.deleteMood(selectedMoodId);
+      setMoodHistory((prev) => prev.filter((m) => m.id !== selectedMoodId));
+      setModalMessage("Mood entry deleted successfully");
+      setShowSuccessModal(true);
+    } catch (error) {
+      setModalMessage("Failed to delete mood entry");
+      setShowErrorModal(true);
+    }
   };
 
   // Render mood entry card
   const renderMoodEntry = ({ item }: { item: MoodEntry }) => (
-    <View style={styles.entryCard}>
+    <View style={[styles.entryCard, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
       <View style={styles.entryHeader}>
         <Text style={styles.entryEmoji}>{item.mood_emoji}</Text>
         <View style={styles.entryDetails}>
-          <Text style={styles.entryMood}>{item.mood_label}</Text>
-          <Text style={styles.entryDate}>
+          <Text style={[styles.entryMood, { color: theme.colors.text }]}>{item.mood_label}</Text>
+          <Text style={[styles.entryDate, { color: theme.colors.textSecondary }]}>
             {new Date(item.created_at).toLocaleString("en-US", {
               month: "short",
               day: "numeric",
@@ -267,7 +269,7 @@ export default function MoodHistoryScreen() {
           </Text>
         </View>
         <View style={styles.entryActions}>
-          <Text style={styles.entryIntensity}>★ {item.intensity}/5</Text>
+          <Text style={[styles.entryIntensity, { color: theme.colors.primary }]}>★ {item.intensity}/5</Text>
           <TouchableOpacity onPress={() => handleDelete(item.id)}>
             <Ionicons name="trash-outline" size={20} color="#F44336" />
           </TouchableOpacity>
@@ -285,7 +287,7 @@ export default function MoodHistoryScreen() {
       )}
 
       {item.notes && (
-        <Text style={styles.entryNotes} numberOfLines={3}>
+        <Text style={[styles.entryNotes, { color: theme.colors.textSecondary }]} numberOfLines={3}>
           {item.notes}
         </Text>
       )}
@@ -302,10 +304,10 @@ export default function MoodHistoryScreen() {
   if (loading && offset === 0) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Mood History" showBack={true} />
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -314,26 +316,26 @@ export default function MoodHistoryScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Mood History" showBack={true} />
 
         {/* Search and Filter Bar */}
         <View style={styles.searchBar}>
-          <View style={styles.searchInputContainer}>
-            <Ionicons name="search" size={20} color="#999" />
+          <View style={[styles.searchInputContainer, { backgroundColor: theme.colors.surface }]}>
+            <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: theme.colors.text }]}
               placeholder="Search notes..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textSecondary}
             />
           </View>
           <TouchableOpacity
-            style={styles.filterButton}
+            style={[styles.filterButton, { backgroundColor: theme.colors.surface }]}
             onPress={() => setFilterModalVisible(true)}
           >
-            <Ionicons name="filter" size={20} color="#4CAF50" />
+            <Ionicons name="filter" size={20} color={theme.colors.primary} />
             {activeFiltersCount > 0 && (
               <View style={styles.filterBadge}>
                 <Text style={styles.filterBadgeText}>{activeFiltersCount}</Text>
@@ -352,7 +354,7 @@ export default function MoodHistoryScreen() {
                     {moodTypes.find(m => m.value === selectedMoodType)?.label}
                   </Text>
                   <TouchableOpacity onPress={() => setSelectedMoodType("")}>
-                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                    <Ionicons name="close-circle" size={16} color={theme.colors.primary} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -362,7 +364,7 @@ export default function MoodHistoryScreen() {
                     From: {formatDate(startDate)}
                   </Text>
                   <TouchableOpacity onPress={() => setStartDate(null)}>
-                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                    <Ionicons name="close-circle" size={16} color={theme.colors.primary} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -372,7 +374,7 @@ export default function MoodHistoryScreen() {
                     To: {formatDate(endDate)}
                   </Text>
                   <TouchableOpacity onPress={() => setEndDate(null)}>
-                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                    <Ionicons name="close-circle" size={16} color={theme.colors.primary} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -380,7 +382,7 @@ export default function MoodHistoryScreen() {
                 <View key={factor} style={styles.activeFilterChip}>
                   <Text style={styles.activeFilterText}>{factor}</Text>
                   <TouchableOpacity onPress={() => toggleFactor(factor)}>
-                    <Ionicons name="close-circle" size={16} color="#4CAF50" />
+                    <Ionicons name="close-circle" size={16} color={theme.colors.primary} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -437,17 +439,17 @@ export default function MoodHistoryScreen() {
           onRequestClose={() => setFilterModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.filterModal}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Filter Moods</Text>
+            <View style={[styles.filterModal, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Filter Moods</Text>
                 <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#333" />
+                  <Ionicons name="close" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.modalContent}>
                 {/* Mood Type Filter */}
-                <Text style={styles.filterLabel}>Mood Type</Text>
+                <Text style={[styles.filterLabel, { color: theme.colors.text }]}>Mood Type</Text>
                 <View style={styles.moodTypeGrid}>
                   {moodTypes.map((mood) => (
                     <TouchableOpacity
@@ -464,7 +466,7 @@ export default function MoodHistoryScreen() {
                       }
                     >
                       <Text style={styles.moodTypeEmoji}>{mood.emoji}</Text>
-                      <Text style={styles.moodTypeLabel}>{mood.label}</Text>
+                      <Text style={[styles.moodTypeLabel, { color: theme.colors.textSecondary }]}>{mood.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -472,7 +474,7 @@ export default function MoodHistoryScreen() {
                 {/* Factors Filter */}
                 {allFactors.length > 0 && (
                   <>
-                    <Text style={styles.filterLabel}>Factors</Text>
+                    <Text style={[styles.filterLabel, { color: theme.colors.text }]}>Factors</Text>
                     <View style={styles.factorsGrid}>
                       {allFactors.map((factor) => (
                         <TouchableOpacity
@@ -500,43 +502,43 @@ export default function MoodHistoryScreen() {
                 )}
 
                 {/* Date Range Filter */}
-                <Text style={styles.filterLabel}>Date Range</Text>
+                <Text style={[styles.filterLabel, { color: theme.colors.text }]}>Date Range</Text>
                 
                 {/* Start Date */}
                 <View style={styles.dateInputContainer}>
-                  <Text style={styles.dateLabel}>From:</Text>
+                  <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>From:</Text>
                   <TouchableOpacity
                     style={styles.dateButton}
                     onPress={() => setShowStartDatePicker(true)}
                   >
-                    <Text style={styles.dateButtonText}>
+                    <Text style={[styles.dateButtonText, { color: theme.colors.text }]}>
                       {formatDate(startDate)}
                     </Text>
-                    <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                    <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
                   </TouchableOpacity>
                   {startDate && (
                     <TouchableOpacity onPress={() => setStartDate(null)}>
-                      <Ionicons name="close-circle" size={20} color="#999" />
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                   )}
                 </View>
 
                 {/* End Date */}
                 <View style={styles.dateInputContainer}>
-                  <Text style={styles.dateLabel}>To:</Text>
-                  <Text style={styles.dateHint}>(Leave empty for single day)</Text>
+                  <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>To:</Text>
+                  <Text style={[styles.dateHint, { color: theme.colors.textSecondary }]}>(Leave empty for single day)</Text>
                   <TouchableOpacity
                     style={styles.dateButton}
                     onPress={() => setShowEndDatePicker(true)}
                   >
-                    <Text style={styles.dateButtonText}>
+                    <Text style={[styles.dateButtonText, { color: theme.colors.text }]}>
                       {formatDate(endDate)}
                     </Text>
-                    <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                    <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
                   </TouchableOpacity>
                   {endDate && (
                     <TouchableOpacity onPress={() => setEndDate(null)}>
-                      <Ionicons name="close-circle" size={20} color="#999" />
+                      <Ionicons name="close-circle" size={20} color={theme.colors.textSecondary} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -564,20 +566,110 @@ export default function MoodHistoryScreen() {
                 )}
               </ScrollView>
 
-              <View style={styles.modalActions}>
+              <View style={[styles.modalActions, { borderTopColor: theme.colors.borderLight }]}>
                 <TouchableOpacity
                   style={styles.clearButton}
                   onPress={clearFilters}
                 >
-                  <Text style={styles.clearButtonText}>Clear All</Text>
+                  <Text style={[styles.clearButtonText, { color: theme.colors.textSecondary }]}>Clear All</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.applyButton}
+                  style={[styles.applyButton, { backgroundColor: theme.colors.primary }]}
                   onPress={applyFilters}
                 >
                   <Text style={styles.applyButtonText}>Apply Filters</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          visible={showDeleteConfirm}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowDeleteConfirm(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.successIcon}>
+                <Ionicons name="warning" size={64} color="#FF9800" />
+              </View>
+              <Text style={[styles.successTitle, { color: theme.colors.text }]}>Delete Entry</Text>
+              <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>
+                Are you sure you want to delete this mood entry? This action cannot be undone.
+              </Text>
+              <View style={styles.modalButtonRow}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: theme.isDark ? "#444" : "#E0E0E0" }]}
+                  onPress={() => setShowDeleteConfirm(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: "#F44336" }]}
+                  onPress={confirmDelete}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.modalButtonText, { color: "#FFF" }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Success Modal */}
+        <Modal
+          visible={showSuccessModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.successIcon}>
+                <Ionicons name="checkmark-circle" size={64} color={theme.colors.primary} />
+              </View>
+              <Text style={[styles.successTitle, { color: theme.colors.text }]}>Success!</Text>
+              <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>
+                {modalMessage}
+              </Text>
+              <TouchableOpacity
+                style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => setShowSuccessModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Error Modal */}
+        <Modal
+          visible={showErrorModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowErrorModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.successIcon}>
+                <Ionicons name="close-circle" size={64} color="#F44336" />
+              </View>
+              <Text style={[styles.successTitle, { color: theme.colors.text }]}>Error</Text>
+              <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>
+                {modalMessage}
+              </Text>
+              <TouchableOpacity
+                style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => setShowErrorModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>Close</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -612,7 +704,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFF",
     borderRadius: 12,
     paddingHorizontal: 12,
     gap: 8,
@@ -626,7 +717,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: "#FFF",
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
@@ -671,11 +761,9 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   entryCard: {
-    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -696,11 +784,9 @@ const styles = StyleSheet.create({
   entryMood: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
   },
   entryDate: {
     fontSize: 13,
-    color: "#999",
     marginTop: 2,
   },
   entryActions: {
@@ -709,7 +795,6 @@ const styles = StyleSheet.create({
   },
   entryIntensity: {
     fontSize: 14,
-    color: "#4CAF50",
     fontWeight: "500",
   },
   factorsContainer: {
@@ -731,7 +816,6 @@ const styles = StyleSheet.create({
   },
   entryNotes: {
     fontSize: 14,
-    color: "#666",
     lineHeight: 20,
   },
   emptyContainer: {
@@ -743,19 +827,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: "#999",
     marginTop: 16,
     marginBottom: 8,
     textAlign: "center",
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#999",
     marginBottom: 24,
     textAlign: "center",
   },
   addButton: {
-    backgroundColor: "#4CAF50",
     borderRadius: 12,
     padding: 16,
     width: "100%",
@@ -770,7 +851,9 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
   filterModal: {
     backgroundColor: "#FFF",
@@ -916,5 +999,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFF",
+  },
+  // Success/Error Modal Styles
+  successModal: {
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  successIcon: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  successMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  successButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignSelf: "stretch",
+    alignItems: "center",
+  },
+  successButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  modalButtonRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignSelf: "stretch",
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    fontWeight: "600",
+    fontSize: 16,
   },
 });

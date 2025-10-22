@@ -18,6 +18,7 @@ import BottomNavigation from "../../../../../components/BottomNavigation";
 import { AppHeader } from "../../../../../components/AppHeader";
 import Svg, { Path } from 'react-native-svg';
 import CurvedBackground from "../../../../../components/CurvedBackground";
+import { useTheme } from "../../../../../contexts/ThemeContext";
 
 const CATEGORIES = [
   "Self Care",
@@ -57,6 +58,7 @@ const getCategoryIcon = (category: string) => {
 };
 
 export default function SelectCategoryScreen() {
+  const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
 
@@ -89,15 +91,15 @@ export default function SelectCategoryScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
           <AppHeader title="Community Forum" showBack={true} />   
           
           {/* Title Section */}
           <View style={styles.titleSection}>
-            <Text style={styles.mainTitle}>Add New Post</Text>
+            <Text style={[styles.mainTitle, { color: theme.colors.text }]}>Add New Post</Text>
           </View>
-          <Text style={styles.subtitle}>Select post category</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.text }]}>Select post category</Text>
 
           <View style={styles.categoriesContainer}>
             {CATEGORIES.map((category) => (
@@ -105,6 +107,7 @@ export default function SelectCategoryScreen() {
                 key={category}
                 style={[
                   styles.categoryCard,
+                  { backgroundColor: theme.colors.surface },
                   selectedCategory === category && styles.categoryCardActive,
                 ]}
                 onPress={() => setSelectedCategory(category)}
@@ -119,6 +122,7 @@ export default function SelectCategoryScreen() {
                 <Text
                   style={[
                     styles.categoryText,
+                    { color: theme.colors.textSecondary },
                     selectedCategory === category && styles.categoryTextActive,
                   ]}
                 >
@@ -180,7 +184,7 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#000",
+    // color moved to theme.colors.text via inline override
     justifyContent: "center",
     alignItems: "center"
   },
@@ -205,7 +209,7 @@ const styles = StyleSheet.create({
   subtitle: {
   fontSize: 16,
   fontWeight: "300",
-  color: "#212121",
+  // color moved to theme.colors.text via inline override
   marginTop: 10,
   marginBottom: 24,
   textAlign: "center",
@@ -233,7 +237,7 @@ const styles = StyleSheet.create({
   categoryCard: {
     width: 100,
     height: 150,
-    backgroundColor: "#EDE7EC",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -273,7 +277,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 12,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     textAlign: "center",
     fontWeight: "500",
   },

@@ -23,6 +23,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
  * ConfirmAppointment Component
@@ -32,6 +33,7 @@ import { Alert } from "react-native";
  * to view appointments or book another. Features an elegant curved background.
  */
 export default function ConfirmAppointment() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -123,7 +125,7 @@ export default function ConfirmAppointment() {
   if (!supportWorker) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <Text style={styles.errorText}>Support worker not found</Text>
         </SafeAreaView>
       </CurvedBackground>
@@ -254,7 +256,7 @@ export default function ConfirmAppointment() {
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -275,11 +277,11 @@ export default function ConfirmAppointment() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointment Confirmation" showBack={true} />
 
         <ScrollView style={styles.scrollContainer}>
-          <Text style={styles.title}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>
 
@@ -287,25 +289,25 @@ export default function ConfirmAppointment() {
           <View style={styles.stepsContainer}>
             <View style={styles.stepRow}>
               {/* Step 1 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>1</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 2 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>2</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 3 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>3</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 4 - Active (Final Step) */}
-              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
                 <Text style={[styles.stepNumber, styles.stepNumberActive]}>
                   4
                 </Text>
@@ -314,48 +316,48 @@ export default function ConfirmAppointment() {
           </View>
 
           {/* Confirmation Card */}
-          <View style={styles.confirmationCard}>
-            <Text style={styles.confirmationTitle}>Appointment Booked</Text>
-            <Text style={styles.confirmationMessage}>
+          <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.confirmationTitle, { color: theme.colors.text }]}>Appointment Booked</Text>
+            <Text style={[styles.confirmationMessage, { color: theme.colors.textSecondary }]}>
               Your appointment has been successfully scheduled.
             </Text>
 
             <View style={styles.appointmentDetails}>
               {/* Support Worker Details */}
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Support Worker:</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {appointment ? appointment.supportWorker : ""}
                 </Text>
               </View>
 
               {/* Appointment Date */}
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Date:</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {appointment ? `${appointment.date}` : ""}
                 </Text>
               </View>
 
               {/* Appointment Time */}
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Time:</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {appointment ? `${appointment.time}` : ""}
                 </Text>
               </View>
 
               {/* Session Type */}
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Session Type:</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
                   {appointment ? appointment.type : ""}
                 </Text>
               </View>
 
               {/* Primary Action Button - View Appointments */}
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
                 onPress={() => router.replace("/appointments/appointment-list")}
               >
                 <Text style={styles.buttonText}>Check Appointments</Text>
@@ -363,10 +365,10 @@ export default function ConfirmAppointment() {
 
               {/* Secondary Action Button - Book Another Appointment */}
               <TouchableOpacity
-                style={styles.secondaryButton}
+                style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
                 onPress={() => router.replace("/appointments/book")}
               >
-                <Text style={styles.secondaryButtonText}>
+                <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
                   Book Another Appointment
                 </Text>
               </TouchableOpacity>
@@ -386,10 +388,10 @@ export default function ConfirmAppointment() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -397,6 +399,7 @@ export default function ConfirmAppointment() {
                     key={index}
                     style={[
                       styles.sideMenuItem,
+                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -405,13 +408,14 @@ export default function ConfirmAppointment() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.primary}
                     />
                     <Text
                       style={[
                         styles.sideMenuItemText,
+                        { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && styles.signOutText,
+                        item.title === "Sign Out" && { color: theme.colors.error },
                       ]}
                     >
                       {item.title}

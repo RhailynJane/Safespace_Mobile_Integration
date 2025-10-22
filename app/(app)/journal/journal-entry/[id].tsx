@@ -16,6 +16,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../../utils/journalApi";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -26,6 +27,7 @@ const tabs = [
 ];
 
 export default function JournalEntryScreen() {
+  const { theme } = useTheme();
   const { id } = useLocalSearchParams();
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,11 +117,11 @@ export default function JournalEntryScreen() {
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.loadingText}>Loading entry...</Text>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading entry...</Text>
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -129,20 +131,20 @@ export default function JournalEntryScreen() {
   if (!entry) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
           <View style={styles.notFoundContainer}>
             <Ionicons
               name="document-outline"
               size={64}
-              color={Colors.textTertiary}
+              color={theme.colors.textSecondary}
             />
-            <Text style={styles.notFoundText}>Entry not found</Text>
+            <Text style={[styles.notFoundText, { color: theme.colors.textSecondary }]}>Entry not found</Text>
             <TouchableOpacity
-              style={styles.backButton}
+              style={[styles.backButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => router.back()}
             >
-              <Text style={styles.backButtonText}>Go Back</Text>
+              <Text style={[styles.backButtonText, { color: theme.colors.surface }]}>Go Back</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -152,7 +154,7 @@ export default function JournalEntryScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
 
         <ScrollView 
@@ -160,31 +162,34 @@ export default function JournalEntryScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           <View style={styles.entryHeader}>
-            <Text style={styles.entryDate}>{formatDate(entry.created_at)}</Text>
-            <Text style={styles.entryTitle}>{entry.title}</Text>
+            <Text style={[styles.entryDate, { color: theme.colors.textSecondary }]}>{formatDate(entry.created_at)}</Text>
+            <Text style={[styles.entryTitle, { color: theme.colors.text }]}>{entry.title}</Text>
             {entry.emoji && entry.emotion_type && (
-              <Text style={styles.entryMood}>
+              <Text style={[styles.entryMood, { color: theme.colors.textSecondary }]}>
                 {entry.emoji} {entry.emotion_type.replace("-", " ")}
               </Text>
             )}
           </View>
 
-          <Text style={styles.entryContent}>{entry.content}</Text>
+          <Text style={[styles.entryContent, { color: theme.colors.text }]}>{entry.content}</Text>
 
           {entry.tags && entry.tags.length > 0 && (
             <View style={styles.tagsContainer}>
               {entry.tags.map((tag: string, index: number) => (
-                <View key={`${entry.id}-${tag}-${index}`} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
+                <View 
+                  key={`${entry.id}-${tag}-${index}`} 
+                  style={[styles.tag, { backgroundColor: theme.colors.primary + '20' }]}
+                >
+                  <Text style={[styles.tagText, { color: theme.colors.primary }]}>{tag}</Text>
                 </View>
               ))}
             </View>
           )}
 
           {entry.share_with_support_worker && (
-            <View style={styles.sharedCard}>
-              <Ionicons name="people" size={20} color={Colors.primary} />
-              <Text style={styles.sharedCardText}>
+            <View style={[styles.sharedCard, { backgroundColor: theme.colors.primary + '20' }]}>
+              <Ionicons name="people" size={20} color={theme.colors.primary} />
+              <Text style={[styles.sharedCardText, { color: theme.colors.primary }]}>
                 This entry is shared with your support worker
               </Text>
             </View>
@@ -192,31 +197,41 @@ export default function JournalEntryScreen() {
 
           <View style={styles.entryActions}>
             <TouchableOpacity
-              style={styles.editButton}
+              style={[
+                styles.editButton, 
+                { 
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.primary 
+                }
+              ]}
               onPress={handleEdit}
               disabled={deleting}
             >
               <Ionicons
                 name="create-outline"
                 size={20}
-                color={Colors.primary}
+                color={theme.colors.primary}
               />
-              <Text style={styles.editButtonText}>Edit</Text>
+              <Text style={[styles.editButtonText, { color: theme.colors.primary }]}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.deleteButton,
+                { 
+                  backgroundColor: theme.colors.error,
+                  borderColor: theme.colors.error 
+                },
                 deleting && styles.disabledButton,
               ]}
               onPress={handleDelete}
               disabled={deleting}
             >
               {deleting ? (
-                <ActivityIndicator size="small" color={Colors.surface} />
+                <ActivityIndicator size="small" color={theme.colors.surface} />
               ) : (
                 <>
-                  <Ionicons name="trash-outline" size={20} color={Colors.surface} />
-                  <Text style={styles.deleteButtonText}>
+                  <Ionicons name="trash-outline" size={20} color={theme.colors.surface} />
+                  <Text style={[styles.deleteButtonText, { color: theme.colors.surface }]}>
                     Delete
                   </Text>
                 </>
@@ -255,7 +270,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: Spacing.md,
   },
   notFoundContainer: {
@@ -268,10 +282,8 @@ const styles = StyleSheet.create({
     ...Typography.title,
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
-    color: Colors.textSecondary,
   },
   backButton: {
-    backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
@@ -284,7 +296,6 @@ const styles = StyleSheet.create({
   },
   entryDate: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginBottom: Spacing.sm,
   },
   entryTitle: {
@@ -295,7 +306,6 @@ const styles = StyleSheet.create({
   },
   entryMood: {
     ...Typography.body,
-    color: Colors.textSecondary,
     textTransform: "capitalize",
   },
   entryContent: {
@@ -310,26 +320,22 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   tag: {
-    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
   },
   tagText: {
     ...Typography.caption,
-    color: Colors.primary,
   },
   sharedCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     padding: Spacing.lg,
     marginBottom: Spacing.xl,
   },
   sharedCardText: {
     ...Typography.body,
-    color: Colors.primary,
     marginLeft: Spacing.md,
     flex: 1,
   },
@@ -347,13 +353,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: Spacing.lg,
     borderRadius: 12,
-    backgroundColor: Colors.surface,
     borderWidth: 2,
-    borderColor: Colors.primary,
   },
   editButtonText: {
     ...Typography.button,
-    color: Colors.primary,
     marginLeft: Spacing.sm,
     fontWeight: "600",
   },
@@ -364,16 +367,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: Spacing.lg,
     borderRadius: 12,
-    backgroundColor: Colors.error,
     borderWidth: 2,
-    borderColor: Colors.error,
   },
   disabledButton: {
     opacity: 0.6,
   },
   deleteButtonText: {
     ...Typography.button,
-    color: Colors.surface,
     marginLeft: Spacing.sm,
     fontWeight: "600",
   },

@@ -16,8 +16,10 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSignIn } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function LoginScreen() {
+  const { theme } = useTheme();
   const { signIn, setActive, isLoaded } = useSignIn();
 
   // Form state management
@@ -26,6 +28,24 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+
+  // Function to update login timestamp
+  const updateLoginTimestamp = async (clerkUserId: string) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      console.log('Login timestamp updated successfully');
+    } catch (error) {
+      console.error('Failed to update login timestamp:', error);
+      // Don't throw error - continue with login even if timestamp update fails
+    }
+  };
 
   const handleSignIn = async () => {
     if (!isLoaded) {
@@ -44,6 +64,13 @@ export default function LoginScreen() {
 
       if (signInAttempt.status === "complete") {
         await setActive({ session: signInAttempt.createdSessionId });
+        
+        // Update login timestamp after successful login
+        const clerkUserId = signInAttempt.createdSessionId;
+        if (clerkUserId) {
+          await updateLoginTimestamp(clerkUserId);
+        }
+        
         router.replace("/(app)/(tabs)/home");
       } else {
         setError("Sign in process incomplete. Please try again.");
@@ -71,7 +98,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
       <KeyboardAvoidingView
@@ -85,32 +112,36 @@ export default function LoginScreen() {
             <SafeSpaceLogo size={218} />
           </View>
 
-          <Text style={styles.title}>Sign In To SafeSpace</Text>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Sign In To SafeSpace</Text>
 
           <View style={styles.toggleContainer}>
-            <View style={[styles.toggleButton, styles.activeToggle]}>
+            <View style={[styles.toggleButton, styles.activeToggle, { backgroundColor: theme.colors.primary }]}>
               <Text style={styles.activeToggleText}>Sign In</Text>
             </View>
             <TouchableOpacity
               style={styles.toggleButton}
               onPress={() => router.push("/(auth)/signup")}
             >
-              <Text style={styles.inactiveToggleText}>Sign Up</Text>
+              <Text style={[styles.inactiveToggleText, { color: theme.colors.textSecondary }]}>Sign Up</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.formContainer}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <View style={styles.inputWrapper}>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email Address</Text>
+            <View style={[styles.inputWrapper, { 
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.borderLight
+            }]}>
               <Ionicons
                 name="mail-outline"
                 size={20}
-                color="#999"
+                color={theme.colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.colors.text }]}
                 placeholder="Enter your email address"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -122,17 +153,21 @@ export default function LoginScreen() {
               />
             </View>
 
-            <Text style={styles.inputLabel}>Password</Text>
-            <View style={styles.inputWrapper}>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Password</Text>
+            <View style={[styles.inputWrapper, { 
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.borderLight
+            }]}>
               <Ionicons
                 name="lock-closed-outline"
                 size={20}
-                color="#999"
+                color={theme.colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.colors.text }]}
                 placeholder="Enter your password..."
+                placeholderTextColor={theme.colors.textSecondary}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -148,15 +183,15 @@ export default function LoginScreen() {
                 <Ionicons
                   name={showPassword ? "eye-off-outline" : "eye-outline"}
                   size={20}
-                  color="#999"
+                  color={theme.colors.icon}
                 />
               </TouchableOpacity>
             </View>
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {error ? <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text> : null}
 
             <TouchableOpacity
-              style={[styles.signInButton, loading && styles.disabledButton]}
+              style={[styles.signInButton, { backgroundColor: theme.colors.primary }, loading && styles.disabledButton]}
               onPress={handleSignIn}
               disabled={loading || !isLoaded}
             >
@@ -170,9 +205,9 @@ export default function LoginScreen() {
                 onPress={() => router.push("/(auth)/signup")}
                 disabled={loading}
               >
-                <Text style={styles.footerText}>
-                  Don't have an account?{" "}
-                  <Text style={styles.linkText}>Sign Up</Text>
+                <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
+                  Dont have an account?{" "}
+                  <Text style={[styles.linkText, { color: theme.colors.error }]}>Sign Up</Text>
                 </Text>
               </TouchableOpacity>
 
@@ -180,7 +215,7 @@ export default function LoginScreen() {
                 style={styles.forgotPassword}
                 onPress={() => router.push("/(auth)/forgot-password")}
               >
-                <Text style={styles.linkText}>Forgot Password</Text>
+                <Text style={[styles.linkText, { color: theme.colors.error }]}>Forgot Password</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -8,8 +8,10 @@ import { useEffect } from "react";
 import { Animated, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SafeSpaceLogo from "../components/SafeSpaceLogo";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function SplashScreen() {
+  const { theme } = useTheme();
   // Animation values for entrance effects
   const fadeAnim = new Animated.Value(0); // Controls opacity (0 = invisible, 1 = fully visible)
   const scaleAnim = new Animated.Value(0.8); // Controls scale (0.8 = 80% size, 1 = full size)
@@ -41,7 +43,7 @@ export default function SplashScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
         {/* Animated container for logo with fade and scale effects */}
         <Animated.View
@@ -57,7 +59,7 @@ export default function SplashScreen() {
         </Animated.View>
 
         {/* App title with fade animation only */}
-        <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
+        <Animated.Text style={[styles.title, { opacity: fadeAnim, color: theme.colors.text }]}>
           SafeSpace
         </Animated.Text>
       </View>

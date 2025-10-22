@@ -20,10 +20,12 @@ import { router } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
+import { useTheme } from "../../../../../contexts/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 
 export default function PostSuccessScreen() {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("community-forum");
   const [scaleAnim] = useState(new Animated.Value(0.8));
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -90,7 +92,7 @@ export default function PostSuccessScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Success" showBack={false} />
 
         <View style={styles.content}>
@@ -98,6 +100,7 @@ export default function PostSuccessScreen() {
           <Animated.View 
             style={[
               styles.successCard,
+              { backgroundColor: theme.colors.surface },
               {
                 opacity: fadeAnim,
                 transform: [{ scale: scaleAnim }]
@@ -116,10 +119,10 @@ export default function PostSuccessScreen() {
             </View>
 
             {/* Success Title */}
-            <Text style={styles.title}>Post Published!</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]}>Post Published!</Text>
 
             {/* Success Message */}
-            <Text style={styles.message}>
+            <Text style={[styles.message, { color: theme.colors.textSecondary }]}>
               Your voice has been shared with the community.{"\n"}
               Your story matters and can help others feel less alone.
             </Text>
@@ -128,15 +131,15 @@ export default function PostSuccessScreen() {
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
                 <Ionicons name="eye-outline" size={20} color="#7CB9A9" />
-                <Text style={styles.statText}>Visible to community</Text>
+                <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>Visible to community</Text>
               </View>
               <View style={styles.statItem}>
                 <Ionicons name="heart-outline" size={20} color="#7CB9A9" />
-                <Text style={styles.statText}>Ready for reactions</Text>
+                <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>Ready for reactions</Text>
               </View>
               <View style={styles.statItem}>
                 <Ionicons name="chatbubble-outline" size={20} color="#7CB9A9" />
-                <Text style={styles.statText}>Open for support</Text>
+                <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>Open for support</Text>
               </View>
             </View>
 
@@ -202,7 +205,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   successCard: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 24,
     padding: 32,
     width: width * 0.9,
@@ -284,14 +287,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     textAlign: "center",
     marginBottom: 16,
     lineHeight: 34,
   },
   message: {
     fontSize: 16,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     textAlign: "center",
     lineHeight: 24,
     marginBottom: 32,
@@ -310,7 +313,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     fontWeight: "500",
   },
   primaryButton: {

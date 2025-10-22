@@ -22,6 +22,7 @@ import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useTheme } from "../../../../../contexts/ThemeContext";
 
 /**
  * AppointmentDetail Component
@@ -34,6 +35,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
  * Features modals for confirmation actions and elegant curved background.
  */
 export default function AppointmentList() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -129,7 +131,7 @@ export default function AppointmentList() {
   if (!appointment) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()}>
               <Ionicons name="arrow-back" size={28} color="#4CAF50" />
@@ -361,36 +363,36 @@ export default function AppointmentList() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointment Details" showBack={true} />
 
         <ScrollView style={styles.content}>
           {/* Appointment Card */}
-          <View style={styles.appointmentCard}>
-            <Text style={styles.supportWorkerName}>
+          <View style={[styles.appointmentCard, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
               {appointment.supportWorker}
             </Text>
 
             {/* Appointment Details */}
             <View style={styles.detailRow}>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-              <Text style={styles.detailText}>{appointment.date}</Text>
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.icon} />
+              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.date}</Text>
             </View>
             <View style={styles.detailRow}>
-              <Ionicons name="time-outline" size={20} color="#666" />
-              <Text style={styles.detailText}>{appointment.time}</Text>
+              <Ionicons name="time-outline" size={20} color={theme.colors.icon} />
+              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.time}</Text>
             </View>
             <View style={styles.detailRow}>
-              <Ionicons name="videocam-outline" size={20} color="#666" />
-              <Text style={styles.detailText}>{appointment.type} Session</Text>
+              <Ionicons name="videocam-outline" size={20} color={theme.colors.icon} />
+              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.type} Session</Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons
                 name="information-circle-outline"
                 size={20}
-                color="#666"
+                color={theme.colors.icon}
               />
-              <Text style={styles.detailText}>
+              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
                 Status: {appointment.status}
               </Text>
             </View>
@@ -400,7 +402,7 @@ export default function AppointmentList() {
           <View style={styles.actions}>
             {/* Join Session Button */}
             <TouchableOpacity
-              style={styles.primaryButton}
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
               onPress={handleJoinSession}
             >
               <Ionicons name="videocam" size={20} color="#FFF" />
@@ -409,20 +411,20 @@ export default function AppointmentList() {
 
             {/* Reschedule Button */}
             <TouchableOpacity
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
               onPress={handleReschedule}
             >
-              <Ionicons name="calendar" size={20} color="#4CAF50" />
-              <Text style={styles.secondaryButtonText}>Reschedule</Text>
+              <Ionicons name="calendar" size={20} color={theme.colors.primary} />
+              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>Reschedule</Text>
             </TouchableOpacity>
 
             {/* Cancel Appointment Button */}
             <TouchableOpacity
-              style={styles.tertiaryButton}
+              style={[styles.tertiaryButton, { borderColor: theme.colors.error }]}
               onPress={handleCancel}
             >
-              <Ionicons name="close-circle" size={20} color="#F44336" />
-              <Text style={styles.tertiaryButtonText}>Cancel Appointment</Text>
+              <Ionicons name="close-circle" size={20} color={theme.colors.error} />
+              <Text style={[styles.tertiaryButtonText, { color: theme.colors.error }]}>Cancel Appointment</Text>
             </TouchableOpacity>
           </View>
 
@@ -438,26 +440,26 @@ export default function AppointmentList() {
               onPress={() => setCancelModalVisible(false)}
             >
               <View style={styles.blurContainer}>
-                <View style={styles.confirmationModalContent}>
-                  <View style={styles.modalIconContainer}>
-                    <Ionicons name="close-circle" size={48} color="#F44336" />
+                <View style={[styles.confirmationModalContent, { backgroundColor: theme.colors.surface }]}>
+                  <View style={[styles.modalIconContainer, { backgroundColor: theme.colors.surface }]}>
+                    <Ionicons name="close-circle" size={48} color={theme.colors.error} />
                   </View>
-                  <Text style={styles.modalTitle}>Cancel Appointment?</Text>
-                  <Text style={styles.modalText}>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Cancel Appointment?</Text>
+                  <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
                     Are you sure you want to cancel your session with{" "}
                     {appointment.supportWorker} on {appointment.date}?
                   </Text>
                   <View style={styles.modalButtons}>
                     <TouchableOpacity
-                      style={[styles.modalButton, styles.modalCancelButton]}
+                      style={[styles.modalButton, styles.modalCancelButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
                       onPress={() => setCancelModalVisible(false)}
                     >
-                      <Text style={styles.modalCancelButtonText}>
+                      <Text style={[styles.modalCancelButtonText, { color: theme.colors.textSecondary }]}>
                         Keep Appointment
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.modalButton, styles.modalConfirmButton]}
+                      style={[styles.modalButton, styles.modalConfirmButton, { backgroundColor: theme.colors.error }]}
                       onPress={confirmCancel}
                     >
                       <Text style={styles.modalConfirmButtonText}>
@@ -482,33 +484,34 @@ export default function AppointmentList() {
               onPress={() => setRescheduleModalVisible(false)}
             >
               <View style={styles.blurContainer}>
-                <View style={styles.confirmationModalContent}>
-                  <View style={styles.modalIconContainer}>
-                    <Ionicons name="calendar" size={48} color="#4CAF50" />
+                <View style={[styles.confirmationModalContent, { backgroundColor: theme.colors.surface }]}>
+                  <View style={[styles.modalIconContainer, { backgroundColor: theme.colors.surface }]}>
+                    <Ionicons name="calendar" size={48} color={theme.colors.primary} />
                   </View>
-                  <Text style={styles.modalTitle}>Reschedule Appointment</Text>
-                  <Text style={styles.modalText}>
+                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Reschedule Appointment</Text>
+                  <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
                     Select a new date and time for your session with{" "}
                     {appointment.supportWorker}.
                   </Text>
 
                   {/* Available Time Slots */}
                   <View style={styles.rescheduleOptions}>
-                    <Text style={styles.rescheduleHint}>
+                    <Text style={[styles.rescheduleHint, { color: theme.colors.textSecondary }]}>
                       Available time slots:
                     </Text>
                     <TouchableOpacity
                       style={[
                         styles.timeSlot,
-                        selectedTimeSlot === "slot1" && styles.selectedTimeSlot,
+                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 },
+                        selectedTimeSlot === "slot1" && { borderColor: theme.colors.primary, borderWidth: 2 },
                       ]}
                       onPress={() => setSelectedTimeSlot("slot1")}
                     >
                       <Text
                         style={[
                           styles.timeSlotText,
-                          selectedTimeSlot === "slot1" &&
-                            styles.selectedTimeSlotText,
+                          { color: theme.colors.text },
+                          selectedTimeSlot === "slot1" && { color: theme.colors.primary },
                         ]}
                       >
                         October 08, 2025 at 2:00 PM
@@ -517,15 +520,16 @@ export default function AppointmentList() {
                     <TouchableOpacity
                       style={[
                         styles.timeSlot,
-                        selectedTimeSlot === "slot2" && styles.selectedTimeSlot,
+                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 },
+                        selectedTimeSlot === "slot2" && { borderColor: theme.colors.primary, borderWidth: 2 },
                       ]}
                       onPress={() => setSelectedTimeSlot("slot2")}
                     >
                       <Text
                         style={[
                           styles.timeSlotText,
-                          selectedTimeSlot === "slot2" &&
-                            styles.selectedTimeSlotText,
+                          { color: theme.colors.text },
+                          selectedTimeSlot === "slot2" && { color: theme.colors.primary },
                         ]}
                       >
                         October 09, 2025 at 11:00 AM
@@ -534,15 +538,16 @@ export default function AppointmentList() {
                     <TouchableOpacity
                       style={[
                         styles.timeSlot,
-                        selectedTimeSlot === "slot3" && styles.selectedTimeSlot,
+                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 },
+                        selectedTimeSlot === "slot3" && { borderColor: theme.colors.primary, borderWidth: 2 },
                       ]}
                       onPress={() => setSelectedTimeSlot("slot3")}
                     >
                       <Text
                         style={[
                           styles.timeSlotText,
-                          selectedTimeSlot === "slot3" &&
-                            styles.selectedTimeSlotText,
+                          { color: theme.colors.text },
+                          selectedTimeSlot === "slot3" && { color: theme.colors.primary },
                         ]}
                       >
                         October 10, 2025 at 4:30 PM
@@ -552,13 +557,13 @@ export default function AppointmentList() {
 
                   <View style={styles.modalButtons}>
                     <TouchableOpacity
-                      style={[styles.modalButton, styles.modalCancelButton]}
+                      style={[styles.modalButton, styles.modalCancelButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
                       onPress={() => setRescheduleModalVisible(false)}
                     >
-                      <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                      <Text style={[styles.modalCancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.modalButton, styles.modalConfirmButton]}
+                      style={[styles.modalButton, styles.modalConfirmButton, { backgroundColor: theme.colors.primary }]}
                       onPress={confirmReschedule}
                     >
                       <Text style={styles.modalConfirmButtonText}>
@@ -584,10 +589,10 @@ export default function AppointmentList() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -595,6 +600,7 @@ export default function AppointmentList() {
                     key={index}
                     style={[
                       styles.sideMenuItem,
+                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -603,12 +609,13 @@ export default function AppointmentList() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.primary}
                     />
                     <Text style={[
                       styles.sideMenuItemText,
+                      { color: theme.colors.text },
                       item.disabled && styles.sideMenuItemTextDisabled,
-                      item.title === "Sign Out" && styles.signOutText,
+                      item.title === "Sign Out" && { color: theme.colors.error },
                     ]}>
                       {item.title}
                       {item.title === "Sign Out" && isSigningOut && "..."}

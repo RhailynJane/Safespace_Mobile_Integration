@@ -24,6 +24,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
+import { useTheme } from "../../../../contexts/ThemeContext";
 /**
  * BookAppointment Component
  *
@@ -35,6 +36,7 @@ import { Alert } from "react-native";
  * Features a multi-step process with visual indicators and elegant curved background.
  */
 export default function BookAppointment() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -94,7 +96,7 @@ export default function BookAppointment() {
   if (!supportWorker) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <Text style={styles.errorText}>Support worker not found</Text>
         </SafeAreaView>
       </CurvedBackground>
@@ -258,7 +260,7 @@ export default function BookAppointment() {
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -299,11 +301,11 @@ export default function BookAppointment() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title=" Book Appointments" showBack={true} />
 
-        <ScrollView style={styles.container}>
-          <Text style={styles.title}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>
 
@@ -311,44 +313,44 @@ export default function BookAppointment() {
           <View style={styles.stepsContainer}>
             <View style={styles.stepRow}>
               {/* Step 1 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>1</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 2 - Active */}
-              <View style={[styles.stepCircle, styles.stepCircleActive]}>
+              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
                 <Text style={[styles.stepNumber, styles.stepNumberActive]}>
                   2
                 </Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 3 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>3</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
               </View>
-              <View style={styles.stepConnector} />
+              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
               {/* Step 4 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>4</Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>4</Text>
               </View>
             </View>
           </View>
 
           {/* Support Worker Card with Avatar and Name */}
-          <View style={styles.supportWorkerCard}>
+          <View style={[styles.supportWorkerCard, { backgroundColor: theme.colors.surface }]}>
             <View style={styles.supportWorkerHeader}>
               <Image
                 source={{ uri: supportWorker.avatar }}
                 style={styles.avatar}
               />
               <View style={styles.supportWorkerInfo}>
-                <Text style={styles.supportWorkerName}>
+                <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
                   {supportWorker.name}
                 </Text>
-                <Text style={styles.supportWorkerTitle}>
+                <Text style={[styles.supportWorkerTitle, { color: theme.colors.textSecondary }]}>
                   {supportWorker.title}
                 </Text>
               </View>
@@ -356,7 +358,7 @@ export default function BookAppointment() {
           </View>
 
           {/* Session Type Selection */}
-          <Text style={styles.sectionTitle}>Select Session Type</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Session Type</Text>
           <View style={styles.sessionTypeContainer}>
             {SESSION_TYPES.map((type) => {
               // Determine icon based on session type
@@ -381,19 +383,22 @@ export default function BookAppointment() {
                   style={[
                     styles.sessionTypeButton,
                     selectedType === type && styles.sessionTypeButtonSelected,
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                    selectedType === type && { borderColor: theme.colors.primary },
                   ]}
                   onPress={() => setSelectedType(type)}
                 >
                   <Ionicons
                     name={iconName as keyof typeof Ionicons.glyphMap}
                     size={24}
-                    color={selectedType === type ? "#4CAF50" : "#666"}
+                    color={selectedType === type ? theme.colors.primary : theme.colors.icon}
                     style={styles.sessionTypeIcon}
                   />
                   <Text
                     style={[
                       styles.sessionTypeText,
-                      selectedType === type && styles.sessionTypeTextSelected,
+                      { color: theme.colors.text },
+                      selectedType === type && { color: theme.colors.primary },
                     ]}
                   >
                     {type}
@@ -404,18 +409,19 @@ export default function BookAppointment() {
           </View>
 
           {/* Date and Time Selection */}
-          <Text style={styles.sectionTitle}>Select Date and Time</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Date and Time</Text>
 
           {/* Available Dates Card */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Available Dates</Text>
+          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Dates</Text>
             <View style={styles.datesContainer}>
               {AVAILABLE_DATES.map((date) => (
                 <TouchableOpacity
                   key={date}
                   style={[
                     styles.dateItem,
-                    selectedDate === date && styles.dateItemSelected,
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                    selectedDate === date && { borderColor: theme.colors.primary },
                   ]}
                   onPress={() => {
                     setSelectedDate(date);
@@ -425,13 +431,14 @@ export default function BookAppointment() {
                   <Ionicons
                     name="calendar"
                     size={20}
-                    color={selectedDate === date ? "#4CAF50" : "#666"}
+                    color={selectedDate === date ? theme.colors.primary : theme.colors.icon}
                     style={styles.dateIcon}
                   />
                   <Text
                     style={[
                       styles.dateText,
-                      selectedDate === date && styles.dateTextSelected,
+                      { color: theme.colors.text },
+                      selectedDate === date && { color: theme.colors.primary },
                     ]}
                   >
                     {date}
@@ -444,28 +451,30 @@ export default function BookAppointment() {
           {/* Available Times Card (only shown when date is selected) */}
           {selectedDate ? (
             <>
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Available Times</Text>
+              <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Times</Text>
                 <View style={styles.timesContainer}>
                   {AVAILABLE_TIMES.map((time) => (
                     <TouchableOpacity
                       key={time}
                       style={[
                         styles.timeItem,
-                        selectedTime === time && styles.timeItemSelected,
+                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                        selectedTime === time && { borderColor: theme.colors.primary },
                       ]}
                       onPress={() => setSelectedTime(time)}
                     >
                       <Ionicons
                         name="time"
                         size={16}
-                        color={selectedTime === time ? "#4CAF50" : "#666"}
+                        color={selectedTime === time ? theme.colors.primary : theme.colors.icon}
                         style={styles.timeIcon}
                       />
                       <Text
                         style={[
                           styles.timeText,
-                          selectedTime === time && styles.timeTextSelected,
+                          { color: theme.colors.text },
+                          selectedTime === time && { color: theme.colors.primary },
                         ]}
                       >
                         {time}
@@ -476,10 +485,10 @@ export default function BookAppointment() {
               </View>
             </>
           ) : (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Available Times</Text>
+            <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Times</Text>
               <View style={styles.timesContainer}></View>
-              <Text style={styles.placeholderText}>
+              <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
                 Please select available date first
               </Text>
             </View>
@@ -489,7 +498,8 @@ export default function BookAppointment() {
           <TouchableOpacity
             style={[
               styles.continueButton,
-              (!selectedDate || !selectedTime) && styles.continueButtonDisabled,
+              { backgroundColor: theme.colors.primary },
+              (!selectedDate || !selectedTime) && { backgroundColor: theme.colors.borderLight },
             ]}
             onPress={handleContinue}
             disabled={!selectedDate || !selectedTime}
@@ -510,10 +520,10 @@ export default function BookAppointment() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -521,6 +531,7 @@ export default function BookAppointment() {
                     key={index}
                     style={[
                       styles.sideMenuItem,
+                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -529,13 +540,14 @@ export default function BookAppointment() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.primary}
                     />
                     <Text
                       style={[
                         styles.sideMenuItemText,
+                        { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && styles.signOutText,
+                        item.title === "Sign Out" && { color: theme.colors.error },
                       ]}
                     >
                       {item.title}

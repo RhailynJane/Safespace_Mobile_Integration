@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 
 // Local interface for signup data
 interface SignupData {
@@ -33,6 +34,7 @@ export default function PasswordStep({
   stepNumber,
   loading = false,
 }: PasswordStepProps) {
+  const { theme } = useTheme();
   // State to toggle password visibility
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -99,23 +101,27 @@ export default function PasswordStep({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Account Setup</Text>
-      <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
+      <Text style={[styles.title, { color: theme.colors.text }]}>Account Setup</Text>
+      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Step {stepNumber} of 3</Text>
 
       <View style={styles.formContainer}>
         {/* Password Input Field */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Password</Text>
-          <View style={styles.inputWrapper}>
+          <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Password</Text>
+          <View style={[styles.inputWrapper, { 
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.borderLight
+          }]}>
             <Ionicons
               name="lock-closed-outline"
               size={20}
-              color="#999"
+              color={theme.colors.icon}
               style={styles.inputIcon}
             />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.colors.text }]}
               placeholder="Enter password"
+              placeholderTextColor={theme.colors.textSecondary}
               value={data.password}
               onChangeText={(text) => onUpdate({ password: text })}
               secureTextEntry={!showPassword}
@@ -127,7 +133,7 @@ export default function PasswordStep({
               <Ionicons
                 name={showPassword ? "eye-off-outline" : "eye-outline"}
                 size={20}
-                color="#999"
+                color={theme.colors.icon}
               />
             </TouchableOpacity>
           </View>
@@ -140,13 +146,13 @@ export default function PasswordStep({
               <View
                 style={[
                   styles.requirementDot,
-                  { backgroundColor: requirement.test ? "#4CAF50" : "#E0E0E0" },
+                  { backgroundColor: requirement.test ? theme.colors.primary : theme.colors.borderLight },
                 ]}
               />
               <Text
                 style={[
                   styles.requirementText,
-                  { color: requirement.test ? "#4CAF50" : "#666" },
+                  { color: requirement.test ? theme.colors.primary : theme.colors.textSecondary },
                 ]}
               >
                 {requirement.message}
@@ -157,21 +163,23 @@ export default function PasswordStep({
 
         {/* Confirm Password Input Field */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Confirm Password</Text>
+          <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Confirm Password</Text>
           <View style={[
             styles.inputWrapper,
-            passwordsDontMatch && styles.inputWrapperError,
-            passwordsMatch && styles.inputWrapperSuccess
+            { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+            passwordsDontMatch && { borderColor: theme.colors.error },
+            passwordsMatch && { borderColor: theme.colors.primary }
           ]}>
             <Ionicons
               name="lock-closed-outline"
               size={20}
-              color="#999"
+              color={theme.colors.icon}
               style={styles.inputIcon}
             />
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.colors.text }]}
               placeholder="Re-enter password"
+              placeholderTextColor={theme.colors.textSecondary}
               value={data.confirmPassword}
               onChangeText={(text) => onUpdate({ confirmPassword: text })}
               secureTextEntry={!showConfirmPassword}
@@ -183,7 +191,7 @@ export default function PasswordStep({
               <Ionicons
                 name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
                 size={20}
-                color="#999"
+                color={theme.colors.icon}
               />
             </TouchableOpacity>
           </View>
@@ -191,21 +199,21 @@ export default function PasswordStep({
           {/* Password Match Indicator */}
           {passwordsMatch && (
             <View style={styles.matchIndicator}>
-              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-              <Text style={styles.matchText}>Passwords match</Text>
+              <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} />
+              <Text style={[styles.matchText, { color: theme.colors.primary }]}>Passwords match</Text>
             </View>
           )}
           {passwordsDontMatch && (
             <View style={styles.matchIndicator}>
-              <Ionicons name="close-circle" size={16} color="#E43232" />
-              <Text style={styles.errorMatchText}>Passwords don't match</Text>
+              <Ionicons name="close-circle" size={16} color={theme.colors.error} />
+              <Text style={[styles.errorMatchText, { color: theme.colors.error }]}>Passwords don&apos;t match</Text>
             </View>
           )}
         </View>
 
         {/* Create Account Button */}
         <TouchableOpacity
-          style={[styles.continueButton, loading && styles.disabledButton]}
+          style={[styles.continueButton, { backgroundColor: theme.colors.primary }, loading && styles.disabledButton]}
           onPress={handleSubmit}
           disabled={loading}
         >

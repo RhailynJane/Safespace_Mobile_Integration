@@ -24,6 +24,7 @@ import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { messagingService, Contact } from "../../../../utils/sendbirdService";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -34,6 +35,7 @@ const { width } = Dimensions.get("window");
  * contact list with online status indicators, and navigation to individual chat screens.
  */
 export default function NewMessagesScreen() {
+  const { theme } = useTheme();
   const { userId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("messages");
@@ -348,9 +350,9 @@ export default function NewMessagesScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading messages...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading messages...</Text>
       </View>
     );
   }
@@ -365,7 +367,7 @@ export default function NewMessagesScreen() {
     activeTab: string;
     onTabPress: (tabId: string) => void;
   }) => (
-    <View style={bottomNavStyles.container}>
+    <View style={[bottomNavStyles.container, { backgroundColor: theme.colors.surface }]}>
       {tabs.map((tab) => (
         <TouchableOpacity
           key={tab.id}
@@ -375,12 +377,12 @@ export default function NewMessagesScreen() {
           <Ionicons
             name={tab.icon as any}
             size={24}
-            color={activeTab === tab.id ? "#2EA78F" : "#9E9E9E"}
+            color={activeTab === tab.id ? theme.colors.primary : theme.colors.iconDisabled}
           />
           <Text
             style={[
               bottomNavStyles.tabText,
-              { color: activeTab === tab.id ? "#2EA78F" : "#9E9E9E" },
+              { color: activeTab === tab.id ? theme.colors.primary : theme.colors.iconDisabled },
             ]}
           >
             {tab.name}
@@ -392,35 +394,35 @@ export default function NewMessagesScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader 
           title="Messages" 
           showBack={true}
           rightActions={
             <TouchableOpacity onPress={() => setNewMessageModalVisible(true)}>
-              <Ionicons name="add" size={24} color="#333" />
+              <Ionicons name="add" size={24} color={theme.colors.icon} />
             </TouchableOpacity>
           }
         />
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
           <Ionicons
             name="search"
             size={20}
-            color="#9E9E9E"
+            color={theme.colors.icon}
             style={styles.searchIcon}
           />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.colors.text }]}
             placeholder="Search conversations..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#9E9E9E"
+            placeholderTextColor={theme.colors.textSecondary}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color="#999" />
+              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
           )}
         </View>
@@ -428,21 +430,21 @@ export default function NewMessagesScreen() {
         {/* Search Results Info */}
         {!!searchQuery.trim() && (
           <View style={styles.searchResultsInfo}>
-            <Text style={styles.searchResultsText}>
+            <Text style={[styles.searchResultsText, { color: theme.colors.textSecondary }]}>
               {filteredConversations.length === 0 
                 ? "No conversations found" 
                 : `Found ${filteredConversations.length} conversation${filteredConversations.length === 1 ? '' : 's'}`
               }
             </Text>
             <TouchableOpacity onPress={clearSearch}>
-              <Text style={styles.clearSearchText}>Clear</Text>
+              <Text style={[styles.clearSearchText, { color: theme.colors.primary }]}>Clear</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {/* Contact List */}
         <ScrollView style={styles.contactList}>
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
             {searchQuery.trim() ? "Search Results" : "Recent Conversations"}
           </Text>
           {filteredConversations.length === 0 ? (
@@ -450,12 +452,12 @@ export default function NewMessagesScreen() {
               <Ionicons 
                 name={searchQuery.trim() ? "search-outline" : "chatbubble-outline"} 
                 size={64} 
-                color="#CCCCCC" 
+                color={theme.colors.iconDisabled} 
               />
-              <Text style={styles.emptyStateText}>
+              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                 {searchQuery.trim() ? "No conversations found" : "No conversations yet"}
               </Text>
-              <Text style={styles.emptyStateSubtext}>
+              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
                 {searchQuery.trim() 
                   ? "Try adjusting your search terms" 
                   : "Start a new conversation by tapping the + button"
@@ -471,7 +473,7 @@ export default function NewMessagesScreen() {
               return (
                 <TouchableOpacity
                   key={conversation.id}
-                  style={styles.contactItem}
+                  style={[styles.contactItem, { borderBottomColor: theme.colors.borderLight }]}
                   onPress={() =>
                     router.push(`../messages/message-chat-screen?id=${conversation.id}&title=${encodeURIComponent(displayName)}`)
                   }
@@ -483,30 +485,30 @@ export default function NewMessagesScreen() {
                         style={styles.contactAvatar}
                       />
                     ) : (
-                      <View style={styles.avatarPlaceholder}>
+                      <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
                         <Text style={styles.avatarText}>
                           {avatar.value}
                         </Text>
                       </View>
                     )}
                     {isOnline && (
-                      <View style={styles.onlineIndicator} />
+                      <View style={[styles.onlineIndicator, { backgroundColor: theme.colors.primary, borderColor: theme.colors.surface }]} />
                     )}
                   </View>
                   <View style={styles.contactInfo}>
-                    <Text style={styles.contactName}>{displayName}</Text>
-                    <Text style={styles.contactMessage}>
+                    <Text style={[styles.contactName, { color: theme.colors.text }]}>{displayName}</Text>
+                    <Text style={[styles.contactMessage, { color: theme.colors.textSecondary }]}>
                       {conversation.last_message || 'No messages yet'}
                     </Text>
                   </View>
                   <View style={styles.timestampContainer}>
-                    <Text style={styles.timestamp}>
+                    <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
                       {conversation.last_message_time ? 
                         formatTime(conversation.last_message_time) : ''
                       }
                     </Text>
                     {conversation.unread_count > 0 && (
-                      <View style={styles.unreadBadge}>
+                      <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
                         <Text style={styles.unreadCount}>
                           {conversation.unread_count}
                         </Text>
@@ -525,32 +527,32 @@ export default function NewMessagesScreen() {
           animationType="slide"
           presentationStyle="pageSheet"
         >
-          <SafeAreaView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
+          <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.borderLight }] }>
               <TouchableOpacity onPress={handleCloseModal}>
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color={theme.colors.icon} />
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>New Message</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>New Message</Text>
               <View style={{ width: 24 }} />
             </View>
 
             {/* Search for Users */}
-            <View style={styles.searchContainer}>
+            <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
               <Ionicons
                 name="search"
                 size={20}
-                color="#9E9E9E"
+                color={theme.colors.icon}
                 style={styles.searchIcon}
               />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: theme.colors.text }]}
                 placeholder="Search by email address..."
                 value={searchQuery}
                 onChangeText={(text) => {
                   setSearchQuery(text);
                   // handleSearchUsers will be called via useEffect debounce
                 }}
-                placeholderTextColor="#9E9E9E"
+                placeholderTextColor={theme.colors.textSecondary}
                 autoFocus={true}
               />
             </View>
@@ -558,7 +560,7 @@ export default function NewMessagesScreen() {
             <ScrollView style={styles.searchResults}>
               {searching ? (
                 <View style={styles.centered}>
-                  <ActivityIndicator size="small" color="#4CAF50" />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                 </View>
               ) : (
                 <>
@@ -566,7 +568,7 @@ export default function NewMessagesScreen() {
                     searchResults.map((user) => (
                       <TouchableOpacity
                         key={user.id}
-                        style={styles.searchResultItem}
+                        style={[styles.searchResultItem, { borderBottomColor: theme.colors.borderLight }]}
                         onPress={() => startNewConversation(user)}
                       >
                         <View style={styles.avatarContainer}>
@@ -576,30 +578,30 @@ export default function NewMessagesScreen() {
                               style={styles.contactAvatar}
                             />
                           ) : (
-                            <View style={styles.avatarPlaceholder}>
+                            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
                               <Text style={styles.avatarText}>
                                 {user.first_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
                               </Text>
                             </View>
                           )}
-                          {user.online && <View style={styles.onlineIndicator} />}
+                          {user.online && <View style={[styles.onlineIndicator, { backgroundColor: theme.colors.primary, borderColor: theme.colors.surface }]} />}
                         </View>
                         <View style={styles.contactInfo}>
-                          <Text style={styles.contactName}>
+                          <Text style={[styles.contactName, { color: theme.colors.text }]}>
                             {user.first_name && user.last_name 
                               ? `${user.first_name} ${user.last_name}`
                               : user.email
                             }
                           </Text>
-                          <Text style={styles.contactEmail}>{user.email}</Text>
+                          <Text style={[styles.contactEmail, { color: theme.colors.textSecondary }]}>{user.email}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={20} color="#9E9E9E" />
+                        <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
                       </TouchableOpacity>
                     ))
                   ) : (
                     searchQuery.trim() && (
                       <View style={styles.centered}>
-                        <Text style={styles.noResultsText}>No users found</Text>
+                        <Text style={[styles.noResultsText, { color: theme.colors.textSecondary }]}>No users found</Text>
                       </View>
                     )
                   )}
@@ -627,12 +629,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    // backgroundColor moved to theme.colors.background via inline override
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: "#666",
+    // color moved to theme via inline override
   },
   header: {
     flexDirection: "row",
@@ -650,7 +652,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
+    // backgroundColor moved to theme.colors.surface via inline override
     margin: 15,
     borderRadius: 10,
     paddingHorizontal: 15,
@@ -662,7 +664,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    // color moved to theme via inline override
   },
   clearButton: {
     padding: 4,
@@ -678,12 +680,12 @@ const styles = StyleSheet.create({
   },
   searchResultsText: {
     fontSize: 14,
-    color: '#666',
+    // color moved to theme via inline override
     fontStyle: 'italic',
   },
   clearSearchText: {
     fontSize: 14,
-    color: '#4CAF50',
+    // color moved to theme.colors.primary via inline override
     fontWeight: '600',
   },
   contactList: {
@@ -693,7 +695,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#9E9E9E",
+    // color moved to theme via inline override
     marginBottom: 15,
     marginTop: 10,
   },
@@ -702,7 +704,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor moved to theme via inline override
   },
   avatarContainer: {
     position: "relative",
@@ -717,7 +719,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#4CAF50",
+    // backgroundColor moved to theme via inline override
     justifyContent: "center",
     alignItems: "center",
   },
@@ -733,37 +735,37 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#4CAF50",
+    // backgroundColor moved to theme via inline override
     borderWidth: 2,
-    borderColor: "#FFF",
+    // borderColor moved to theme via inline override
   },
   contactInfo: {
     flex: 1,
   },
   contactName: {
     fontSize: 16,
-    color: "#333",
+    // color moved to theme via inline override
     fontWeight: "500",
     marginBottom: 4,
   },
   contactMessage: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme via inline override
   },
   contactEmail: {
     fontSize: 14,
-    color: "#999",
+    // color moved to theme via inline override
   },
   timestampContainer: {
     alignItems: "flex-end",
   },
   timestamp: {
     fontSize: 12,
-    color: "#9E9E9E",
+    // color moved to theme via inline override
     marginBottom: 4,
   },
   unreadBadge: {
-    backgroundColor: "#4CAF50",
+    // backgroundColor moved to theme via inline override
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -783,19 +785,19 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: "#666",
+    // color moved to theme via inline override
     marginTop: 16,
     fontWeight: "600",
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: "#999",
+    // color moved to theme via inline override
     marginTop: 8,
     textAlign: "center",
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme via inline override
   },
   modalHeader: {
     flexDirection: "row",
@@ -803,12 +805,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor moved to theme via inline override
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    // color moved to theme via inline override
   },
   searchResults: {
     flex: 1,
@@ -819,7 +821,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor moved to theme via inline override
   },
   centered: {
     alignItems: "center",
@@ -828,7 +830,7 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     textAlign: "center",
-    color: "#999",
+    // color moved to theme via inline override
     fontSize: 16,
   },
 });
@@ -839,7 +841,7 @@ const bottomNavStyles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme via inline override
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: "#000",

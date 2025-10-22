@@ -24,6 +24,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -35,6 +36,7 @@ const { width } = Dimensions.get("window");
  * with clear navigation options and an elegant curved background.
  */
 export default function AppointmentsScreen() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -219,7 +221,7 @@ export default function AppointmentsScreen() {
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -247,7 +249,7 @@ export default function AppointmentsScreen() {
       <View style={styles.buttonContainer}>
         {/* Primary action button - Book Appointment */}
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
           onPress={handleBookAppointment}
         >
           <Text style={styles.buttonText}>Book Appointment</Text>
@@ -255,10 +257,10 @@ export default function AppointmentsScreen() {
 
         {/* Secondary action button - View Scheduled Appointments */}
         <TouchableOpacity
-          style={styles.secondaryButton}
+          style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
           onPress={handleViewScheduled}
         >
-          <Text style={styles.secondaryButtonText}>
+          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }] }>
             Check Scheduled Appointments
           </Text>
         </TouchableOpacity>
@@ -271,7 +273,7 @@ export default function AppointmentsScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointments" showBack={true} />
 
         {/* Appointment Illustration */}
@@ -299,10 +301,10 @@ export default function AppointmentsScreen() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -310,6 +312,7 @@ export default function AppointmentsScreen() {
                     key={index}
                     style={[
                       styles.sideMenuItem,
+                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -318,11 +321,12 @@ export default function AppointmentsScreen() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.icon}
                     />
                     <Text
                       style={[
                         styles.sideMenuItemText,
+                        { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
                         item.title === "Sign Out" && styles.signOutText,
                       ]}
@@ -351,6 +355,7 @@ export default function AppointmentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // backgroundColor removed - now uses theme.colors.background
   },
   appointmentImage: {
     width: width * 0.9,
@@ -410,13 +415,13 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    // borderBottomColor removed - now uses theme.colors.borderLight
     alignItems: "center",
   },
   menuProfileImage: {
@@ -428,12 +433,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    // color removed - now uses theme.colors.text
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
+    // color removed - now uses theme.colors.textSecondary
   },
   sideMenuContent: {
     padding: 10,
@@ -444,11 +449,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor removed - now uses theme.colors.borderLight
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
+    // color removed - now uses theme.colors.text
     marginLeft: 15,
   },
   buttonContainer: {

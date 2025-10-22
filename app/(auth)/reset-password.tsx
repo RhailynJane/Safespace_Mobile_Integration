@@ -17,8 +17,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSignIn } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ResetPasswordScreen() {
+  const { theme } = useTheme();
   const { email } = useLocalSearchParams<{ email: string }>();
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
@@ -174,7 +176,7 @@ export default function ResetPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
       <KeyboardAvoidingView
@@ -315,7 +317,7 @@ export default function ResetPasswordScreen() {
               disabled={loading || !isLoaded}
             >
               <Text style={styles.secondaryButtonText}>
-                Didn't receive the code? Resend
+                Didn&apos;t receive the code? Resend
               </Text>
             </TouchableOpacity>
           </View>

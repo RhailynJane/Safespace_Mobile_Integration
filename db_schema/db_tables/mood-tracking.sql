@@ -14,7 +14,7 @@ CREATE TABLE mood_entries (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    CONSTRAINT chk_mood_type CHECK (mood_type IN ('very-happy', 'happy', 'neutral', 'sad', 'very-sad'))
+    CONSTRAINT chk_mood_type CHECK (mood_type IN ('very_happy', 'happy', 'neutral', 'sad', 'very_sad'))
 );
 
 -- Add comment to document the share column

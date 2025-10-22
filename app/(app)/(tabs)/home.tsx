@@ -23,10 +23,8 @@ import { assessmentTracker } from "../../../utils/assessmentTracker";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { 
   Resource, 
-  fetchAllResourcesWithExternal,
-  getRandomQuote,
-  getDailyAffirmation 
-} from "../../../utils/resourcesApi";
+  fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 type MoodEntry = {
   id: string;
@@ -48,8 +46,10 @@ export default function HomeScreen() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
+const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const { user } = useUser();
+  const { theme } = useTheme();
 
   // Bottom navigation configuration
   const tabs = [
@@ -145,6 +145,46 @@ export default function HomeScreen() {
   };
 
   /**
+ * Loads profile image from AsyncStorage and Clerk
+ */
+const fetchProfileImage = useCallback(async () => {
+  try {
+    // Priority 1: Check AsyncStorage (set by edit screen)
+    const savedImage = await AsyncStorage.getItem('profileImage');
+    if (savedImage) {
+      console.log('📸 Found profile image in AsyncStorage');
+      setProfileImage(savedImage);
+      return;
+    }
+
+    // Priority 2: Check profileData in AsyncStorage
+    const savedProfileData = await AsyncStorage.getItem('profileData');
+    if (savedProfileData) {
+      const parsedData = JSON.parse(savedProfileData);
+      if (parsedData.profileImageUrl) {
+        console.log('📸 Found profile image in profileData');
+        setProfileImage(parsedData.profileImageUrl);
+        return;
+      }
+    }
+
+    // Priority 3: Use Clerk user image as fallback
+    if (user?.imageUrl) {
+      console.log('📸 Using Clerk profile image');
+      setProfileImage(user.imageUrl);
+      return;
+    }
+
+    console.log('📸 No profile image found');
+    setProfileImage(null);
+  } catch (error) {
+    console.error('Error loading profile image:', error);
+    setProfileImage(null);
+  }
+}, [user?.imageUrl]);
+
+
+  /**
    * Returns label text for mood type
    */
   const getLabelForMood = (moodType: string) => {
@@ -224,23 +264,24 @@ export default function HomeScreen() {
   }, []);
 
   useFocusEffect(
-    useCallback(() => {
-      const fetchData = async () => {
-        setLoading(true);
-        try {
-          await Promise.all([
-            fetchRecentMoods(),
-            fetchResources(),
-            checkAssessmentStatus(),
-          ]);
-        } finally {
-          setLoading(false);
-        }
-      };
+  useCallback(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchRecentMoods(),
+          fetchResources(),
+          checkAssessmentStatus(),
+          fetchProfileImage(), // ✅ Add this
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      fetchData();
-    }, [fetchRecentMoods, fetchResources, checkAssessmentStatus])
-  );
+    fetchData();
+  }, [fetchRecentMoods, fetchResources, checkAssessmentStatus, fetchProfileImage])
+);
 
   /**
    * Formats date into relative or short format
@@ -324,15 +365,15 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={["top"]}>
         {/* Use AppHeader component - handles all navigation and menu */}
         <AppHeader showBack={false} showMenu={true} showNotifications={true} />
 
@@ -348,11 +389,11 @@ export default function HomeScreen() {
           >
             {/* Greeting Section */}
             <View style={styles.greetingSection}>
-              <Text style={styles.greetingText}>
+              <Text style={[styles.greetingText, { color: theme.colors.text }]}>
                 {getGreeting()},{" "}
-                <Text style={styles.nameText}>{getGreetingName()}!</Text>
+                <Text style={[styles.nameText, { color: theme.colors.text }]}>{getGreetingName()}!</Text>
               </Text>
-              <Text style={styles.subGreetingText}>
+              <Text style={[styles.subGreetingText, { color: theme.colors.textSecondary }]}>
                 How are you feeling today?
               </Text>
             </View>
@@ -373,7 +414,7 @@ export default function HomeScreen() {
             {isAssessmentDue && (
               <View style={styles.section}>
                 <TouchableOpacity
-                  style={styles.pendingTaskCard}
+                  style={[styles.pendingTaskCard, { backgroundColor: theme.colors.surface }]}
                   onPress={() => router.push("../self-assessment")}
                 >
                   <View style={styles.pendingTaskHeader}>
@@ -391,16 +432,16 @@ export default function HomeScreen() {
                     </View>
                   </View>
 
-                  <Text style={styles.pendingTaskTitle}>
+                  <Text style={[styles.pendingTaskTitle, { color: theme.colors.text }]}>
                     Complete Your Assessment
                   </Text>
-                  <Text style={styles.pendingTaskDescription}>
+                  <Text style={[styles.pendingTaskDescription, { color: theme.colors.textSecondary }]}>
                     Please complete your mental wellbeing assessment. This helps
                     your support worker provide better care.
                   </Text>
 
                   <View style={styles.pendingTaskFooter}>
-                    <Text style={styles.pendingTaskTime}>
+                    <Text style={[styles.pendingTaskTime, { color: theme.colors.textSecondary }]}>
                       Takes 5-7 minutes
                     </Text>
                     <Ionicons
@@ -415,7 +456,7 @@ export default function HomeScreen() {
 
             {/* Quick Actions Grid */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
               <View style={styles.actionsGrid}>
                 {quickActions.map((action) => (
                   <TouchableOpacity
@@ -423,8 +464,8 @@ export default function HomeScreen() {
                     style={[
                       styles.actionCard,
                       {
-                        backgroundColor: action.color,
-                        borderColor: action.borderColor,
+                          backgroundColor: theme.colors.surface,
+                          borderColor: theme.colors.borderLight,
                       },
                     ]}
                     onPress={action.onPress}
@@ -432,7 +473,7 @@ export default function HomeScreen() {
                     <View
                       style={[
                         styles.iconContainer,
-                        { backgroundColor: action.borderColor },
+                          { backgroundColor: action.color },
                       ]}
                     >
                       {action.image ? (
@@ -452,7 +493,7 @@ export default function HomeScreen() {
                         />
                       )}
                     </View>
-                    <Text style={styles.actionTitle}>{action.title}</Text>
+                      <Text style={[styles.actionTitle, { color: theme.colors.text }]}>{action.title}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -464,20 +505,20 @@ export default function HomeScreen() {
                 onPress={() => router.push("/mood-history")}
                 style={styles.sectionTitleContainer}
               >
-                <Text style={styles.sectionTitle}>Recent Moods</Text>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Moods</Text>
               </TouchableOpacity>
               {recentMoods.length > 0 ? (
-                <View style={styles.recentMoods}>
+                <View style={[styles.recentMoods, { backgroundColor: theme.colors.surface }]}>
                   {recentMoods.map((mood) => (
-                    <View key={mood.id} style={styles.moodItem}>
+                    <View key={mood.id} style={[styles.moodItem, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
                       <Text style={styles.moodEmoji}>
                         {getEmojiForMood(mood.mood_type)}
                       </Text>
                       <View style={styles.moodDetails}>
-                        <Text style={styles.moodDate}>
+                        <Text style={[styles.moodDate, { color: theme.colors.textSecondary }]}>
                           {formatDate(mood.created_at)}
                         </Text>
-                        <Text style={styles.moodText}>
+                        <Text style={[styles.moodText, { color: theme.colors.text }]}>
                           {getLabelForMood(mood.mood_type)}
                         </Text>
                       </View>
@@ -485,9 +526,9 @@ export default function HomeScreen() {
                   ))}
                 </View>
               ) : (
-                <View style={styles.noDataContainer}>
-                  <Text style={styles.noDataText}>No mood entries yet</Text>
-                  <Text style={styles.noDataSubtext}>
+                <View style={[styles.noDataContainer, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>No mood entries yet</Text>
+                  <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
                     Start tracking your mood to see insights here
                   </Text>
                 </View>
@@ -496,12 +537,12 @@ export default function HomeScreen() {
 
             {/* Resources Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recommended Resources</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recommended Resources</Text>
               {resources.length > 0 ? (
                 resources.map((resource) => (
                   <TouchableOpacity
                     key={resource.id}
-                    style={styles.resourceCard}
+                    style={[styles.resourceCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}
                     onPress={() => handleResourcePress(resource)}
                   >
                     <View style={styles.resourceHeader}>
@@ -516,7 +557,7 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                       <View style={styles.resourceInfo}>
-                        <Text style={styles.resourceTitle} numberOfLines={2}>
+                        <Text style={[styles.resourceTitle, { color: theme.colors.text }]} numberOfLines={2}>
                           {resource.title}
                         </Text>
                         <View style={styles.resourceMeta}>
@@ -536,19 +577,19 @@ export default function HomeScreen() {
                             </Text>
                           </View>
                           <View style={styles.resourceDot} />
-                          <Text style={styles.resourceDuration}>
+                          <Text style={[styles.resourceDuration, { color: theme.colors.textSecondary }]}>
                             {resource.duration}
                           </Text>
                         </View>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#999" />
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
                   </TouchableOpacity>
                 ))
               ) : (
-                <View style={styles.noDataContainer}>
-                  <Text style={styles.noDataText}>No resources available</Text>
-                  <Text style={styles.noDataSubtext}>
+                <View style={[styles.noDataContainer, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>No resources available</Text>
+                  <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
                     Check back later for new content
                   </Text>
                 </View>
@@ -557,11 +598,11 @@ export default function HomeScreen() {
               {/* View All Resources Button */}
               {resources.length > 0 && (
                 <TouchableOpacity
-                  style={styles.viewAllButton}
+                    style={[styles.viewAllButton, { borderColor: theme.colors.primary }]}
                   onPress={() => router.push("/resources")}
                 >
-                  <Text style={styles.viewAllButtonText}>View All Resources</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#4CAF50" />
+                    <Text style={[styles.viewAllButtonText, { color: theme.colors.primary }]}>View All Resources</Text>
+                    <Ionicons name="arrow-forward" size={16} color={theme.colors.primary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -693,7 +734,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   recentMoods: {
-    backgroundColor: "#EDE7EC",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",

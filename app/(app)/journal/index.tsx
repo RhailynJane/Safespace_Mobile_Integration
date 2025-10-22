@@ -17,6 +17,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -27,6 +28,7 @@ const tabs = [
 ];
 
 export default function JournalScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,27 +91,27 @@ export default function JournalScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal" showBack={true} showMenu={true} />
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.content}>
-            <Text style={styles.subText}>
+            <Text style={[styles.subText, { color: theme.colors.textSecondary }]}>
               Express your thoughts and feelings
             </Text>
 
             <TouchableOpacity
-              style={styles.createCard}
+              style={[styles.createCard, { backgroundColor: theme.colors.surface }]}
               onPress={handleCreateJournal}
             >
               <View style={styles.createCardContent}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name="book" size={32} color={Colors.warning} />
+                <View style={[styles.iconContainer, { backgroundColor: theme.isDark ? '#FFB74D' : Colors.warning + '20' }]}>
+                  <Ionicons name="book" size={32} color={theme.isDark ? '#FFF3E0' : Colors.warning} />
                 </View>
 
                 <View style={styles.createTextContainer}>
-                  <Text style={styles.createTitle}>Create Journal</Text>
-                  <Text style={styles.createSubtitle}>
+                  <Text style={[styles.createTitle, { color: theme.colors.text }]}>Create Journal</Text>
+                  <Text style={[styles.createSubtitle, { color: theme.colors.textSecondary }]}>
                     Set up a journal based on your current mood & conditions
                   </Text>
                 </View>
@@ -121,27 +123,27 @@ export default function JournalScreen() {
                   <Ionicons
                     name="add-circle-outline"
                     size={28}
-                    color={Colors.textSecondary}
+                    color={theme.colors.textSecondary}
                   />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
 
             <View style={styles.recentSection}>
-              <Text style={styles.sectionTitle}>Recent Journal Entries</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Journal Entries</Text>
 
-              <View style={styles.recentContainer}>
+              <View style={[styles.recentContainer, { backgroundColor: theme.isDark ? theme.colors.primary + '20' : Colors.primary + '20' }]}>
                 {loading ? (
                   <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Colors.primary} />
-                    <Text style={styles.loadingText}>Loading entries...</Text>
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
+                    <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading entries...</Text>
                   </View>
                 ) : journalEntries.length > 0 ? (
                   <>
                     {journalEntries.map((entry) => (
                       <TouchableOpacity
                         key={entry.id}
-                        style={styles.entryCard}
+                        style={[styles.entryCard, { backgroundColor: theme.colors.surface }]}
                         onPress={() => handleEntryPress(entry.id)}
                       >
                         <View style={styles.entryHeader}>
@@ -149,23 +151,23 @@ export default function JournalScreen() {
                             <Text style={styles.entryEmoji}>{entry.emoji}</Text>
                           ) : null}
                           <View style={styles.entryInfo}>
-                            <Text style={styles.entryTitle}>{entry.title}</Text>
-                            <Text style={styles.entryDate}>
+                            <Text style={[styles.entryTitle, { color: theme.colors.text }]}>{entry.title}</Text>
+                            <Text style={[styles.entryDate, { color: theme.colors.textSecondary }]}>
                               {formatDate(entry.created_at)}
                             </Text>
                           </View>
                         </View>
-                        <Text style={styles.entryPreview} numberOfLines={2}>
+                        <Text style={[styles.entryPreview, { color: theme.colors.textSecondary }]} numberOfLines={2}>
                           {entry.content}
                         </Text>
                         {entry.share_with_support_worker && (
-                          <View style={styles.sharedBadge}>
+                          <View style={[styles.sharedBadge, { backgroundColor: theme.colors.primary + '20' }]}>
                             <Ionicons
                               name="people"
                               size={12}
-                              color={Colors.primary}
+                              color={theme.colors.primary}
                             />
-                            <Text style={styles.sharedText}>Shared</Text>
+                            <Text style={[styles.sharedText, { color: theme.colors.primary }]}>Shared</Text>
                           </View>
                         )}
                       </TouchableOpacity>
@@ -175,14 +177,14 @@ export default function JournalScreen() {
                       style={styles.viewAllButton}
                       onPress={handleViewAllEntries}
                     >
-                      <Text style={styles.viewAllText}>
+                      <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>
                         View Journal Entries
                       </Text>
                     </TouchableOpacity>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.noEntriesText}>
+                    <Text style={[styles.noEntriesText, { color: theme.colors.textSecondary }]}>
                       No entries recorded
                     </Text>
 
@@ -190,7 +192,7 @@ export default function JournalScreen() {
                       style={styles.viewAllButton}
                       onPress={handleViewAllEntries}
                     >
-                      <Text style={styles.viewAllText}>
+                      <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>
                         View Journal Entries
                       </Text>
                     </TouchableOpacity>
@@ -229,10 +231,8 @@ const styles = StyleSheet.create({
     ...Typography.subtitle,
     textAlign: "center",
     marginBottom: Spacing.xxl,
-    color: Colors.textSecondary,
   },
   createCard: {
-    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.xl,
     marginBottom: Spacing.xxl,
@@ -250,7 +250,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: Colors.warning + "20",
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.lg,
@@ -265,7 +264,6 @@ const styles = StyleSheet.create({
   },
   createSubtitle: {
     ...Typography.caption,
-    color: Colors.textSecondary,
   },
   createButton: {
     padding: Spacing.sm,
@@ -279,7 +277,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   recentContainer: {
-    backgroundColor: Colors.primary + "20",
     borderRadius: 16,
     padding: Spacing.xl,
     minHeight: 200,
@@ -291,11 +288,9 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: Spacing.md,
   },
   entryCard: {
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
@@ -319,18 +314,15 @@ const styles = StyleSheet.create({
   },
   entryDate: {
     ...Typography.caption,
-    color: Colors.textSecondary,
   },
   entryPreview: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     lineHeight: 18,
   },
   sharedBadge: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: Spacing.sm,
-    backgroundColor: Colors.primary + "20",
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: 8,
@@ -338,14 +330,12 @@ const styles = StyleSheet.create({
   },
   sharedText: {
     ...Typography.caption,
-    color: Colors.primary,
     marginLeft: 4,
     fontSize: 10,
   },
   noEntriesText: {
     ...Typography.caption,
     textAlign: "center",
-    color: Colors.textSecondary,
     marginTop: Spacing.huge,
     marginBottom: Spacing.huge,
   },
