@@ -727,6 +727,7 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
         cp.*,
         cc.name as category_name,
         cp.author_name,
+        u.profile_image_url AS author_image_url,
         COUNT(DISTINCT pr.id) as reaction_count,
         COUNT(DISTINCT pb.id) as bookmark_count,
         COALESCE(
@@ -738,6 +739,7 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
         ) as reactions
       FROM community_posts cp
       LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      LEFT JOIN users u ON u.clerk_user_id = cp.author_id
       LEFT JOIN post_reactions pr ON cp.id = pr.post_id
       LEFT JOIN post_bookmarks pb ON cp.id = pb.post_id
       LEFT JOIN (
@@ -763,7 +765,7 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
       paramIndex++;
     }
 
-    query += ` GROUP BY cp.id, cc.name
+  query += ` GROUP BY cp.id, cc.name, u.profile_image_url
                ORDER BY cp.reaction_count DESC, cp.created_at DESC 
                LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
@@ -798,6 +800,7 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
         cp.*,
         cc.name as category_name,
         cp.author_name,
+        u.profile_image_url AS author_image_url,
         COALESCE(
           json_object_agg(
             pr.emoji, 
@@ -807,6 +810,7 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
         ) as reactions
       FROM community_posts cp
       LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      LEFT JOIN users u ON u.clerk_user_id = cp.author_id
       LEFT JOIN post_reactions pr ON cp.id = pr.post_id
       LEFT JOIN (
         SELECT post_id, emoji, COUNT(*) as count
@@ -814,7 +818,7 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
         GROUP BY post_id, emoji
       ) reaction_counts ON cp.id = reaction_counts.post_id AND pr.emoji = reaction_counts.emoji
       WHERE cp.id = $1
-      GROUP BY cp.id, cc.name`,
+      GROUP BY cp.id, cc.name, u.profile_image_url`,
       [id]
     );
 
