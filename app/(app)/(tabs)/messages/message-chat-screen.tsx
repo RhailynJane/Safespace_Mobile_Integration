@@ -57,6 +57,8 @@ import * as DocumentPicker from "expo-document-picker";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
 import activityApi from "../../../../utils/activityApi";
+import * as FileSystem from "expo-file-system";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import { Paths, File as FSFile } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
@@ -109,6 +111,8 @@ export default function ChatScreen() {
   const [currentAttachment, setCurrentAttachment] =
     useState<ExtendedMessage | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [fileErrorModalVisible, setFileErrorModalVisible] = useState(false);
+  const [fileErrorMessage, setFileErrorMessage] = useState("");
   const [userNearBottom, setUserNearBottom] = useState(true);
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
   const didMarkReadRef = useRef(false);
@@ -347,7 +351,7 @@ export default function ChatScreen() {
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7, // slightly lower quality to reduce file size and improve performance
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -396,7 +400,7 @@ export default function ChatScreen() {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7, // slightly lower quality to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -446,7 +450,7 @@ export default function ChatScreen() {
     }
   };
 
-  // Upload attachment to server
+  // Upload attachment to server (multipart) and create a proper attachment message
   const uploadAttachment = async (
     fileUri: string,
     fileType: "image" | "file",
@@ -457,51 +461,66 @@ export default function ChatScreen() {
     try {
       setUploading(true);
 
-      // Generate a descriptive filename if not provided
-      const actualFileName =
-        fileName ||
-        (fileType === "image"
-          ? `photo_${Date.now()}.jpg`
-          : `document_${Date.now()}.file`);
+      // Derive filename and extension
+      const defaultName = fileType === "image" ? `photo_${Date.now()}.jpg` : `document_${Date.now()}.bin`;
+      const actualFileName = fileName || (fileUri.split("/").pop() || defaultName);
+      const nameParts = actualFileName.split(".");
+      const ext = (nameParts.length > 1 ? nameParts.pop() : "bin") as string;
+      const mimeType = getMimeType(ext) || (fileType === "image" ? "image/jpeg" : "application/octet-stream");
 
-      // Choose appropriate emoji and description
-      const emoji = fileType === "image" ? "🖼️" : "📄";
-      const description = fileType === "image" ? "Image" : "File";
-
-      // console.log(`📤 Sharing ${description}: ${actualFileName}`);
-
-      // Send message using your working messages API
-      const messageResponse = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clerkUserId: userId,
-            messageText: `${emoji} Shared ${description}: ${actualFileName}`,
-            messageType: "text",
-          }),
+      // Validate size against backend 10MB cap
+      try {
+        const info = await getFileInfo(fileUri);
+        if (info.size && info.size > 10 * 1024 * 1024) {
+          Alert.alert(
+            "File Too Large",
+            "Please select a file under 10 MB. For images, try choosing a lower-quality version or cropping."
+          );
+          return;
         }
+      } catch (_e) {
+        // Ignore size check failures; we'll let the server enforce limits
+      }
+
+      // Build multipart form data
+      const form = new FormData();
+      form.append("conversationId", String(conversationId));
+      form.append("clerkUserId", String(userId));
+      form.append("messageType", fileType);
+      form.append(
+        "file",
+        {
+          uri: fileUri,
+          name: actualFileName,
+          type: mimeType,
+        } as any
       );
 
-      if (messageResponse.ok) {
-        const result = await messageResponse.json();
+      const res = await fetch(`${API_BASE_URL}/api/messages/upload-attachment`, {
+        method: "POST",
+        // Let React Native set the Content-Type with boundary
+        body: form as any,
+      });
 
-        // Update UI immediately
-        setMessages((prev) => [...prev, result.data]);
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("📁 Upload failed:", errText);
+        setFileErrorMessage("Failed to upload attachment. Please try again.");
+        setFileErrorModalVisible(true);
+        return;
+      }
 
-        // Refresh messages after a short delay
-        setTimeout(() => loadMessages(), 1000);
-
-        Alert.alert("Success", `${description} shared successfully!`);
-      } else {
-        const errorText = await messageResponse.text();
-        console.error("Server error:", errorText);
-        Alert.alert("Error", "Failed to share file. Please try again.");
+      const json = await res.json();
+      if (json?.data) {
+        // Optimistically add the new message returned by server
+        setMessages((prev) => [...prev, json.data]);
+        // Optionally refresh to sync ordering/unread states
+        setTimeout(() => loadMessages(), 800);
       }
     } catch (error) {
-      console.error("Network error:", error);
-      Alert.alert("Error", "Network error. Please check your connection.");
+      console.error("📁 Upload error:", error);
+      setFileErrorMessage("Network error. Please check your connection.");
+      setFileErrorModalVisible(true);
     } finally {
       setUploading(false);
     }
@@ -591,62 +610,38 @@ export default function ChatScreen() {
   // Download file to local storage and share
   const downloadAndShareFile = async (remoteUri: string, fileName: string) => {
     try {
+      console.log("📥 Starting download:", { remoteUri, fileName });
       setDownloading(true);
-
-      // console.log("Downloading file:", { remoteUri, fileName });
-
-      // Extract file extension
       const urlWithoutParams = remoteUri.split("?")[0];
-      const fileExtension =
-        (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
+      const fileExtension = (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
       const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+
+      // Use FSFile to generate a writable path in cache
+      const outFile = new FSFile(Paths.cache, `${safeFileName}.${fileExtension}`);
+      console.log("📥 Downloading to:", outFile.uri);
       
-      // Create file in cache directory
-      const file = new FSFile(Paths.cache, `${safeFileName}.${fileExtension}`);
-      const localUri = file.uri;
+      await FileSystemLegacy.downloadAsync(remoteUri, outFile.uri);
+      const localUri = outFile.uri;
+      
+      console.log("✅ Download complete, opening share sheet");
 
-      // console.log("Download details:", { localUri, fileExtension });
-
-      // Download file using fetch and write to file
-      const response = await fetch(remoteUri);
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      await file.write(new Uint8Array(arrayBuffer));
-
-      // console.log("Download complete:", { localUri, fileExtension });
-
-      // Check if sharing is available
       const canShare = await Sharing.isAvailableAsync();
-
       if (canShare) {
         await Sharing.shareAsync(localUri, {
           mimeType: getMimeType(fileExtension),
-          dialogTitle: `Download ${fileName}`,
-          UTI: getUTI(fileExtension), // For iOS
+          dialogTitle: `Share ${fileName}`,
+          UTI: getUTI(fileExtension),
         });
-
-        Alert.alert("Success", "File downloaded and shared successfully!");
+        console.log("✅ Share sheet closed");
       } else {
-        Alert.alert("Success", "File downloaded successfully!");
-        // If sharing not available, open the file directly
+        console.log("⚠️ Sharing not available, opening in browser");
+        // Fallback: open in browser quietly
         await WebBrowser.openBrowserAsync(remoteUri);
       }
     } catch (error) {
-      console.error("Download error:", error);
-
-      let errorMessage = "Unable to download the file.";
-
-      if (error instanceof Error) {
-        if (error.message.includes("Network request failed")) {
-          errorMessage = "Network error. Please check your connection.";
-        } else if (error.message.includes("Invalid file URL")) {
-          errorMessage = "The file link is invalid or broken.";
-        } else if (error.message.includes("404")) {
-          errorMessage = "File not found on server.";
-        }
-      }
-
-      Alert.alert("Download Failed", errorMessage);
+      console.error("❌ Download error:", error);
+      setFileErrorMessage("Unable to download or share the file. Please try again.");
+      setFileErrorModalVisible(true);
     } finally {
       setDownloading(false);
     }
@@ -672,46 +667,93 @@ export default function ChatScreen() {
     return mimeTypes[extension.toLowerCase()] || "application/octet-stream";
   };
 
+  // Ensure we share a local file: download remote HTTP(S) URIs to cache first
+  const shareUriEnsuringLocal = async (uri: string, fallbackName = `share_${Date.now()}`) => {
+    console.log("📤 shareUriEnsuringLocal called with:", uri);
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      console.log("⚠️ Sharing not available on this device");
+      return false;
+    }
+    try {
+      let localUri = uri;
+      let ext = 'file';
+      if (uri.startsWith('http')) {
+        console.log("📥 Remote URI detected, downloading first...");
+        const withoutParams = (uri.split('?')[0] ?? uri) as string;
+        ext = (withoutParams.split('.').pop() || 'file').toLowerCase();
+        const outFile = new FSFile(Paths.cache, `${fallbackName}.${ext}`);
+        console.log("📥 Downloading to:", outFile.uri);
+        await FileSystemLegacy.downloadAsync(uri, outFile.uri);
+        localUri = outFile.uri;
+        console.log("✅ Download complete:", localUri);
+      }
+      console.log("📤 Opening share sheet for:", localUri);
+      await Sharing.shareAsync(localUri, { mimeType: getMimeType(ext) });
+      console.log("✅ Share sheet closed");
+      return true;
+    } catch (e) {
+      console.error('❌ Share error:', e);
+      return false;
+    }
+  };
+
   // Save image to gallery
   const saveImageToGallery = async (imageUri: string) => {
+    console.log("💾 saveImageToGallery called with:", imageUri);
     try {
       setDownloading(true);
-
-      // Request permissions
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "We need access to your media library to save images."
-        );
+      // Request permissions; if not available or rejected, fallback to share sheet
+      try {
+        console.log("🔐 Requesting media library permissions...");
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        console.log("🔐 Permission status:", status);
+        if (status !== "granted") {
+          console.log("⚠️ Permission denied, falling back to share");
+          const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+          if (shared) return;
+          setFileErrorMessage("Cannot save without media permissions.");
+          setFileErrorModalVisible(true);
+          return;
+        }
+      } catch (_permErr) {
+        console.error("⚠️ Permission request error:", _permErr);
+        // Some Android setups (Expo Go) will reject if manifest lacks permissions.
+        // Gracefully fallback to share sheet.
+        const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+        if (shared) return;
+        setFileErrorMessage("Unable to request media permissions.");
+        setFileErrorModalVisible(true);
         return;
       }
 
       let finalUri = imageUri;
-
-      // If it's a remote URL, download it first
+      // If remote, download to a writable cache path
       if (imageUri.startsWith("http")) {
+        console.log("📥 Remote image, downloading first...");
         const fileName = `image_${Date.now()}.jpg`;
-        const imageFile = new FSFile(Paths.cache, fileName);
-        
-        // Download using fetch
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        await imageFile.write(new Uint8Array(arrayBuffer));
-        
-        finalUri = imageFile.uri;
+        const outFile = new FSFile(Paths.cache, fileName);
+        await FileSystemLegacy.downloadAsync(imageUri, outFile.uri);
+        finalUri = outFile.uri;
+        console.log("✅ Downloaded to:", finalUri);
       }
 
-      // Save to gallery
+      console.log("💾 Creating media library asset...");
       const asset = await MediaLibrary.createAssetAsync(finalUri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-
-      Alert.alert("Success", "Image saved to your gallery!");
+      console.log("✅ Image saved to gallery!");
     } catch (error) {
-      console.error("Save image error:", error);
-      Alert.alert("Error", "Failed to save image to gallery");
+      console.error("❌ Save image error:", error);
+      // Final fallback: try share if gallery save failed
+      try {
+        console.log("⚠️ Gallery save failed, trying share fallback...");
+        const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+        if (shared) return;
+      } catch (_e2) {
+        // ignore share fallback errors here; will show modal below
+      }
+      setFileErrorMessage("Failed to save image to gallery.");
+      setFileErrorModalVisible(true);
     } finally {
       setDownloading(false);
     }
@@ -851,41 +893,32 @@ export default function ChatScreen() {
   const handleDownloadFile = async (message: ExtendedMessage) => {
     if (!message.attachment_url) return;
 
-    try {
-      setDownloading(true);
+    const fileUri = message.attachment_url;
+    const fileName = message.file_name || `file_${Date.now()}`;
 
-      const fileUri = message.attachment_url;
-      const fileName = message.file_name || `file_${Date.now()}`;
-
-      // console.log("Starting download:", { fileUri, fileName });
-
-      // Show download confirmation
-      Alert.alert(
-        "Download File",
-        `Download "${message.file_name || "this file"}"?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Download",
-            onPress: () => {
-              (async () => {
-                try {
-                  await downloadAndShareFile(fileUri, fileName);
-                } catch (error) {
-                  console.error("Download error:", error);
-                  Alert.alert("Error", "Failed to download file");
-                }
-              })();
-            },
+    // Show download confirmation
+    Alert.alert(
+      "Download File",
+      `Download "${message.file_name || "this file"}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Download",
+          onPress: async () => {
+            try {
+              setDownloading(true);
+              await downloadAndShareFile(fileUri, fileName);
+            } catch (error) {
+              console.error("Download error:", error);
+              setFileErrorMessage("Failed to download file. Please try again.");
+              setFileErrorModalVisible(true);
+            } finally {
+              setDownloading(false);
+            }
           },
-        ]
-      );
-    } catch (error) {
-      console.error("Error handling file:", error);
-      Alert.alert("Error", "Failed to download file");
-    } finally {
-      setDownloading(false);
-    }
+        },
+      ]
+    );
   };
 
   // Render message content based on type
@@ -1263,6 +1296,30 @@ export default function ChatScreen() {
                 <Text style={styles.viewerFooterText}>
                   Pinch to zoom • Tap download to save
                 </Text>
+              </View>
+            </View>
+          </Modal>
+
+          {/* File Error Modal */}
+          <Modal
+            visible={fileErrorModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setFileErrorModalVisible(false)}
+          >
+            <View style={styles.centeredOverlay}>
+              <View style={[styles.simpleModal, { backgroundColor: theme.colors.surface }]}>
+                <Ionicons name="alert-circle" size={28} color={theme.colors.error} style={{ marginBottom: 8 }} />
+                <Text style={[styles.simpleModalTitle, { color: theme.colors.text }]}>Something went wrong</Text>
+                <Text style={[styles.simpleModalMessage, { color: theme.colors.textSecondary }]}>
+                  {fileErrorMessage || "An unexpected error occurred."}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.simpleModalButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => setFileErrorModalVisible(false)}
+                >
+                  <Text style={styles.simpleModalButtonText}>OK</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </Modal>
@@ -1729,6 +1786,43 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
+  },
+  centeredOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Simple Modal styles
+  simpleModal: {
+    width: '80%',
+    maxWidth: 400,
+    alignSelf: 'center',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+  },
+  simpleModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  simpleModalMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  simpleModalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  simpleModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

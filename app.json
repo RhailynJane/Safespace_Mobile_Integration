@@ -13,7 +13,15 @@
         "expo-router"
       ],
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow SafeSpace to access your photos",
+          "savePhotosPermission": "Allow SafeSpace to save photos to your library",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"

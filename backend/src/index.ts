@@ -3614,25 +3614,22 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
       }
     };
 
-    // Optional: Save to file_uploads table using manual SQL
+    // Save to file_uploads table using Prisma (best-effort; non-blocking if it fails)
     try {
-      const db = require('../services/db'); // Your database connection
-      await db.query(`
-        INSERT INTO file_uploads 
-          (message_id, original_name, stored_name, file_path, file_size, mime_type, uploaded_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [
-        message.id,
-        req.file.originalname,
-        req.file.filename,
-        req.file.path,
-        req.file.size,
-        req.file.mimetype,
-        user.id
-      ]);
-      console.log('📁 File upload record created successfully');
+      await prisma.fileUpload.create({
+        data: {
+          message_id: message.id,
+          original_name: req.file.originalname,
+          stored_name: req.file.filename,
+          file_path: req.file.path,
+          file_size: req.file.size,
+          mime_type: req.file.mimetype,
+          uploaded_by: user.id,
+        },
+      });
+      console.log('📁 File upload record created successfully (Prisma)');
     } catch (uploadError) {
-      console.error('📁 Failed to create file_uploads record:', uploadError);
+      console.error('📁 Failed to create file_uploads record (Prisma):', uploadError);
       // Don't fail the entire request if this fails
     }
 
