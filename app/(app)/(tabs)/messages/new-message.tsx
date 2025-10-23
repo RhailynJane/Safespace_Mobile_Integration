@@ -25,6 +25,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { messagingService, Contact } from "../../../../utils/sendbirdService";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 
 const { width } = Dimensions.get("window");
 
@@ -37,6 +38,7 @@ const { width } = Dimensions.get("window");
 export default function NewMessagesScreen() {
   const { theme } = useTheme();
   const { userId } = useAuth();
+  const API_BASE_URL = getApiBaseUrl();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,7 +70,20 @@ export default function NewMessagesScreen() {
 
     try {
       setLoading(true);
-      // For new-message, we rely on backend only (no SendBird init needed)
+      // Try to initialize SendBird (if configured); otherwise we'll use backend
+      try {
+        const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
+        const sbInitialized = await messagingService.initializeSendBird(
+          userId,
+          accessToken,
+          "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
+        );
+        console.log("💬 [NewMessages] SendBird initialized:", sbInitialized);
+      } catch (e) {
+        console.log("💬 [NewMessages] SendBird init skipped/fallback", e);
+      }
+      // Load from backend (or SendBird via wrapper if available)
+      console.log("💬 [NewMessages] initializeMessaging for user:", userId);
       await loadConversationsAndContacts();
     } catch (error) {
       console.error("Failed to initialize messaging:", error);
@@ -83,10 +98,37 @@ export default function NewMessagesScreen() {
       console.error("User ID is null or undefined");
       return;
     }
+    console.log("💬 [NewMessages] Loading conversations for:", userId);
     const conversationsResult = await messagingService.getConversations(userId);
+    console.log("💬 [NewMessages] Conversations result:", {
+      success: conversationsResult.success,
+      count: conversationsResult.data?.length || 0,
+      sample: conversationsResult.data?.[0] ? {
+        id: conversationsResult.data[0].id,
+        participants: conversationsResult.data[0].participants?.map(p => p.clerk_user_id)
+      } : null
+    });
     if (conversationsResult.success) {
-      setConversations(conversationsResult.data);
-      setFilteredConversations(conversationsResult.data);
+      let convs = conversationsResult.data || [];
+      // Fallback: if empty, try direct backend fetch (cache-busted) just in case
+      if (convs.length === 0) {
+        try {
+          const resp = await fetch(`${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`);
+          if (resp.ok) {
+            const json = await resp.json();
+            console.log("💬 [NewMessages] Fallback fetch conversations count:", json?.data?.length || 0);
+            convs = json?.data || [];
+          } else {
+            console.log("💬 [NewMessages] Fallback fetch failed with status:", resp.status);
+          }
+        } catch (e) {
+          console.log("💬 [NewMessages] Fallback fetch error:", e);
+        }
+      }
+      setConversations(convs);
+      setFilteredConversations(convs);
+    } else {
+      console.log("💬 [NewMessages] getConversations did not succeed");
     }
 
     const contactsResult = await messagingService.getContacts(userId);
@@ -213,7 +255,16 @@ export default function NewMessagesScreen() {
     if (!userId) {
       const firstParticipant = participants[0];
       if (firstParticipant?.profile_image_url) {
-        return { type: "image", value: firstParticipant.profile_image_url };
+        const raw = firstParticipant.profile_image_url as string;
+        let normalized = raw;
+        if (raw.startsWith('http')) {
+          normalized = raw;
+        } else if (raw.startsWith('/')) {
+          normalized = `${API_BASE_URL}${raw}`;
+        } else if (raw.startsWith('data:image')) {
+          normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(firstParticipant.clerk_user_id || '')}/profile-image`;
+        }
+        return { type: "image", value: normalized };
       }
       const initials = getUserInitials(
         firstParticipant?.first_name,
@@ -233,7 +284,16 @@ export default function NewMessagesScreen() {
 
     // If profile image exists, return URL
     if (displayParticipant?.profile_image_url) {
-      return { type: "image", value: displayParticipant.profile_image_url };
+      const raw = displayParticipant.profile_image_url as string;
+      let normalized = raw;
+      if (raw.startsWith('http')) {
+        normalized = raw;
+      } else if (raw.startsWith('/')) {
+        normalized = `${API_BASE_URL}${raw}`;
+      } else if (raw.startsWith('data:image')) {
+        normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(displayParticipant.clerk_user_id || '')}/profile-image`;
+      }
+      return { type: "image", value: normalized };
     }
 
     // Otherwise return initials for text display

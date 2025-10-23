@@ -499,7 +499,7 @@ class MessagingService {
     try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${userId}`
+        `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
       );
 
       if (!response.ok) throw new Error("Backend request failed");
