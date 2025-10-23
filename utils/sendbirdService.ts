@@ -604,6 +604,7 @@ class MessagingService {
   ): Promise<{ success: boolean; data: any }> {
     try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
+      console.log("💬 [Backend] Creating conversation:", { userId, participantIds: data.participantIds, title: data.title });
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations`,
         {
@@ -618,12 +619,19 @@ class MessagingService {
         }
       );
 
-      if (!response.ok) throw new Error("Backend request failed");
+      console.log("💬 [Backend] Create conversation response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("💬 [Backend] Create conversation failed:", response.status, errorText);
+        throw new Error(`Backend request failed: ${response.status} ${errorText}`);
+      }
 
       const result = await response.json();
+      console.log("💬 [Backend] Create conversation result:", result);
       return { success: true, data: result.data };
     } catch (error) {
-      console.log("Backend fallback failed for createConversation");
+      console.error("💬 [Backend] Create conversation error:", error);
       return {
         success: true,
         data: { id: `conv_${Date.now()}`, channel_url: `conv_${Date.now()}` },

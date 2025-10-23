@@ -347,27 +347,49 @@ export default function NewMessagesScreen() {
         
         console.log("📝 Created conversation result:", result.data);
         
-        // Navigate to the new chat with all required parameters
+        // Compute a safe conversation id; fallback to lookup if non-numeric
         const fullName = `${contact.first_name} ${contact.last_name}`.trim();
         const online = contact.online ? "1" : "0";
-        const conversationId = result.data.id || result.data;
-        
-        console.log("🔗 Navigating to chat with ID:", conversationId);
-        
-        router.push({
-          pathname: `../messages/message-chat-screen`,
-          params: {
-            id: conversationId,
-            title: fullName,
-            otherClerkId: contact.clerk_user_id,
-            initialOnline: online,
-            initialLastActive: contact.last_active_at || "",
-            profileImageUrl: contact.profile_image_url || "",
+        let conversationId = result.data?.id || result.data;
+
+        const isNumericId = typeof conversationId === 'string' && /^\d+$/.test(conversationId);
+        if (!isNumericId) {
+          try {
+            console.log("🔎 Fallback: resolving numeric conversation id via list…");
+            const resp = await fetch(`${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`);
+            if (resp.ok) {
+              const json = await resp.json();
+              const conv = (json?.data || []).find((c: any) =>
+                Array.isArray(c.participants) && c.participants.some((p: any) => p.clerk_user_id === contact.clerk_user_id)
+              );
+              if (conv?.id) {
+                conversationId = conv.id;
+                console.log("✅ Resolved conversation id:", conversationId);
+              }
+            }
+          } catch (e) {
+            console.log("❌ Fallback resolution failed:", e);
           }
-        });
-        
-        // Refresh conversations
-        initializeMessaging();
+        }
+
+        if (!conversationId || !(typeof conversationId === 'string') || !/^\d+$/.test(conversationId)) {
+          Alert.alert("Error", "Failed to create conversation. Please try again.");
+        } else {
+          console.log("🔗 Navigating to chat with ID:", conversationId);
+          router.push({
+            pathname: `../messages/message-chat-screen`,
+            params: {
+              id: conversationId,
+              title: fullName,
+              otherClerkId: contact.clerk_user_id,
+              initialOnline: online,
+              initialLastActive: contact.last_active_at || "",
+              profileImageUrl: contact.profile_image_url || "",
+            }
+          });
+          // Refresh conversations after navigation kickoff
+          initializeMessaging();
+        }
       } else {
         Alert.alert("Error", "Failed to start conversation");
       }

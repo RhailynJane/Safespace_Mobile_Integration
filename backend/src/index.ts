@@ -2978,26 +2978,28 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
         const participantUserIds = participants.map(p => p.id);
         
         // Find existing conversation with exactly these participants
-        const existingConversation = await tx.conversation.findFirst({
+        // Query all conversations with these participants and filter in memory
+        const existingConversations = await tx.conversation.findMany({
           where: {
-            conversation_type: "direct",
             AND: participantUserIds.map(userId => ({
               participants: {
                 some: {
                   user_id: userId
                 }
               }
-            })),
-            participants: {
-              // Ensure exactly 2 participants (no more, no less)
-              none: {
-                user_id: {
-                  notIn: participantUserIds
-                }
-              }
-            }
+            }))
+          },
+          include: {
+            participants: true
           }
         });
+
+        // Filter to find exact match: direct type with exactly 2 participants
+        const existingConversation = existingConversations.find(conv => 
+          conv.conversation_type === 'direct' && 
+          conv.participants.length === 2 &&
+          conv.participants.every(p => participantUserIds.includes(p.user_id))
+        );
 
         if (existingConversation) {
           console.log(`💬 Found existing conversation ${existingConversation.id}, returning it`);
@@ -3089,7 +3091,8 @@ app.get(
       // Check for existing conversations
       const contactsWithConversations = await Promise.all(
         contacts.map(async (contact) => {
-          const existingConversation = await prisma.conversation.findFirst({
+          // Query conversations with both users and filter in memory
+          const conversations = await prisma.conversation.findMany({
             where: {
               AND: [
                 {
@@ -3109,13 +3112,13 @@ app.get(
                       }
                     }
                   }
-                },
-                {
-                  conversation_type: 'direct'
                 }
               ]
             }
           });
+
+          // Filter to direct conversations only
+          const existingConversation = conversations.find(c => c.conversation_type === 'direct');
 
           return {
             ...contact,
