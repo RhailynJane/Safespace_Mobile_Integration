@@ -61,6 +61,7 @@ import { Paths, File as FSFile } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import * as MediaLibrary from "expo-media-library";
 import { useIsFocused } from "@react-navigation/native";
 
@@ -85,8 +86,7 @@ export default function ChatScreen() {
   const initialLastActiveParam = (params.initialLastActive as string) || "";
   const otherClerkIdParam = (params.otherClerkId as string) || "";
   const profileImageUrlParam = (params.profileImageUrl as string) || "";
-  const API_BASE_URL =
-    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+  const API_BASE_URL = getApiBaseUrl();
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");

@@ -25,6 +25,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import profileAPI, { ClientProfileData } from "../../../../utils/profileApi";
+import avatarEvents from "../../../../utils/avatarEvents";
 import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme } from "../../../../contexts/ThemeContext";
@@ -680,6 +681,8 @@ export default function EditProfileScreen() {
           // Base64 images can be 66MB+ causing OOM errors
           await AsyncStorage.setItem("profileImage", imageUrl);
           setProfileImage(imageUrl);
+          // Notify app header and other listeners immediately
+          avatarEvents.emit(imageUrl);
 
           setSuccessMessage("Profile picture updated!");
           setShowSuccessModal(true);
@@ -876,6 +879,8 @@ export default function EditProfileScreen() {
               JSON.stringify(updatedProfileData)
             );
             console.log("✅ Updated profileData in AsyncStorage");
+            // Emit again to ensure any subscribers update
+            avatarEvents.emit(profileImage);
           } catch (syncError) {
             console.error("Error syncing profileData:", syncError);
           }

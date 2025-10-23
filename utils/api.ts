@@ -1,15 +1,7 @@
 // utils/api.ts
-import { Platform } from "react-native";
+import { getApiBaseUrl } from './apiBaseUrl';
 
-const getBaseURL = () => {
-  if (__DEV__) {
-    return "http://10.0.165.112:3001";
-  } else {
-    return "https://your-production-api.com";
-  }
-};
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE_URL = getApiBaseUrl();
 
 export interface SyncUserData {
   clerkUserId: string;

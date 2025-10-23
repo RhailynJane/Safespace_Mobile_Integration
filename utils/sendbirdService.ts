@@ -1,22 +1,6 @@
 // utils/sendbirdService.ts
-import { Platform } from "react-native";
 import activityApi from "./activityApi";
-
-const getApiBaseUrl = (): string => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:3001";
-  } else if (Platform.OS === "ios") {
-    return "http://localhost:3001";
-  } else if (Platform.OS === "web") {
-    return "http://localhost:3001";
-  }
-
-  return "http://localhost:3001";
-};
+import { getApiBaseUrl } from './apiBaseUrl';
 
 const API_BASE_URL = getApiBaseUrl();
 

@@ -29,6 +29,7 @@ import activityApi from "../../../../utils/activityApi";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { useRef } from "react";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
@@ -43,8 +44,7 @@ export default function MessagesScreen() {
   const [sendbirdStatus, setSendbirdStatus] =
     useState<string>("Initializing...");
   // Removed session-based unread suppression; rely on backend read receipts instead
-  const API_BASE_URL =
-    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+  const API_BASE_URL = getApiBaseUrl();
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -349,9 +349,19 @@ export default function MessagesScreen() {
     const displayParticipant =
       otherParticipants.length > 0 ? otherParticipants[0] : participants[0];
 
-    // If profile image exists, return URL
+    // If profile image exists, return a normalized absolute URL
     if (displayParticipant?.profile_image_url) {
-      return { type: "image", value: displayParticipant.profile_image_url };
+      const raw = displayParticipant.profile_image_url;
+      let normalized = raw;
+      if (raw.startsWith('http')) {
+        normalized = raw;
+      } else if (raw.startsWith('/')) {
+        normalized = `${API_BASE_URL}${raw}`;
+      } else if (raw.startsWith('data:image')) {
+        // Use lightweight server endpoint that streams the image instead of embedding base64
+        normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(displayParticipant.clerk_user_id || '')}/profile-image`;
+      }
+      return { type: "image", value: normalized };
     }
 
     // Otherwise return initials for text display
@@ -535,6 +545,7 @@ export default function MessagesScreen() {
                     // Determine other participant to pass initial presence
                     const otherParticipants = conversation.participants.filter((p) => p.clerk_user_id !== userId);
                     const other = otherParticipants[0];
+                    const otherAvatar = other ? getAvatarDisplay([other as any]) : { type: 'text', value: '' } as const;
 
                     router.push({
                       pathname: "../messages/message-chat-screen",
@@ -545,7 +556,7 @@ export default function MessagesScreen() {
                         initialOnline: other?.online ? "1" : "0",
                         initialLastActive: other?.last_active_at || "",
                         otherClerkId: other?.clerk_user_id || "",
-                        profileImageUrl: other?.profile_image_url || "",
+                        profileImageUrl: otherAvatar.type === 'image' ? otherAvatar.value : "",
                       },
                     });
                   }}

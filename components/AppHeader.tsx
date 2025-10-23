@@ -21,8 +21,17 @@ import { assessmentTracker } from "../utils/assessmentTracker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import activityApi from "../utils/activityApi";
+import { getApiBaseUrl, makeAbsoluteUrl } from "../utils/apiBaseUrl";
+import avatarEvents from "../utils/avatarEvents";
 
 const { width } = Dimensions.get("window");
+const normalizeImageUri = (uri?: string | null) => {
+  if (!uri) return null;
+  if (uri.startsWith('http')) return uri;
+  if (uri.startsWith('/')) return makeAbsoluteUrl(uri);
+  if (uri.startsWith('data:image')) return null; // avoid rendering large base64 in header
+  return uri;
+};
 
 export interface AppHeaderProps {
   title?: string;
@@ -208,6 +217,20 @@ export const AppHeader = ({
       if (user?.id) {
         loadProfileImage();
       }
+      // Subscribe to avatar updates so header reflects changes immediately
+      const unsubscribe = avatarEvents.subscribe((url) => {
+        // If event sends a URL, store it and update state; if null, clear
+        if (url && typeof url === 'string') {
+          AsyncStorage.setItem('profileImage', url).catch(() => {});
+          setProfileImage(url);
+        } else {
+          setProfileImage(null);
+        }
+      });
+
+      return () => {
+        unsubscribe();
+      };
     }, [user?.id, loadProfileImage])
   );
 
@@ -394,9 +417,9 @@ export const AppHeader = ({
         ) : (
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile/edit")}>
             <View style={styles.profileImageContainer}>
-              {profileImage ? (
+              {profileImage && normalizeImageUri(profileImage) ? (
                 <Image
-                  source={{ uri: profileImage }}
+                  source={{ uri: normalizeImageUri(profileImage)! }}
                   style={styles.profileImage}
                 />
               ) : user?.imageUrl ? (
@@ -461,9 +484,9 @@ export const AppHeader = ({
                   { borderWidth: 2, borderColor: "red" },
                 ]}
               >
-                {profileImage ? (
+                {profileImage && normalizeImageUri(profileImage) ? (
                   <Image
-                    source={{ uri: profileImage }}
+                    source={{ uri: normalizeImageUri(profileImage)! }}
                     style={styles.profileAvatarImage}
                   />
                 ) : user?.imageUrl ? (

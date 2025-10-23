@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+import { getApiBaseUrl } from './apiBaseUrl';
+const API_BASE_URL = getApiBaseUrl();
 
 // utils/profileApi.ts
 export interface ClientProfileData {
@@ -61,33 +62,22 @@ export const profileApi = {
 
   async uploadProfileImage(clerkUserId: string, imageUri: string): Promise<string> {
     try {
-      console.log('📸 Uploading profile image for user:', clerkUserId);
-      
-      // Read the image file and convert to base64
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
-      
-      // Convert blob to base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const base64String = reader.result as string;
-          resolve(base64String);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      console.log('📸 Uploading profile image (multipart) for user:', clerkUserId);
 
-      // Send base64 image to backend
-      const apiResponse = await fetch(`${API_BASE_URL}/api/client-profile/${clerkUserId}/profile-image`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          profileImageBase64: base64,
-        }),
+      // Build multipart/form-data payload
+      const formData = new FormData();
+      // Infer a filename and mime type
+      const fileName = imageUri.split('/').pop() || `profile-${Date.now()}.jpg`;
+      const mimeType = fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+      // React Native/Expo file object
+  // @ts-ignore - React Native file payload shape for FormData in Expo/React Native
+      formData.append('profileImage', { uri: imageUri, name: fileName, type: mimeType });
+
+      const apiResponse = await fetch(`${API_BASE_URL}/api/upload/profile-image/${encodeURIComponent(clerkUserId)}`, {
+        method: 'POST',
+        // Let fetch set the correct Content-Type boundary for multipart
+        body: formData as any,
       });
 
       if (!apiResponse.ok) {
@@ -97,12 +87,10 @@ export const profileApi = {
       }
 
       const result = await apiResponse.json();
-      
-      if (result.success) {
-        return result.data.profileImageUrl;
-      } else {
-        throw new Error(result.message);
+      if (result.success && result.data?.imageUrl) {
+        return result.data.imageUrl as string;
       }
+      throw new Error(result.message || 'Failed to upload image');
     } catch (error) {
       console.error('❌ Error uploading profile image:', error);
       throw error;

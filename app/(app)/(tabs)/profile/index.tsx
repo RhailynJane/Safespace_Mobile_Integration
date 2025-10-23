@@ -20,8 +20,9 @@ import BottomNavigation from "../../../../components/BottomNavigation";
 import { syncUserWithDatabase } from "../../../../utils/userSync";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = getApiBaseUrl();
 
 interface ProfileData {
   firstName: string;
@@ -222,7 +223,7 @@ export default function ProfileScreen() {
     }
   };
 
-    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+    
 
   const handleLogout = async (user: any) => {
     try {

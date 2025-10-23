@@ -1,8 +1,7 @@
 // utils/settingsAPI.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth, useUser } from '@clerk/clerk-expo';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+import { getApiBaseUrl } from './apiBaseUrl';
 
 export interface SettingsAPIResponse {
   success: boolean;
@@ -31,7 +30,7 @@ class SettingsAPI {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = API_BASE_URL;
+    this.baseURL = getApiBaseUrl();
     console.log('🔧 Settings API initialized with base URL:', this.baseURL);
   }
 

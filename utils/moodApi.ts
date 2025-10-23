@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { getApiBaseUrl } from './apiBaseUrl';
 
-// Use your local network IP that's working for assessments
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+// Centralized API base URL resolution
+const API_BASE_URL = getApiBaseUrl();
 
 export interface MoodEntry {
   id: string;

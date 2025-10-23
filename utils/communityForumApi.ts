@@ -1,6 +1,6 @@
-import { Platform } from "react-native";
+import { getApiBaseUrl } from './apiBaseUrl';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE_URL = getApiBaseUrl();
 
 class CommunityForumApi {
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
