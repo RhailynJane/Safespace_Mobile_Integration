@@ -676,12 +676,14 @@ export default function EditProfileScreen() {
         try {
           // Upload image to backend (returns URL, not base64)
           const imageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
+          console.log('📸 Profile edit: Uploaded image URL:', imageUrl);
           
           // ✅ FIX: Store URL instead of base64 to prevent memory issues
           // Base64 images can be 66MB+ causing OOM errors
           await AsyncStorage.setItem("profileImage", imageUrl);
           setProfileImage(imageUrl);
           // Notify app header and other listeners immediately
+          console.log('📸 Profile edit: Emitting avatar event with URL:', imageUrl);
           avatarEvents.emit(imageUrl);
 
           setSuccessMessage("Profile picture updated!");

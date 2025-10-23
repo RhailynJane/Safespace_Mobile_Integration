@@ -219,12 +219,15 @@ export const AppHeader = ({
       }
       // Subscribe to avatar updates so header reflects changes immediately
       const unsubscribe = avatarEvents.subscribe((url) => {
+        console.log('📸 AppHeader received avatar event:', url);
         // If event sends a URL, store it and update state; if null, clear
         if (url && typeof url === 'string') {
           AsyncStorage.setItem('profileImage', url).catch(() => {});
           setProfileImage(url);
+          console.log('✅ AppHeader profileImage updated to:', url);
         } else {
           setProfileImage(null);
+          console.log('✅ AppHeader profileImage cleared');
         }
       });
 
