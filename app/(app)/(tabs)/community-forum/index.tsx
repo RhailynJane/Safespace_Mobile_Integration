@@ -57,6 +57,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../utils/communityForumApi";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
@@ -1191,7 +1192,7 @@ export default function CommunityMainScreen() {
                           </Text>
                           <Text style={[styles.postAuthor, { color: theme.colors.textSecondary }]}>
                             {post.author_name} •{" "}
-                            {new Date(post.created_at).toLocaleDateString()}
+                            {new Date(post.created_at).toLocaleDateString([], { timeZone: APP_TIME_ZONE })}
                             {post.is_draft && " • Draft"}
                           </Text>
                         </View>

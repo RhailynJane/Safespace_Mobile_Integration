@@ -11,40 +11,35 @@ export default function AppLayout() {
 
   console.log('📱 AppLayout - Auth State:', { isLoaded, isSignedIn });
 
-  // Global heartbeat to keep user online while app is active
+  // On sign-in or app foreground, record login once (no heartbeat/polling)
   useEffect(() => {
     if (!isSignedIn || !userId) return;
 
-    const sendHeartbeat = async () => {
+    const record = async () => {
       try {
-        await activityApi.heartbeat(userId);
-        console.log('💓 Heartbeat sent for user:', userId);
+        await activityApi.recordLogin(userId);
+        console.log('✅ Presence: recorded login for user:', userId);
       } catch (error) {
-        console.error('❌ Heartbeat failed:', error);
+        console.error('❌ recordLogin failed:', error);
       }
     };
 
-    // Send initial heartbeat
-    sendHeartbeat();
+    // Initial record when layout mounts for a signed-in user
+    record();
 
-    // Send heartbeat every 20 seconds to keep user online
-    const heartbeatInterval = setInterval(sendHeartbeat, 20000);
-
-    // Handle app state changes (foreground/background)
+    // Record again when app returns to foreground (no interval)
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // App came to foreground - send immediate heartbeat
-        console.log('📱 App came to foreground - sending heartbeat');
-        sendHeartbeat();
+        console.log('📱 App foregrounded - refreshing presence');
+        record();
       }
       appState.current = nextAppState;
     });
 
     return () => {
-      clearInterval(heartbeatInterval);
       subscription.remove();
     };
   }, [isSignedIn, userId]);

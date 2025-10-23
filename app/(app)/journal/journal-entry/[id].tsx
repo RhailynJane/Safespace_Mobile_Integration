@@ -16,6 +16,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../../utils/journalApi";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import { useTheme } from "../../../../contexts/ThemeContext";
 
 const tabs = [
@@ -111,7 +112,7 @@ export default function JournalEntryScreen() {
       hour: "2-digit",
       minute: "2-digit",
     };
-    return date.toLocaleDateString("en-US", options);
+    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
 
   if (loading) {

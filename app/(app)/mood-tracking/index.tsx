@@ -24,6 +24,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { moodApi, MoodEntry } from "../../../utils/moodApi";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -288,6 +289,7 @@ const MoodTrackingScreen = () => {
                           day: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
+                          timeZone: APP_TIME_ZONE,
                         })}
                       </Text>
                     </View>

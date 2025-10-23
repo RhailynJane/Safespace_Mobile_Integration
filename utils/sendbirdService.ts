@@ -32,6 +32,7 @@ export interface Participant {
   email: string;
   profile_image_url?: string;
   online: boolean;
+  presence?: 'online' | 'away' | 'offline';
   last_active_at: string | null;
 }
 
@@ -496,7 +497,6 @@ class MessagingService {
   private async getConversationsFromBackend(
     userId: string
   ): Promise<{ success: boolean; data: Conversation[] }> {
-    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
@@ -521,7 +521,6 @@ class MessagingService {
   data: Message[];
   pagination: { page: number; limit: number; hasMore: boolean };
 }> {
-  try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
   try {
     console.log(`📨 Getting messages from backend for conversation ${conversationId}`);
     
@@ -566,7 +565,6 @@ class MessagingService {
       messageType?: MessageType;
     }
   ): Promise<{ success: boolean; data: Message }> {
-    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
@@ -602,7 +600,6 @@ class MessagingService {
       title?: string;
     }
   ): Promise<{ success: boolean; data: any }> {
-    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       console.log("💬 [Backend] Creating conversation:", { userId, participantIds: data.participantIds, title: data.title });
       const response = await fetch(
@@ -642,7 +639,6 @@ class MessagingService {
   async getContacts(
     userId: string
   ): Promise<{ success: boolean; data: Contact[] }> {
-    try { await activityApi.heartbeat(userId); } catch (_e) { /* ignore */ }
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/messages/contacts/${userId}`

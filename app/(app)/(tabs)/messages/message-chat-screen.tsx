@@ -64,6 +64,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import * as MediaLibrary from "expo-media-library";
 import { useIsFocused } from "@react-navigation/native";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -83,6 +84,7 @@ export default function ChatScreen() {
   const conversationTitle = params.title as string;
   const channelUrl = (params.channelUrl as string) || "";
   const initialOnlineParam = (params.initialOnline as string) || "";
+  const initialPresenceParam = (params.initialPresence as string) || "";
   const initialLastActiveParam = (params.initialLastActive as string) || "";
   const otherClerkIdParam = (params.otherClerkId as string) || "";
   const profileImageUrlParam = (params.profileImageUrl as string) || "";
@@ -95,6 +97,11 @@ export default function ChatScreen() {
   const [contact, setContact] = useState<Participant | null>(null);
   // Optimistic presence: default to online unless explicitly told otherwise by param
   const [isOnline, setIsOnline] = useState(initialOnlineParam === "0" ? false : true);
+  const [presence, setPresence] = useState<'online' | 'away' | 'offline'>(
+    (initialPresenceParam as any) === 'online' || (initialPresenceParam as any) === 'away' || (initialPresenceParam as any) === 'offline'
+      ? (initialPresenceParam as any)
+      : (initialOnlineParam === '0' ? 'offline' : 'online')
+  );
   const [attachmentModalVisible, setAttachmentModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -287,7 +294,7 @@ export default function ChatScreen() {
     return () => clearInterval(pollInterval);
   }, [isFocused, conversationId, userId, loadMessages]);
 
-  // Update online status based on last activity (every 10 seconds)
+  // One-time status refresh after mount (no polling)
   useEffect(() => {
     if (!isFocused || !contact || !contact.clerk_user_id || contact.clerk_user_id === "unknown") return;
 
@@ -296,27 +303,27 @@ export default function ChatScreen() {
         const status = await activityApi.status(contact.clerk_user_id);
         if (status) {
           const newOnline = !!status.online;
+          const newPresence = (status as any).presence as 'online' | 'away' | 'offline' | undefined;
           if (isOnline !== newOnline) {
             setIsOnline(newOnline);
           }
-          // Update contact with fresh last_active_at
+          if (newPresence && newPresence !== presence) {
+            setPresence(newPresence);
+          } else {
+            const fallback = newOnline ? 'online' : 'offline';
+            if (fallback !== presence) setPresence(fallback);
+          }
           setContact((prev) => prev ? { ...prev, online: newOnline, last_active_at: status.last_active_at } : prev);
         }
-      } catch (e) {
-        // ignore transient errors
+      } catch (_e) {
+        // ignore
       }
     };
 
-    // Delay initial status check by 2 seconds to not block initial render
-    const initialTimeout = setTimeout(updateOnlineStatus, 2000);
-    const statusInterval = setInterval(updateOnlineStatus, 15000); // Check every 15 seconds (reduced from 10)
-
-    return () => {
-      clearTimeout(initialTimeout);
-      clearInterval(statusInterval);
-    };
+    const initialTimeout = setTimeout(updateOnlineStatus, 1500);
+    return () => clearTimeout(initialTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFocused, contact?.clerk_user_id]); // Only re-run if clerk_user_id changes (not isOnline to avoid loops)
+  }, [isFocused, contact?.clerk_user_id, isOnline, presence]);
 
   useEffect(() => {
     // Only auto-scroll if user is near bottom or last message is mine
@@ -562,9 +569,10 @@ export default function ChatScreen() {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: APP_TIME_ZONE,
       });
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: APP_TIME_ZONE });
     }
   };
 
@@ -951,13 +959,15 @@ export default function ChatScreen() {
                       </Text>
                     </View>
                   )}
-                  {/* Online/Offline indicator in header */}
+                  {/* Presence indicator in header: green online, yellow away, gray offline */}
                   <View
                     style={[
                       styles.headerStatusIndicator,
-                      isOnline
-                        ? styles.onlineIndicator
-                        : styles.offlineIndicator,
+                      {
+                        backgroundColor:
+                          presence === 'online' ? '#4CAF50' : presence === 'away' ? '#FFC107' : theme.colors.iconDisabled,
+                        borderColor: theme.colors.surface,
+                      },
                     ]}
                   />
                 </View>
@@ -966,12 +976,14 @@ export default function ChatScreen() {
                   <Text
                     style={[
                       styles.contactStatus,
-                      isOnline ? styles.onlineStatus : styles.offlineStatus,
+                      presence === 'online' ? styles.onlineStatus : styles.offlineStatus,
                     ]}
                   >
-                    {contact
-                      ? getLastSeenText(contact.last_active_at, isOnline)
-                      : "Offline"}
+                    {presence === 'online'
+                      ? 'Online now'
+                      : presence === 'away'
+                        ? 'Away'
+                        : (contact ? getLastSeenText(contact.last_active_at, false) : 'Offline')}
                   </Text>
                 </View>
               </View>

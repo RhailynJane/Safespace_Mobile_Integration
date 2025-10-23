@@ -18,6 +18,7 @@ import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { AppHeader } from "../../../components/AppHeader";
 import { assessmentTracker } from "../../../utils/assessmentTracker";
 import BottomNavigation from "../../../components/BottomNavigation";
@@ -216,9 +217,10 @@ const fetchProfileImage = useCallback(async () => {
    * Returns appropriate greeting based on time of day
    */
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
+    const hour = new Date().toLocaleString("en-US", { hour: "2-digit", hour12: false, timeZone: APP_TIME_ZONE });
+    const hourNum = Number.parseInt(hour, 10);
+    if (hourNum < 12) return "Good Morning";
+    if (hourNum < 17) return "Good Afternoon";
     return "Good Evening";
   };
 
@@ -308,6 +310,7 @@ const fetchProfileImage = useCallback(async () => {
       return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
+        timeZone: APP_TIME_ZONE,
       });
     }
   };

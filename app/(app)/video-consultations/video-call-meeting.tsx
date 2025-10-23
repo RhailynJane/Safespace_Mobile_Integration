@@ -21,6 +21,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 
 const { width, height } = Dimensions.get("window");
 
@@ -85,7 +86,7 @@ export default function VideoCallScreen() {
         id: messages.length + 1,
         text: newMessage,
         sender: "You",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })
       };
       setMessages([...messages, newMsg]);
       setNewMessage("");
@@ -96,7 +97,7 @@ export default function VideoCallScreen() {
           id: messages.length + 2,
           text: "Thank you for sharing that. Let's explore this further in our session.",
           sender: "Eric",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })
         };
         setMessages(prev => [...prev, responseMsg]);
       }, 1500);

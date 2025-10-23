@@ -4,6 +4,7 @@ const API_BASE_URL = getApiBaseUrl();
 
 export type UserStatus = {
   online: boolean;
+  presence?: 'online' | 'away' | 'offline';
   last_active_at: string | null;
   last_login_at: string | null;
   last_logout_at: string | null;

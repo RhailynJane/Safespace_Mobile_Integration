@@ -21,6 +21,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { moodApi, MoodEntry, MoodFilters } from "../../../utils/moodApi";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 const tabs = [
@@ -212,6 +213,7 @@ export default function MoodHistoryScreen() {
       month: "short",
       day: "numeric",
       year: "numeric",
+      timeZone: APP_TIME_ZONE,
     });
   };
 
@@ -265,6 +267,7 @@ export default function MoodHistoryScreen() {
               year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
+              timeZone: APP_TIME_ZONE,
             })}
           </Text>
         </View>

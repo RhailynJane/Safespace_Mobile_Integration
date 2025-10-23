@@ -20,6 +20,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from "../../../contexts/ThemeContext";
 
@@ -208,7 +209,7 @@ export default function JournalHistoryScreen() {
       month: "long",
       day: "numeric",
     };
-    return date.toLocaleDateString("en-US", options);
+    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
 
   const formatDateForDisplay = (date: Date | null) => {
@@ -218,7 +219,7 @@ export default function JournalHistoryScreen() {
       month: "short",
       day: "numeric",
     };
-    return date.toLocaleDateString("en-US", options);
+    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
 
   const renderFilterButton = (filter: FilterType, label: string) => (

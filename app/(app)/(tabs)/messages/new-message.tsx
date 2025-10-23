@@ -26,6 +26,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import { messagingService, Contact } from "../../../../utils/sendbirdService";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 const { width } = Dimensions.get("window");
 
@@ -440,9 +441,10 @@ export default function NewMessagesScreen() {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: APP_TIME_ZONE,
       });
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: APP_TIME_ZONE });
     }
   };
 
@@ -583,6 +585,7 @@ export default function NewMessagesScreen() {
                         initialOnline: isOnline ? "1" : "0",
                         initialLastActive: otherParticipant?.last_active_at || "",
                         profileImageUrl: otherParticipant?.profile_image_url || "",
+                        initialPresence: (otherParticipant?.presence as any) || (isOnline ? 'online' : 'offline'),
                       }
                     })
                   }

@@ -270,9 +270,9 @@ app.post("/api/users/login-activity", async (req: Request, res: Response) => {
 
     const result = await pool.query(
       `UPDATE users
-       SET last_login_at = CURRENT_TIMESTAMP,
-           last_login = CURRENT_TIMESTAMP,
-           last_active_at = CURRENT_TIMESTAMP,
+     SET last_login_at = CURRENT_TIMESTAMP,
+       last_login = CURRENT_TIMESTAMP,
+       last_active_at = CURRENT_TIMESTAMP,
            updated_at = CURRENT_TIMESTAMP
        WHERE clerk_user_id = $1
        RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
@@ -318,7 +318,7 @@ app.post("/api/users/logout-activity", async (req: Request, res: Response) => {
   }
 });
 
-// Heartbeat to update last_active_at
+// Heartbeat to update last_active_at (legacy - will be unused by client)
 app.post("/api/users/heartbeat", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.body as { clerkUserId?: string };
@@ -346,7 +346,7 @@ app.post("/api/users/heartbeat", async (req: Request, res: Response) => {
   }
 });
 
-// Get single user's online status and timestamps
+// Get single user's presence and timestamps
 app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
@@ -360,29 +360,31 @@ app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) =>
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-  const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
+    const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
     const now = new Date();
     const activeAt = last_active_at ? new Date(last_active_at) : null;
-  const loginAt = last_login_at ? new Date(last_login_at) : null;
+    const loginAt = last_login_at ? new Date(last_login_at) : null;
     const logoutAt = last_logout_at ? new Date(last_logout_at) : null;
-    const onlineWindowMs = 30 * 1000; // 30 seconds for immediate online detection
-    const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
-  
-  // Check if user explicitly logged out after their last activity
-  const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
-  
-  // Grace period: only ignore logout if it happened within 5s of login AND login is recent
-  const graceMs = 5000;
-  const loginRecent = loginAt ? now.getTime() - loginAt.getTime() <= onlineWindowMs : false;
-  const logoutInGracePeriod = logoutAt && loginAt && loginRecent ? 
-    (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
-  
-  // User is online if: active recently AND (not logged out OR logout is in grace period)
-  const online = activeRecently && (!loggedOutAfterActive || logoutInGracePeriod);
+
+    // Logged-in means last_login_at exists and is after last_logout_at (or no logout yet)
+    const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+
+    // Away if logged in but no activity for >= 30 minutes
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+
+    let presence: 'online' | 'away' | 'offline' = 'offline';
+    if (loggedIn) {
+      presence = activeRecently ? 'online' : 'away';
+    } else {
+      presence = 'offline';
+    }
+
+    const online = presence === 'online';
 
     res.json({
       success: true,
-      data: { online, last_active_at, last_login_at, last_logout_at }
+      data: { online, presence, last_active_at, last_login_at, last_logout_at }
     });
   } catch (error: any) {
     console.error("Error fetching user status:", error.message);
@@ -390,7 +392,7 @@ app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) =>
   }
 });
 
-// Batch status for multiple users
+// Batch presence for multiple users
 app.post("/api/users/status-batch", async (req: Request, res: Response) => {
   try {
     const { clerkUserIds } = req.body as { clerkUserIds?: string[] };
@@ -406,29 +408,26 @@ app.post("/api/users/status-batch", async (req: Request, res: Response) => {
     );
 
     const now = new Date();
-    const onlineWindowMs = 30 * 1000; // 30 seconds for immediate online detection
-    const statusMap: Record<string, { online: boolean; last_active_at: string | null; last_login_at: string | null; last_logout_at: string | null; }> = {};
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const statusMap: Record<string, { online: boolean; presence: 'online' | 'away' | 'offline'; last_active_at: string | null; last_login_at: string | null; last_logout_at: string | null; }> = {};
 
     for (const row of result.rows) {
       const activeAt = row.last_active_at ? new Date(row.last_active_at) : null;
       const loginAt = row.last_login_at ? new Date(row.last_login_at) : null;
       const logoutAt = row.last_logout_at ? new Date(row.last_logout_at) : null;
-      const activeRecently = activeAt ? now.getTime() - activeAt.getTime() <= onlineWindowMs : false;
-      
-      // Check if user explicitly logged out after their last activity
-      const loggedOutAfterActive = logoutAt && activeAt ? logoutAt > activeAt : false;
-      
-      // Grace period: only ignore logout if it happened within 5s of login AND login is recent
-      const graceMs = 5000;
-      const loginRecent = loginAt ? now.getTime() - loginAt.getTime() <= onlineWindowMs : false;
-      const logoutInGracePeriod = logoutAt && loginAt && loginRecent ? 
-        (logoutAt.getTime() <= loginAt.getTime() + graceMs) : false;
-      
-      // User is online if: active recently AND (not logged out OR logout is in grace period)
-      const online = activeRecently && (!loggedOutAfterActive || logoutInGracePeriod);
-      
+
+      const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+      const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+
+      let presence: 'online' | 'away' | 'offline' = 'offline';
+      if (loggedIn) {
+        presence = activeRecently ? 'online' : 'away';
+      }
+      const online = presence === 'online';
+
       statusMap[row.clerk_user_id] = {
         online,
+        presence,
         last_active_at: row.last_active_at || null,
         last_login_at: row.last_login_at || null,
         last_logout_at: row.last_logout_at || null,
@@ -2582,18 +2581,22 @@ app.get(
 
       const usersStatus = await prisma.user.findMany({
         where: { clerk_user_id: { in: allClerkIds } },
-        select: { clerk_user_id: true, last_active_at: true },
+        select: { clerk_user_id: true, last_active_at: true, last_login_at: true, last_logout_at: true },
       });
-      const statusMap = new Map<string, { online: boolean; last_active_at: Date | null }>();
+      const statusMap = new Map<string, { online: boolean; presence: 'online' | 'away' | 'offline'; last_active_at: Date | null }>();
       const now = new Date();
+      const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
       usersStatus.forEach((u) => {
-        let online = false;
-        if (u.last_active_at) {
-          const lastActive = new Date(u.last_active_at);
-          const minutes = (now.getTime() - lastActive.getTime()) / (1000 * 60);
-          online = minutes <= 3; // consistent with getUserOnlineStatus
+        const activeAt = u.last_active_at ? new Date(u.last_active_at) : null;
+        const loginAt = u.last_login_at ? new Date(u.last_login_at) : null;
+        const logoutAt = u.last_logout_at ? new Date(u.last_logout_at) : null;
+        const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+        const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+        let presence: 'online' | 'away' | 'offline' = 'offline';
+        if (loggedIn) {
+          presence = activeRecently ? 'online' : 'away';
         }
-        statusMap.set(u.clerk_user_id, { online, last_active_at: u.last_active_at });
+        statusMap.set(u.clerk_user_id, { online: presence === 'online', presence, last_active_at: u.last_active_at });
       });
 
       const conversationsWithOnlineStatus = conversations.map((conversation) => {
@@ -2610,6 +2613,7 @@ app.get(
             // Avoid sending base64 blobs in JSON, provide an endpoint URL instead
             profile_image_url: sanitizeProfileImageRef(p.user.profile_image_url, p.user.clerk_user_id),
             online: s ? s.online : false,
+            presence: s ? s.presence : 'offline',
             last_active_at: s ? s.last_active_at : p.user.last_active_at,
           };
         });
@@ -3305,7 +3309,9 @@ app.get(
                   last_name: true,
                   email: true,
                   profile_image_url: true,
-                  last_active_at: true, // Include last_active_at
+                  last_active_at: true,
+                  last_login_at: true,
+                  last_logout_at: true,
                   updated_at: true
                 }
               }
@@ -3350,17 +3356,29 @@ app.get(
       const formattedConversations = conversations.map(conversation => {
         const lastMessage = conversation.messages[0];
         
-        // Get ALL participants with online status
-        const allParticipants = conversation.participants.map(p => ({
-          id: p.user.id,
-          clerk_user_id: p.user.clerk_user_id,
-          first_name: p.user.first_name,
-          last_name: p.user.last_name,
-          email: p.user.email,
-          profile_image_url: p.user.profile_image_url,
-          online: isUserOnline(p.user.last_active_at),
-          last_active_at: p.user.last_active_at
-        }));
+        // Get ALL participants with presence
+        const allParticipants = conversation.participants.map(p => {
+          const now = new Date();
+          const activeAt = p.user.last_active_at ? new Date(p.user.last_active_at) : null;
+          const loginAt = (p.user as any).last_login_at ? new Date((p.user as any).last_login_at) : null;
+          const logoutAt = (p.user as any).last_logout_at ? new Date((p.user as any).last_logout_at) : null;
+          const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+          const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+          const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+          const presence: 'online' | 'away' | 'offline' = loggedIn ? (activeRecently ? 'online' : 'away') : 'offline';
+
+          return {
+            id: p.user.id,
+            clerk_user_id: p.user.clerk_user_id,
+            first_name: p.user.first_name,
+            last_name: p.user.last_name,
+            email: p.user.email,
+            profile_image_url: p.user.profile_image_url,
+            online: presence === 'online',
+            presence,
+            last_active_at: p.user.last_active_at
+          };
+        });
 
         // console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
 
@@ -3399,20 +3417,18 @@ async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
     // First try to get from your database
     const user = await prisma.user.findUnique({
       where: { clerk_user_id: clerkUserId },
-      select: { last_active_at: true }
+      select: { last_active_at: true, last_login_at: true, last_logout_at: true }
     });
 
-    if (user?.last_active_at) {
-      const now = new Date();
-      const lastActive = new Date(user.last_active_at);
-      const minutesSinceLastActive = (now.getTime() - lastActive.getTime()) / (1000 * 60);
-      
-      // Consider user online if active in last 3 minutes (more aggressive)
-      return minutesSinceLastActive <= 3;
-    }
+    const now = new Date();
+    const activeAt = user?.last_active_at ? new Date(user.last_active_at) : null;
+    const loginAt = user?.last_login_at ? new Date(user.last_login_at) : null;
+    const logoutAt = user?.last_logout_at ? new Date(user.last_logout_at) : null;
+    const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
 
-    // If no activity data, return false
-    return false;
+    return loggedIn && activeRecently;
   } catch (error) {
     console.error("Error checking user online status:", error);
     return false; // Ensure a value is returned in case of an error

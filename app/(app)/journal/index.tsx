@@ -17,6 +17,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 const tabs = [
@@ -86,7 +87,7 @@ export default function JournalScreen() {
       month: "short",
       day: "numeric",
     };
-    return date.toLocaleDateString("en-US", options);
+    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
 
   return (

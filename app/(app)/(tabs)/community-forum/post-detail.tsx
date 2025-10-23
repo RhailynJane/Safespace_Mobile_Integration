@@ -43,6 +43,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -248,7 +249,7 @@ export default function PostDetailScreen() {
     if (diffInHours < 1) return "Just now";
     if (diffInHours < 24) return `${diffInHours} hours ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)} days ago`;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString([], { timeZone: APP_TIME_ZONE });
   };
 
   /**

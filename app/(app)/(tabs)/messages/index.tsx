@@ -30,6 +30,7 @@ import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { useRef } from "react";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 export default function MessagesScreen() {
   const { theme } = useTheme();
@@ -182,7 +183,7 @@ export default function MessagesScreen() {
                 if (p.clerk_user_id === userId) return p;
                 const s = statusMap[p.clerk_user_id];
                 return s
-                  ? { ...p, online: !!s.online, last_active_at: s.last_active_at }
+                  ? { ...p, online: !!s.online, presence: s.presence as any, last_active_at: s.last_active_at }
                   : p;
               }),
             }));
@@ -208,52 +209,7 @@ export default function MessagesScreen() {
     }
   };
 
-  // Periodically refresh presence on the list so online status feels live
-  useEffect(() => {
-    if (!isFocused || !userId || conversations.length === 0) return;
-    const interval = setInterval(async () => {
-      try {
-        const otherIds = Array.from(
-          new Set(
-            conversations
-              .flatMap((c) => c.participants)
-              .filter((p) => p.clerk_user_id !== userId)
-              .map((p) => p.clerk_user_id)
-              .filter(Boolean)
-          )
-        );
-        if (otherIds.length === 0) return;
-        const statusMap = await activityApi.statusBatch(otherIds);
-        setConversations((prev) =>
-          prev.map((c) => ({
-            ...c,
-            participants: c.participants.map((p) => {
-              if (p.clerk_user_id === userId) return p;
-              const s = statusMap[p.clerk_user_id];
-              return s
-                ? { ...p, online: !!s.online, last_active_at: s.last_active_at }
-                : p;
-            }),
-          }))
-        );
-        setFilteredConversations((prev) =>
-          prev.map((c) => ({
-            ...c,
-            participants: c.participants.map((p) => {
-              if (p.clerk_user_id === userId) return p;
-              const s = statusMap[p.clerk_user_id];
-              return s
-                ? { ...p, online: !!s.online, last_active_at: s.last_active_at }
-                : p;
-            }),
-          }))
-        );
-      } catch (e) {
-        // ignore transient errors
-      }
-    }, 20000); // 20s
-    return () => clearInterval(interval);
-  }, [isFocused, userId, conversations.length]);
+  // Removed presence polling per request
 
   // Poll for new messages and update unread counts every 10 seconds
   useEffect(() => {
@@ -383,9 +339,10 @@ export default function MessagesScreen() {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: APP_TIME_ZONE,
       });
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: APP_TIME_ZONE });
     }
   };
 
@@ -546,6 +503,7 @@ export default function MessagesScreen() {
                     const otherParticipants = conversation.participants.filter((p) => p.clerk_user_id !== userId);
                     const other = otherParticipants[0];
                     const otherAvatar = other ? getAvatarDisplay([other as any]) : { type: 'text', value: '' } as const;
+                    const initialPresence = (other?.presence as any) || (other?.online ? 'online' : 'offline');
 
                     router.push({
                       pathname: "../messages/message-chat-screen",
@@ -557,6 +515,7 @@ export default function MessagesScreen() {
                         initialLastActive: other?.last_active_at || "",
                         otherClerkId: other?.clerk_user_id || "",
                         profileImageUrl: otherAvatar.type === 'image' ? otherAvatar.value : "",
+                        initialPresence: initialPresence,
                       },
                     });
                   }}
@@ -584,24 +543,26 @@ export default function MessagesScreen() {
                       }
                     })()}
 
-                    {/* Show green dot if online, gray dot if offline */}
+                    {/* Show presence dot: green online, yellow away, gray offline */}
                     {(() => {
                       const otherParticipants =
                         conversation.participants.filter(
                           (p) => p.clerk_user_id !== userId
                         );
-                      const isOnline = otherParticipants.some(
-                        (p) => p.online === true
-                      );
+                      // choose first other participant's presence
+                      const presence = otherParticipants[0]?.presence || (otherParticipants[0]?.online ? 'online' : 'offline');
+                      const color = presence === 'online'
+                        ? theme.colors.primary
+                        : presence === 'away'
+                          ? '#FFC107'
+                          : theme.colors.iconDisabled;
 
                       return (
                         <View
                           style={[
                             styles.onlineIndicator,
                             {
-                              backgroundColor: isOnline
-                                ? theme.colors.primary
-                                : theme.colors.iconDisabled,
+                              backgroundColor: color,
                               borderColor: theme.colors.surface,
                             },
                           ]}
