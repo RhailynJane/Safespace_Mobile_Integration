@@ -5,7 +5,7 @@
  * LLM Prompt: Add comprehensive comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,9 @@ import { AppHeader } from "../../../../../components/AppHeader";
 import { useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../../utils/communityForumApi";
 import { useTheme } from "../../../../../contexts/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import avatarEvents from "../../../../../utils/avatarEvents";
+import { makeAbsoluteUrl } from "../../../../../utils/apiBaseUrl";
 
 const { width } = Dimensions.get("window");
 
@@ -45,6 +48,7 @@ export default function CreatePostScreen() {
   const [isDraft, setIsDraft] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -65,6 +69,62 @@ export default function CreatePostScreen() {
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  const loadProfileImage = useCallback(async () => {
+    try {
+      const storedImage = await AsyncStorage.getItem("profileImage");
+      console.log('📝 Create Post: Loaded from AsyncStorage:', storedImage);
+      if (storedImage) {
+        setProfileImage(storedImage);
+        console.log('📝 Create Post: Set profileImage to:', storedImage);
+        return;
+      }
+      if (user?.imageUrl) {
+        console.log('📝 Create Post: Using Clerk imageUrl:', user.imageUrl);
+        setProfileImage(user.imageUrl);
+      }
+    } catch (error) {
+      console.error("Error loading profile image:", error);
+    }
+  }, [user?.imageUrl]);
+
+  useEffect(() => {
+    loadProfileImage();
+    
+    const unsubscribe = avatarEvents.subscribe((newAvatarUrl) => {
+      console.log('📝 Create Post received avatar event:', newAvatarUrl);
+      setProfileImage(newAvatarUrl);
+      if (newAvatarUrl) {
+        AsyncStorage.setItem("profileImage", newAvatarUrl);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [loadProfileImage]);
+
+  const normalizeImageUri = (uri: string | null | undefined): string | null => {
+    if (!uri) {
+      console.log('📝 Create Post normalizeImageUri: uri is null/undefined');
+      return null;
+    }
+    if (uri.startsWith('data:image')) {
+      console.log('📝 Create Post normalizeImageUri: Blocking base64 image');
+      return null;
+    }
+    if (uri.startsWith('http://') || uri.startsWith('https://')) {
+      console.log('📝 Create Post normalizeImageUri: Using absolute URL:', uri);
+      return uri;
+    }
+    if (uri.startsWith('/')) {
+      const absolute = makeAbsoluteUrl(uri);
+      console.log('📝 Create Post normalizeImageUri: Converted relative to absolute:', absolute);
+      return absolute;
+    }
+    console.log('📝 Create Post normalizeImageUri: Returning as-is:', uri);
+    return uri;
+  };
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -216,7 +276,14 @@ export default function CreatePostScreen() {
                 <View style={styles.authorInfo}>
                   <View style={styles.avatarContainer}>
                     <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>{getInitials()}</Text>
+                      {normalizeImageUri(profileImage) ? (
+                        <Image 
+                          source={{ uri: normalizeImageUri(profileImage)! }} 
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.avatarText}>{getInitials()}</Text>
+                      )}
                     </View>
                   </View>
                   <View style={styles.authorDetails}>
@@ -529,6 +596,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 50,
+    height: 50,
   },
   avatarText: {
     color: "#FFFFFF",

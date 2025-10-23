@@ -30,6 +30,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -39,6 +40,9 @@ import { useState, useEffect } from "react";
 import { communityApi } from "../../../../utils/communityForumApi";
 import { useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import avatarEvents from "../../../../utils/avatarEvents";
+import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -61,6 +65,42 @@ export default function PostDetailScreen() {
   const [reactionPickerVisible, setReactionPickerVisible] = useState(false); // Reaction picker visibility
   const [bookmarked, setBookmarked] = useState(false); // Bookmark status
   const [reacting, setReacting] = useState(false); // Reaction update in progress
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Load and subscribe to profile image updates for current user (for self-authored posts fallback)
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const stored = await AsyncStorage.getItem("profileImage");
+        if (stored) {
+          setProfileImage(stored);
+          return;
+        }
+        if (user?.imageUrl) {
+          setProfileImage(user.imageUrl);
+        }
+      } catch (e) {
+        console.warn("PostDetail: failed to load profile image", e);
+      }
+    };
+
+    loadProfileImage();
+    const unsub = avatarEvents.subscribe((url) => {
+      setProfileImage(url ?? null);
+    });
+    return () => {
+      unsub();
+    };
+  }, [user?.imageUrl]);
+
+  // Normalize any avatar URI
+  const normalizeImageUri = (uri?: string | null): string | null => {
+    if (!uri) return null;
+    if (uri.startsWith("data:image")) return null; // block base64
+    if (uri.startsWith("http://") || uri.startsWith("https://")) return uri;
+    if (uri.startsWith("/")) return makeAbsoluteUrl(uri);
+    return uri;
+  };
 
   /**
    * Load post data when component mounts or postId changes
@@ -285,9 +325,33 @@ export default function PostDetailScreen() {
             {/* Post Header with Author Info */}
             <View style={styles.postHeader}>
               <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>
-                  {post.author_name?.charAt(0) || 'U'}
-                </Text>
+                {(() => {
+                  // Prefer author image from API if present
+                  const authorImg = normalizeImageUri(
+                    post?.author_image_url || post?.profile_image_url || post?.authorImageUrl
+                  );
+                  // Fallback to current user's avatar if they authored this post
+                  const authorIdCandidates = [
+                    post?.clerk_user_id,
+                    post?.clerkUserId,
+                    post?.author_id,
+                    post?.user_id,
+                  ].filter(Boolean);
+                  const isMyPost = authorIdCandidates.includes(user?.id);
+                  const selfImg = normalizeImageUri(profileImage);
+
+                  if (authorImg) {
+                    return <Image source={{ uri: authorImg }} style={styles.avatarImage} />;
+                  }
+                  if (isMyPost && selfImg) {
+                    return <Image source={{ uri: selfImg }} style={styles.avatarImage} />;
+                  }
+                  return (
+                    <Text style={styles.avatarText}>
+                      {post.author_name?.charAt(0) || 'U'}
+                    </Text>
+                  );
+                })()}
               </View>
               <View style={styles.userInfo}>
                 <Text style={[styles.userName, { color: theme.colors.text }]}>{post.author_name || 'Anonymous User'}</Text>
@@ -527,6 +591,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
   },
   avatarText: {
     color: "#FFFFFF",

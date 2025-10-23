@@ -58,6 +58,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../utils/communityForumApi";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import avatarEvents from "../../../../utils/avatarEvents";
+import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 
 const { width, height } = Dimensions.get("window");
 
@@ -96,6 +98,7 @@ function useCommunityMainScreenState() {
   const [categories, setCategories] = useState<any[]>([]);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -133,6 +136,8 @@ function useCommunityMainScreenState() {
     fadeAnim,
     isSigningOut,
     setIsSigningOut,
+    profileImage,
+    setProfileImage,
     showSuccessModal,
     setShowSuccessModal,
     successMessage,
@@ -181,6 +186,8 @@ function CommunityMainScreenLogic() {
     fadeAnim,
     isSigningOut,
     setIsSigningOut,
+    profileImage,
+    setProfileImage,
     showSuccessModal,
     setShowSuccessModal,
     successMessage,
@@ -230,6 +237,8 @@ function CommunityMainScreenLogic() {
     fadeAnim,
     isSigningOut,
     setIsSigningOut,
+    profileImage,
+    setProfileImage,
     signOut,
     isSignedIn,
     user,
@@ -282,6 +291,8 @@ export default function CommunityMainScreen() {
     fadeAnim,
     isSigningOut,
     setIsSigningOut,
+    profileImage,
+    setProfileImage,
     signOut,
     isSignedIn,
     user,
@@ -327,6 +338,80 @@ export default function CommunityMainScreen() {
       loadMyPosts();
     }
   }, [selectedCategory, activeView]);
+
+  /**
+   * Load profile image on mount and subscribe to avatar events
+   */
+  useEffect(() => {
+    loadProfileImage();
+    
+    // Subscribe to avatar change events for real-time updates
+    const unsubscribe = avatarEvents.subscribe((newAvatarUrl) => {
+      console.log('🎭 Community Forum received avatar event with URL:', newAvatarUrl);
+      setProfileImage(newAvatarUrl);
+      // Update AsyncStorage
+      if (newAvatarUrl) {
+        AsyncStorage.setItem("profileImage", newAvatarUrl);
+      } else {
+        AsyncStorage.removeItem("profileImage");
+      }
+      console.log('✅ Community Forum profileImage updated to:', newAvatarUrl);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  /**
+   * Load profile image from various sources in priority order
+   */
+  const loadProfileImage = async () => {
+    try {
+      // Priority 1: AsyncStorage
+      const storedImage = await AsyncStorage.getItem("profileImage");
+      if (storedImage) {
+        console.log('🎭 Community Forum loaded image from AsyncStorage:', storedImage);
+        setProfileImage(storedImage);
+        return;
+      }
+
+      // Priority 2: Clerk user image
+      if (user?.imageUrl) {
+        console.log('🎭 Community Forum loaded image from Clerk:', user.imageUrl);
+        setProfileImage(user.imageUrl);
+      }
+    } catch (error) {
+      console.error("Error loading profile image:", error);
+    }
+  };
+
+  /**
+   * Normalize image URI to handle different formats
+   * Blocks base64 images to prevent OOM issues
+   */
+  const normalizeImageUri = (uri: string | null | undefined): string | null => {
+    if (!uri) return null;
+    
+    // Block base64 images
+    if (uri.startsWith('data:image')) {
+      console.log('⚠️ Community Forum: Blocking base64 image to prevent OOM');
+      return null;
+    }
+    
+    // If it's already an absolute URL, use it as-is
+    if (uri.startsWith('http://') || uri.startsWith('https://')) {
+      return uri;
+    }
+    
+    // If it's a relative path, make it absolute
+    if (uri.startsWith('/')) {
+      return makeAbsoluteUrl(uri);
+    }
+    
+    return uri;
+  };
+
 
   /**
    * Initial data loading sequence
@@ -1062,9 +1147,43 @@ export default function CommunityMainScreen() {
                     <View style={styles.postHeader}>
                       <View style={styles.postUserInfo}>
                         <View style={styles.avatarContainer}>
-                          <Text style={styles.avatarText}>
-                            {post.author_name?.charAt(0) || "U"}
-                          </Text>
+                          {(() => {
+                            const authorImg = normalizeImageUri(
+                              post?.author_image_url || post?.profile_image_url || post?.authorImageUrl
+                            );
+                            const authorIdCandidates = [
+                              post?.clerk_user_id,
+                              post?.clerkUserId,
+                              post?.author_id,
+                              post?.user_id,
+                            ].filter(Boolean);
+                            const isMyPost = authorIdCandidates.includes(user?.id);
+                            const selfImg = normalizeImageUri(profileImage);
+                            console.log('🎭 Post Avatar Check:', {
+                              postId: post.id,
+                              authorIds: authorIdCandidates,
+                              currentUserId: user?.id,
+                              isMyPost,
+                              authorImg,
+                              selfImg,
+                            });
+
+                            if (authorImg) {
+                              return (
+                                <Image source={{ uri: authorImg }} style={styles.avatarImage} />
+                              );
+                            }
+                            if (isMyPost && selfImg) {
+                              return (
+                                <Image source={{ uri: selfImg }} style={styles.avatarImage} />
+                              );
+                            }
+                            return (
+                              <Text style={styles.avatarText}>
+                                {post.author_name?.charAt(0) || "U"}
+                              </Text>
+                            );
+                          })()}
                         </View>
                         <View style={styles.postTitleContainer}>
                           <Text style={[styles.postTitle, { color: theme.colors.text }]} numberOfLines={2}>
@@ -1195,7 +1314,14 @@ export default function CommunityMainScreen() {
           <Animated.View style={[styles.sideMenu, { backgroundColor: theme.colors.surface, opacity: fadeAnim }]}>
             <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View style={styles.profileAvatar}>
-                <Text style={styles.profileAvatarText}>{getInitials()}</Text>
+                {normalizeImageUri(profileImage) ? (
+                  <Image 
+                    source={{ uri: normalizeImageUri(profileImage)! }} 
+                    style={styles.profileAvatarImage}
+                  />
+                ) : (
+                  <Text style={styles.profileAvatarText}>{getInitials()}</Text>
+                )}
               </View>
               <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
               <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
@@ -1587,6 +1713,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
   },
   avatarText: {
     color: "#FFFFFF",
@@ -1833,6 +1964,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
+    overflow: "hidden",
+  },
+  profileAvatarImage: {
+    width: 60,
+    height: 60,
   },
   profileAvatarText: {
     color: "#FFFFFF",
