@@ -11,12 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSignIn } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
+import StatusModal from "../../components/StatusModal";
 import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ResetPasswordScreen() {
@@ -34,14 +34,31 @@ export default function ResetPasswordScreen() {
   const [passwordError, setPasswordError] = useState("");
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
 
-  const { isLoaded, signIn, setActive } = useSignIn();
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
-  // Initialize the reset password flow when component mounts
-  useEffect(() => {
-    if (isLoaded && email && !signIn) {
-      initializeResetPassword();
-    }
-  }, [isLoaded, email]);
+  // Show modal helper
+  const showErrorModal = (title: string, message: string) => {
+    setModalConfig({ type: 'error', title, message });
+    setShowModal(true);
+  };
+
+  const showSuccessModal = (title: string, message: string) => {
+    setModalConfig({ type: 'success', title, message });
+    setShowModal(true);
+  };
+
+  const showInfoModal = (title: string, message: string) => {
+    setModalConfig({ type: 'info', title, message });
+    setShowModal(true);
+  };
+
+  const { isLoaded, signIn, setActive } = useSignIn();
 
   const initializeResetPassword = async () => {
     if (!isLoaded || !email) return;
@@ -54,9 +71,17 @@ export default function ResetPasswordScreen() {
       });
     } catch (err: any) {
       console.error("Failed to initialize reset password:", err);
-      Alert.alert("Error", "Failed to initialize password reset. Please try again.");
+      showErrorModal("Error", "Failed to initialize password reset. Please try again.");
     }
   };
+
+  // Initialize the reset password flow when component mounts
+  useEffect(() => {
+    if (isLoaded && email && !signIn) {
+      initializeResetPassword();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, email]);
 
   // Validate password strength
   const validatePassword = (pwd: string) => {
@@ -100,7 +125,7 @@ export default function ResetPasswordScreen() {
     }
 
     if (!isLoaded || !signIn) {
-      Alert.alert("Error", "Authentication service is not ready");
+      showErrorModal("Error", "Authentication service is not ready");
       return;
     }
 
@@ -117,16 +142,12 @@ export default function ResetPasswordScreen() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         
-        Alert.alert(
+        showSuccessModal(
           "Password Reset Successful",
-          "Your password has been reset successfully.",
-          [
-            {
-              text: "OK",
-              onPress: () => router.replace("/(app)/(tabs)/home"),
-            },
-          ]
+          "Your password has been reset successfully."
         );
+        // Navigate after modal closes
+        setTimeout(() => router.replace("/(app)/(tabs)/home"), 2000);
       } else {
         throw new Error("Password reset failed");
       }
@@ -166,7 +187,7 @@ export default function ResetPasswordScreen() {
         identifier: email,
       });
 
-      Alert.alert("Code Resent", "A new verification code has been sent to your email.");
+      showInfoModal("Code Resent", "A new verification code has been sent to your email.");
     } catch (err: any) {
       console.error("Resend code error:", err);
       setCodeError("Failed to resend code. Please try again.");
@@ -335,6 +356,15 @@ export default function ResetPasswordScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Status Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setShowModal(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -10,11 +10,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { SignupData } from "../app/(auth)/signup";
 import { useTheme } from "../contexts/ThemeContext";
+import StatusModal from "./StatusModal";
 
 // Props interface for the SignUpDetailsForm component
 interface SignUpDetailsFormProps {
@@ -44,6 +44,20 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   // State to store validation errors for form fields
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Show modal helper
+  const showErrorModal = (title: string, message: string) => {
+    setModalConfig({ type: 'error', title, message });
+    setShowModal(true);
+  };
 
   /**
    * Validates personal information fields
@@ -142,8 +156,8 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
       if (validatePassword()) {
         onNext();
       } else {
-        // Show alert if password doesn't meet requirements
-        Alert.alert(
+        // Show modal if password doesn't meet requirements
+        showErrorModal(
           "Password Requirements",
           "Please ensure your password meets all requirements"
         );
@@ -369,14 +383,14 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
               <View
                 style={[
                   styles.requirementDot,
-                  { backgroundColor: requirement.test ? "#4CAF50" : "#E0E0E0" },
+                  { backgroundColor: requirement.test ? theme.colors.primary : (theme.isDark ? '#666666' : '#CCCCCC') },
                 ]}
               />
               {/* Requirement text with dynamic color */}
               <Text
                 style={[
                   styles.requirementText,
-                  { color: requirement.test ? "#4CAF50" : "#666" },
+                  { color: requirement.test ? theme.colors.primary : (theme.isDark ? '#E0E0E0' : '#666666') },
                 ]}
               >
                 {requirement.message}
@@ -390,6 +404,15 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
           <Text style={styles.continueButtonText}>Create an Account</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Status Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setShowModal(false)}
+      />
     </View>
   );
 };
