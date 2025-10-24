@@ -95,6 +95,7 @@ export default function ChatScreen() {
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [contact, setContact] = useState<Participant | null>(null);
@@ -120,6 +121,7 @@ export default function ChatScreen() {
   const [manualScrolling, setManualScrolling] = useState(false);
   const scrollIdleTimerRef = useRef<any>(null);
   const messagesListRef = useRef<FlatList<ExtendedMessage>>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
@@ -579,6 +581,7 @@ export default function ChatScreen() {
         // console.log("💬 Message sent successfully");
         setMessages((prev) => [...prev, result.data]);
         setNewMessage("");
+        setIsTyping(false); // Reset typing state after sending
 
         // Reload messages to ensure both parties see the same
         setTimeout(() => loadMessages(), 500);
@@ -591,6 +594,36 @@ export default function ChatScreen() {
       Alert.alert("Error", "Failed to send message");
     } finally {
       setSending(false);
+    }
+  };
+
+  // Handle emoji picker
+  const handleEmojiPress = () => {
+    // Simple emoji insertion - you can replace with a full emoji picker library
+    const commonEmojis = ['😊', '😂', '❤️', '👍', '🎉', '😍', '🙏', '✨'];
+    const buttons = [
+      ...commonEmojis.map(emoji => ({
+        text: emoji,
+        onPress: () => setNewMessage(prev => prev + emoji)
+      })),
+      { text: 'Cancel', onPress: () => {} }
+    ];
+    Alert.alert('Quick Emojis', 'Select an emoji', buttons);
+  };
+
+  // Handle voice recording
+  const handleMicPress = async () => {
+    if (isRecording) {
+      // Stop recording
+      setIsRecording(false);
+      Alert.alert('Voice Recording', 'Voice recording feature coming soon!');
+    } else {
+      // Start recording
+      Alert.alert(
+        'Voice Message',
+        'Voice recording feature will be available soon. This will allow you to record and send voice messages.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -1021,12 +1054,12 @@ export default function ChatScreen() {
 
   return (
     <CurvedBackground>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={[styles.container, { backgroundColor: theme.colors.background }]}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.container}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
           {/* Fixed Header with dynamic height based on screen size */}
           <View style={[styles.headerWrapper, { height: headerHeight }]}>
             <View style={styles.header}>
@@ -1210,56 +1243,103 @@ export default function ChatScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Message Input */}
-          <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.borderLight }] }>
-            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background }] }>
+          {/* Message Input - Single row with icons and text input */}
+          <View style={[
+            styles.bottomInputSection, 
+            { 
+              backgroundColor: theme.colors.surface,
+              paddingBottom: Math.max(insets.bottom, 4),
+            }
+          ]}>
+            {/* Show expand button when icons are hidden */}
+            {isTyping && (
               <TouchableOpacity
-                style={styles.attachmentButton}
-                onPress={() => setAttachmentModalVisible(true)}
-                disabled={uploading}
+                style={styles.iconButton}
+                onPress={() => setIsTyping(false)}
               >
-                {uploading ? (
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                ) : (
-                  <Ionicons name="attach" size={24} color={theme.colors.primary} />
-                )}
+                <Ionicons name="chevron-forward" size={28} color={theme.colors.primary} />
               </TouchableOpacity>
+            )}
 
+            {/* Left icons - hide when typing */}
+            {!isTyping && (
+              <>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={takePhoto}
+                >
+                  <Ionicons name="camera" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="image" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={handleMicPress}
+                >
+                  <Ionicons 
+                    name={isRecording ? "stop-circle" : "mic"} 
+                    size={28} 
+                    color={isRecording ? "#FF0000" : theme.colors.primary} 
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+
+            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background }]}>
               <TextInput
                 style={[styles.textInput, { color: theme.colors.text }]}
-                placeholder="Type a message..."
+                placeholder="Message"
                 value={newMessage}
-                onChangeText={setNewMessage}
-                multiline
+                onChangeText={(text) => {
+                  setNewMessage(text);
+                  setIsTyping(text.length > 0);
+                }}
+                onFocus={() => {
+                  if (newMessage.length > 0) {
+                    setIsTyping(true);
+                  }
+                }}
+                onBlur={() => {
+                  // Keep icons hidden if there's still text
+                  if (newMessage.length === 0) {
+                    setIsTyping(false);
+                  }
+                }}
+                multiline={false}
                 maxLength={500}
                 editable={!sending && !uploading}
-                onSubmitEditing={handleSendMessage}
-                returnKeyType="send"
                 placeholderTextColor={theme.colors.textDisabled}
+                returnKeyType="send"
+                onSubmitEditing={handleSendMessage}
               />
+            </View>
 
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={handleEmojiPress}
+            >
+              <Ionicons name="happy-outline" size={28} color={theme.colors.primary} />
+            </TouchableOpacity>
+
+            {newMessage.trim() !== "" && (
               <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  { backgroundColor: theme.colors.primary },
-                  (newMessage.trim() === "" || sending || uploading) && { backgroundColor: theme.colors.borderLight },
-                ]}
+                style={styles.iconButton}
                 onPress={handleSendMessage}
-                disabled={
-                  newMessage.trim() === "" || sending || uploading || !userId
-                }
+                disabled={sending || uploading}
               >
                 {sending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : (
-                  <Ionicons
-                    name="send"
-                    size={24}
-                    color={newMessage.trim() === "" ? theme.colors.iconDisabled : "#FFFFFF"}
-                  />
+                  <Ionicons name="send" size={28} color={theme.colors.primary} />
                 )}
               </TouchableOpacity>
-            </View>
+            )}
           </View>
 
           {/* Enhanced Attachment Viewer Modal */}
@@ -1423,8 +1503,8 @@ export default function ChatScreen() {
               </View>
             </View>
           </Modal>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </CurvedBackground>
   );
 }
@@ -1611,42 +1691,34 @@ const styles = StyleSheet.create({
   theirMessageTime: {
     color: "#999",
   },
-  inputContainer: {
-    padding: 15,
-    // backgroundColor moved to theme via inline override
+  // Bottom input section - all items in one row
+  bottomInputSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    gap: 2,
     borderTopWidth: 1,
-    // borderTopColor moved to theme via inline override
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  iconButton: {
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputWrapper: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    // backgroundColor moved to theme via inline override
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-  },
-  attachmentButton: {
-    padding: 4,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    minHeight: 32,
   },
   textInput: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    maxHeight: 100,
     fontSize: 16,
-    // color moved to theme via inline override
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    // backgroundColor moved to theme via inline override
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
-  },
-  sendButtonDisabled: {
-    // backgroundColor moved to theme via inline override
+    paddingVertical: 4,
   },
   // Attachment styles
   imageAttachment: {

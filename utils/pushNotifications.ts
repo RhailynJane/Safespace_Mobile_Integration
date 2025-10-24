@@ -1,19 +1,33 @@
-import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getApiBaseUrl } from './apiBaseUrl';
 
-// Configure how notifications are shown when the app is foregrounded
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    // iOS presentation options in newer SDKs
-    shouldShowBanner: true,
-    shouldShowList: true,
-  })
-});
+// Check if running in Expo Go
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Lazy load notifications module to avoid importing in Expo Go
+let Notifications: any = null;
+
+async function getNotificationsModule() {
+  if (isExpoGo) {
+    return null;
+  }
+  if (!Notifications) {
+    Notifications = await import('expo-notifications');
+    // Configure how notifications are shown when the app is foregrounded
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        // iOS presentation options in newer SDKs
+        shouldShowBanner: true,
+        shouldShowList: true,
+      })
+    });
+  }
+  return Notifications;
+}
 
 async function getProjectId(): Promise<string | undefined> {
   // Try to resolve projectId for bare or dev clients
@@ -25,6 +39,17 @@ async function getProjectId(): Promise<string | undefined> {
 
 export async function registerForPushNotifications(clerkUserId: string): Promise<string | null> {
   try {
+    // Skip push notification registration in Expo Go (SDK 53+)
+    if (isExpoGo) {
+      console.log('⚠️ Push notifications are not supported in Expo Go (SDK 53+).');
+      console.log('   To enable push notifications, create a development build:');
+      console.log('   Run: npx expo run:android or npx expo run:ios');
+      return null;
+    }
+
+    const Notifications = await getNotificationsModule();
+    if (!Notifications) return null;
+
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     if (existingStatus !== 'granted') {
@@ -88,20 +113,36 @@ export function addNotificationListeners(
   onReceive: (title: string, body: string) => void,
   onTap?: (data: any) => void,
 ) {
-  const receiveSub = Notifications.addNotificationReceivedListener((notification) => {
-    const { title, body } = notification.request.content;
-    if (title || body) onReceive(title || 'Notification', body || '');
-  });
+  // Skip adding listeners in Expo Go (SDK 53+)
+  if (isExpoGo) {
+    console.log('⚠️ Notification listeners not added in Expo Go');
+    return { remove: () => {}, receiveSub: { remove: () => {} }, responseSub: { remove: () => {} } };
+  }
 
-  const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-    const data = response.notification.request.content.data;
-    if (onTap) onTap(data);
-  });
+  // Return a promise-based approach since we need to dynamically import
+  let receiveSub: any = null;
+  let responseSub: any = null;
+
+  // Initialize listeners asynchronously
+  (async () => {
+    const Notifications = await getNotificationsModule();
+    if (!Notifications) return;
+
+    receiveSub = Notifications.addNotificationReceivedListener((notification: any) => {
+      const { title, body } = notification.request.content;
+      if (title || body) onReceive(title || 'Notification', body || '');
+    });
+
+    responseSub = Notifications.addNotificationResponseReceivedListener((response: any) => {
+      const data = response.notification.request.content.data;
+      if (onTap) onTap(data);
+    });
+  })();
 
   return {
     remove: () => {
-      try { receiveSub.remove(); } catch (_e) { /* no-op */ }
-      try { responseSub.remove(); } catch (_e) { /* no-op */ }
+      try { receiveSub?.remove(); } catch (_e) { /* no-op */ }
+      try { responseSub?.remove(); } catch (_e) { /* no-op */ }
     }
   };
 }

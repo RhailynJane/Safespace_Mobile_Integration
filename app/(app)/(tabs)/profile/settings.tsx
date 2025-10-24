@@ -33,7 +33,7 @@ import TimePickerModal from "../../../../components/TimePickerModal";
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
-  const { theme, isDarkMode, setDarkMode: setGlobalDarkMode, textSize, setTextSize: setGlobalTextSize } = useTheme();
+  const { theme, isDarkMode, setDarkMode: setGlobalDarkMode, textSize, setTextSize: setGlobalTextSize, scaledFontSize } = useTheme();
 
   // Settings state
   const [autoLockTimer, setAutoLockTimer] = useState("5 minutes");
@@ -84,6 +84,9 @@ export default function SettingsScreen() {
     setTextSizeSlider(textSizeToSlider(textSize));
   }, [textSize]);
 
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -108,10 +111,10 @@ export default function SettingsScreen() {
   const loadSettings = async () => {
     try {
       setIsLoading(true);
-  const settings = await settingsAPI.fetchSettings(user?.id);
+      const settings = await settingsAPI.fetchSettings(user?.id);
       
-  // Apply all saved settings EXCEPT dark mode and text size (managed by ThemeContext)
-  // Do not override current theme/context values here to avoid reverting user changes
+      // Apply all saved settings EXCEPT dark mode and text size (managed by ThemeContext)
+      // Do not override current theme/context values here to avoid reverting user changes
       setAutoLockTimer(settings.autoLockTimer);
       setNotificationsEnabled(settings.notificationsEnabled);
       // granular notifications
@@ -136,8 +139,8 @@ export default function SettingsScreen() {
       setJournalReminderCustomSchedule(settings.journalReminderCustomSchedule ?? {});
       
     } catch (error) {
-  console.log('Error loading settings:', error);
-  setStatusModal({visible:true, type:'error', title:'Error', message:'Failed to load settings'});
+      console.log('Error loading settings:', error);
+      setStatusModal({visible:true, type:'error', title:'Error', message:'Failed to load settings'});
     } finally {
       setIsLoading(false);
     }
@@ -182,8 +185,8 @@ export default function SettingsScreen() {
       }
       
     } catch (error) {
-  console.log('Error saving settings:', error);
-  setStatusModal({visible:true, type:'error', title:'Error', message:'Failed to save settings'});
+      console.log('Error saving settings:', error);
+      setStatusModal({visible:true, type:'error', title:'Error', message:'Failed to save settings'});
     }
   };
 
@@ -248,7 +251,6 @@ export default function SettingsScreen() {
         case "Large":
           fontScale = 1.15;
           break;
-      
       }
       
       await AsyncStorage.setItem('appFontScale', JSON.stringify(fontScale));
@@ -615,7 +617,6 @@ export default function SettingsScreen() {
 
           {/* Notifications */}
           <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notifications</Text>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notifications</Text>
 
             {renderToggleRow(
@@ -999,7 +1000,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -1022,7 +1023,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     marginBottom: 15,
   },
@@ -1046,11 +1047,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "500",
   },
   settingSubtitle: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     marginTop: 2,
   },
   settingRight: {
@@ -1058,7 +1059,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   settingValue: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     marginRight: 8,
   },
   timeInputContainer: {
@@ -1076,11 +1077,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timeInputText: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: '500',
   },
   timeSeparator: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     marginHorizontal: 4,
   },
   nestedSettings: {
@@ -1092,7 +1093,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontStyle: "italic",
   },
   saveButton: {
@@ -1103,7 +1104,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: "white",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   // Slider styles
@@ -1119,10 +1120,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sliderLabel: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
   },
   sliderValue: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: '600',
   },
   slider: {
@@ -1135,7 +1136,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sliderTickLabel: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
   },
   // Selection modal styles
   modalOverlay: {
@@ -1152,7 +1153,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   selectionModalTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: '600',
     marginBottom: 8,
   },
@@ -1161,18 +1162,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   selectionOptionText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
   },
   selectionCancelBtn: {
     paddingVertical: 12,
     alignItems: 'center',
   },
   selectionCancelText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
   },
   // Custom schedule styles
   customScheduleTitle: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: '600',
     marginBottom: 12,
     marginTop: 8,
@@ -1192,7 +1193,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customDayLabel: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     marginLeft: 12,
     flex: 1,
   },
@@ -1207,7 +1208,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   customDayTimeText: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: '500',
   },
 });
