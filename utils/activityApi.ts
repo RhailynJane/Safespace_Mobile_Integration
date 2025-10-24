@@ -10,17 +10,34 @@ export type UserStatus = {
   last_logout_at: string | null;
 };
 
-async function postJson<T>(endpoint: string, body: any): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status} ${res.statusText}: ${text}`);
+async function postJson<T>(endpoint: string, body: any, retries = 3, delay = 1000): Promise<T> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      
+      // If user not found (404), retry after delay (user might be syncing)
+      if (res.status === 404 && attempt < retries) {
+        console.log(`⏳ User not found (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status} ${res.statusText}: ${text}`);
+      }
+      return res.json();
+    } catch (error) {
+      if (attempt === retries) throw error;
+      console.log(`⏳ Request failed (attempt ${attempt}/${retries}), retrying...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
-  return res.json();
+  throw new Error('Max retries exceeded');
 }
 
 export const activityApi = {

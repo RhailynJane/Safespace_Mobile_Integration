@@ -46,7 +46,7 @@ export interface Resource {
 }
 
 class ApiService {
-  private async makeRequest(endpoint: string, options: RequestInit = {}) {
+  private async makeRequest(endpoint: string, options: RequestInit = {}, retries = 3, delay = 1000) {
     const url = `${API_BASE_URL}${endpoint}`;
 
     const config: RequestInit = {
@@ -57,23 +57,37 @@ class ApiService {
       ...options,
     };
 
-    try {
-      console.log(`Making API request to: ${url}`);
-      const response = await fetch(url, config);
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`Making API request to: ${url}`);
+        const response = await fetch(url, config);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API Error (${response.status}):`, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        // If user not found (404), retry after delay (user might be syncing)
+        if (response.status === 404 && attempt < retries) {
+          console.log(`⏳ Resource not found (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`API Error (${response.status}):`, errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log(`API Response:`, data);
+        return data;
+      } catch (error) {
+        if (attempt === retries) {
+          console.error(`API Request failed for ${endpoint}:`, error);
+          throw error;
+        }
+        console.log(`⏳ Request failed (attempt ${attempt}/${retries}), retrying...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-
-      const data = await response.json();
-      console.log(`API Response:`, data);
-      return data;
-    } catch (error) {
-      console.error(`API Request failed for ${endpoint}:`, error);
-      throw error;
     }
+    throw new Error('Max retries exceeded');
   }
 
   async syncUser(userData: SyncUserData) {

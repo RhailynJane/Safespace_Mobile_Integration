@@ -10,12 +10,14 @@ import {
   Image,
   Animated,
   Dimensions,
+  Platform,
+  StatusBar,
   Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { assessmentTracker } from "../utils/assessmentTracker";
 import { useFocusEffect } from "@react-navigation/native";
@@ -25,6 +27,7 @@ import { getApiBaseUrl, makeAbsoluteUrl } from "../utils/apiBaseUrl";
 import avatarEvents from "../utils/avatarEvents";
 
 const { width } = Dimensions.get("window");
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
 const normalizeImageUri = (uri?: string | null) => {
   if (!uri) return null;
   if (uri.startsWith('http')) return uri;
@@ -49,7 +52,8 @@ export const AppHeader = ({
   showNotifications = true,
   rightActions,
 }: AppHeaderProps) => {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -408,8 +412,8 @@ export const AppHeader = ({
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+    <View style={[styles.safeArea, { backgroundColor: "transparent", paddingTop: insets.top }]}>
+      <View style={[styles.header, { backgroundColor: "transparent" }]}>
         {showBack ? (
           <TouchableOpacity
             onPress={() => router.back()}
@@ -544,7 +548,7 @@ export const AppHeader = ({
           </Animated.View>
         </Animated.View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -555,7 +559,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    marginBottom: 8,
     height: 56,
     // backgroundColor removed - now uses theme.colors.surface
   },

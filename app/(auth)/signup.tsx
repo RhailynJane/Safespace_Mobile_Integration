@@ -195,14 +195,32 @@ export default function SignupScreen() {
     } catch (err: any) {
       console.error("Sign up error:", err);
 
+      // Check for specific Clerk errors
+      if (err.errors && err.errors.length > 0) {
+        const clerkError = err.errors[0];
+        console.error("Clerk error details:", err.errors);
+        
+        // Handle password pwned error
+        if (clerkError.code === "form_password_pwned") {
+          showErrorModal(
+            "Weak Password",
+            "This password has been found in an online data breach. For your account safety, please use a different, more secure password."
+          );
+          return;
+        }
+        
+        // Handle other Clerk errors
+        if (clerkError.message) {
+          setErrorMessage(clerkError.message);
+          showErrorModal("Error", clerkError.message);
+          return;
+        }
+      }
+
       // Use the improved CAPTCHA error handler
       const errorMessage = CaptchaHandler.handleCaptchaError(err);
       setErrorMessage(errorMessage);
-
-      // Log detailed error for debugging
-      if (err.errors) {
-        console.error("Clerk error details:", err.errors);
-      }
+      showErrorModal("Error", errorMessage);
     } finally {
       setLoading(false);
     }
