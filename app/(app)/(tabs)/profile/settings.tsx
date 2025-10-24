@@ -22,6 +22,7 @@ import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 import { useUser } from '@clerk/clerk-expo';
+import TimePickerModal from "../../../../components/TimePickerModal";
 
 /**
  * SettingsScreen Component
@@ -49,7 +50,24 @@ export default function SettingsScreen() {
   const [quietStartTime, setQuietStartTime] = useState("22:00");
   const [quietEndTime, setQuietEndTime] = useState("08:00");
   const [reminderFrequency, setReminderFrequency] = useState("Daily");
+  // Per-category reminder settings
+  const [moodReminderEnabled, setMoodReminderEnabled] = useState(false);
+  const [moodReminderTime, setMoodReminderTime] = useState("09:00");
+  const [moodReminderFrequency, setMoodReminderFrequency] = useState("Daily");
+  const [moodReminderCustomSchedule, setMoodReminderCustomSchedule] = useState<Record<string, string>>({});
+  const [journalReminderEnabled, setJournalReminderEnabled] = useState(false);
+  const [journalReminderTime, setJournalReminderTime] = useState("20:00");
+  const [journalReminderFrequency, setJournalReminderFrequency] = useState("Daily");
+  const [journalReminderCustomSchedule, setJournalReminderCustomSchedule] = useState<Record<string, string>>({});
   const { user } = useUser();
+  // Time picker modal visibility state
+  const [quietStartPickerVisible, setQuietStartPickerVisible] = useState(false);
+  const [quietEndPickerVisible, setQuietEndPickerVisible] = useState(false);
+  const [moodTimePickerVisible, setMoodTimePickerVisible] = useState(false);
+  const [journalTimePickerVisible, setJournalTimePickerVisible] = useState(false);
+  // Custom schedule per-day picker visibility
+  const [moodCustomDayPickers, setMoodCustomDayPickers] = useState<Record<string, boolean>>({});
+  const [journalCustomDayPickers, setJournalCustomDayPickers] = useState<Record<string, boolean>>({});
   // Status modal state (replaces Alert.alert)
   const [statusModal, setStatusModal] = useState<{visible:boolean; type:'success'|'error'|'info'; title:string; message:string}>({visible:false, type:'info', title:'', message:''});
 
@@ -108,6 +126,14 @@ export default function SettingsScreen() {
       setQuietStartTime(settings.quietStartTime);
       setQuietEndTime(settings.quietEndTime);
       setReminderFrequency(settings.reminderFrequency);
+      setMoodReminderEnabled(settings.moodReminderEnabled);
+      setMoodReminderTime(settings.moodReminderTime);
+      setMoodReminderFrequency(settings.moodReminderFrequency);
+      setMoodReminderCustomSchedule(settings.moodReminderCustomSchedule ?? {});
+      setJournalReminderEnabled(settings.journalReminderEnabled);
+      setJournalReminderTime(settings.journalReminderTime);
+      setJournalReminderFrequency(settings.journalReminderFrequency);
+      setJournalReminderCustomSchedule(settings.journalReminderCustomSchedule ?? {});
       
     } catch (error) {
   console.log('Error loading settings:', error);
@@ -138,6 +164,14 @@ export default function SettingsScreen() {
         quietStartTime,
         quietEndTime,
         reminderFrequency,
+        moodReminderEnabled,
+        moodReminderTime,
+        moodReminderFrequency,
+        moodReminderCustomSchedule,
+        journalReminderEnabled,
+        journalReminderTime,
+        journalReminderFrequency,
+        journalReminderCustomSchedule,
       };
 
       const result = await settingsAPI.saveSettings(settings, user?.id);
@@ -310,7 +344,16 @@ export default function SettingsScreen() {
 
   const textSizeOptions = ["Extra Small", "Small", "Medium", "Large"];
   const autoLockOptions = ["Immediate", "1 minute", "5 minutes", "15 minutes", "Never"];
-  const reminderFrequencyOptions = ["Never", "Daily", "Twice daily", "Weekly"];
+  const reminderFrequencyOptions = ["Never", "Hourly", "Daily", "Weekdays", "Weekends", "Weekly", "Custom"];
+  const daysOfWeek = [
+    { key: 'mon', label: 'Monday' },
+    { key: 'tue', label: 'Tuesday' },
+    { key: 'wed', label: 'Wednesday' },
+    { key: 'thu', label: 'Thursday' },
+    { key: 'fri', label: 'Friday' },
+    { key: 'sat', label: 'Saturday' },
+    { key: 'sun', label: 'Sunday' },
+  ];
 
   /**
    * Renders a toggle switch row
@@ -393,7 +436,52 @@ export default function SettingsScreen() {
   );
 
   /**
-   * Renders time input row for quiet hours
+   * Renders time picker row with native time picker modal
+   */
+  const renderTimePickerRow = (
+    title: string,
+    subtitle: string,
+    value: string,
+    onSelect: (time: string) => void,
+    visible: boolean,
+    setVisible: (visible: boolean) => void,
+    icon: keyof typeof Ionicons.glyphMap,
+    disabled = false
+  ) => (
+    <>
+      <TouchableOpacity
+        style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }, disabled && styles.disabledRow]}
+        onPress={() => !disabled && setVisible(true)}
+      >
+        <View style={styles.settingLeft}>
+          <Ionicons name={icon} size={20} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
+          <View style={styles.settingTextContainer}>
+            <Text style={[styles.settingTitle, { color: disabled ? theme.colors.textDisabled : theme.colors.text }]}>
+              {title}
+            </Text>
+            <Text style={[styles.settingSubtitle, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>
+              {subtitle}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.settingRight}>
+          <Text style={[styles.settingValue, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>
+            {value}
+          </Text>
+          <Ionicons name="time" size={16} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
+        </View>
+      </TouchableOpacity>
+      <TimePickerModal
+        visible={visible}
+        value={value}
+        onSelect={onSelect}
+        onCancel={() => setVisible(false)}
+      />
+    </>
+  );
+
+  /**
+   * Renders time input row for quiet hours (dual time pickers)
    */
   const renderTimeInputRow = (
     title: string,
@@ -404,32 +492,50 @@ export default function SettingsScreen() {
     onEndChange: (text: string) => void,
     icon: keyof typeof Ionicons.glyphMap
   ) => (
-    <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}>
-      <View style={styles.settingLeft}>
-        <Ionicons name={icon} size={20} color={theme.colors.icon} />
-        <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: theme.colors.text }]}>{title}</Text>
-          <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
+    <>
+      <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}>
+        <View style={styles.settingLeft}>
+          <Ionicons name={icon} size={20} color={theme.colors.icon} />
+          <View style={styles.settingTextContainer}>
+            <Text style={[styles.settingTitle, { color: theme.colors.text }]}>{title}</Text>
+            <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
+          </View>
+        </View>
+        <View style={styles.timeInputContainer}>
+          <TouchableOpacity
+            style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+            onPress={() => setQuietStartPickerVisible(true)}
+          >
+            <Text style={[styles.timeInputText, { color: theme.colors.text }]}>{startValue}</Text>
+          </TouchableOpacity>
+          <Text style={[styles.timeSeparator, { color: theme.colors.text }]}>to</Text>
+          <TouchableOpacity
+            style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+            onPress={() => setQuietEndPickerVisible(true)}
+          >
+            <Text style={[styles.timeInputText, { color: theme.colors.text }]}>{endValue}</Text>
+          </TouchableOpacity>
         </View>
       </View>
-      <View style={styles.timeInputContainer}>
-        <TextInput
-          style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
-          value={startValue}
-          onChangeText={onStartChange}
-          placeholder="22:00"
-          placeholderTextColor={theme.colors.textSecondary}
-        />
-        <Text style={[styles.timeSeparator, { color: theme.colors.text }]}>to</Text>
-        <TextInput
-          style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
-          value={endValue}
-          onChangeText={onEndChange}
-          placeholder="08:00"
-          placeholderTextColor={theme.colors.textSecondary}
-        />
-      </View>
-    </View>
+      <TimePickerModal
+        visible={quietStartPickerVisible}
+        value={startValue}
+        onSelect={(time) => {
+          onStartChange(time);
+          setQuietStartPickerVisible(false);
+        }}
+        onCancel={() => setQuietStartPickerVisible(false)}
+      />
+      <TimePickerModal
+        visible={quietEndPickerVisible}
+        value={endValue}
+        onSelect={(time) => {
+          onEndChange(time);
+          setQuietEndPickerVisible(false);
+        }}
+        onCancel={() => setQuietEndPickerVisible(false)}
+      />
+    </>
   );
 
   return (
@@ -510,6 +616,7 @@ export default function SettingsScreen() {
           {/* Notifications */}
           <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notifications</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notifications</Text>
 
             {renderToggleRow(
               "Enable Notifications",
@@ -551,6 +658,98 @@ export default function SettingsScreen() {
                 "happy",
                 !notificationsEnabled
               )}
+              {/* Mood reminders controls */}
+              <View style={[styles.nestedSettings, !notificationsEnabled && styles.disabledRow]}>
+                {renderToggleRow(
+                  "Mood reminder",
+                  "Schedule a daily/weekly mood check-in",
+                  moodReminderEnabled,
+                  setMoodReminderEnabled,
+                  "time",
+                  !notificationsEnabled || !notifMoodTracking
+                )}
+                {moodReminderEnabled && (
+                  <>
+                    {renderPickerRow(
+                      "Mood reminder frequency",
+                      "How often to get mood reminders",
+                      moodReminderFrequency,
+                      reminderFrequencyOptions,
+                      setMoodReminderFrequency,
+                      "repeat",
+                      !notificationsEnabled || !notifMoodTracking
+                    )}
+                    {/* Show time picker for non-Custom frequencies */}
+                    {moodReminderFrequency !== 'Custom' && moodReminderFrequency !== 'Hourly' && moodReminderFrequency !== 'Never' && (
+                      <View style={styles.nestedSettings}>
+                        {renderTimePickerRow(
+                          "Mood reminder time",
+                          "Time of day",
+                          moodReminderTime,
+                          setMoodReminderTime,
+                          moodTimePickerVisible,
+                          setMoodTimePickerVisible,
+                          "time",
+                          !notificationsEnabled || !notifMoodTracking
+                        )}
+                      </View>
+                    )}
+                    {/* Show custom per-day schedule for Custom frequency */}
+                    {moodReminderFrequency === 'Custom' && (
+                      <View style={styles.nestedSettings}>
+                        <Text style={[styles.customScheduleTitle, { color: theme.colors.text }]}>
+                          Select days and times:
+                        </Text>
+                        {daysOfWeek.map((day) => {
+                          const dayTime = moodReminderCustomSchedule[day.key] || '';
+                          const isEnabled = !!dayTime;
+                          return (
+                            <View key={day.key} style={[styles.customDayRow, { borderBottomColor: theme.colors.borderLight }]}>
+                              <View style={styles.customDayLeft}>
+                                <Switch
+                                  value={isEnabled}
+                                  onValueChange={(val) => {
+                                    if (val) {
+                                      setMoodReminderCustomSchedule(prev => ({ ...prev, [day.key]: '09:00' }));
+                                    } else {
+                                      const newSchedule = { ...moodReminderCustomSchedule };
+                                      delete newSchedule[day.key];
+                                      setMoodReminderCustomSchedule(newSchedule);
+                                    }
+                                  }}
+                                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                                  thumbColor="#FFFFFF"
+                                />
+                                <Text style={[styles.customDayLabel, { color: theme.colors.text }]}>{day.label}</Text>
+                              </View>
+                              {isEnabled && (
+                                <TouchableOpacity
+                                  style={[styles.customDayTime, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                                  onPress={() => setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: true }))}
+                                >
+                                  <Text style={[styles.customDayTimeText, { color: theme.colors.text }]}>{dayTime}</Text>
+                                  <Ionicons name="time" size={16} color={theme.colors.icon} />
+                                </TouchableOpacity>
+                              )}
+                              {isEnabled && (
+                                <TimePickerModal
+                                  visible={moodCustomDayPickers[day.key] || false}
+                                  value={dayTime}
+                                  onSelect={(time) => {
+                                    setMoodReminderCustomSchedule(prev => ({ ...prev, [day.key]: time }));
+                                    setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: false }));
+                                  }}
+                                  onCancel={() => setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: false }))}
+                                />
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
               {renderToggleRow(
                 "Journaling",
                 "Prompts and entry activity",
@@ -563,6 +762,98 @@ export default function SettingsScreen() {
                 "book",
                 !notificationsEnabled
               )}
+              {/* Journaling reminders controls */}
+              <View style={[styles.nestedSettings, !notificationsEnabled && styles.disabledRow]}>
+                {renderToggleRow(
+                  "Journaling reminder",
+                  "Schedule prompts to write entries",
+                  journalReminderEnabled,
+                  setJournalReminderEnabled,
+                  "time",
+                  !notificationsEnabled || !notifJournaling
+                )}
+                {journalReminderEnabled && (
+                  <>
+                    {renderPickerRow(
+                      "Journal reminder frequency",
+                      "How often to get journaling reminders",
+                      journalReminderFrequency,
+                      reminderFrequencyOptions,
+                      setJournalReminderFrequency,
+                      "repeat",
+                      !notificationsEnabled || !notifJournaling
+                    )}
+                    {/* Show time picker for non-Custom frequencies */}
+                    {journalReminderFrequency !== 'Custom' && journalReminderFrequency !== 'Hourly' && journalReminderFrequency !== 'Never' && (
+                      <View style={styles.nestedSettings}>
+                        {renderTimePickerRow(
+                          "Journal reminder time",
+                          "Time of day",
+                          journalReminderTime,
+                          setJournalReminderTime,
+                          journalTimePickerVisible,
+                          setJournalTimePickerVisible,
+                          "time",
+                          !notificationsEnabled || !notifJournaling
+                        )}
+                      </View>
+                    )}
+                    {/* Show custom per-day schedule for Custom frequency */}
+                    {journalReminderFrequency === 'Custom' && (
+                      <View style={styles.nestedSettings}>
+                        <Text style={[styles.customScheduleTitle, { color: theme.colors.text }]}>
+                          Select days and times:
+                        </Text>
+                        {daysOfWeek.map((day) => {
+                          const dayTime = journalReminderCustomSchedule[day.key] || '';
+                          const isEnabled = !!dayTime;
+                          return (
+                            <View key={day.key} style={[styles.customDayRow, { borderBottomColor: theme.colors.borderLight }]}>
+                              <View style={styles.customDayLeft}>
+                                <Switch
+                                  value={isEnabled}
+                                  onValueChange={(val) => {
+                                    if (val) {
+                                      setJournalReminderCustomSchedule(prev => ({ ...prev, [day.key]: '20:00' }));
+                                    } else {
+                                      const newSchedule = { ...journalReminderCustomSchedule };
+                                      delete newSchedule[day.key];
+                                      setJournalReminderCustomSchedule(newSchedule);
+                                    }
+                                  }}
+                                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                                  thumbColor="#FFFFFF"
+                                />
+                                <Text style={[styles.customDayLabel, { color: theme.colors.text }]}>{day.label}</Text>
+                              </View>
+                              {isEnabled && (
+                                <TouchableOpacity
+                                  style={[styles.customDayTime, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                                  onPress={() => setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: true }))}
+                                >
+                                  <Text style={[styles.customDayTimeText, { color: theme.colors.text }]}>{dayTime}</Text>
+                                  <Ionicons name="time" size={16} color={theme.colors.icon} />
+                                </TouchableOpacity>
+                              )}
+                              {isEnabled && (
+                                <TimePickerModal
+                                  visible={journalCustomDayPickers[day.key] || false}
+                                  value={dayTime}
+                                  onSelect={(time) => {
+                                    setJournalReminderCustomSchedule(prev => ({ ...prev, [day.key]: time }));
+                                    setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: false }));
+                                  }}
+                                  onCancel={() => setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: false }))}
+                                />
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
               {renderToggleRow(
                 "Messages",
                 "New messages and replies",
@@ -773,19 +1064,24 @@ const styles = StyleSheet.create({
   timeInputContainer: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
   timeInput: {
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 14,
-    width: 70,
-    textAlign: "center",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeInputText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
   timeSeparator: {
     fontSize: 14,
-    marginHorizontal: 8,
+    marginHorizontal: 4,
   },
   nestedSettings: {
     marginLeft: 32,
@@ -873,5 +1169,45 @@ const styles = StyleSheet.create({
   },
   selectionCancelText: {
     fontSize: 14,
+  },
+  // Custom schedule styles
+  customScheduleTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+    marginTop: 8,
+    paddingLeft: 4,
+  },
+  customDayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+  },
+  customDayLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  customDayLabel: {
+    fontSize: 15,
+    marginLeft: 12,
+    flex: 1,
+  },
+  customDayTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+    minWidth: 100,
+  },
+  customDayTimeText: {
+    fontSize: 15,
+    fontWeight: '500',
   },
 });

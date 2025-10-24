@@ -32,6 +32,15 @@ export interface UserSettings {
   quietStartTime: string;
   quietEndTime: string;
   reminderFrequency: string;
+  // Per-category reminders
+  moodReminderEnabled: boolean;
+  moodReminderTime: string;
+  moodReminderFrequency: string;
+  moodReminderCustomSchedule: Record<string, string>;
+  journalReminderEnabled: boolean;
+  journalReminderTime: string;
+  journalReminderFrequency: string;
+  journalReminderCustomSchedule: Record<string, string>;
 }
 
 class SettingsAPI {
@@ -302,6 +311,18 @@ class SettingsAPI {
       quietStartTime: serverData.quiet_start_time ?? '22:00',
       quietEndTime: serverData.quiet_end_time ?? '08:00',
       reminderFrequency: serverData.reminder_frequency ?? 'Daily',
+      moodReminderEnabled: serverData.mood_reminder_enabled ?? false,
+      moodReminderTime: serverData.mood_reminder_time ?? '09:00',
+      moodReminderFrequency: serverData.mood_reminder_frequency ?? 'Daily',
+      moodReminderCustomSchedule: typeof serverData.mood_reminder_custom_schedule === 'string' 
+        ? JSON.parse(serverData.mood_reminder_custom_schedule)
+        : (serverData.mood_reminder_custom_schedule ?? {}),
+      journalReminderEnabled: serverData.journal_reminder_enabled ?? false,
+      journalReminderTime: serverData.journal_reminder_time ?? '20:00',
+      journalReminderFrequency: serverData.journal_reminder_frequency ?? 'Daily',
+      journalReminderCustomSchedule: typeof serverData.journal_reminder_custom_schedule === 'string'
+        ? JSON.parse(serverData.journal_reminder_custom_schedule)
+        : (serverData.journal_reminder_custom_schedule ?? {}),
     };
   }
 
@@ -327,6 +348,14 @@ class SettingsAPI {
       quietStartTime: clientSettings.quietStartTime,
       quietEndTime: clientSettings.quietEndTime,
       reminderFrequency: clientSettings.reminderFrequency,
+      moodReminderEnabled: clientSettings.moodReminderEnabled,
+      moodReminderTime: clientSettings.moodReminderTime,
+      moodReminderFrequency: clientSettings.moodReminderFrequency,
+      moodReminderCustomSchedule: clientSettings.moodReminderCustomSchedule,
+      journalReminderEnabled: clientSettings.journalReminderEnabled,
+      journalReminderTime: clientSettings.journalReminderTime,
+      journalReminderFrequency: clientSettings.journalReminderFrequency,
+      journalReminderCustomSchedule: clientSettings.journalReminderCustomSchedule,
     };
   }
 
@@ -347,8 +376,17 @@ class SettingsAPI {
       quietStartTime: '22:00',
       quietEndTime: '08:00',
       reminderFrequency: 'Daily',
+      moodReminderEnabled: false,
+      moodReminderTime: '09:00',
+      moodReminderFrequency: 'Daily',
+      moodReminderCustomSchedule: {},
+      journalReminderEnabled: false,
+      journalReminderTime: '20:00',
+      journalReminderFrequency: 'Daily',
+      journalReminderCustomSchedule: {},
     };
   }
 }
+
 
 export default new SettingsAPI();

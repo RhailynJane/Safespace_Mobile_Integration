@@ -20,13 +20,21 @@
           "photosPermission": "Allow SafeSpace to access your photos",
           "savePhotosPermission": "Allow SafeSpace to save photos to your library",
           "isAccessMediaLocationEnabled": false,
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
         }
       ]
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e7c636be-6f7e-403c-8731-4ec9a0ec2d48"
+      }
+    },
+    "owner": "safespacedev"
   },
   "splash": {
     "image": "./assets/splash-icon.png",

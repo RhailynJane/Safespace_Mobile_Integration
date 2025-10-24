@@ -48,11 +48,23 @@ export async function registerForPushNotifications(clerkUserId: string): Promise
 
     const projectId = await getProjectId();
     let tokenData;
-    if (projectId) {
-      tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-    } else {
-      tokenData = await Notifications.getExpoPushTokenAsync();
+    try {
+      if (projectId) {
+        tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      } else {
+        // For development without projectId, try without it
+        console.log('⚠️ No projectId found, attempting without it (may not work in production)');
+        tokenData = await Notifications.getExpoPushTokenAsync();
+      }
+    } catch (tokenError: any) {
+      if (tokenError.message?.includes('projectId')) {
+        console.log('⚠️ Push notifications require an Expo project. Run "eas init" to set up your project.');
+        console.log('   For now, push notifications will be disabled.');
+        return null;
+      }
+      throw tokenError;
     }
+    
     const token = tokenData?.data;
     if (!token) return null;
 

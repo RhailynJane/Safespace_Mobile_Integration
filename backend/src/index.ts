@@ -54,7 +54,18 @@ async function ensureUserSettingsSchema() {
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_messages BOOLEAN DEFAULT TRUE",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_post_reactions BOOLEAN DEFAULT TRUE",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_appointments BOOLEAN DEFAULT TRUE",
-      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_self_assessment BOOLEAN DEFAULT TRUE"
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_self_assessment BOOLEAN DEFAULT TRUE",
+      // Reminder controls per category
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_enabled BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_time VARCHAR(5) DEFAULT '09:00'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_frequency VARCHAR(20) DEFAULT 'Daily'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_custom_schedule JSONB DEFAULT '{}'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_enabled BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_time VARCHAR(5) DEFAULT '20:00'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_frequency VARCHAR(20) DEFAULT 'Daily'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_custom_schedule JSONB DEFAULT '{}'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_mood_reminder_at TIMESTAMP NULL",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_journal_reminder_at TIMESTAMP NULL"
     ];
     for (const sql of alterSqls) {
       await pool.query(sql);
@@ -217,6 +228,105 @@ async function sendPushToUser(userId: number, title: string, body: string, data?
   }
 }
 
+// Reminder scheduler: check every minute for mood/journaling reminders
+function frequencyMatches(freq: string, now: Date, lastSent: Date | null, customSchedule?: any): boolean {
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const isWeekday = day >= 1 && day <= 5;
+  const isWeekend = day === 0 || day === 6;
+  const f = (freq || 'Daily').toLowerCase();
+  
+  if (f === 'never' || f === 'off') return false;
+  if (f === 'hourly') return true; // will check every hour
+  if (f === 'daily') return true;
+  if (f === 'weekdays') return isWeekday;
+  if (f === 'weekends') return isWeekend;
+  if (f === 'weekly') {
+    if (!lastSent) return true;
+    const diffMs = now.getTime() - lastSent.getTime();
+    return diffMs >= 6.5 * 24 * 60 * 60 * 1000; // ~weekly
+  }
+  if (f === 'custom' && customSchedule) {
+    const todayKey = dayNames[day];
+    return !!customSchedule[todayKey]; // enabled if key exists
+  }
+  return true;
+}
+
+function shouldSendAtTime(freq: string, now: Date, configTime: string, lastSent: Date | null, customSchedule?: any): boolean {
+  const day = now.getDay();
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const nowHHMM = hhmm(now);
+  
+  if (freq === 'Hourly') {
+    // send at top of every hour if at least 55 minutes since last
+    if (now.getMinutes() === 0) {
+      if (!lastSent) return true;
+      const diffMs = now.getTime() - lastSent.getTime();
+      return diffMs >= 55 * 60 * 1000;
+    }
+    return false;
+  }
+  
+  if (freq === 'Custom' && customSchedule) {
+    const todayKey = dayNames[day];
+    const todayTime = customSchedule[todayKey];
+    if (!todayTime) return false; // not scheduled today
+    return nowHHMM === todayTime;
+  }
+  
+  // Daily, Weekdays, Weekends, Weekly: use configTime
+  return nowHHMM === configTime;
+}
+
+function hhmm(now: Date): string {
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+async function runRemindersTick() {
+  try {
+    const now = new Date();
+    const res = await pool.query(`
+      SELECT 
+        us.*, u.id as uid
+      FROM user_settings us
+      JOIN users u ON u.id = us.user_id
+      WHERE (us.mood_reminder_enabled = TRUE OR us.journal_reminder_enabled = TRUE)
+    `);
+    for (const row of res.rows) {
+      const lastMoodSent = row.last_mood_reminder_at ? new Date(row.last_mood_reminder_at) : null;
+      const lastJournalSent = row.last_journal_reminder_at ? new Date(row.last_journal_reminder_at) : null;
+      
+      // Mood reminders
+      if (row.mood_reminder_enabled) {
+        const freq = row.mood_reminder_frequency || 'Daily';
+        const customSched = row.mood_reminder_custom_schedule || {};
+        if (frequencyMatches(freq, now, lastMoodSent, customSched) && shouldSendAtTime(freq, now, row.mood_reminder_time || '09:00', lastMoodSent, customSched)) {
+          await createAndPushNotification(row.uid, 'mood', 'Mood check-in', 'How are you feeling right now? Take a quick mood check.');
+          await pool.query(`UPDATE user_settings SET last_mood_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
+        }
+      }
+      
+      // Journaling reminders
+      if (row.journal_reminder_enabled) {
+        const freq = row.journal_reminder_frequency || 'Daily';
+        const customSched = row.journal_reminder_custom_schedule || {};
+        if (frequencyMatches(freq, now, lastJournalSent, customSched) && shouldSendAtTime(freq, now, row.journal_reminder_time || '20:00', lastJournalSent, customSched)) {
+          await createAndPushNotification(row.uid, 'journaling', 'Journal reminder', 'Write a quick entry to reflect on your day.');
+          await pool.query(`UPDATE user_settings SET last_journal_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('⚠️ Reminder tick failed:', e.message);
+  }
+}
+
+// Start scheduler (tick at the top of each minute)
+setInterval(runRemindersTick, 60 * 1000);
+
 // Centralized helper to create a notification row and send push if allowed by settings
 async function createAndPushNotification(
   userId: number,
@@ -287,6 +397,152 @@ app.get("/", (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     port: PORT,
   });
+});
+
+// Lightweight test endpoint for settings API
+app.get('/api/test-settings', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Settings API reachable' });
+});
+
+// Settings: GET current settings for a user
+app.get('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+    const userId = userRes.rows[0].id;
+
+    const sRes = await pool.query(
+      `SELECT 
+        dark_mode, text_size, auto_lock_timer, notifications_enabled,
+        notif_all, notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+        quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+        mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+        journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule
+       FROM user_settings WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (sRes.rows.length === 0) {
+      // Return defaults
+      return res.json({ success: true, settings: {
+        dark_mode: false,
+        text_size: 'Medium',
+        auto_lock_timer: '5 minutes',
+        notifications_enabled: true,
+        notif_all: true,
+        notif_mood_tracking: true,
+        notif_journaling: true,
+        notif_messages: true,
+        notif_post_reactions: true,
+        notif_appointments: true,
+        notif_self_assessment: true,
+        quiet_hours_enabled: false,
+        quiet_start_time: '22:00',
+        quiet_end_time: '08:00',
+        reminder_frequency: 'Daily',
+        mood_reminder_enabled: false,
+        mood_reminder_time: '09:00',
+        mood_reminder_frequency: 'Daily',
+        mood_reminder_custom_schedule: {},
+        journal_reminder_enabled: false,
+        journal_reminder_time: '20:00',
+        journal_reminder_frequency: 'Daily',
+        journal_reminder_custom_schedule: {},
+      }});
+    }
+
+    return res.json({ success: true, settings: sRes.rows[0] });
+  } catch (e: any) {
+    console.error('❌ Settings GET failed:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch settings', error: e.message });
+  }
+});
+
+// Settings: PUT update/insert
+app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { settings } = req.body as { settings?: any };
+    if (!settings) return res.status(400).json({ success: false, message: 'settings payload required' });
+
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+    const userId = userRes.rows[0].id;
+
+    const query = `INSERT INTO user_settings (
+      user_id,
+      dark_mode, text_size, auto_lock_timer, notifications_enabled,
+      notif_all, notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+      quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+      mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+      journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
+      updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+      $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (user_id)
+    DO UPDATE SET 
+      dark_mode = EXCLUDED.dark_mode,
+      text_size = EXCLUDED.text_size,
+      auto_lock_timer = EXCLUDED.auto_lock_timer,
+      notifications_enabled = EXCLUDED.notifications_enabled,
+      notif_all = EXCLUDED.notif_all,
+      notif_mood_tracking = EXCLUDED.notif_mood_tracking,
+      notif_journaling = EXCLUDED.notif_journaling,
+      notif_messages = EXCLUDED.notif_messages,
+      notif_post_reactions = EXCLUDED.notif_post_reactions,
+      notif_appointments = EXCLUDED.notif_appointments,
+      notif_self_assessment = EXCLUDED.notif_self_assessment,
+      quiet_hours_enabled = EXCLUDED.quiet_hours_enabled,
+      quiet_start_time = EXCLUDED.quiet_start_time,
+      quiet_end_time = EXCLUDED.quiet_end_time,
+      reminder_frequency = EXCLUDED.reminder_frequency,
+      mood_reminder_enabled = EXCLUDED.mood_reminder_enabled,
+      mood_reminder_time = EXCLUDED.mood_reminder_time,
+      mood_reminder_frequency = EXCLUDED.mood_reminder_frequency,
+      mood_reminder_custom_schedule = EXCLUDED.mood_reminder_custom_schedule,
+      journal_reminder_enabled = EXCLUDED.journal_reminder_enabled,
+      journal_reminder_time = EXCLUDED.journal_reminder_time,
+      journal_reminder_frequency = EXCLUDED.journal_reminder_frequency,
+      journal_reminder_custom_schedule = EXCLUDED.journal_reminder_custom_schedule,
+      updated_at = CURRENT_TIMESTAMP
+    `;
+
+    const params = [
+      userId,
+      settings.darkMode ?? false,
+      settings.textSize ?? 'Medium',
+      settings.autoLockTimer ?? '5 minutes',
+      settings.notificationsEnabled ?? true,
+      settings.notifAll ?? true,
+      settings.notifMoodTracking ?? true,
+      settings.notifJournaling ?? true,
+      settings.notifMessages ?? true,
+      settings.notifPostReactions ?? true,
+      settings.notifAppointments ?? true,
+      settings.notifSelfAssessment ?? true,
+      settings.quietHoursEnabled ?? false,
+      settings.quietStartTime ?? '22:00',
+      settings.quietEndTime ?? '08:00',
+      settings.reminderFrequency ?? 'Daily',
+      settings.moodReminderEnabled ?? false,
+      settings.moodReminderTime ?? '09:00',
+      settings.moodReminderFrequency ?? 'Daily',
+      JSON.stringify(settings.moodReminderCustomSchedule ?? {}),
+      settings.journalReminderEnabled ?? false,
+      settings.journalReminderTime ?? '20:00',
+      settings.journalReminderFrequency ?? 'Daily',
+      JSON.stringify(settings.journalReminderCustomSchedule ?? {}),
+    ];
+
+    await pool.query(query, params);
+    res.json({ success: true, message: 'Settings saved' });
+  } catch (e: any) {
+    console.error('❌ Settings PUT failed:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to save settings', error: e.message });
+  }
 });
 
 // Get all users endpoint
@@ -378,6 +634,7 @@ app.post(
         await pool.query(
           `INSERT INTO user_settings (
             user_id,
+            clerk_user_id,
             dark_mode,
             text_size,
             auto_lock_timer,
@@ -393,11 +650,20 @@ app.post(
             quiet_start_time,
             quiet_end_time,
             reminder_frequency,
+            mood_reminder_enabled,
+            mood_reminder_time,
+            mood_reminder_frequency,
+            mood_reminder_custom_schedule,
+            journal_reminder_enabled,
+            journal_reminder_time,
+            journal_reminder_frequency,
+            journal_reminder_custom_schedule,
             created_at,
             updated_at
           )
           SELECT 
             id,
+            clerk_user_id,
             false,
             'Medium',
             '5 minutes',
@@ -413,11 +679,19 @@ app.post(
             '22:00',
             '08:00',
             'Daily',
+            false,
+            '09:00',
+            'Daily',
+            '{}'::jsonb,
+            false,
+            '20:00',
+            'Daily',
+            '{}'::jsonb,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
           FROM users
           WHERE clerk_user_id = $1
-          ON CONFLICT (user_id) DO NOTHING`,
+          ON CONFLICT (clerk_user_id) DO NOTHING`,
           [clerkUserId]
         );
         console.log('✅ Default user settings created for new user');
