@@ -1287,13 +1287,16 @@ export default function EditProfileScreen() {
                   style={[styles.input, { color: theme.colors.text }]}
                   value={formData.phoneNumber}
                   onChangeText={(text) => {
-                    setFormData({ ...formData, phoneNumber: text });
-                    validateField("phoneNumber", text);
+                    // Only allow digits and limit to 10
+                    const filtered = text.replace(/[^0-9]/g, '').slice(0, 10);
+                    setFormData({ ...formData, phoneNumber: filtered });
+                    validateField("phoneNumber", filtered);
                   }}
                   onBlur={() => validateField("phoneNumber", formData.phoneNumber)}
-                  placeholder="Enter your phone number"
+                  placeholder="Enter your phone number (10 digits)"
                   keyboardType="phone-pad"
                   placeholderTextColor={theme.colors.textSecondary}
+                  maxLength={10}
                 />
               </View>
               {validationErrors.phoneNumber ? (
@@ -1690,13 +1693,16 @@ export default function EditProfileScreen() {
                   style={[styles.input, { color: theme.colors.text }]}
                   value={formData.emergencyContactNumber}
                   onChangeText={(text) => {
-                    setFormData({ ...formData, emergencyContactNumber: text });
-                    validateField("emergencyContactNumber", text);
+                    // Only allow digits and limit to 10
+                    const filtered = text.replace(/[^0-9]/g, '').slice(0, 10);
+                    setFormData({ ...formData, emergencyContactNumber: filtered });
+                    validateField("emergencyContactNumber", filtered);
                   }}
                   onBlur={() => validateField("emergencyContactNumber", formData.emergencyContactNumber)}
-                  placeholder="Emergency contact phone number"
+                  placeholder="Emergency contact phone number (10 digits)"
                   keyboardType="phone-pad"
                   placeholderTextColor={theme.colors.textSecondary}
+                  maxLength={10}
                 />
               </View>
               {validationErrors.emergencyContactNumber ? (
