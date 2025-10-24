@@ -19,7 +19,8 @@
         {
           "photosPermission": "Allow SafeSpace to access your photos",
           "savePhotosPermission": "Allow SafeSpace to save photos to your library",
-          "isAccessMediaLocationEnabled": false
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": ["photo"]
         }
       ]
     ],

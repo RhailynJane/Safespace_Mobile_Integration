@@ -41,7 +41,6 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Image,
   Modal,
   Pressable,
   Animated,
@@ -61,6 +60,7 @@ import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
+import OptimizedImage from "../../../../components/OptimizedImage";
 
 const { width, height } = Dimensions.get("window");
 
@@ -1171,12 +1171,26 @@ export default function CommunityMainScreen() {
 
                             if (authorImg) {
                               return (
-                                <Image source={{ uri: authorImg }} style={styles.avatarImage} />
+                                <OptimizedImage 
+                                  source={{ uri: authorImg }} 
+                                  style={styles.avatarImage}
+                                  cache="force-cache"
+                                  loaderSize="small"
+                                  loaderColor="#7CB9A9"
+                                  showErrorIcon={false}
+                                />
                               );
                             }
                             if (isMyPost && selfImg) {
                               return (
-                                <Image source={{ uri: selfImg }} style={styles.avatarImage} />
+                                <OptimizedImage 
+                                  source={{ uri: selfImg }} 
+                                  style={styles.avatarImage}
+                                  cache="force-cache"
+                                  loaderSize="small"
+                                  loaderColor="#7CB9A9"
+                                  showErrorIcon={false}
+                                />
                               );
                             }
                             return (
@@ -1316,9 +1330,13 @@ export default function CommunityMainScreen() {
             <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View style={styles.profileAvatar}>
                 {normalizeImageUri(profileImage) ? (
-                  <Image 
+                  <OptimizedImage 
                     source={{ uri: normalizeImageUri(profileImage)! }} 
                     style={styles.profileAvatarImage}
+                    cache="force-cache"
+                    loaderSize="small"
+                    loaderColor="#7CB9A9"
+                    showErrorIcon={false}
                   />
                 ) : (
                   <Text style={styles.profileAvatarText}>{getInitials()}</Text>

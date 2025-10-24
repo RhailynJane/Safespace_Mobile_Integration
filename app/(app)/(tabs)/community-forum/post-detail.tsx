@@ -30,7 +30,6 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -44,6 +43,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
+import OptimizedImage from "../../../../components/OptimizedImage";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -342,10 +342,28 @@ export default function PostDetailScreen() {
                   const selfImg = normalizeImageUri(profileImage);
 
                   if (authorImg) {
-                    return <Image source={{ uri: authorImg }} style={styles.avatarImage} />;
+                    return (
+                      <OptimizedImage 
+                        source={{ uri: authorImg }} 
+                        style={styles.avatarImage}
+                        cache="force-cache"
+                        loaderSize="small"
+                        loaderColor="#7CB9A9"
+                        showErrorIcon={false}
+                      />
+                    );
                   }
                   if (isMyPost && selfImg) {
-                    return <Image source={{ uri: selfImg }} style={styles.avatarImage} />;
+                    return (
+                      <OptimizedImage 
+                        source={{ uri: selfImg }} 
+                        style={styles.avatarImage}
+                        cache="force-cache"
+                        loaderSize="small"
+                        loaderColor="#7CB9A9"
+                        showErrorIcon={false}
+                      />
+                    );
                   }
                   return (
                     <Text style={styles.avatarText}>

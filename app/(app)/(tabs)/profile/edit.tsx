@@ -11,7 +11,6 @@ import {
   TextInput,
   Switch,
   Alert,
-  Image,
   ActivityIndicator,
   Modal,
   Platform,
@@ -29,6 +28,7 @@ import avatarEvents from "../../../../utils/avatarEvents";
 import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import OptimizedImage from "../../../../components/OptimizedImage";
 
 // Gender options for the form
 const GENDER_OPTIONS = [
@@ -1157,9 +1157,13 @@ export default function EditProfileScreen() {
           <View style={styles.profilePhotoSection}>
             <View style={styles.profilePhotoContainer}>
               {profileImage ? (
-                <Image
+                <OptimizedImage
                   source={{ uri: profileImage }}
                   style={styles.profilePhoto}
+                  cache="force-cache"
+                  loaderSize="large"
+                  loaderColor="#4CAF50"
+                  showErrorIcon={false}
                 />
               ) : (
                 <View style={styles.profilePhoto}>

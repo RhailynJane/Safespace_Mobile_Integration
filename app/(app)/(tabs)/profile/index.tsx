@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -8,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Image,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +19,7 @@ import { syncUserWithDatabase } from "../../../../utils/userSync";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
+import OptimizedImage from "../../../../components/OptimizedImage";
 
 const API_URL = getApiBaseUrl();
 
@@ -57,7 +56,7 @@ export default function ProfileScreen() {
   ];
 
   // Use the existing sync function from userSync.ts
-  const syncUserWithBackend = async (): Promise<boolean> => {
+  const syncUserWithBackend = useCallback(async (): Promise<boolean> => {
     if (!user) {
       console.log("❌ No user available for sync");
       return false;
@@ -72,7 +71,7 @@ export default function ProfileScreen() {
       console.error("❌ Error syncing user via userSync.ts:", error);
       return false;
     }
-  };
+  }, [user]);
 
   // Simple function to fetch client profile directly
   const fetchClientProfile = async (clerkUserId: string): Promise<any> => {
@@ -208,7 +207,7 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, syncUserWithBackend]);
 
   useEffect(() => {
     fetchProfileData();
@@ -301,9 +300,13 @@ export default function ProfileScreen() {
           {/* Profile Information Section */}
           <View style={[styles.profileSection, { backgroundColor: theme.colors.surface }]}>
             {profileData.profileImageUrl ? (
-              <Image
+              <OptimizedImage
                 source={{ uri: profileData.profileImageUrl }}
                 style={styles.profileImage}
+                cache="force-cache"
+                loaderSize="large"
+                loaderColor="#4CAF50"
+                showErrorIcon={false}
               />
             ) : (
               <View style={styles.profileInitials}>

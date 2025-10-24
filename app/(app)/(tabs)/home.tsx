@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -26,6 +25,7 @@ import {
   Resource, 
   fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
 import { useTheme } from "../../../contexts/ThemeContext";
+import OptimizedImage from "../../../components/OptimizedImage";
 
 type MoodEntry = {
   id: string;
@@ -488,13 +488,17 @@ const fetchProfileImage = useCallback(async () => {
                       ]}
                     >
                       {action.image ? (
-                        <Image
+                        <OptimizedImage
                           source={action.image}
                           style={[
                             styles.actionImage,
                             action.id === "crisis" && styles.crisisSupportImage,
                           ]}
                           resizeMode="contain"
+                          cache="force-cache"
+                          loaderSize="small"
+                          loaderColor="#666"
+                          showErrorIcon={false}
                         />
                       ) : (
                         <Ionicons

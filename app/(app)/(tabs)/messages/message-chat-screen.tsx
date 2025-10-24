@@ -40,12 +40,12 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,16 +55,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import CurvedBackground from "../../../../components/CurvedBackground";
+import OptimizedImage from "../../../../components/OptimizedImage";
 import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
 import activityApi from "../../../../utils/activityApi";
 import * as FileSystem from "expo-file-system";
-import * as FileSystemLegacy from "expo-file-system/legacy";
-import { Paths, File as FSFile } from "expo-file-system";
+import * as FSLegacy from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import * as MediaLibrary from "expo-media-library";
+import Constants from "expo-constants";
 import { useIsFocused } from "@react-navigation/native";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
@@ -118,6 +119,7 @@ export default function ChatScreen() {
   const didMarkReadRef = useRef(false);
   const [manualScrolling, setManualScrolling] = useState(false);
   const scrollIdleTimerRef = useRef<any>(null);
+  const messagesListRef = useRef<FlatList<ExtendedMessage>>(null);
 
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
@@ -308,14 +310,12 @@ export default function ChatScreen() {
         if (status) {
           const newOnline = !!status.online;
           const newPresence = (status as any).presence as 'online' | 'away' | 'offline' | undefined;
-          if (isOnline !== newOnline) {
-            setIsOnline(newOnline);
-          }
-          if (newPresence && newPresence !== presence) {
+          setIsOnline(newOnline);
+          
+          if (newPresence) {
             setPresence(newPresence);
           } else {
-            const fallback = newOnline ? 'online' : 'offline';
-            if (fallback !== presence) setPresence(fallback);
+            setPresence(newOnline ? 'online' : 'offline');
           }
           setContact((prev) => prev ? { ...prev, online: newOnline, last_active_at: status.last_active_at } : prev);
         }
@@ -327,7 +327,7 @@ export default function ChatScreen() {
     const initialTimeout = setTimeout(updateOnlineStatus, 1500);
     return () => clearTimeout(initialTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFocused, contact?.clerk_user_id, isOnline, presence]);
+  }, [isFocused, contact?.clerk_user_id]);
 
   useEffect(() => {
     // Only auto-scroll if user is near bottom or last message is mine
@@ -335,9 +335,7 @@ export default function ChatScreen() {
     const lastIsMine = last ? last.sender.clerk_user_id === userId : false;
     if (!manualScrolling && (userNearBottom || lastIsMine)) {
       setTimeout(() => {
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollToEnd({ animated: true });
-        }
+        messagesListRef.current?.scrollToEnd?.({ animated: true });
       }, 100);
     }
   }, [messages, userNearBottom, userId, manualScrolling]);
@@ -463,10 +461,33 @@ export default function ChatScreen() {
 
       // Derive filename and extension
       const defaultName = fileType === "image" ? `photo_${Date.now()}.jpg` : `document_${Date.now()}.bin`;
-      const actualFileName = fileName || (fileUri.split("/").pop() || defaultName);
-      const nameParts = actualFileName.split(".");
-      const ext = (nameParts.length > 1 ? nameParts.pop() : "bin") as string;
-      const mimeType = getMimeType(ext) || (fileType === "image" ? "image/jpeg" : "application/octet-stream");
+      const originalName = fileName || (fileUri.split("/").pop() || defaultName);
+      const nameParts = originalName.split(".");
+      const originalExt = (nameParts.length > 1 ? nameParts.pop() : "bin") as string;
+      let finalExt = originalExt;
+      let finalMime = getMimeType(originalExt) || (fileType === "image" ? "image/jpeg" : "application/octet-stream");
+      let finalNameBase = nameParts.join(".") || (fileType === "image" ? `photo_${Date.now()}` : `document_${Date.now()}`);
+      let uploadUri = fileUri;
+
+      // If image, compress/resize before upload using expo-image-manipulator (if available)
+      if (fileType === 'image') {
+        try {
+          // @ts-ignore - optional dependency; will be resolved at runtime if installed
+          const ImageManipulator: any = await import('expo-image-manipulator');
+          const manipulated = await ImageManipulator.manipulateAsync(
+            fileUri,
+            [{ resize: { width: 1280 } }],
+            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          if (manipulated?.uri) {
+            uploadUri = manipulated.uri;
+            finalExt = 'jpg';
+            finalMime = 'image/jpeg';
+          }
+        } catch (_e) {
+          // If the module isn't installed or manipulation fails, proceed with original file
+        }
+      }
 
       // Validate size against backend 10MB cap
       try {
@@ -487,12 +508,13 @@ export default function ChatScreen() {
       form.append("conversationId", String(conversationId));
       form.append("clerkUserId", String(userId));
       form.append("messageType", fileType);
+      const finalFileName = `${finalNameBase}.${finalExt}`;
       form.append(
         "file",
         {
-          uri: fileUri,
-          name: actualFileName,
-          type: mimeType,
+          uri: uploadUri,
+          name: finalFileName,
+          type: finalMime,
         } as any
       );
 
@@ -612,22 +634,23 @@ export default function ChatScreen() {
     try {
       console.log("📥 Starting download:", { remoteUri, fileName });
       setDownloading(true);
-      const urlWithoutParams = remoteUri.split("?")[0];
+      const resolvedUri = resolveRemoteUri(remoteUri);
+      const urlWithoutParams = resolvedUri.split("?")[0];
       const fileExtension = (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
       const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const baseName = safeFileName.replace(/\.[^/.]+$/, ""); // remove existing extension if present
 
-      // Use FSFile to generate a writable path in cache
-      const outFile = new FSFile(Paths.cache, `${safeFileName}.${fileExtension}`);
-      console.log("📥 Downloading to:", outFile.uri);
-      
-      await FileSystemLegacy.downloadAsync(remoteUri, outFile.uri);
-      const localUri = outFile.uri;
-      
+      // Use legacy API shim to avoid runtime deprecation errors (SDK 54): download into cache directory
+      const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
+      const fileUri = `${cacheDir}${baseName}.${fileExtension}`;
+      console.log("📥 Downloading to:", fileUri);
+      await FSLegacy.downloadAsync(resolvedUri, fileUri);
+
       console.log("✅ Download complete, opening share sheet");
 
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(localUri, {
+        await Sharing.shareAsync(fileUri, {
           mimeType: getMimeType(fileExtension),
           dialogTitle: `Share ${fileName}`,
           UTI: getUTI(fileExtension),
@@ -680,12 +703,14 @@ export default function ChatScreen() {
       let ext = 'file';
       if (uri.startsWith('http')) {
         console.log("📥 Remote URI detected, downloading first...");
-        const withoutParams = (uri.split('?')[0] ?? uri) as string;
+        const resolved = resolveRemoteUri(uri);
+        const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
         ext = (withoutParams.split('.').pop() || 'file').toLowerCase();
-        const outFile = new FSFile(Paths.cache, `${fallbackName}.${ext}`);
-        console.log("📥 Downloading to:", outFile.uri);
-        await FileSystemLegacy.downloadAsync(uri, outFile.uri);
-        localUri = outFile.uri;
+        const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
+        const destUri = `${cacheDir}${fallbackName}.${ext}`;
+        console.log("📥 Downloading to:", destUri);
+        await FSLegacy.downloadAsync(resolved, destUri);
+        localUri = destUri;
         console.log("✅ Download complete:", localUri);
       }
       console.log("📤 Opening share sheet for:", localUri);
@@ -703,10 +728,21 @@ export default function ChatScreen() {
     console.log("💾 saveImageToGallery called with:", imageUri);
     try {
       setDownloading(true);
+      // Expo Go limitation: cannot grant full media access; fallback to share
+      if (Constants?.appOwnership === 'expo') {
+        console.log("ℹ️ Running in Expo Go, using share fallback for gallery save");
+        const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+        if (!shared) {
+          setFileErrorMessage("Saving to gallery isn't supported in Expo Go. Shared instead.");
+          setFileErrorModalVisible(true);
+        }
+        return;
+      }
       // Request permissions; if not available or rejected, fallback to share sheet
       try {
         console.log("🔐 Requesting media library permissions...");
-        const { status } = await MediaLibrary.requestPermissionsAsync();
+        // Request only photo permission to avoid AUDIO manifest requirement on Android 13+
+        const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
         console.log("🔐 Permission status:", status);
         if (status !== "granted") {
           console.log("⚠️ Permission denied, falling back to share");
@@ -731,10 +767,13 @@ export default function ChatScreen() {
       // If remote, download to a writable cache path
       if (imageUri.startsWith("http")) {
         console.log("📥 Remote image, downloading first...");
-        const fileName = `image_${Date.now()}.jpg`;
-        const outFile = new FSFile(Paths.cache, fileName);
-        await FileSystemLegacy.downloadAsync(imageUri, outFile.uri);
-        finalUri = outFile.uri;
+        const resolved = resolveRemoteUri(imageUri);
+        const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
+        const ext = (withoutParams.split('.').pop() || 'jpg').toLowerCase();
+        const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
+        const destUri = `${cacheDir}image_${Date.now()}.${ext}`;
+        await FSLegacy.downloadAsync(resolved, destUri);
+        finalUri = destUri;
         console.log("✅ Downloaded to:", finalUri);
       }
 
@@ -782,13 +821,12 @@ export default function ChatScreen() {
             ]);
           }}
         >
-          <Image
-            source={{ uri: message.attachment_url }}
+          <OptimizedImage
+            source={{ uri: resolveRemoteUri(message.attachment_url) }}
             style={styles.attachmentImage}
             resizeMode="cover"
-            onError={(error) => {
-              console.log("Failed to load attachment image:", error.nativeEvent.error);
-            }}
+            cache="force-cache"
+            loaderColor={theme.colors.primary}
           />
           <View style={styles.imageOverlay}>
             <Ionicons name="expand" size={20} color="#FFFFFF" />
@@ -921,6 +959,28 @@ export default function ChatScreen() {
     );
   };
 
+  // Normalize any local LAN or localhost URLs to the public API base (e.g., ngrok)
+  const resolveRemoteUri = (uri: string) => {
+    try {
+      if (!uri) return uri;
+      // If relative path
+      if (uri.startsWith('/')) {
+        return `${API_BASE_URL}${uri}`;
+      }
+      const src = new URL(uri);
+      const api = new URL(API_BASE_URL);
+      // If host differs and the path is under uploads, rebuild with public base
+      if (src.host !== api.host && src.pathname.startsWith('/uploads')) {
+        return `${api.origin}${src.pathname}`;
+      }
+      return uri;
+    } catch {
+      // Fallback: if it's not parsable but looks like an uploads path, prefix API base
+      if (uri?.startsWith('/uploads')) return `${API_BASE_URL}${uri}`;
+      return uri;
+    }
+  };
+
   // Render message content based on type
   // Handle viewing attachments
   const handleViewAttachment = async (message: ExtendedMessage) => {
@@ -975,15 +1035,15 @@ export default function ChatScreen() {
               </TouchableOpacity>
 
               <View style={styles.contactInfo}>
-                <View style={{ position: 'relative' }}>
+                <View style={styles.headerAvatarWrapper}>
                   {contact?.profile_image_url ? (
-                    <Image
-                      source={{ uri: contact.profile_image_url }}
+                    <OptimizedImage
+                      source={{ uri: resolveRemoteUri(contact.profile_image_url) }}
                       style={styles.headerAvatar}
                       resizeMode="cover"
-                      onError={(error) => {
-                        console.log("Failed to load header profile image:", error.nativeEvent.error);
-                      }}
+                      cache="force-cache"
+                      loaderSize="small"
+                      showErrorIcon={false}
                     />
                   ) : (
                     <View style={styles.headerAvatar}>
@@ -1004,7 +1064,7 @@ export default function ChatScreen() {
                     ]}
                   />
                 </View>
-                <View>
+                <View style={styles.headerTextBlock}>
                   <Text style={styles.contactName}>{conversationTitle}</Text>
                   <Text
                     style={[
@@ -1029,27 +1089,95 @@ export default function ChatScreen() {
             </View>
           </View>
 
-          {/* Chat Messages */}
-          <ScrollView
-            style={styles.messagesContainer}
-            ref={scrollViewRef}
+          {/* Chat Messages (FlatList for virtualization) */}
+          <FlatList
+            ref={messagesListRef}
+            data={messages}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => {
+              const myMessage = isMyMessage(item);
+              return (
+                <View
+                  style={[
+                    styles.messageContainer,
+                    myMessage ? styles.myMessageContainer : styles.theirMessageContainer,
+                  ]}
+                >
+                  {!myMessage && (
+                    <View style={styles.avatarContainer}>
+                      {item.sender.profile_image_url ? (
+                        <OptimizedImage
+                          source={{ uri: resolveRemoteUri(item.sender.profile_image_url) }}
+                          style={styles.avatar}
+                          resizeMode="cover"
+                          cache="force-cache"
+                          loaderSize="small"
+                          showErrorIcon={false}
+                        />
+                      ) : (
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>
+                            {getUserInitials(item.sender.first_name, item.sender.last_name)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      myMessage ? styles.myMessage : styles.theirMessage,
+                    ]}
+                  >
+                    {renderMessageContent(item)}
+                    <Text
+                      style={[
+                        styles.messageTime,
+                        myMessage ? styles.myMessageTime : styles.theirMessageTime,
+                      ]}
+                    >
+                      {formatTime(item.created_at)}
+                    </Text>
+                  </View>
+
+                  {myMessage && (
+                    <View style={styles.avatarContainer}>
+                      {item.sender.profile_image_url ? (
+                        <OptimizedImage
+                          source={{ uri: resolveRemoteUri(item.sender.profile_image_url) }}
+                          style={[styles.avatar, styles.myAvatar]}
+                          resizeMode="cover"
+                          cache="force-cache"
+                          loaderSize="small"
+                          showErrorIcon={false}
+                        />
+                      ) : (
+                        <View style={[styles.avatar, styles.myAvatar]}>
+                          <Text style={styles.avatarText}>
+                            {getUserInitials(item.sender.first_name, item.sender.last_name)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            }}
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
               const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
               const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
-              const near = distanceFromBottom < 300; // px threshold
+              const near = distanceFromBottom < 300;
               if (near !== userNearBottom) setUserNearBottom(near);
               setShowScrollToLatest(!near && messages.length > 0);
-              // If user is not near, assume manual scrolling is happening
-              if (!near) {
-                setManualScrolling(true);
-              }
+              if (!near) setManualScrolling(true);
             }}
             scrollEventThrottle={100}
             onContentSizeChange={() => {
-              if (!manualScrolling && userNearBottom && scrollViewRef.current) {
-                scrollViewRef.current.scrollToEnd({ animated: true });
+              if (!manualScrolling && userNearBottom) {
+                messagesListRef.current?.scrollToEnd?.({ animated: true });
               }
             }}
             onScrollBeginDrag={() => {
@@ -1064,111 +1192,16 @@ export default function ChatScreen() {
               if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
               scrollIdleTimerRef.current = setTimeout(() => setManualScrolling(false), 800);
             }}
-          >
-            {messages.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="chatbubble-outline" size={64} color={theme.colors.iconDisabled} />
-                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No messages yet</Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                  Start the conversation by sending a message
-                </Text>
-              </View>
-            ) : (
-              messages.map((message) => {
-                const myMessage = isMyMessage(message);
-
-                return (
-                  <View
-                    key={message.id}
-                    style={[
-                      styles.messageContainer,
-                      myMessage
-                        ? styles.myMessageContainer
-                        : styles.theirMessageContainer,
-                    ]}
-                  >
-                    {/* Other user's avatar */}
-                    {!myMessage && (
-                      <View style={styles.avatarContainer}>
-                        {message.sender.profile_image_url ? (
-                          <Image
-                            source={{ uri: message.sender.profile_image_url }}
-                            style={styles.avatar}
-                            resizeMode="cover"
-                            onError={(error) => {
-                              console.log("Failed to load sender avatar:", error.nativeEvent.error);
-                            }}
-                          />
-                        ) : (
-                          <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>
-                              {getUserInitials(
-                                message.sender.first_name,
-                                message.sender.last_name
-                              )}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-
-                    {/* Message bubble with file attachment */}
-                    <View
-                      style={[
-                        styles.messageBubble,
-                        myMessage ? styles.myMessage : styles.theirMessage,
-                      ]}
-                    >
-                      {renderMessageContent(message)}
-                      <Text
-                        style={[
-                          styles.messageTime,
-                          myMessage
-                            ? styles.myMessageTime
-                            : styles.theirMessageTime,
-                        ]}
-                      >
-                        {formatTime(message.created_at)}
-                      </Text>
-                    </View>
-
-                    {/* My avatar */}
-                    {myMessage && (
-                      <View style={styles.avatarContainer}>
-                        {message.sender.profile_image_url ? (
-                          <Image
-                            source={{ uri: message.sender.profile_image_url }}
-                            style={[styles.avatar, styles.myAvatar]}
-                            resizeMode="cover"
-                            onError={(error) => {
-                              console.log("Failed to load my avatar:", error.nativeEvent.error);
-                            }}
-                          />
-                        ) : (
-                          <View style={[styles.avatar, styles.myAvatar]}>
-                            <Text style={styles.avatarText}>
-                              {getUserInitials(
-                                message.sender.first_name,
-                                message.sender.last_name
-                              )}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
+            initialNumToRender={12}
+            windowSize={7}
+            removeClippedSubviews
+          />
 
           {showScrollToLatest && (
             <TouchableOpacity
               style={styles.scrollToLatestButton}
               onPress={() => {
-                if (scrollViewRef.current) {
-                  scrollViewRef.current.scrollToEnd({ animated: true });
-                }
+                messagesListRef.current?.scrollToEnd?.({ animated: true });
                 setShowScrollToLatest(false);
                 setUserNearBottom(true);
               }}
@@ -1280,14 +1313,13 @@ export default function ChatScreen() {
                 contentContainerStyle={styles.viewerScrollContent}
               >
                 {currentAttachment?.attachment_url && (
-                  <Image
-                    source={{ uri: currentAttachment.attachment_url }}
+                  <OptimizedImage
+                    source={{ uri: resolveRemoteUri(currentAttachment.attachment_url) }}
                     style={styles.fullSizeImage}
                     resizeMode="contain"
-                    onError={(error) => {
-                      console.log("Failed to load full-size image:", error.nativeEvent.error);
-                      Alert.alert("Error", "Failed to load image");
-                    }}
+                    cache="force-cache"
+                    loaderColor="#FFFFFF"
+                    loaderSize="large"
                   />
                 )}
               </ScrollView>
@@ -1432,6 +1464,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 15,
   },
+  headerAvatarWrapper: {
+    position: 'relative',
+    marginRight: 16, // extra space so the status dot never overlaps text
+  },
   headerAvatar: {
     width: 40,
     height: 40,
@@ -1439,7 +1475,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#2196F3",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
     position: "relative",
   },
   headerAvatarText: {
@@ -1449,13 +1484,17 @@ const styles = StyleSheet.create({
   },
   headerStatusIndicator: {
     position: "absolute",
-    bottom: -2,
-    right: -2,
+    bottom: -1,
+    right: -1,
     width: 12,
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: "#FFF",
+  },
+  headerTextBlock: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   onlineIndicator: {
     backgroundColor: "#4CAF50",
