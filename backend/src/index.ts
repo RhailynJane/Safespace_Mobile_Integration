@@ -193,6 +193,45 @@ app.post(
         // Don't fail the whole sync if client_profiles fails
       }
 
+      // ✅ Create default user settings
+      try {
+        await pool.query(
+          `INSERT INTO user_settings (
+            user_id,
+            dark_mode,
+            text_size,
+            auto_lock_timer,
+            notifications_enabled,
+            quiet_hours_enabled,
+            quiet_start_time,
+            quiet_end_time,
+            reminder_frequency,
+            created_at,
+            updated_at
+          )
+          SELECT 
+            id,
+            false,
+            'Medium',
+            '5 minutes',
+            true,
+            false,
+            '22:00',
+            '08:00',
+            'Daily',
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+          FROM users
+          WHERE clerk_user_id = $1
+          ON CONFLICT (user_id) DO NOTHING`,
+          [clerkUserId]
+        );
+        console.log('✅ Default user settings created for new user');
+      } catch (settingsError: any) {
+        console.error('⚠️ Failed to create user_settings record:', settingsError.message);
+        // Don't fail the whole sync if settings creation fails
+      }
+
       res.json({
         success: true,
         message: "User synced successfully",

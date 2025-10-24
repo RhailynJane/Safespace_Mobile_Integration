@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface StatusModalProps {
   visible: boolean;
@@ -30,6 +31,8 @@ export default function StatusModal({
   onClose,
   buttonText = 'OK',
 }: StatusModalProps) {
+  const { theme, isDarkMode } = useTheme();
+  
   const getIconName = () => {
     switch (type) {
       case 'success':
@@ -76,14 +79,30 @@ export default function StatusModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
+      <View style={[
+        styles.modalOverlay,
+        { backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)' }
+      ]}>
+        <View style={[
+          styles.modalContent,
+          { backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }
+        ]}>
           <View style={styles.iconContainer}>
             <Ionicons name={getIconName()} size={64} color={getIconColor()} />
           </View>
 
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <Text style={[
+            styles.title,
+            { color: isDarkMode ? '#F9FAFB' : '#1F2937' }
+          ]}>
+            {title}
+          </Text>
+          <Text style={[
+            styles.message,
+            { color: isDarkMode ? '#D1D5DB' : '#6B7280' }
+          ]}>
+            {message}
+          </Text>
 
           <TouchableOpacity
             style={[styles.button, { backgroundColor: getButtonColor() }]}
@@ -100,13 +119,13 @@ export default function StatusModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    // backgroundColor removed - now uses theme via inline override
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    // backgroundColor removed - now uses theme via inline override
     borderRadius: 24,
     padding: 32,
     width: '90%',
@@ -124,7 +143,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1F2937',
+    // color removed - now uses theme via inline override
     marginBottom: 12,
     textAlign: 'center',
     letterSpacing: 0.3,
@@ -133,7 +152,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 28,
-    color: '#6B7280',
+    // color removed - now uses theme via inline override
     lineHeight: 24,
     paddingHorizontal: 8,
   },
