@@ -482,7 +482,14 @@ export const AppHeader = ({
             onPress={hideSideMenu}
           />
 
-          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim, backgroundColor: theme.colors.surface }]}>
+          <Animated.View style={[
+            styles.sideMenu, 
+            { 
+              opacity: fadeAnim, 
+              backgroundColor: theme.colors.surface,
+              paddingTop: Math.max(insets.top, 20) // Use safe area top with minimum 20px
+            }
+          ]}>
             {/* FIXED: Added avatar with initials to side menu header */}
             <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View
@@ -509,7 +516,10 @@ export const AppHeader = ({
               <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
             </View>
 
-            <ScrollView style={styles.sideMenuContent}>
+            <ScrollView 
+              style={styles.sideMenuContent}
+              contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 20, 40) }}
+            >
               {sideMenuItems.map((item, index) => (
                 <TouchableOpacity
                   key={index}
@@ -631,7 +641,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   sideMenu: {
-    paddingTop: 40,
+    // paddingTop removed - now dynamic based on safe area
     width: width * 0.75,
     // backgroundColor removed - now uses theme.colors.surface
     height: "100%",
