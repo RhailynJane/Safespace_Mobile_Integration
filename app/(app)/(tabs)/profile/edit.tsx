@@ -1533,11 +1533,30 @@ export default function EditProfileScreen() {
                       key={item.id.toString()}
                       style={styles.suggestionItem}
                       onPress={() => {
+                        // Parse the full address to extract all components
+                        const addressParts = item.description.split(",");
+                        const street = addressParts[0]?.trim() || "";
+                        
+                        // Extract city and postal code from the address object if available
+                        const city = item.address?.city || item.address?.town || item.address?.village || "";
+                        const postalCode = item.address?.postcode || "";
+                        
+                        // Update form with all extracted data
                         setFormData({
                           ...formData,
-                          streetAddress: item.description.split(",")[0], // Get just the street part
+                          streetAddress: street,
+                          location: city,
+                          postalCode: postalCode,
                         });
+                        
+                        // Also update location query to show the city in the field
+                        if (city) {
+                          setLocationQuery(city);
+                        }
+                        
                         setShowStreetSuggestions(false);
+                        
+                        console.log('📍 Auto-populated address:', { street, city, postalCode });
                       }}
                     >
                       <Ionicons

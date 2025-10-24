@@ -130,7 +130,15 @@ export const locationService = {
         return data.features.map((item: any) => ({
           id: item.id,
           description: item.place_name,
-          address: item.properties?.address || item.address || ''
+          address: {
+            street: item.address || item.text || '',
+            city: item.context?.find((c: any) => c.id.includes('place'))?.text || '',
+            state: item.context?.find((c: any) => c.id.includes('region'))?.text || '',
+            country: item.context?.find((c: any) => c.id.includes('country'))?.text || '',
+            postcode: item.context?.find((c: any) => c.id.includes('postcode'))?.text || '',
+            town: '',
+            village: ''
+          }
         }));
       }
 
