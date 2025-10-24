@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import StatusModal from "./StatusModal";
+import { router } from "expo-router";
 
 // Local interface for signup data
 interface SignupData {
@@ -45,6 +47,50 @@ export default function PersonalInfoStep({
   const { theme } = useTheme();
   // State to store validation errors for each form field
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Modal state for age restriction
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  /**
+   * Handles age input changes and checks for minimum age requirement
+   */
+  const handleAgeChange = (text: string) => {
+    // Only allow digits
+    const filtered = text.replace(/[^0-9]/g, '');
+    onUpdate({ age: filtered });
+
+    // Check if user entered a complete age less than 16
+    if (filtered.length >= 2) {
+      const ageNum = parseInt(filtered, 10);
+      if (!isNaN(ageNum) && ageNum < 16) {
+        // Show modal immediately
+        setModalConfig({
+          type: 'error',
+          title: 'Age Requirement',
+          message: 'You must be at least 16 years old to create an account. If you need support, please contact Kids Help Phone at 1-800-668-6868 (available 24/7).\n\nNeed Immediate Help? If you or someone you know is in crisis, please call 911 or contact a 24/7 crisis line in your area. For urgent mental health support, reach out to the Distress Centre at 403-266-HELP (4357) or visit distresscentre.com.',
+        });
+        setShowModal(true);
+      }
+    }
+  };
+
+  /**
+   * Handles modal close and redirects to login
+   */
+  const handleModalClose = () => {
+    setShowModal(false);
+    // Clear age field
+    onUpdate({ age: '' });
+    // Navigate back to login after a short delay
+    setTimeout(() => {
+      router.replace('/(auth)/login');
+    }, 300);
+  };
 
   /**
    * Validates all form fields for required data and correct formats
@@ -236,11 +282,7 @@ export default function PersonalInfoStep({
               placeholder="Enter your Age (16+)"
               placeholderTextColor={theme.colors.textSecondary}
               value={data.age}
-              onChangeText={(text) => {
-                // Only allow digits
-                const filtered = text.replace(/[^0-9]/g, '');
-                onUpdate({ age: filtered });
-              }}
+              onChangeText={handleAgeChange}
               keyboardType="numeric" // Show numeric keyboard for age input
               maxLength={3}
             />
@@ -285,6 +327,15 @@ export default function PersonalInfoStep({
           <Text style={styles.continueButtonText}>Continue</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Age Restriction Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={handleModalClose}
+      />
     </View>
   );
 }
