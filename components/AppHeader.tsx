@@ -276,6 +276,31 @@ export const AppHeader = ({
     );
   };
 
+  // Unread notifications badge
+  const [unreadCount, setUnreadCount] = useState(0);
+  const baseURL = getApiBaseUrl();
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${baseURL}/api/notifications/${user.id}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      const rows = (json.data || []) as Array<{ is_read: boolean }>; 
+      const count = rows.reduce((acc, r) => acc + (r.is_read ? 0 : 1), 0);
+      setUnreadCount(count);
+    } catch (e) {
+      // ignore
+    }
+  }, [user?.id, baseURL]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+      return () => {};
+    }, [fetchUnreadCount])
+  );
+
   // Base menu items
   const baseMenuItems = [
     {
@@ -453,8 +478,15 @@ export const AppHeader = ({
           {rightActions}
 
           {showNotifications && (
-            <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <TouchableOpacity onPress={() => router.push("/notifications")} style={{ position: 'relative', padding: 4 }}>
               <Ionicons name="notifications-outline" size={24} color={theme.colors.icon} />
+              {unreadCount > 0 && (
+                <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+                  <Text style={styles.unreadBadgeText} numberOfLines={1}>
+                    {unreadCount > 9 ? '9+' : String(unreadCount)}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 
@@ -633,6 +665,22 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: "#FF6B6B",
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   fullScreenOverlay: {
     flex: 1,

@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
 
 /**
  * AppointmentList Component
@@ -35,7 +36,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
  * Features an elegant curved background and intuitive interface.
  */
 export default function AppointmentList() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,9 +46,18 @@ export default function AppointmentList() {
     "upcoming" | "past"
   >("upcoming");
 
+  // StatusModal states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalType, setStatusModalType] = useState<'success' | 'error' | 'info'>('info');
+  const [statusModalTitle, setStatusModalTitle] = useState('');
+  const [statusModalMessage, setStatusModalMessage] = useState('');
+
   // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -57,6 +67,16 @@ export default function AppointmentList() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
 
   /**
    * Handles bottom tab navigation
@@ -88,7 +108,7 @@ export default function AppointmentList() {
 
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -460,6 +480,15 @@ export default function AppointmentList() {
           </View>
         </Modal>
 
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModalVisible}
+          type={statusModalType}
+          title={statusModalTitle}
+          message={statusModalMessage}
+          onClose={() => setStatusModalVisible(false)}
+        />
+
         {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
@@ -471,7 +500,7 @@ export default function AppointmentList() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -493,12 +522,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2E7D32",
   },
   title: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
@@ -525,13 +554,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
   },
   sideMenuContent: {
@@ -546,7 +575,7 @@ const styles = StyleSheet.create({
     // borderBottomColor moved to theme.colors.borderLight via inline override
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme.colors.text via inline override
     marginLeft: 15,
   },
@@ -564,7 +593,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
   },
   appointmentsTabs: {
@@ -582,7 +611,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#4CAF50",
   },
   tabText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#666",
   },
   activeTabText: {
@@ -607,7 +636,7 @@ const styles = StyleSheet.create({
     // borderLeftColor moved to theme.colors.primary via inline override
   },
   supportWorker: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     // color moved to theme.colors.text via inline override
     marginBottom: 12,
@@ -621,7 +650,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   detailText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
     marginLeft: 8,
   },
@@ -635,7 +664,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   sessionTypeText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
     marginLeft: 6,
   },
@@ -645,7 +674,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyStateText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme.colors.text via inline override
     marginTop: 16,
   },
@@ -666,7 +695,7 @@ const styles = StyleSheet.create({
   },
   scheduleButtonText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     marginLeft: 8,
   },

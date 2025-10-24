@@ -37,6 +37,14 @@ export default function SettingsScreen() {
   // Settings state
   const [autoLockTimer, setAutoLockTimer] = useState("5 minutes");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  // Granular notification toggles
+  const [notifAll, setNotifAll] = useState(true);
+  const [notifMoodTracking, setNotifMoodTracking] = useState(true);
+  const [notifJournaling, setNotifJournaling] = useState(true);
+  const [notifMessages, setNotifMessages] = useState(true);
+  const [notifPostReactions, setNotifPostReactions] = useState(true);
+  const [notifAppointments, setNotifAppointments] = useState(true);
+  const [notifSelfAssessment, setNotifSelfAssessment] = useState(true);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
   const [quietStartTime, setQuietStartTime] = useState("22:00");
   const [quietEndTime, setQuietEndTime] = useState("08:00");
@@ -88,6 +96,14 @@ export default function SettingsScreen() {
   // Do not override current theme/context values here to avoid reverting user changes
       setAutoLockTimer(settings.autoLockTimer);
       setNotificationsEnabled(settings.notificationsEnabled);
+      // granular notifications
+      setNotifAll(settings.notifAll ?? true);
+      setNotifMoodTracking(settings.notifMoodTracking ?? true);
+      setNotifJournaling(settings.notifJournaling ?? true);
+      setNotifMessages(settings.notifMessages ?? true);
+      setNotifPostReactions(settings.notifPostReactions ?? true);
+      setNotifAppointments(settings.notifAppointments ?? true);
+      setNotifSelfAssessment(settings.notifSelfAssessment ?? true);
       setQuietHoursEnabled(settings.quietHoursEnabled);
       setQuietStartTime(settings.quietStartTime);
       setQuietEndTime(settings.quietEndTime);
@@ -111,6 +127,13 @@ export default function SettingsScreen() {
         textSize,
         autoLockTimer,
         notificationsEnabled,
+        notifAll,
+        notifMoodTracking,
+        notifJournaling,
+        notifMessages,
+        notifPostReactions,
+        notifAppointments,
+        notifSelfAssessment,
         quietHoursEnabled,
         quietStartTime,
         quietEndTime,
@@ -495,6 +518,100 @@ export default function SettingsScreen() {
               setNotificationsEnabled,
               "notifications"
             )}
+
+            {/* Category toggles */}
+            <View style={[styles.nestedSettings, !notificationsEnabled && styles.disabledRow]}>
+              {renderToggleRow(
+                "All Notifications",
+                "Master toggle for all categories",
+                notifAll,
+                (val) => {
+                  setNotifAll(val);
+                  setNotifMoodTracking(val);
+                  setNotifJournaling(val);
+                  setNotifMessages(val);
+                  setNotifPostReactions(val);
+                  setNotifAppointments(val);
+                  setNotifSelfAssessment(val);
+                },
+                "notifications",
+                !notificationsEnabled
+              )}
+              {renderToggleRow(
+                "Mood Tracking",
+                "Moods, streaks and reminders",
+                notifMoodTracking,
+                (val) => {
+                  setNotifMoodTracking(val);
+                  // auto-update master when all toggles are true/false
+                  const nextAll = val && notifJournaling && notifMessages && notifPostReactions && notifAppointments && notifSelfAssessment;
+                  if (val) setNotifAll(nextAll);
+                  else setNotifAll(false);
+                },
+                "happy",
+                !notificationsEnabled
+              )}
+              {renderToggleRow(
+                "Journaling",
+                "Prompts and entry activity",
+                notifJournaling,
+                (val) => {
+                  setNotifJournaling(val);
+                  const nextAll = notifMoodTracking && val && notifMessages && notifPostReactions && notifAppointments && notifSelfAssessment;
+                  if (val) setNotifAll(nextAll); else setNotifAll(false);
+                },
+                "book",
+                !notificationsEnabled
+              )}
+              {renderToggleRow(
+                "Messages",
+                "New messages and replies",
+                notifMessages,
+                (val) => {
+                  setNotifMessages(val);
+                  const nextAll = notifMoodTracking && notifJournaling && val && notifPostReactions && notifAppointments && notifSelfAssessment;
+                  if (val) setNotifAll(nextAll); else setNotifAll(false);
+                },
+                "chatbubbles",
+                !notificationsEnabled
+              )}
+              {renderToggleRow(
+                "Post Reactions",
+                "Likes and reactions to your posts",
+                notifPostReactions,
+                (val) => {
+                  setNotifPostReactions(val);
+                  const nextAll = notifMoodTracking && notifJournaling && notifMessages && val && notifAppointments && notifSelfAssessment;
+                  if (val) setNotifAll(nextAll); else setNotifAll(false);
+                },
+                "heart",
+                !notificationsEnabled
+              )}
+              {renderToggleRow(
+                "Appointments",
+                "Reminders and updates for sessions",
+                notifAppointments,
+                (val) => {
+                  setNotifAppointments(val);
+                  const nextAll = notifMoodTracking && notifJournaling && notifMessages && notifPostReactions && val && notifSelfAssessment;
+                  if (val) setNotifAll(nextAll); else setNotifAll(false);
+                },
+                "calendar",
+                !notificationsEnabled
+              )}
+              {renderToggleRow(
+                "Self Assessment",
+                "Due dates and results",
+                notifSelfAssessment,
+                (val) => {
+                  setNotifSelfAssessment(val);
+                  const nextAll = notifMoodTracking && notifJournaling && notifMessages && notifPostReactions && notifAppointments && val;
+                  if (val) setNotifAll(nextAll); else setNotifAll(false);
+                },
+                "checkmark-circle",
+                !notificationsEnabled
+              )}
+            </View>
 
             {renderToggleRow(
               "Quiet Hours",

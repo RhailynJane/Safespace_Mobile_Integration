@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
+import StatusModal from "../../../../components/StatusModal";
 
 /**
  * ConfirmAppointment Component
@@ -34,15 +35,39 @@ import activityApi from "../../../../utils/activityApi";
  * to view appointments or book another. Features an elegant curved background.
  */
 export default function ConfirmAppointment() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [activeView, setActiveView] = useState("confirmation");
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // StatusModal states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalType, setStatusModalType] = useState<'success' | 'error' | 'info'>('info');
+  const [statusModalTitle, setStatusModalTitle] = useState('');
+  const [statusModalMessage, setStatusModalMessage] = useState('');
+
+  // Clerk authentication hooks
+  const { signOut, isSignedIn } = useAuth();
+  const { user } = useUser();
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Get support worker ID from navigation params
   const { supportWorkerId } = useLocalSearchParams();
+
+  /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
 
   // Mock data for support workers (replaces backend data)
   const supportWorkers = [
@@ -66,11 +91,6 @@ export default function ConfirmAppointment() {
   const supportWorker = supportWorkers.find(
     (sw) => sw.id === Number(supportWorkerId)
   );
-
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
-  const { user } = useUser();
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -115,7 +135,7 @@ export default function ConfirmAppointment() {
 
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -136,7 +156,7 @@ export default function ConfirmAppointment() {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <Text style={styles.errorText}>Support worker not found</Text>
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>Support worker not found</Text>
         </SafeAreaView>
       </CurvedBackground>
     );
@@ -438,6 +458,15 @@ export default function ConfirmAppointment() {
           </View>
         </Modal>
 
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModalVisible}
+          type={statusModalType}
+          title={statusModalTitle}
+          message={statusModalMessage}
+          onClose={() => setStatusModalVisible(false)}
+        />
+
         {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
@@ -449,13 +478,13 @@ export default function ConfirmAppointment() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
   },
   errorText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     color: "#666",
     textAlign: "center",
     marginTop: 50,
@@ -468,7 +497,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
@@ -488,12 +516,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2E7D32",
   },
   title: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
@@ -524,7 +552,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   stepNumber: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#4CAF50",
     fontWeight: "600",
   },
@@ -551,14 +579,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   confirmationTitle: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24),
     fontWeight: "bold",
     color: "#2E7D32",
     marginBottom: 12,
     textAlign: "center",
   },
   confirmationMessage: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#666",
     textAlign: "center",
     marginBottom: 24,
@@ -577,12 +605,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   detailLabel: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#666",
     fontWeight: "600",
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     fontWeight: "500",
   },
@@ -597,7 +625,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   secondaryButton: {
@@ -612,7 +640,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#4CAF50",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   modalContainer: {
@@ -635,13 +663,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#757575",
   },
   sideMenuContent: {
@@ -656,7 +684,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     marginLeft: 15,
   },

@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useUser } from '@clerk/clerk-expo';
+import { getApiBaseUrl } from '../../../utils/apiBaseUrl';
 
 // Type definition for a Notification object.
 interface Notification {
@@ -36,57 +38,36 @@ export default function NotificationsScreen() {
   const { theme } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const { user } = useUser();
+  const baseURL = getApiBaseUrl();
+
+  const loadNotifications = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${baseURL}/api/notifications/${user.id}`);
+      if (!res.ok) {
+        console.log('Failed to load notifications:', res.status);
+        return;
+      }
+      const json = await res.json();
+      const rows = (json.data || []) as Array<{id:number; type:string; title:string; message:string; is_read:boolean; created_at:string}>;
+      const mapped: Notification[] = rows.map(r => ({
+        id: String(r.id),
+        title: r.title,
+        message: r.message,
+        time: new Date(r.created_at).toLocaleString(),
+        isRead: Boolean(r.is_read),
+        type: (r.type as Notification['type']) || 'system',
+      }));
+      setNotifications(mapped);
+    } catch (e) {
+      console.log('Error loading notifications:', e);
+    }
+  }, [user?.id, baseURL]);
 
   useEffect(() => {
     loadNotifications();
-  }, []);
-
-  const loadNotifications = () => {
-    const mockNotifications: Notification[] = [
-      {
-        id: "1",
-        title: "New Message",
-        message: "You have a new message from Dr. Smith",
-        time: "10 minutes ago",
-        isRead: false,
-        type: "message",
-      },
-      {
-        id: "2",
-        title: "Appointment Reminder",
-        message: "Your appointment is scheduled for tomorrow at 2:00 PM",
-        time: "1 hour ago",
-        isRead: true,
-        type: "appointment",
-      },
-      {
-        id: "3",
-        title: "Journal Reminder",
-        message: "Don't forget to complete your daily journal entry",
-        time: "3 hours ago",
-        isRead: false,
-        type: "reminder",
-      },
-      {
-        id: "4",
-        title: "System Update",
-        message: "New features are available in the latest update",
-        time: "1 day ago",
-        isRead: true,
-        type: "system",
-      },
-      {
-        id: "5",
-        title: "Mood Check-in",
-        message: "How are you feeling today? Track your mood",
-        time: "2 days ago",
-        isRead: true,
-        type: "reminder",
-      },
-    ];
-
-    setNotifications(mockNotifications);
-  };
+  }, [loadNotifications]);
 
   /**
    * onRefresh
@@ -103,14 +84,19 @@ export default function NotificationsScreen() {
    * Marks a single notification as read by matching its ID.
    * Useful for when user taps on an unread notification.
    */
-  const markAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((notification) =>
-        notification.id === id
-          ? { ...notification, isRead: true }
-          : notification
-      )
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await fetch(`${baseURL}/api/notifications/${id}/read`, { method: 'POST' });
+      setNotifications(
+        notifications.map((notification) =>
+          notification.id === id
+            ? { ...notification, isRead: true }
+            : notification
+        )
+      );
+    } catch (e) {
+      console.log('Failed to mark notification as read:', e);
+    }
   };
 
   /**
@@ -118,13 +104,19 @@ export default function NotificationsScreen() {
    * Marks all notifications in the list as read.
    * Triggered when user presses the "Mark all as read" button.
    */
-  const markAllAsRead = () => {
-    setNotifications(
-      notifications.map((notification) => ({
-        ...notification,
-        isRead: true,
-      }))
-    );
+  const markAllAsRead = async () => {
+    if (!user?.id) return;
+    try {
+      await fetch(`${baseURL}/api/notifications/${user.id}/read-all`, { method: 'POST' });
+      setNotifications(
+        notifications.map((notification) => ({
+          ...notification,
+          isRead: true,
+        }))
+      );
+    } catch (e) {
+      console.log('Failed to mark all as read:', e);
+    }
   };
 
   /**

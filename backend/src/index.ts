@@ -44,6 +44,70 @@ const pool = new Pool({
   port: 5432,
 });
 
+// Ensure database schema is up to date for user_settings notification columns
+async function ensureUserSettingsSchema() {
+  try {
+    const alterSqls = [
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_all BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_mood_tracking BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_journaling BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_messages BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_post_reactions BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_appointments BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_self_assessment BOOLEAN DEFAULT TRUE"
+    ];
+    for (const sql of alterSqls) {
+      await pool.query(sql);
+    }
+    console.log('✅ Ensured user_settings notification columns exist');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure user_settings schema:', e.message);
+  }
+}
+
+// Ensure database schema for notifications table
+async function ensureNotificationsSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(30) NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_notifications_user_id_created_at ON notifications(user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+    `);
+    console.log('✅ Ensured notifications table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure notifications schema:', e.message);
+  }
+}
+
+// Ensure database schema for push tokens
+async function ensurePushTokensSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(20),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        revoked BOOLEAN NOT NULL DEFAULT FALSE
+      );
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_revoked ON push_tokens(revoked);
+    `);
+    console.log('✅ Ensured push_tokens table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure push_tokens schema:', e.message);
+  }
+}
+
 // Interface definitions
 interface SyncUserRequest {
   clerkUserId: string;
@@ -99,6 +163,122 @@ pool.connect((err, client, release) => {
     if (release) release();
   }
 });
+
+// Kick off lightweight auto-migration for user_settings
+ensureUserSettingsSchema();
+ensureNotificationsSchema();
+ensurePushTokensSchema();
+
+// Unified helper: check quiet hours window
+function isWithinQuietHours(now: Date, start: string, end: string): boolean {
+  // start/end as 'HH:MM'
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60 + em;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  if (startMin === endMin) return false; // no quiet
+  if (startMin < endMin) {
+    return nowMin >= startMin && nowMin < endMin;
+  } else {
+    // wraps midnight
+    return nowMin >= startMin || nowMin < endMin;
+  }
+}
+
+// Send Expo push notification to all active tokens for a user
+async function sendPushToUser(userId: number, title: string, body: string, data?: Record<string, any>) {
+  try {
+    const tokensRes = await pool.query(`SELECT token FROM push_tokens WHERE user_id = $1 AND revoked = FALSE`, [userId]);
+    if (tokensRes.rows.length === 0) return;
+
+    const messages = tokensRes.rows.map((r) => ({
+      to: r.token,
+      title,
+      body,
+      sound: 'default',
+      data: data || {},
+      priority: 'high',
+    }));
+
+    // Send to Expo push API
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(messages),
+    } as any);
+
+    if (!response.ok) {
+      const txt = await response.text();
+      console.warn('⚠️ Expo push send failed:', response.status, txt);
+    }
+  } catch (e: any) {
+    console.warn('⚠️ sendPushToUser error:', e.message);
+  }
+}
+
+// Centralized helper to create a notification row and send push if allowed by settings
+async function createAndPushNotification(
+  userId: number,
+  category: 'message' | 'appointment' | 'system' | 'reminder' | 'journaling' | 'mood' | 'post_reactions' | 'self_assessment',
+  title: string,
+  message: string,
+  data?: Record<string, any>
+) {
+  try {
+    // Read settings and quiet hours
+    const sRes = await pool.query(
+      `SELECT 
+         COALESCE(notifications_enabled, TRUE) as notifications_enabled,
+         COALESCE(notif_all, TRUE) as notif_all,
+         COALESCE(notif_messages, TRUE) as notif_messages,
+         COALESCE(notif_journaling, TRUE) as notif_journaling,
+         COALESCE(notif_mood_tracking, TRUE) as notif_mood_tracking,
+         COALESCE(notif_post_reactions, TRUE) as notif_post_reactions,
+         COALESCE(notif_appointments, TRUE) as notif_appointments,
+         COALESCE(notif_self_assessment, TRUE) as notif_self_assessment,
+         COALESCE(quiet_hours_enabled, FALSE) as quiet_hours_enabled,
+         COALESCE(quiet_start_time, '22:00') as quiet_start_time,
+         COALESCE(quiet_end_time, '08:00') as quiet_end_time
+       FROM user_settings WHERE user_id = $1`,
+      [userId]
+    );
+
+    const s = sRes.rows[0] || {};
+    const allEnabled = s.notifications_enabled !== false && s.notif_all !== false;
+    const byCategory: Record<string, boolean> = {
+      message: s.notif_messages !== false,
+      journaling: s.notif_journaling !== false,
+      mood: s.notif_mood_tracking !== false,
+      post_reactions: s.notif_post_reactions !== false,
+      appointment: s.notif_appointments !== false,
+      self_assessment: s.notif_self_assessment !== false,
+      system: true,
+      reminder: true,
+    };
+
+    // Always insert a notification row (in-app feed), but push only if allowed
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, $2, $3, $4)`,
+      [userId, category, title, message]
+    );
+
+    const categoryAllowed = byCategory[category] !== false;
+    let canPush = allEnabled && categoryAllowed;
+    if (canPush && sRes.rows.length > 0 && s.quiet_hours_enabled) {
+      const now = new Date();
+      if (isWithinQuietHours(now, s.quiet_start_time, s.quiet_end_time)) {
+        canPush = false;
+      }
+    }
+
+    if (canPush) {
+      await sendPushToUser(userId, title, message, { type: category, ...(data || {}) });
+    }
+  } catch (e: any) {
+    console.warn('⚠️ createAndPushNotification failed:', e.message);
+  }
+}
 
 // Test endpoint
 app.get("/", (req: Request, res: Response) => {
@@ -202,6 +382,13 @@ app.post(
             text_size,
             auto_lock_timer,
             notifications_enabled,
+            notif_all,
+            notif_mood_tracking,
+            notif_journaling,
+            notif_messages,
+            notif_post_reactions,
+            notif_appointments,
+            notif_self_assessment,
             quiet_hours_enabled,
             quiet_start_time,
             quiet_end_time,
@@ -214,6 +401,13 @@ app.post(
             false,
             'Medium',
             '5 minutes',
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
             true,
             false,
             '22:00',
@@ -639,6 +833,18 @@ app.post(
       );
 
       console.log("Assessment submitted successfully:", result.rows[0]);
+
+      // Fire a self-assessment notification to the same user (respects settings/quiet hours)
+      try {
+        await createAndPushNotification(
+          userId,
+          'self_assessment',
+          'Assessment Submitted',
+          'Thanks for completing your self-assessment.'
+        );
+      } catch (e: any) {
+        console.warn('⚠️ Failed to notify assessment submission:', e.message);
+      }
 
       res.json({
         success: true,
@@ -1681,6 +1887,72 @@ app.get(
     }
   }
 );
+
+// =============================================
+// NOTIFICATIONS ENDPOINTS
+// =============================================
+
+// Get notifications for a user
+app.get("/api/notifications/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userResult.rows[0].id;
+
+    const result = await pool.query(
+      `SELECT id, type, title, message, is_read, created_at
+       FROM notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [userId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error: any) {
+    console.error('❌ Error fetching notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch notifications', error: error.message });
+  }
+});
+
+// Mark one notification as read
+app.post("/api/notifications/:id/read", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE id = $1`, [Number(id)]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error marking notification as read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark as read', error: error.message });
+  }
+});
+
+// Mark all notifications as read for a user
+app.post("/api/notifications/:clerkUserId/read-all", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userResult.rows[0].id;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error marking all notifications as read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark all as read', error: error.message });
+  }
+});
 
 // Update a mood entry
 app.put("/api/moods/:moodId", async (req: Request, res: Response) => {
@@ -2919,6 +3191,37 @@ app.post(
           online: false
         }
       };
+
+      // Create notifications for other participants in this conversation
+      try {
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversation_id: Number.parseInt(conversationId) },
+          include: { user: { select: { id: true, clerk_user_id: true, first_name: true, last_name: true } } }
+        });
+
+        const senderClerkId = result.sender.clerk_user_id;
+        const senderName = `${result.sender.first_name || ''} ${result.sender.last_name || ''}`.trim() || 'Someone';
+        const previewText = (result.message_text || '').slice(0, 140);
+
+        // Notify all except sender
+        const recipients = participants.filter(p => p.user.clerk_user_id !== senderClerkId);
+
+        for (const p of recipients) {
+          try {
+            await createAndPushNotification(
+              p.user.id,
+              'message',
+              'New Message',
+              `${senderName ? senderName + ': ' : ''}${previewText}`,
+              { conversationId: Number.parseInt(conversationId) }
+            );
+          } catch (notifyErr: any) {
+            console.warn('⚠️ Failed to create notification for user', p.user.id, notifyErr.message);
+          }
+        }
+      } catch (notifyBlockErr: any) {
+        console.warn('⚠️ Notification creation block failed:', notifyBlockErr.message);
+      }
 
       res.json({
         success: true,
@@ -4174,6 +4477,13 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           text_size: "Medium",
           auto_lock_timer: "5 minutes",
           notifications_enabled: true,
+          notif_all: true,
+          notif_mood_tracking: true,
+          notif_journaling: true,
+          notif_messages: true,
+          notif_post_reactions: true,
+          notif_appointments: true,
+          notif_self_assessment: true,
           quiet_hours_enabled: false,
           quiet_start_time: "22:00",
           quiet_end_time: "08:00",
@@ -4249,18 +4559,32 @@ app.put(
              text_size = COALESCE($2, text_size),
              auto_lock_timer = COALESCE($3, auto_lock_timer),
              notifications_enabled = COALESCE($4, notifications_enabled),
-             quiet_hours_enabled = COALESCE($5, quiet_hours_enabled),
-             quiet_start_time = COALESCE($6, quiet_start_time),
-             quiet_end_time = COALESCE($7, quiet_end_time),
-             reminder_frequency = COALESCE($8, reminder_frequency),
+             notif_all = COALESCE($5, notif_all),
+             notif_mood_tracking = COALESCE($6, notif_mood_tracking),
+             notif_journaling = COALESCE($7, notif_journaling),
+             notif_messages = COALESCE($8, notif_messages),
+             notif_post_reactions = COALESCE($9, notif_post_reactions),
+             notif_appointments = COALESCE($10, notif_appointments),
+             notif_self_assessment = COALESCE($11, notif_self_assessment),
+             quiet_hours_enabled = COALESCE($12, quiet_hours_enabled),
+             quiet_start_time = COALESCE($13, quiet_start_time),
+             quiet_end_time = COALESCE($14, quiet_end_time),
+             reminder_frequency = COALESCE($15, reminder_frequency),
              updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $9
+           WHERE user_id = $16
            RETURNING *`,
           [
             settings.darkMode,
             settings.textSize,
             settings.autoLockTimer,
             settings.notificationsEnabled,
+            (settings as any).notifAll,
+            (settings as any).notifMoodTracking,
+            (settings as any).notifJournaling,
+            (settings as any).notifMessages,
+            (settings as any).notifPostReactions,
+            (settings as any).notifAppointments,
+            (settings as any).notifSelfAssessment,
             settings.quietHoursEnabled,
             settings.quietStartTime,
             settings.quietEndTime,
@@ -4274,8 +4598,16 @@ app.put(
           `INSERT INTO user_settings (
             user_id, clerk_user_id, 
             dark_mode, text_size, auto_lock_timer,
-            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            notifications_enabled,
+            notif_all,
+            notif_mood_tracking,
+            notif_journaling,
+            notif_messages,
+            notif_post_reactions,
+            notif_appointments,
+            notif_self_assessment,
+            quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
           RETURNING *`,
           [
             userId,
@@ -4284,6 +4616,13 @@ app.put(
             settings.textSize ?? 'Medium',
             settings.autoLockTimer ?? '5 minutes',
             settings.notificationsEnabled ?? true,
+            (settings as any).notifAll ?? true,
+            (settings as any).notifMoodTracking ?? true,
+            (settings as any).notifJournaling ?? true,
+            (settings as any).notifMessages ?? true,
+            (settings as any).notifPostReactions ?? true,
+            (settings as any).notifAppointments ?? true,
+            (settings as any).notifSelfAssessment ?? true,
             settings.quietHoursEnabled ?? false,
             settings.quietStartTime ?? '22:00',
             settings.quietEndTime ?? '08:00',
@@ -4715,5 +5054,34 @@ app.post('/api/users/:clerkUserId/login', async (req, res) => {
       error: 'Failed to update login timestamp',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+});
+
+// Register push token for user
+app.post('/api/push/register', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, token, platform } = req.body as { clerkUserId?: string; token?: string; platform?: string };
+    if (!clerkUserId || !token) {
+      return res.status(400).json({ success: false, message: 'clerkUserId and token are required' });
+    }
+
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+
+    // Upsert by token
+    await pool.query(
+      `INSERT INTO push_tokens (user_id, token, platform, revoked)
+       VALUES ($1, $2, $3, FALSE)
+       ON CONFLICT (token)
+       DO UPDATE SET user_id = EXCLUDED.user_id, platform = EXCLUDED.platform, revoked = FALSE`,
+      [userId, token, platform || null]
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error registering push token:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to register token', error: error.message });
   }
 });

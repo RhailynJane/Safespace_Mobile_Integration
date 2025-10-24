@@ -20,6 +20,14 @@ export interface UserSettings {
 
   // Notifications
   notificationsEnabled: boolean;
+  // Granular notification categories
+  notifAll: boolean;
+  notifMoodTracking: boolean;
+  notifJournaling: boolean;
+  notifMessages: boolean;
+  notifPostReactions: boolean;
+  notifAppointments: boolean;
+  notifSelfAssessment: boolean;
   quietHoursEnabled: boolean;
   quietStartTime: string;
   quietEndTime: string;
@@ -283,6 +291,13 @@ class SettingsAPI {
 
       // Notifications
       notificationsEnabled: serverData.notifications_enabled ?? true,
+      notifAll: serverData.notif_all ?? true,
+      notifMoodTracking: serverData.notif_mood_tracking ?? true,
+      notifJournaling: serverData.notif_journaling ?? true,
+      notifMessages: serverData.notif_messages ?? true,
+      notifPostReactions: serverData.notif_post_reactions ?? true,
+      notifAppointments: serverData.notif_appointments ?? true,
+      notifSelfAssessment: serverData.notif_self_assessment ?? true,
       quietHoursEnabled: serverData.quiet_hours_enabled ?? false,
       quietStartTime: serverData.quiet_start_time ?? '22:00',
       quietEndTime: serverData.quiet_end_time ?? '08:00',
@@ -301,6 +316,13 @@ class SettingsAPI {
 
       // Notifications
       notificationsEnabled: clientSettings.notificationsEnabled,
+      notifAll: clientSettings.notifAll,
+      notifMoodTracking: clientSettings.notifMoodTracking,
+      notifJournaling: clientSettings.notifJournaling,
+      notifMessages: clientSettings.notifMessages,
+      notifPostReactions: clientSettings.notifPostReactions,
+      notifAppointments: clientSettings.notifAppointments,
+      notifSelfAssessment: clientSettings.notifSelfAssessment,
       quietHoursEnabled: clientSettings.quietHoursEnabled,
       quietStartTime: clientSettings.quietStartTime,
       quietEndTime: clientSettings.quietEndTime,
@@ -314,6 +336,13 @@ class SettingsAPI {
       textSize: 'Medium',
       autoLockTimer: '5 minutes',
       notificationsEnabled: true,
+      notifAll: true,
+      notifMoodTracking: true,
+      notifJournaling: true,
+      notifMessages: true,
+      notifPostReactions: true,
+      notifAppointments: true,
+      notifSelfAssessment: true,
       quietHoursEnabled: false,
       quietStartTime: '22:00',
       quietEndTime: '08:00',

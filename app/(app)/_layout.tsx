@@ -1,13 +1,20 @@
 // app/(app)/_layout.tsx
 import { Stack, Redirect } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
-import { ActivityIndicator, View, AppState } from "react-native";
-import { useEffect, useRef } from "react";
+import { ActivityIndicator, View, AppState, Text, TouchableOpacity } from "react-native";
+import { useEffect, useRef, useState } from "react";
 import activityApi from "../../utils/activityApi";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getApiBaseUrl } from "../../utils/apiBaseUrl";
+import { registerForPushNotifications, addNotificationListeners } from "../../utils/pushNotifications";
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const appState = useRef(AppState.currentState);
+  const [banner, setBanner] = useState<{visible:boolean; title:string; body:string}>({visible:false, title:'', body:''});
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pushSubsRef = useRef<{ remove: () => void } | null>(null);
+  const baseURL = getApiBaseUrl();
 
   console.log('📱 AppLayout - Auth State:', { isLoaded, isSignedIn });
 
@@ -44,6 +51,94 @@ export default function AppLayout() {
     };
   }, [isSignedIn, userId]);
 
+  // Simple in-app banner (foreground) by polling notifications API
+  useEffect(() => {
+    if (!isSignedIn || !userId) {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      pollingRef.current = null;
+      // cleanup push listeners if any
+      if (pushSubsRef.current) {
+        try { pushSubsRef.current.remove(); } catch (_e) { /* no-op */ }
+        pushSubsRef.current = null;
+      }
+      return;
+    }
+
+    let isMounted = true;
+    const key = `lastSeenNotificationId:${userId}`;
+
+    const checkNotifications = async () => {
+      try {
+        const res = await fetch(`${baseURL}/api/notifications/${userId}`);
+        if (!res.ok) return;
+        const json = await res.json();
+  const rows: Array<{id:number; type:string; title:string; message:string; is_read:boolean; created_at:string}> = json.data || [];
+  if (!rows || rows.length === 0) return;
+
+        const lastSeenStr = await AsyncStorage.getItem(key);
+        const lastSeenId = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
+        const newest = rows[0]; // ordered desc by backend
+  if (newest && newest.id > lastSeenId) {
+          // Find first unread newer than last seen
+          const firstNew = rows.find(r => r.id > lastSeenId && !r.is_read) || rows.find(r => r.id > lastSeenId);
+          if (firstNew && isMounted) {
+            setBanner({visible:true, title: firstNew.title || 'Notification', body: firstNew.message || ''});
+            // update last seen to newest id to avoid repeated banners
+            if (newest) await AsyncStorage.setItem(key, String(newest.id));
+            // auto-hide after 3.5s
+            setTimeout(() => setBanner(b => ({...b, visible:false})), 3500);
+          } else {
+            if (newest) await AsyncStorage.setItem(key, String(newest.id));
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    // kick once and then interval
+    checkNotifications();
+  const id = setInterval(checkNotifications, 15000);
+  pollingRef.current = id;
+
+    return () => {
+      isMounted = false;
+  clearInterval(id);
+  pollingRef.current = null;
+    };
+  }, [isSignedIn, userId, baseURL]);
+
+  // Register for push and attach listeners to show instant banners
+  useEffect(() => {
+    if (!isSignedIn || !userId) return;
+    let mounted = true;
+    (async () => {
+      try {
+        await registerForPushNotifications(userId);
+      } catch (e) {
+        // ignore
+      }
+      if (!mounted) return;
+      // Attach listeners
+      const subs = addNotificationListeners(
+        (title, body) => {
+          setBanner({ visible: true, title: title || 'Notification', body: body || '' });
+          setTimeout(() => setBanner(b => ({ ...b, visible: false })), 3500);
+        },
+        // on tap (optional: navigate by data.type)
+        (_data) => {}
+      );
+      pushSubsRef.current = subs;
+    })();
+    return () => {
+      mounted = false;
+      if (pushSubsRef.current) {
+        try { pushSubsRef.current.remove(); } catch (_e) { /* no-op */ }
+        pushSubsRef.current = null;
+      }
+    };
+  }, [isSignedIn, userId]);
+
   if (!isLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -58,7 +153,36 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <>
+      {/* Foreground in-app banner */}
+      {banner.visible && (
+        <View style={{
+          position: 'absolute',
+          top: 16,
+          left: 16,
+          right: 16,
+          zIndex: 999,
+          backgroundColor: 'rgba(0,0,0,0.85)',
+          borderRadius: 12,
+          padding: 12,
+          shadowColor: '#000',
+          shadowOpacity: 0.2,
+          shadowRadius: 6,
+          shadowOffset: { width: 0, height: 2 }
+        }}>
+          <View style={{flexDirection:'row', alignItems:'flex-start'}}>
+            <View style={{flex:1}}>
+              <Text style={{color:'#fff', fontWeight:'600', fontSize:14}}>{banner.title}</Text>
+              <Text style={{color:'#fff', marginTop:4, fontSize:13}} numberOfLines={3}>{banner.body}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setBanner(b => ({...b, visible:false}))}>
+              <Text style={{color:'#ccc', marginLeft:8}}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="crisis-support" />
       <Stack.Screen name="journal" />
@@ -67,6 +191,7 @@ export default function AppLayout() {
       <Stack.Screen name="resources" />
       <Stack.Screen name="self-assessment" />
       <Stack.Screen name="video-consultations" />
-    </Stack>
+      </Stack>
+    </>
   );
 }
