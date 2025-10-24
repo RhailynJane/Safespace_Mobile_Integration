@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 // app/(app)/(tabs)/profile/settings.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import {
   ScrollView,
   Switch,
   TextInput,
-  Alert,
+  Modal,
 } from "react-native";
+import Slider from '@react-native-community/slider';
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,6 +20,8 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
+import { useUser } from '@clerk/clerk-expo';
 
 /**
  * SettingsScreen Component
@@ -29,16 +32,31 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
-  const { theme, isDarkMode, setDarkMode: setGlobalDarkMode } = useTheme();
+  const { theme, isDarkMode, setDarkMode: setGlobalDarkMode, textSize, setTextSize: setGlobalTextSize } = useTheme();
 
   // Settings state
-  const [textSize, setTextSize] = useState("Medium");
   const [autoLockTimer, setAutoLockTimer] = useState("5 minutes");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
   const [quietStartTime, setQuietStartTime] = useState("22:00");
   const [quietEndTime, setQuietEndTime] = useState("08:00");
   const [reminderFrequency, setReminderFrequency] = useState("Daily");
+  const { user } = useUser();
+  // Status modal state (replaces Alert.alert)
+  const [statusModal, setStatusModal] = useState<{visible:boolean; type:'success'|'error'|'info'; title:string; message:string}>({visible:false, type:'info', title:'', message:''});
+
+  // Generic selection modal state to replace Alert pickers
+  const [selectionModal, setSelectionModal] = useState<{visible:boolean; title:string; options:string[]; onSelect:(v:string)=>void}>({visible:false, title:'', options:[], onSelect:()=>{}});
+
+  // Text size slider mapping
+  const textSizeLabels = ["Extra Small", "Small", "Medium", "Large"] as const;
+  type TextSizeLabel = typeof textSizeLabels[number];
+  const textSizeToSlider = (size: string): number => Math.max(0, textSizeLabels.indexOf((size as TextSizeLabel)));
+  const sliderToTextSize = (val: number): TextSizeLabel => textSizeLabels[Math.min(textSizeLabels.length-1, Math.max(0, Math.round(val)))] as TextSizeLabel;
+  const [textSizeSlider, setTextSizeSlider] = useState<number>(textSizeToSlider(textSize));
+  useEffect(() => {
+    setTextSizeSlider(textSizeToSlider(textSize));
+  }, [textSize]);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -64,12 +82,10 @@ export default function SettingsScreen() {
   const loadSettings = async () => {
     try {
       setIsLoading(true);
-      const settings = await settingsAPI.fetchSettings();
+  const settings = await settingsAPI.fetchSettings(user?.id);
       
-      // Apply all saved settings EXCEPT dark mode (it's managed by ThemeContext)
-      // Dark mode is already loaded from AsyncStorage by ThemeContext
-      // We only update it here if the user explicitly changes it
-      setTextSize(settings.textSize);
+  // Apply all saved settings EXCEPT dark mode and text size (managed by ThemeContext)
+  // Do not override current theme/context values here to avoid reverting user changes
       setAutoLockTimer(settings.autoLockTimer);
       setNotificationsEnabled(settings.notificationsEnabled);
       setQuietHoursEnabled(settings.quietHoursEnabled);
@@ -78,8 +94,8 @@ export default function SettingsScreen() {
       setReminderFrequency(settings.reminderFrequency);
       
     } catch (error) {
-      console.log('Error loading settings:', error);
-      Alert.alert("Error", "Failed to load settings");
+  console.log('Error loading settings:', error);
+  setStatusModal({visible:true, type:'error', title:'Error', message:'Failed to load settings'});
     } finally {
       setIsLoading(false);
     }
@@ -101,12 +117,16 @@ export default function SettingsScreen() {
         reminderFrequency,
       };
 
-      await settingsAPI.saveSettings(settings);
-      console.log('Settings saved successfully');
+      const result = await settingsAPI.saveSettings(settings, user?.id);
+      if (!result.success) {
+        setStatusModal({visible:true, type:'error', title:'Save Failed', message: result.message || 'Failed to save settings'});
+      } else {
+        setStatusModal({visible:true, type:'success', title:'Saved', message:'Settings saved successfully'});
+      }
       
     } catch (error) {
-      console.log('Error saving settings:', error);
-      Alert.alert("Error", "Failed to save settings");
+  console.log('Error saving settings:', error);
+  setStatusModal({visible:true, type:'error', title:'Error', message:'Failed to save settings'});
     }
   };
 
@@ -159,16 +179,19 @@ export default function SettingsScreen() {
       // Calculate font scale based on text size
       let fontScale = 1.0;
       switch (size) {
+        case "Extra Small":
+          fontScale = 0.85;
+          break;
         case "Small":
-          fontScale = 0.9;
+          fontScale = 0.95;
           break;
         case "Medium":
-          fontScale = 1.5;
+          fontScale = 1.0;
           break;
         case "Large":
-          fontScale = 2;
+          fontScale = 1.15;
           break;
-    
+      
       }
       
       await AsyncStorage.setItem('appFontScale', JSON.stringify(fontScale));
@@ -229,7 +252,8 @@ export default function SettingsScreen() {
    * Handles text size change with immediate feedback
    */
   const handleTextSizeChange = (size: string) => {
-    setTextSize(size);
+    setGlobalTextSize(size);
+    setTextSizeSlider(textSizeToSlider(size));
     // Apply immediately
     applyTextSize(size);
   };
@@ -261,7 +285,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const textSizeOptions = ["Small", "Medium", "Large", "Extra Large"];
+  const textSizeOptions = ["Extra Small", "Small", "Medium", "Large"];
   const autoLockOptions = ["Immediate", "1 minute", "5 minutes", "15 minutes", "Never"];
   const reminderFrequencyOptions = ["Never", "Daily", "Twice daily", "Weekly"];
 
@@ -314,17 +338,15 @@ export default function SettingsScreen() {
       style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }, disabled && styles.disabledRow]}
       onPress={() => {
         if (disabled) return;
-        Alert.alert(
+        setSelectionModal({
+          visible: true,
           title,
-          "Select an option:",
-          [
-            ...options.map(option => ({
-              text: option,
-              onPress: () => onSelect(option),
-            })),
-            { text: "Cancel", style: "cancel" as const }
-          ]
-        );
+          options,
+          onSelect: (val: string) => {
+            onSelect(val);
+            setSelectionModal(s => ({...s, visible:false}));
+          }
+        });
       }}
     >
       <View style={styles.settingLeft}>
@@ -411,14 +433,41 @@ export default function SettingsScreen() {
               "moon"
             )}
 
-            {renderPickerRow(
-              "Text Size",
-              "Adjust text size for better readability",
-              textSize,
-              textSizeOptions,
-              handleTextSizeChange,
-              "text"
-            )}
+            {/* Text Size Slider */}
+            <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}> 
+              <View style={styles.settingLeft}>
+                <Ionicons name="text" size={20} color={theme.colors.icon} />
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: theme.colors.text }]}>Text Size</Text>
+                  <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>Adjust text size for better readability</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.sliderBlock}>
+              <View style={styles.sliderHeader}>
+                <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>Size</Text>
+                <Text style={[styles.sliderValue, { color: theme.colors.text }]}>{textSizeLabels[textSizeSlider]}</Text>
+              </View>
+              <Slider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={3}
+                step={1}
+                value={textSizeSlider}
+                minimumTrackTintColor={theme.colors.primary}
+                maximumTrackTintColor={theme.colors.border}
+                thumbTintColor={theme.colors.primary}
+                onValueChange={(val) => setTextSizeSlider(val)}
+                onSlidingComplete={(val) => handleTextSizeChange(sliderToTextSize(val))}
+              />
+              <View style={styles.sliderLabelsRow}>
+                {textSizeLabels.map((lbl, idx) => (
+                  <Text key={lbl} style={[styles.sliderTickLabel, { color: idx === textSizeSlider ? theme.colors.text : theme.colors.textSecondary }]}>
+                    {lbl}
+                  </Text>
+                ))}
+              </View>
+            </View>
           </View>
 
           {/* Privacy & Security */}
@@ -496,6 +545,41 @@ export default function SettingsScreen() {
             </View>
           )}
         </ScrollView>
+
+        {/* Selection Modal for pickers */}
+        <Modal
+          visible={selectionModal.visible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSelectionModal(s => ({...s, visible:false}))}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.selectionModalContent, { backgroundColor: theme.colors.surface }]}> 
+              <Text style={[styles.selectionModalTitle, { color: theme.colors.text }]}>{selectionModal.title}</Text>
+              {selectionModal.options.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.selectionOption, { borderBottomColor: theme.colors.borderLight }]}
+                  onPress={() => selectionModal.onSelect(opt)}
+                >
+                  <Text style={[styles.selectionOptionText, { color: theme.colors.text }]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity onPress={() => setSelectionModal(s => ({...s, visible:false}))} style={styles.selectionCancelBtn}>
+                <Text style={[styles.selectionCancelText, { color: theme.colors.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModal.visible}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          onClose={() => setStatusModal(s => ({...s, visible:false}))}
+        />
 
         <BottomNavigation
           tabs={tabs}
@@ -608,5 +692,69 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  // Slider styles
+  sliderBlock: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sliderLabel: {
+    fontSize: 14,
+  },
+  sliderValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderLabelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  sliderTickLabel: {
+    fontSize: 12,
+  },
+  // Selection modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  selectionModalContent: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 16,
+  },
+  selectionModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  selectionOption: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  selectionOptionText: {
+    fontSize: 16,
+  },
+  selectionCancelBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  selectionCancelText: {
+    fontSize: 14,
   },
 });

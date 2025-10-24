@@ -80,9 +80,9 @@ class SettingsAPI {
     }
   }
 
-  async fetchSettings(): Promise<UserSettings> {
+  async fetchSettings(providedClerkUserId?: string): Promise<UserSettings> {
     try {
-      const clerkUserId = await this.getClerkUserId();
+      const clerkUserId = providedClerkUserId || await this.getClerkUserId();
       const url = `${this.baseURL}/api/settings/${clerkUserId}`;
       console.log('🔧 Fetching settings from:', url);
       
@@ -124,9 +124,9 @@ class SettingsAPI {
     }
   }
 
-  async saveSettings(settings: UserSettings): Promise<SettingsAPIResponse> {
+  async saveSettings(settings: UserSettings, providedClerkUserId?: string): Promise<SettingsAPIResponse> {
     try {
-      const clerkUserId = await this.getClerkUserId();
+      const clerkUserId = providedClerkUserId || await this.getClerkUserId();
       const url = `${this.baseURL}/api/settings/${clerkUserId}`;
       console.log('🔧 Saving settings to:', url);
       console.log('🔧 Settings to save:', settings);

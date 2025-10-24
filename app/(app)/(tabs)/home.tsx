@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { moodApi } from "../../../utils/moodApi"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -25,6 +25,7 @@ import {
   fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 import OptimizedImage from "../../../components/OptimizedImage";
+import React from "react";
 
 type MoodEntry = {
   id: string;
@@ -49,7 +50,10 @@ export default function HomeScreen() {
 const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const { user } = useUser();
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
+
+  // Create styles with scaled font sizes
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Bottom navigation configuration
   const tabs = [
@@ -635,7 +639,8 @@ const fetchProfileImage = useCallback(async () => {
   );
 }
 
-const styles = StyleSheet.create({
+// Create dynamic styles function that accepts scaledFontSize
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -655,7 +660,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   greetingText: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24),
     fontWeight: "300",
     color: "#000",
     marginBottom: 4,
@@ -665,7 +670,7 @@ const styles = StyleSheet.create({
     color: "#000",
   },
   subGreetingText: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     color: "#000",
     opacity: 0.8,
   },
@@ -674,7 +679,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   sectionTitle: {
-    fontSize: 14,
+     fontSize: scaledFontSize(14),
     fontWeight: "700",
     color: "#000",
     marginBottom: 20,
@@ -695,7 +700,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   helpButtonText: {
-    fontSize: 16,
+     fontSize: scaledFontSize(16),
     color: "#FFFFFF",
     fontWeight: "600",
     marginLeft: 8,
@@ -741,7 +746,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   actionTitle: {
-    fontSize: 14,
+     fontSize: scaledFontSize(14),
     fontWeight: "600",
     color: "#000",
     textAlign: "center",
