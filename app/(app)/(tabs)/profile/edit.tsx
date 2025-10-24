@@ -182,7 +182,6 @@ export default function EditProfileScreen() {
     location: "",
     // Emergency Contact
     emergencyContactName: "",
-    emergencyContactPhone: "",
     emergencyContactRelationship: "",
     emergencyContactNumber: "",
     // Settings
@@ -356,9 +355,9 @@ export default function EditProfileScreen() {
               profileData.emergencyContactName ||
               prev.emergencyContactName ||
               "",
-            emergencyContactPhone:
+            emergencyContactNumber:
               profileData.emergencyContactPhone ||
-              prev.emergencyContactPhone ||
+              prev.emergencyContactNumber ||
               "",
             emergencyContactRelationship:
               profileData.emergencyContactRelationship ||
@@ -1210,6 +1209,7 @@ export default function EditProfileScreen() {
                   onBlur={() => validateField("firstName", formData.firstName)}
                   placeholder="Enter your first name"
                   placeholderTextColor={theme.colors.textSecondary}
+                  numberOfLines={1}
                 />
               </View>
               {validationErrors.firstName ? (
@@ -1699,7 +1699,7 @@ export default function EditProfileScreen() {
                     validateField("emergencyContactNumber", filtered);
                   }}
                   onBlur={() => validateField("emergencyContactNumber", formData.emergencyContactNumber)}
-                  placeholder="Emergency contact phone number (10 digits)"
+                  placeholder="Emergency contact number (10 digits)"
                   keyboardType="phone-pad"
                   placeholderTextColor={theme.colors.textSecondary}
                   maxLength={10}
@@ -2123,6 +2123,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 12,
+    overflow: "hidden",
   },
   inputIcon: {
     marginRight: 10,

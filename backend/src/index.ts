@@ -166,6 +166,33 @@ app.post(
         },
       });
 
+      // ✅ Also create/update client_profiles record
+      try {
+        const displayName = `${firstName} ${lastName}`.trim();
+        await pool.query(
+          `INSERT INTO client_profiles (
+            clerk_user_id, 
+            display_name,
+            email,
+            phone_number,
+            created_at,
+            updated_at
+          ) 
+          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT (clerk_user_id) 
+          DO UPDATE SET
+            display_name = COALESCE(EXCLUDED.display_name, client_profiles.display_name),
+            email = COALESCE(EXCLUDED.email, client_profiles.email),
+            phone_number = COALESCE(EXCLUDED.phone_number, client_profiles.phone_number),
+            updated_at = CURRENT_TIMESTAMP`,
+          [clerkUserId, displayName, email, phoneNumber]
+        );
+        console.log('✅ Client profile created/updated for new user');
+      } catch (profileError: any) {
+        console.error('⚠️ Failed to create client_profiles record:', profileError.message);
+        // Don't fail the whole sync if client_profiles fails
+      }
+
       res.json({
         success: true,
         message: "User synced successfully",
