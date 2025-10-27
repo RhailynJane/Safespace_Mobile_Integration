@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // app/(app)/help-support.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import {

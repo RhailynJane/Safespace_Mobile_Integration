@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Linking } from "react-native";
 import {
   View,
@@ -16,6 +16,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
+import StatusModal from "../../../components/StatusModal";
 
 const { width } = Dimensions.get("window");
 
@@ -30,10 +31,19 @@ const { width } = Dimensions.get("window");
  * Features an elegant curved background and urgent, clear interface design.
  */
 export default function CrisisScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // State management
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("crisis");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -43,6 +53,15 @@ export default function CrisisScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideModal = () => {
+    setModalVisible(false);
+  };
 
   /**
    * Handles bottom tab navigation
@@ -61,18 +80,23 @@ export default function CrisisScreen() {
    * Handles emergency call actions - opens phone dialer with number
    * @param number - The emergency number to call
    */
-  const handleEmergencyCall = async (number: string) => {
+  const handleEmergencyCall = async (number: string, serviceName: string) => {
     try {
+      setLoading(true);
       const phoneNumber = `tel:${number}`;
       const supported = await Linking.canOpenURL(phoneNumber);
       
       if (supported) {
         await Linking.openURL(phoneNumber);
+        showModal('success', 'Call Initiated', `Opening ${serviceName}. If the call doesn't start automatically, please dial ${number} manually.`);
       } else {
-        console.log("Phone calling not supported");
+        showModal('error', 'Call Not Supported', `Your device doesn't support phone calls. Please dial ${number} manually.`);
       }
     } catch (error) {
       console.error("Error making phone call:", error);
+      showModal('error', 'Call Failed', `Unable to make the call. Please dial ${number} manually.`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,16 +105,21 @@ export default function CrisisScreen() {
    */
   const handleDistressCenter = async () => {
     try {
+      setLoading(true);
       const url = "https://distresscentre.com";
       const supported = await Linking.canOpenURL(url);
       
       if (supported) {
         await Linking.openURL(url);
+        showModal('success', 'Website Opened', 'Opening Distress Centre website in your browser...');
       } else {
-        console.log("Cannot open URL");
+        showModal('error', 'Browser Not Available', 'Cannot open website. Please check your browser app.');
       }
     } catch (error) {
       console.error("Error opening website:", error);
+      showModal('error', 'Navigation Failed', 'Unable to open the website. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -99,6 +128,18 @@ export default function CrisisScreen() {
     return (
       <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+          Connecting...
+        </Text>
+        
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideModal}
+          buttonText="OK"
+        />
       </CurvedBackground>
     );
   }
@@ -134,7 +175,7 @@ export default function CrisisScreen() {
           <View style={styles.emergencyButtons}>
             <TouchableOpacity
               style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#C62828' : '#E53935' }]}
-              onPress={() => handleEmergencyCall("911")}
+              onPress={() => handleEmergencyCall("911", "Emergency Services")}
             >
               <View style={styles.buttonIconContainer}>
                 <Ionicons name="call" size={24} color="#FFFFFF" />
@@ -148,7 +189,7 @@ export default function CrisisScreen() {
 
             <TouchableOpacity
               style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#388E3C' : '#4CAF50' }]}
-              onPress={() => handleEmergencyCall("988")}
+              onPress={() => handleEmergencyCall("988", "Crisis Hotline")}
             >
               <View style={styles.buttonIconContainer}>
                 <Ionicons name="heart" size={24} color="#FFFFFF" />
@@ -162,7 +203,7 @@ export default function CrisisScreen() {
 
             <TouchableOpacity
               style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#1976D2' : '#2196F3' }]}
-              onPress={() => handleEmergencyCall("403-266-4357")}
+              onPress={() => handleEmergencyCall("403-266-4357", "Distress Center")}
             >
               <View style={styles.buttonIconContainer}>
                 <Ionicons name="people" size={24} color="#FFFFFF" />
@@ -328,12 +369,22 @@ export default function CrisisScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideModal}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -342,6 +393,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "500",
   },
   scrollView: {
     flex: 1,
@@ -366,13 +422,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emergencyTitle: {
-    fontSize: 22,
+    fontSize: scaledFontSize(22), // Base size 22px
     fontWeight: "700",
     color: "#FFFFFF",
     marginLeft: 12,
   },
   emergencyText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     color: "#FFFFFF",
     lineHeight: 22,
     marginBottom: 12,
@@ -383,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emergencyContactText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     color: "#FFFFFF",
     marginLeft: 6,
     opacity: 0.8,
@@ -418,13 +474,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emergencyButtonMainText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18), // Base size 18px
     fontWeight: "600",
     marginBottom: 4,
+    color: "#FFFFFF",
   },
   emergencyButtonSubText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     opacity: 0.9,
+    color: "#FFFFFF",
   },
   buttonArrow: {
     opacity: 0.8,
@@ -438,7 +496,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
     marginLeft: 12,
   },
@@ -468,7 +526,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   strategyText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     textAlign: "center",
     fontWeight: "500",
     lineHeight: 18,
@@ -489,12 +547,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   groundingTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
     marginLeft: 12,
   },
   groundingDescription: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15), // Base size 15px
     lineHeight: 20,
     marginBottom: 20,
     opacity: 0.8,
@@ -518,10 +576,10 @@ const styles = StyleSheet.create({
   stepNumberText: {
     color: "#FFFFFF",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
   stepText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     flex: 1,
     fontWeight: "500",
   },
@@ -541,12 +599,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   supportTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
     marginLeft: 12,
   },
   supportText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     lineHeight: 22,
     textAlign: "center",
     opacity: 0.9,
