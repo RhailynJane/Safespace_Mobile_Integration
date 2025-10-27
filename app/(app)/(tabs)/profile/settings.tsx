@@ -313,8 +313,6 @@ export default function SettingsScreen() {
   const handleTextSizeChange = (size: string) => {
     setGlobalTextSize(size);
     setTextSizeSlider(textSizeToSlider(size));
-    // Apply immediately
-    applyTextSize(size);
   };
 
   /**

@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Image,
   RefreshControl,
   Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -33,7 +34,8 @@ import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 export default function MessagesScreen() {
-  const { theme } = useTheme();
+    // Access isDarkMode and fontScale from useTheme
+  const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
   const isFocused = useIsFocused();
   const { userId } = useAuth(); // Get actual Clerk user ID
   const [loading, setLoading] = useState(true);
@@ -42,8 +44,13 @@ export default function MessagesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
-  const [sendbirdStatus, setSendbirdStatus] =
-    useState<string>("Initializing...");
+  const [sendbirdStatus, setSendbirdStatus] = useState<string>("Initializing...");
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalData, setStatusModalData] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
   // Removed session-based unread suppression; rely on backend read receipts instead
   const API_BASE_URL = getApiBaseUrl();
 
@@ -55,11 +62,20 @@ export default function MessagesScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalData({ type, title, message });
+    setStatusModalVisible(true);
+  };
+
   const initializeMessaging = useCallback(async () => {
     if (!userId) {
       console.log("❌ No user ID available");
       setSendbirdStatus("User not authenticated");
       setLoading(false);
+      showStatusModal('error', 'Authentication Error', 'Please sign in to access messages');
       return;
     }
 
@@ -80,6 +96,7 @@ export default function MessagesScreen() {
     } catch (error) {
       console.log("Failed to initialize messaging");
       setSendbirdStatus("Using Backend API");
+      showStatusModal('info', 'Connection Notice', 'Using backend messaging service');
       await loadConversations();
     }
   }, [userId]);
@@ -198,11 +215,13 @@ export default function MessagesScreen() {
         console.log("💬 Failed to load conversations from backend");
         setConversations([]);
         setFilteredConversations([]);
+        showStatusModal('error', 'Load Error', 'Failed to load conversations. Please try again.');
       }
     } catch (error) {
       console.error("💬 Error loading conversations:", error);
       setConversations([]);
       setFilteredConversations([]);
+      showStatusModal('error', 'Connection Error', 'Unable to load conversations. Please check your connection.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -364,13 +383,72 @@ export default function MessagesScreen() {
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
 
+        {/* Status Modal */}
+        <Modal
+          visible={statusModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setStatusModalVisible(false)}
+        >
+          <View style={[
+            styles.modalOverlay,
+            { backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)' }
+          ]}>
+            <View style={[
+              styles.modalContent,
+              { backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }
+            ]}>
+              <View style={styles.iconContainer}>
+                <Ionicons 
+                  name={
+                    statusModalData.type === 'success' ? 'checkmark-circle' :
+                    statusModalData.type === 'error' ? 'close-circle' : 'information-circle'
+                  } 
+                  size={64} 
+                  color={
+                    statusModalData.type === 'success' ? '#4CAF50' :
+                    statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                  } 
+                />
+              </View>
+
+              <Text style={[
+                styles.modalTitle,
+                { color: isDarkMode ? '#F9FAFB' : '#1F2937' }
+              ]}>
+                {statusModalData.title}
+              </Text>
+              <Text style={[
+                styles.modalMessage,
+                { color: isDarkMode ? '#D1D5DB' : '#6B7280' }
+              ]}>
+                {statusModalData.message}
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton, 
+                  { 
+                    backgroundColor: 
+                      statusModalData.type === 'success' ? '#4CAF50' :
+                      statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                  }
+                ]}
+                onPress={() => setStatusModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* New Message Button */}
         <View>
           <TouchableOpacity
             style={styles.newMessageButton}
             onPress={() => {
               if (!userId) {
-                Alert.alert("Error", "Please sign in to send messages");
+                showStatusModal('error', 'Authentication Required', 'Please sign in to send messages');
                 return;
               }
               router.push("../messages/new-message");
@@ -429,7 +507,7 @@ export default function MessagesScreen() {
         {/* Connection Status removed per request */}
 
         {/* Conversation List */}
-  <View style={[styles.conversationContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
+        <View style={[styles.conversationContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <ScrollView
             style={styles.conversationList}
             refreshControl={
@@ -483,7 +561,7 @@ export default function MessagesScreen() {
                   style={[styles.conversationItem, { borderBottomColor: theme.colors.borderLight }]}
                   onPress={() => {
                     if (!userId) {
-                      Alert.alert("Error", "Please sign in to view messages");
+                      showStatusModal('error', 'Authentication Required', 'Please sign in to view messages');
                       return;
                     }
                     // Persistently clear unread via backend mark-read endpoint, and optimistically update UI
@@ -621,41 +699,36 @@ export default function MessagesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor removed - now uses theme.colors.background
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    // backgroundColor removed - now uses theme.colors.background
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
-    // color removed - now uses theme.colors.text
+    fontSize: scaledFontSize(16),
   },
   statusContainer: {
     alignItems: "center",
     marginTop: 5,
   },
   statusSubtitle: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: scaledFontSize(14),
     fontStyle: "italic",
   },
   statusText: {
     marginTop: 5,
-    fontSize: 14,
-    color: "#999",
+    fontSize: scaledFontSize(14),
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 30,
-    // backgroundColor removed - now uses theme.colors.surface
     marginTop: 10,
     margin: 15,
     paddingHorizontal: 15,
@@ -674,8 +747,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    // color removed - now uses theme.colors.text
+    fontSize: scaledFontSize(16),
   },
   clearButton: {
     padding: 4,
@@ -690,14 +762,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   searchResultsText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: scaledFontSize(14),
     fontStyle: 'italic',
   },
   clearSearchText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '600',
+    fontSize: scaledFontSize(14),
+    fontWeight: "600",
   },
   statusIndicator: {
     flexDirection: "row",
@@ -711,12 +781,11 @@ const styles = StyleSheet.create({
   },
   statusIndicatorText: {
     color: "#FFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
   },
   conversationContainer: {
     flex: 1,
-    // backgroundColor moved to theme.colors.surface via inline override
     borderWidth: 1,
     margin: 15,
     padding: 10,
@@ -726,7 +795,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
     borderRadius: 10,
-    // borderColor moved to theme.colors.borderLight via inline override
     marginBottom: 100,
     marginTop: 5,
   },
@@ -740,14 +808,12 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 18,
-    // color moved to theme.colors.text via inline override
+    fontSize: scaledFontSize(18),
     marginTop: 16,
     fontWeight: "600",
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    // color moved to theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(14),
     marginTop: 8,
     textAlign: "center",
     marginHorizontal: 20,
@@ -756,12 +822,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    // backgroundColor moved to theme.colors.primary via inline override
     borderRadius: 20,
   },
   retryButtonText: {
     color: "#FFF",
     fontWeight: "600",
+    fontSize: scaledFontSize(14),
   },
   conversationItem: {
     flexDirection: "row",
@@ -770,7 +836,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     paddingTop: 3,
     borderBottomWidth: 1,
-    // borderBottomColor moved to theme.colors.borderLight via inline override
     width: "100%",
   },
   avatarContainer: {
@@ -789,9 +854,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#4CAF50",
     borderWidth: 2,
-    borderColor: "#FFF",
   },
   conversationContent: {
     flex: 1,
@@ -803,30 +866,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   conversationName: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     fontWeight: "800",
-    // color moved to theme.colors.text via inline override
   },
   conversationTime: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontStyle: "italic",
-    // color moved to theme.colors.textSecondary via inline override
   },
   conversationMessage: {
-    fontSize: 14,
-    // color moved to theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(14),
     marginBottom: 2,
   },
   unreadMessage: {
-    // color moved to theme.colors.text via inline override
     fontWeight: "500",
   },
   participantsText: {
-    fontSize: 12,
-    // color moved to theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(12),
   },
   unreadBadge: {
-    // backgroundColor moved to theme.colors.primary via inline override
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -837,7 +894,7 @@ const styles = StyleSheet.create({
   },
   unreadCount: {
     color: "#FFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "bold",
   },
   newMessageButton: {
@@ -861,21 +918,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   newMessageButtonText: {
-    // color moved to inline override for better contrast on gradient
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "800",
   },
   initialsAvatar: {
     width: 60,
     height: 60,
     borderRadius: 60,
-    // backgroundColor moved to theme.colors.primary via inline override
     justifyContent: "center",
     alignItems: "center",
   },
   initialsText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
   },
   offlineIndicator: {
@@ -885,7 +940,59 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    // colors moved to inline override using theme.colors.iconDisabled and theme.colors.surface
     borderWidth: 2,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 24,
+    padding: 32,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  iconContainer: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: scaledFontSize(28),
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  modalMessage: {
+    fontSize: scaledFontSize(16),
+    textAlign: "center",
+    marginBottom: 28,
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  modalButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modalButtonText: {
+    color: "#FFFFFF",
+    fontSize: scaledFontSize(17),
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });

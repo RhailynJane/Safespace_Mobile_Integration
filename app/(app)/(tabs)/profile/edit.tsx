@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 // app/(app)/(tabs)/profile/edit.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -110,7 +110,7 @@ const HEALTH_CONCERNS_OPTIONS = [
 ];
 
 export default function EditProfileScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
@@ -203,6 +203,9 @@ export default function EditProfileScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Load existing profile data when screen loads
   useEffect(() => {
@@ -1104,11 +1107,11 @@ export default function EditProfileScreen() {
       <View style={styles.suggestionsContainer}>
         <View style={styles.suggestionsList}>
           {loadingLocations ? (
-            <View style={styles.loadingSuggestions}>
-              <ActivityIndicator size="small" color="#4CAF50" />
-              <Text style={styles.loadingText}>Searching locations...</Text>
-            </View>
-          ) : (
+                <View style={styles.loadingSuggestions}>
+                  <ActivityIndicator size="small" color="#4CAF50" />
+                  <Text style={styles.loadingSuggestionsText}>Searching locations...</Text>
+                </View>
+              ) : (
             <View style={styles.suggestionsContainer}>
               {locationSuggestions.map((item) => (
                 <TouchableOpacity
@@ -2048,7 +2051,8 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -2056,6 +2060,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: scaledFontSize(16),
   },
   scrollContainer: {
     paddingBottom: 100,
@@ -2078,7 +2086,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   initialsText: {
-    fontSize: 36,
+    fontSize: scaledFontSize(36),
     fontWeight: "bold",
     color: "#FFFFFF",
   },
@@ -2093,7 +2101,7 @@ const styles = StyleSheet.create({
   },
   editPhotoText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "500",
   },
   uploadingOverlay: {
@@ -2108,29 +2116,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   formSection: {
-    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
-    // color removed - now uses theme.colors.text via inline override
     marginBottom: 15,
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "700",
-    // color removed - now uses theme.colors.text via inline override
     marginBottom: 8,
   },
   errorText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#FF3B30",
     marginTop: 5,
     marginLeft: 5,
@@ -2138,7 +2143,6 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    // backgroundColor removed - now uses theme via inline override
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -2149,8 +2153,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    // color removed - now uses theme.colors.text via inline override
+    fontSize: scaledFontSize(16),
   },
   optionsContainer: {
     flexDirection: "row",
@@ -2160,18 +2163,15 @@ const styles = StyleSheet.create({
   optionButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    // backgroundColor removed - now uses theme via inline override
     borderRadius: 20,
     borderWidth: 1,
-    // borderColor removed - now uses theme via inline override
   },
   optionButtonSelected: {
     backgroundColor: "#4CAF50",
     borderColor: "#4CAF50",
   },
   optionText: {
-    fontSize: 12,
-    // color removed - now uses theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(12),
   },
   optionTextSelected: {
     color: "#FFFFFF",
@@ -2190,11 +2190,10 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   notificationSection: {
-    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
@@ -2219,8 +2218,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   notificationText: {
-    fontSize: 14,
-    // color removed - now uses theme.colors.text via inline override
+    fontSize: scaledFontSize(14),
   },
   suggestionsContainer: {
     position: "relative",
@@ -2246,7 +2244,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   suggestionText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#333",
     marginLeft: 10,
     flex: 1,
@@ -2257,9 +2255,9 @@ const styles = StyleSheet.create({
     padding: 15,
     justifyContent: "center",
   },
-  loadingText: {
+  loadingSuggestionsText: {
     marginLeft: 10,
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
   },
   placeholderText: {
@@ -2302,12 +2300,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   datePickerTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
   },
   pickerTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
   },
@@ -2359,7 +2357,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F8F0",
   },
   optionItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     flex: 1,
   },
@@ -2374,7 +2372,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 15,
     backgroundColor: "#F8F8F8",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
   },
   // Success Modal Styles
@@ -2407,7 +2405,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1 }],
   },
   successTitle: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
     fontWeight: "700",
     color: "#1F2937",
     marginBottom: 12,
@@ -2415,7 +2413,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   errorTitle: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
     fontWeight: "700",
     color: "#1F2937",
     marginBottom: 12,
@@ -2423,7 +2421,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   successMessage: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     textAlign: "center",
     marginBottom: 28,
     color: "#6B7280",
@@ -2458,7 +2456,7 @@ const styles = StyleSheet.create({
   },
   successButtonText: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: scaledFontSize(17),
     fontWeight: "600",
     letterSpacing: 0.5,
   },
