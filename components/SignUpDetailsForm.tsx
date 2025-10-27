@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { SignupData } from "../app/(auth)/signup";
+import { useTheme } from "../contexts/ThemeContext";
 
 // Props interface for the SignUpDetailsForm component
 interface SignUpDetailsFormProps {
@@ -38,6 +39,7 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
   onBack,
   stepNumber,
 }) => {
+  const { theme } = useTheme();
   // State to toggle password visibility
   const [showPassword, setShowPassword] = useState(false);
   // State to store validation errors for form fields
@@ -138,8 +140,8 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
   if (step === "personal") {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Personal Information</Text>
-        <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
+        <Text style={[styles.title, { color: theme.colors.text }]}>Personal Information</Text>
+        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Step {stepNumber} of 3</Text>
 
         <View style={styles.formContainer}>
           {/* First Name Input */}
@@ -272,8 +274,8 @@ const SignUpDetailsForm: React.FC<SignUpDetailsFormProps> = ({
   // Render password setup step
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Account Setup</Text>
-      <Text style={styles.subtitle}>Step {stepNumber} of 3</Text>
+      <Text style={[styles.title, { color: theme.colors.text }]}>Account Setup</Text>
+      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Step {stepNumber} of 3</Text>
 
       <View style={styles.formContainer}>
         {/* Password Input with visibility toggle */}

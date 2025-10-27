@@ -1,7 +1,5 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
+/* eslint-disable react-hooks/exhaustive-deps */
+// app/(app)/(tabs)/profile/edit.tsx
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -14,177 +12,189 @@ import {
   Switch,
   Alert,
   Image,
-  FlatList,
+  ActivityIndicator,
+  Modal,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import profileAPI from '../../../../utils/profileApi'; 
-import * as Location from 'expo-location';
-import settingsApi from "../../../../utils/settingsApi";
+import profileAPI, { ClientProfileData } from "../../../../utils/profileApi";
+import { locationService } from "../../../../utils/locationService";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
+// Gender options for the form
+const GENDER_OPTIONS = [
+  "Woman",
+  "Man",
+  "Non-Binary",
+  "Agender",
+  "Gender-fluid",
+  "Genderqueer",
+  "Gender Variant",
+  "Intersex",
+  "Non-Conforming",
+  "Questioning",
+  "Transgender Man",
+  "Transgender Woman",
+  "Two-Spirit",
+  "I don't identify with any gender",
+  "I do not know",
+  "Prefer not to answer",
+];
 
-/**
- * EditProfileScreen Component
- * 
- * Screen for editing user profile information including photo, name, email,
- * location, and notification preferences. Features image upload functionality
- * and location autocomplete suggestions.
- */
+// Status in Canada options
+const CANADA_STATUS_OPTIONS = [
+  "Canadian Citizen",
+  "Permanent Resident",
+  "Refugee",
+  "Newcomer",
+  "Temporary Resident",
+  "Do not know",
+  "Prefer not to answer",
+  "Other",
+];
+
+const ETHNOCULTURAL_OPTIONS = [
+  "First Nations",
+  "Métis",
+  "Inuit",
+  "European",
+  "Asian",
+  "South Asian",
+  "Southeast Asian",
+  "African",
+  "Caribbean",
+  "Latin American",
+  "Middle Eastern",
+  "Mixed Heritage",
+  "Prefer not to answer",
+  "Other",
+];
+
+const LANGUAGE_OPTIONS = [
+  "English",
+  "French",
+  "Spanish",
+  "Mandarin",
+  "Cantonese",
+  "Punjabi",
+  "Tagalog",
+  "Arabic",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Russian",
+  "Japanese",
+  "Korean",
+  "Hindi",
+  "Vietnamese",
+  "Other",
+];
+
+// Mental Health/Medical Concerns options
+const HEALTH_CONCERNS_OPTIONS = [
+  "I have a disability",
+  "I have an illness or mental-health concern",
+  "I do not have any ongoing medical conditions",
+  "I do not know",
+  "Not applicable",
+  "Prefer not to answer",
+];
+
 export default function EditProfileScreen() {
+  const { theme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  
-  const GOOGLE_PLACES_AUTOCOMPLETE_URL = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
-  const GOOGLE_PLACES_DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json';
-  const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+  const [dateDisplay, setDateDisplay] = useState("");
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [showEthnoculturalPicker, setShowEthnoculturalPicker] = useState(false);
+  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([]);
+  const [showStreetSuggestions, setShowStreetSuggestions] = useState(false);
+  const [postalSuggestions, setPostalSuggestions] = useState<any[]>([]);
+  const [showPostalSuggestions, setShowPostalSuggestions] = useState(false);
+  const [showCanadaDatePicker, setShowCanadaDatePicker] = useState(false);
+  const [tempCanadaDate, setTempCanadaDate] = useState(new Date());
+  const [canadaDateDisplay, setCanadaDateDisplay] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
+  // Add a ref for debouncing
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sample cities for autocomplete
-  const sampleCities = [
-    "New York, NY", "Los Angeles, CA", "Chicago, IL", "Houston, TX", "Phoenix, AZ",
-    "Philadelphia, PA", "San Antonio, TX", "San Diego, CA", "Dallas, TX", "San Jose, CA",
-    "Austin, TX", "Jacksonville, FL", "Fort Worth, TX", "Columbus, OH", "Charlotte, NC",
-    "San Francisco, CA", "Indianapolis, IN", "Seattle, WA", "Denver, CO", "Boston, MA",
-    "Toronto, ON", "Vancouver, BC", "Montreal, QC", "Calgary, AB", "Ottawa, ON"
-  ];
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    dateOfBirth: "",
+    gender: "",
+    pronouns: "",
+    isLGBTQ: "",
+    primaryLanguage: "",
+    ethnoculturalBackground: "",
+    mentalHealthConcerns: "",
+    supportNeeded: "",
+    canadaStatus: "",
+    dateCameToCanada: "",
+    streetAddress: "",
+    location: "",
+    postalCode: "",
+    emergencyContactName: "",
+    emergencyContactNumber: "",
+    emergencyContactRelationship: "",
+  });
 
   // Get user data from Clerk
   const { user } = useUser();
-  
-  // Form state
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
+    phoneNumber: "",
+    dateOfBirth: "", // This ensures it's always a string, not undefined
+    gender: "",
+    pronouns: "",
+    // Address
+    streetAddress: "",
+    city: "",
+    postalCode: "",
     location: "",
+    // Emergency Contact
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    emergencyContactRelationship: "",
+    emergencyContactNumber: "",
+    // Settings
     notifications: true,
-    shareWithSupportWorker: false, // NEW FIELD
+    shareWithSupportWorker: false,
+    isLGBTQ: "",
+    primaryLanguage: "",
+    mentalHealthConcerns: "",
+    supportNeeded: "",
+    ethnoculturalBackground: "",
+    canadaStatus: "",
+    dateCameToCanada: "",
   });
-
-    /**
-   * Fetches location suggestions from Google Places API
-   */
-    const fetchGooglePlacesSuggestions = async (input: string) => {
-      if (input.length < 2) {
-        setLocationSuggestions([]);
-        setShowLocationSuggestions(false);
-        return;
-      }
-
-      try {
-        const params = new URLSearchParams({
-          input: input,
-          key: GOOGLE_PLACES_API_KEY,
-          types: '(cities)', // Restrict to cities
-          language: 'en',
-        });
-
-        const response = await fetch(`${GOOGLE_PLACES_AUTOCOMPLETE_URL}?${params}`);
-        const data = await response.json();
-
-        if (data.status === 'OK' && data.predictions) {
-          const suggestions = data.predictions.map((prediction: any) => ({
-            description: prediction.description,
-            place_id: prediction.place_id,
-            main_text: prediction.structured_formatting?.main_text || '',
-            secondary_text: prediction.structured_formatting?.secondary_text || '',
-          }));
-          
-          setLocationSuggestions(suggestions);
-          setShowLocationSuggestions(true);
-        } else {
-          console.log('Google Places API error:', data.status);
-          setLocationSuggestions([]);
-        }
-      } catch (error) {
-        console.error('Error fetching places:', error);
-        // Fallback to your sample cities if API fails
-        const filtered = sampleCities.filter(city =>
-          city.toLowerCase().includes(input.toLowerCase())
-        ).slice(0, 5);
-        setLocationSuggestions(filtered.map(city => ({ description: city })));
-        setShowLocationSuggestions(filtered.length > 0);
-      }
-    };
-
-    /**
-   * Gets detailed place information including coordinates
-   */
-  const fetchPlaceDetails = async (placeId: string) => {
-    try {
-      const params = new URLSearchParams({
-        place_id: placeId,
-        key: GOOGLE_PLACES_API_KEY,
-        fields: 'geometry,formatted_address,address_components',
-      });
-
-      const response = await fetch(`${GOOGLE_PLACES_DETAILS_URL}?${params}`);
-      const data = await response.json();
-
-      if (data.status === 'OK' && data.result) {
-        return {
-          formatted_address: data.result.formatted_address,
-          lat: data.result.geometry.location.lat,
-          lng: data.result.geometry.location.lng,
-          address_components: data.result.address_components,
-        };
-      }
-    } catch (error) {
-      console.error('Error fetching place details:', error);
-    }
-    return null;
-  };
-
-  // Update your handleLocationSearch function
-  const handleLocationSearch = (text: string) => {
-    setLocationQuery(text);
-    setFormData({ ...formData, location: text });
-    
-    // Cancel previous timeout if exists
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    // Debounce the API call
-    searchTimeoutRef.current = setTimeout(() => {
-      fetchGooglePlacesSuggestions(text);
-    }, 300); // Wait 300ms after user stops typing
-  };
-
-  // Add a ref for debouncing
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  // Update your selectLocation function
-  const selectLocation = async (location: any) => {
-    if (typeof location === 'string') {
-      // Fallback for sample cities
-      setLocationQuery(location);
-      setFormData({ ...formData, location });
-    } else {
-      // Google Places result
-      setLocationQuery(location.description);
-      setFormData({ ...formData, location: location.description });
-      
-      // Optionally fetch more details
-      if (location.place_id) {
-        const details = await fetchPlaceDetails(location.place_id);
-        if (details) {
-          // You can store coordinates or other details if needed
-          console.log('Place details:', details);
-          // Store in formData or separate state as needed
-        }
-      }
-    }
-    setShowLocationSuggestions(false);
-  };
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -196,91 +206,497 @@ export default function EditProfileScreen() {
 
   // Load existing profile data when screen loads
   useEffect(() => {
-    loadProfileData();
-  }, []);
+    if (user?.id) {
+      loadProfileData();
+    }
+  }, [user]);
+
+  /**
+   * Opens the Canada date picker and initializes with existing date
+   */
+  const handleCanadaDatePress = () => {
+    if (formData.dateCameToCanada) {
+      let dateToParse: string = formData.dateCameToCanada;
+
+      // Handle both MM/DD/YYYY and YYYY-MM-DD formats
+      let year: string, month: string, day: string;
+
+      if (dateToParse.includes("/")) {
+        // MM/DD/YYYY format
+        const dateParts = dateToParse.split("/");
+        month = dateParts[0] || "1";
+        day = dateParts[1] || "1";
+        year = dateParts[2] || "2020";
+      } else if (dateToParse.includes("-")) {
+        // YYYY-MM-DD format
+        if (dateToParse.includes("T")) {
+          const splitResult = dateToParse.split("T")[0];
+          dateToParse = splitResult || dateToParse;
+        }
+        const dateParts = dateToParse.split("-");
+        year = dateParts[0] || "2020";
+        month = dateParts[1] || "1";
+        day = dateParts[2] || "1";
+      } else {
+        year = "2020";
+        month = "1";
+        day = "1";
+      }
+
+      const parsedDate = new Date(
+        Number.parseInt(year),
+        Number.parseInt(month) - 1,
+        Number.parseInt(day)
+      );
+      setTempCanadaDate(parsedDate);
+
+      const displayDate = `${String(parsedDate.getMonth() + 1).padStart(2, "0")}/${String(parsedDate.getDate()).padStart(2, "0")}/${parsedDate.getFullYear()}`;
+      setCanadaDateDisplay(displayDate);
+    } else {
+      setTempCanadaDate(new Date());
+      setCanadaDateDisplay("");
+    }
+    setShowCanadaDatePicker(true);
+  };
 
   /**
    * Loads profile data from local storage and Clerk
    */
   const loadProfileData = async () => {
+    if (!user?.id) return;
+
     try {
-      // First, load from Clerk user object (primary source of truth)
-      if (user) {
-        setFormData({
-          firstName: user.firstName || "",
-          lastName: user.lastName || "",
-          email: user.emailAddresses[0]?.emailAddress || "",
-          location: formData.location,
-          notifications: formData.notifications,
-          shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
-        });
-        
-        // Also set profile image from Clerk if available
-        if (user.imageUrl) {
-          setProfileImage(user.imageUrl);
+      setLoading(true);
+
+      setFormData((prev) => ({
+        ...prev,
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.emailAddresses[0]?.emailAddress || "",
+        phoneNumber: user.phoneNumbers[0]?.phoneNumber || "",
+      }));
+
+      const profileData = await profileAPI.getClientProfile(user.id);
+
+      // Handle Date of Birth
+      if (profileData?.dateOfBirth) {
+        let dateString: string = profileData.dateOfBirth;
+        if (dateString.includes("T")) {
+          const splitResult = dateString.split("T")[0];
+          dateString = splitResult || dateString;
         }
+
+        const dateParts = dateString.split("-");
+        const year: string = dateParts[0] || "";
+        const month: string = dateParts[1] || "";
+        const day: string = dateParts[2] || "";
+        const displayDate = `${month}/${day}/${year}`;
+        setDateDisplay(displayDate);
+
+        setFormData((prev) => ({
+          ...prev,
+          dateOfBirth: dateString,
+        }));
       }
-      
-      // Then load any additional data from local storage (like custom profile image)
-      const savedImage = await AsyncStorage.getItem('profileImage');
+
+      if (user.imageUrl) {
+        setProfileImage(user.imageUrl);
+      }
+
+      const savedImage = await AsyncStorage.getItem("profileImage");
       if (savedImage) {
         setProfileImage(savedImage);
       }
-      
-      // Load saved profile data for location and other custom fields
-      const savedProfileData = await AsyncStorage.getItem('profileData');
+
+      const savedProfileData = await AsyncStorage.getItem("profileData");
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          location: parsedData.location || prev.location,
-          notifications: parsedData.notifications !== undefined ? parsedData.notifications : prev.notifications,
-          shareWithSupportWorker: parsedData.shareWithSupportWorker !== undefined ? parsedData.shareWithSupportWorker : prev.shareWithSupportWorker, // NEW
+          ...parsedData,
         }));
-        
+
         if (parsedData.location) {
           setLocationQuery(parsedData.location);
         }
       }
 
-      // Finally, try to fetch from backend API if available
+      const savedCmhaData = await AsyncStorage.getItem("cmhaProfileData");
+      if (savedCmhaData) {
+        const cmhaData = JSON.parse(savedCmhaData);
+        setFormData((prev) => ({
+          ...prev,
+          ...cmhaData,
+        }));
+      }
+
       try {
-        const profileData = await profileAPI.getClientProfile();
-        
+        const profileData = await profileAPI.getClientProfile(user.id);
+
         if (profileData) {
-          setFormData(prev => ({
-            firstName: user?.firstName || profileData.firstName || prev.firstName,
-            lastName: user?.lastName || profileData.lastName || prev.lastName,
-            email: user?.emailAddresses[0]?.emailAddress || profileData.email || prev.email,
-            location: profileData.location || prev.location,
-            notifications: profileData.notifications !== false,
-            shareWithSupportWorker: profileData.shareWithSupportWorker !== undefined ? profileData.shareWithSupportWorker : prev.shareWithSupportWorker, // NEW
+          setFormData((prev) => ({
+            ...prev,
+            firstName:
+              profileData.firstName || user.firstName || prev.firstName || "",
+            lastName:
+              profileData.lastName || user.lastName || prev.lastName || "",
+            email:
+              profileData.email ||
+              user.emailAddresses[0]?.emailAddress ||
+              prev.email ||
+              "",
+            phoneNumber: profileData.phoneNumber || prev.phoneNumber || "",
+            location: profileData.city || prev.location || "",
+            dateOfBirth: profileData.dateOfBirth || prev.dateOfBirth || "",
+            gender: profileData.gender || prev.gender || "",
+            streetAddress: profileData.address || prev.streetAddress || "",
+            postalCode: profileData.postalCode || prev.postalCode || "",
+            emergencyContactName:
+              profileData.emergencyContactName ||
+              prev.emergencyContactName ||
+              "",
+            emergencyContactPhone:
+              profileData.emergencyContactPhone ||
+              prev.emergencyContactPhone ||
+              "",
+            emergencyContactRelationship:
+              profileData.emergencyContactRelationship ||
+              prev.emergencyContactRelationship ||
+              "",
+            pronouns: profileData.pronouns || prev.pronouns || "",
+            isLGBTQ: profileData.isLGBTQ || prev.isLGBTQ || "",
+            primaryLanguage:
+              profileData.primaryLanguage || prev.primaryLanguage || "",
+            mentalHealthConcerns:
+              profileData.mentalHealthConcerns ||
+              prev.mentalHealthConcerns ||
+              "",
+            supportNeeded:
+              profileData.supportNeeded || prev.supportNeeded || "",
+            ethnoculturalBackground:
+              profileData.ethnoculturalBackground ||
+              prev.ethnoculturalBackground ||
+              "",
+            canadaStatus: profileData.canadaStatus || prev.canadaStatus || "",
+            dateCameToCanada:
+              profileData.dateCameToCanada || prev.dateCameToCanada || "",
           }));
-          
-          if (profileData.location) {
-            setLocationQuery(profileData.location);
+
+          if (profileData.city) {
+            setLocationQuery(profileData.city);
+          }
+
+          // ✅ Handle Date Came to Canada display
+          if (profileData.dateCameToCanada) {
+            let dateString: string = profileData.dateCameToCanada;
+            if (dateString.includes("T")) {
+              const splitResult = dateString.split("T")[0];
+              dateString = splitResult || dateString;
+            }
+
+            const dateParts = dateString.split("-");
+            const year: string = dateParts[0] || "";
+            const month: string = dateParts[1] || "";
+            const day: string = dateParts[2] || "";
+
+            if (year && month && day) {
+              const displayDate = `${month}/${day}/${year}`;
+              setCanadaDateDisplay(displayDate);
+            }
+          }
+
+          if (profileData.profileImage) {
+            setProfileImage(profileData.profileImage);
+            // Also save to local storage for offline access
+            await AsyncStorage.setItem("profileImage", profileData.profileImage);
           }
         }
       } catch (apiError) {
-        console.log('API fetch failed, using local/Clerk data:', apiError);
+        console.log("API fetch failed, using local/Clerk data:", apiError);
       }
-      
     } catch (error) {
-      console.log('Error loading profile data:', error);
-      Alert.alert("Error", "Failed to load profile data");
+      console.log("Error loading profile data:", error);
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load profile data");
+      setShowErrorModal(true);
+    } finally {
+      setLoading(false);
     }
   };
 
   /**
-   * Saves image to local storage
+   * Handles Canada date selection changes
    */
-  const saveImageToStorage = async (imageUri: string) => {
+  const handleCanadaDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowCanadaDatePicker(false);
+    }
+
+    if (selectedDate) {
+      if (Platform.OS === "android") {
+        // For Android, confirm immediately
+        const year = selectedDate.getUTCFullYear();
+        const month = String(selectedDate.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(selectedDate.getUTCDate()).padStart(2, "0");
+        const formattedDate = `${year}-${month}-${day}`;
+        const displayDate = `${month}/${day}/${year}`;
+
+        setFormData({ ...formData, dateCameToCanada: formattedDate });
+        setCanadaDateDisplay(displayDate);
+      } else {
+        // For iOS, just update tempDate
+        setTempCanadaDate(selectedDate);
+      }
+    }
+  };
+
+  /**
+   * Confirms the Canada date selection (iOS only)
+   */
+  const handleCanadaDateConfirm = () => {
+    const year = tempCanadaDate.getFullYear();
+    const month = String(tempCanadaDate.getMonth() + 1).padStart(2, "0");
+    const day = String(tempCanadaDate.getDate()).padStart(2, "0");
+    const formattedDate = `${year}-${month}-${day}`;
+    const displayDate = `${month}/${day}/${year}`;
+
+    setFormData({
+      ...formData,
+      dateCameToCanada: formattedDate,
+    });
+    setCanadaDateDisplay(displayDate);
+    setShowCanadaDatePicker(false);
+  };
+
+  // Address search functions
+  const handleStreetSearch = async (text: string) => {
+    setFormData({ ...formData, streetAddress: text });
+
+    if (text.length < 3) {
+      setStreetSuggestions([]);
+      setShowStreetSuggestions(false);
+      return;
+    }
+
     try {
-      await AsyncStorage.setItem('profileImage', imageUri);
-      console.log('Profile image saved successfully');
+      const suggestions = await locationService.searchAddresses(text);
+      setStreetSuggestions(suggestions);
+      setShowStreetSuggestions(suggestions.length > 0);
     } catch (error) {
-      console.log('Error saving profile image:', error);
-      Alert.alert("Error", "Failed to save profile image");
+      console.error("Error fetching street suggestions:", error);
+    }
+  };
+
+  const handlePostalSearch = async (text: string) => {
+    setFormData({ ...formData, postalCode: text });
+
+    if (text.length < 3) {
+      setPostalSuggestions([]);
+      setShowPostalSuggestions(false);
+      return;
+    }
+
+    try {
+      const suggestions = await locationService.searchPostalCodes(text);
+      setPostalSuggestions(suggestions);
+      setShowPostalSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error("Error fetching postal suggestions:", error);
+    }
+  };
+
+  /**
+   * Opens the date picker modal and initializes the temporary date state
+   * with the current date of birth from the form, handling both ISO and YYYY-MM-DD formats.
+   */
+  const handleDatePress = () => {
+    if (formData.dateOfBirth) {
+      let dateToParse: string = formData.dateOfBirth;
+
+      if (dateToParse.includes("T")) {
+        const splitResult = dateToParse.split("T")[0];
+        dateToParse = splitResult || dateToParse;
+      }
+
+      const dateParts = dateToParse.split("-");
+      const year: string = dateParts[0] || "0";
+      const month: string = dateParts[1] || "1";
+      const day: string = dateParts[2] || "1";
+
+      const parsedDate = new Date(
+        Number.parseInt(year),
+        Number.parseInt(month) - 1,
+        Number.parseInt(day)
+      );
+      setTempDate(parsedDate);
+
+      const displayDate = `${String(parsedDate.getMonth() + 1).padStart(2, "0")}/${String(parsedDate.getDate()).padStart(2, "0")}/${parsedDate.getFullYear()}`;
+      setDateDisplay(displayDate);
+    } else {
+      setTempDate(new Date());
+      setDateDisplay("");
+    }
+    setShowDatePicker(true);
+  };
+
+  const handleDateConfirm = () => {
+    // Format date as YYYY-MM-DD for database (without timezone)
+    const year = tempDate.getFullYear();
+    const month = String(tempDate.getMonth() + 1).padStart(2, "0");
+    const day = String(tempDate.getDate()).padStart(2, "0");
+    const formattedDate = `${year}-${month}-${day}`;
+
+    // Format for display as MM/DD/YYYY
+    const displayDate = `${month}/${day}/${year}`;
+
+    console.log("📅 Date selected:", {
+      tempDate,
+      formattedDate,
+      displayDate,
+    });
+
+    setFormData({
+      ...formData,
+      dateOfBirth: formattedDate,
+    });
+    setDateDisplay(displayDate);
+    setShowDatePicker(false);
+  };
+
+  // For Android, handle the native date picker - FIXED VERSION
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+
+    if (selectedDate) {
+      if (Platform.OS === "android") {
+        // For Android, confirm immediately - use UTC methods
+        const year = selectedDate.getUTCFullYear();
+        const month = String(selectedDate.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(selectedDate.getUTCDate()).padStart(2, "0");
+        const formattedDate = `${year}-${month}-${day}`;
+        const displayDate = `${month}/${day}/${year}`;
+
+        setFormData({ ...formData, dateOfBirth: formattedDate });
+        setDateDisplay(displayDate);
+      } else {
+        // For iOS, just update tempDate (user will confirm with button)
+        setTempDate(selectedDate);
+      }
+    }
+  };
+
+  /**
+   * Fetches location suggestions from OpenStreetMap
+   */
+  const fetchLocationSuggestions = async (input: string) => {
+    if (input.length < 2) {
+      setLocationSuggestions([]);
+      setShowLocationSuggestions(false);
+      return;
+    }
+
+    try {
+      setLoadingLocations(true);
+      const suggestions = await locationService.searchLocations(input);
+
+      setLocationSuggestions(suggestions);
+      setShowLocationSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error("Error fetching location suggestions:", error);
+      setLocationSuggestions([]);
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  /**
+   * Handles location search with debouncing
+   */
+  const handleLocationSearch = (text: string) => {
+    setLocationQuery(text);
+    setFormData({ ...formData, location: text });
+
+    // Cancel previous timeout if exists
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Debounce the API call
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchLocationSuggestions(text);
+    }, 500);
+  };
+
+  /**
+   * Selects location from suggestions
+   */
+  const selectLocation = (location: any) => {
+    setLocationQuery(location.description);
+    setFormData({ ...formData, location: location.description });
+    setShowLocationSuggestions(false);
+    setLocationSuggestions([]);
+  };
+
+  /**
+   * Handles profile photo selection and upload
+   */
+  const handleSelectImage = async () => {
+    if (!user?.id) {
+      setErrorTitle("Error");
+      setErrorMessage("User not available");
+      setShowErrorModal(true);
+      return;
+    }
+
+    try {
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        setErrorTitle("Permission Required");
+        setErrorMessage("Sorry, we need camera roll permissions to change your profile picture.");
+        setShowErrorModal(true);
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5, // Reduced from 0.8 to compress more
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setUploadingImage(true);
+        const imageUri = result.assets[0].uri;
+
+        try {
+          // Upload image to backend (now stored as base64 in database)
+          const base64ImageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
+          
+          // Save to local storage for immediate display and offline access
+          await AsyncStorage.setItem("profileImage", base64ImageUrl);
+          setProfileImage(base64ImageUrl);
+
+          setSuccessMessage("Profile picture updated!");
+          setShowSuccessModal(true);
+        } catch (uploadError) {
+          console.error("Error uploading image:", uploadError);
+          setErrorTitle("Error");
+          setErrorMessage("Failed to upload profile picture. Please try again.");
+          setShowErrorModal(true);
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+    } catch (error) {
+      console.error("Error selecting image:", error);
+      setUploadingImage(false);
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update profile picture. Please try again.");
+      setShowErrorModal(true);
     }
   };
 
@@ -289,10 +705,22 @@ export default function EditProfileScreen() {
    */
   const saveProfileDataToStorage = async () => {
     try {
-      await AsyncStorage.setItem('profileData', JSON.stringify(formData));
-      console.log('Profile data saved to storage');
+      await AsyncStorage.setItem("profileData", JSON.stringify(formData));
+      console.log("Profile data saved to storage");
     } catch (error) {
-      console.log('Error saving profile data to storage:', error);
+      console.log("Error saving profile data to storage:", error);
+    }
+  };
+
+  /**
+   * Saves CMHA specific data to local storage
+   */
+  const saveCmhaDataToStorage = async () => {
+    try {
+      await AsyncStorage.setItem("cmhaProfileData", JSON.stringify(formData));
+      console.log("CMHA data saved to storage");
+    } catch (error) {
+      console.log("Error saving CMHA data to storage:", error);
     }
   };
 
@@ -300,57 +728,217 @@ export default function EditProfileScreen() {
    * Saves profile changes to backend API and local storage
    */
   const handleSaveChanges = async () => {
+    if (!user?.id) {
+      setErrorTitle("Error");
+      setErrorMessage("User not available");
+      setShowErrorModal(true);
+      return;
+    }
+
     try {
-      // Validate required fields
-      if (!formData.firstName || !formData.email) {
-        Alert.alert("Error", "Please fill in all required fields");
+      setSaving(true);
+
+      // Comprehensive validation for all required fields
+      const missingFields: string[] = [];
+
+      // Personal Information
+      if (!formData.firstName?.trim()) missingFields.push("First Name");
+      if (!formData.lastName?.trim()) missingFields.push("Last Name");
+      if (!formData.email?.trim()) missingFields.push("Email Address");
+      if (!formData.phoneNumber?.trim()) missingFields.push("Phone Number");
+      if (!formData.dateOfBirth?.trim()) missingFields.push("Date of Birth");
+
+      // Demographics
+      if (!formData.gender?.trim()) missingFields.push("Gender");
+      if (!formData.pronouns?.trim()) missingFields.push("Pronouns");
+      if (!formData.isLGBTQ?.trim()) missingFields.push("LGBTQ+ Identification");
+      if (!formData.primaryLanguage?.trim()) missingFields.push("Primary Language");
+
+      // CMHA Demographics
+      if (!formData.ethnoculturalBackground?.trim()) missingFields.push("Ethnocultural Background");
+      if (!formData.mentalHealthConcerns?.trim()) missingFields.push("Mental Health/Medical Concerns");
+      if (!formData.supportNeeded?.trim()) missingFields.push("Support Needed");
+      if (!formData.canadaStatus?.trim()) missingFields.push("Status in Canada");
+      if (!formData.dateCameToCanada?.trim()) missingFields.push("Date Came to Canada");
+
+      // Address
+      if (!formData.streetAddress?.trim()) missingFields.push("Street Address");
+      if (!formData.location?.trim()) missingFields.push("City");
+      if (!formData.postalCode?.trim()) missingFields.push("Postal Code");
+
+      // Emergency Contact
+      if (!formData.emergencyContactName?.trim()) missingFields.push("Emergency Contact Name");
+      if (!formData.emergencyContactNumber?.trim()) missingFields.push("Emergency Contact Phone");
+      if (!formData.emergencyContactRelationship?.trim()) missingFields.push("Emergency Contact Relationship");
+
+      if (missingFields.length > 0) {
+        const fieldsList = missingFields.join("\n• ");
+        setErrorTitle("Required Fields Missing");
+        setErrorMessage(`Please fill in all required fields:\n\n• ${fieldsList}`);
+        setShowErrorModal(true);
         return;
       }
 
-      // Note: We don't update firstName, lastName, or email in Clerk
-      // Those should be updated through Clerk's user management
-      // We only save additional profile data like location and notifications
-      
-      // Save to backend API if available
-      try {
-        const result = await profileAPI.updateClientProfile({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          location: formData.location,
-          notifications: formData.notifications,
-          shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
-          profileImage: profileImage || undefined,
-        });
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        setErrorTitle("Invalid Email");
+        setErrorMessage("Please enter a valid email address");
+        setShowErrorModal(true);
+        return;
+      }
 
-      // Save notification setting separately to SettingsAPI
-      const settingsResult = await settingsApi.saveSettings({
-        notificationsEnabled: formData.notifications,
-        shareWithSupportWorker: formData.shareWithSupportWorker, // NEW
-      });
+      // Phone number validation (basic)
+      const phoneRegex = /^\d{10}$/;
+      const cleanedPhone = formData.phoneNumber.replace(/\D/g, '');
+      if (!phoneRegex.test(cleanedPhone)) {
+        setErrorTitle("Invalid Phone Number");
+        setErrorMessage("Please enter a valid 10-digit phone number");
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Postal code validation (Canadian format)
+      const postalRegex = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i;
+      if (!postalRegex.test(formData.postalCode.trim())) {
+        setErrorTitle("Invalid Postal Code");
+        setErrorMessage("Please enter a valid Canadian postal code (e.g., A1A 1A1)");
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Prepare data for backend API - FIXED VERSION
+      const profileData: Partial<ClientProfileData> = {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim(),
+        phoneNumber: formData.phoneNumber?.trim() || undefined,
+        dateOfBirth: formData.dateOfBirth?.trim() || undefined,
+        gender: formData.gender?.trim() || undefined,
+        address: formData.streetAddress?.trim() || undefined,
+        city: formData.location?.trim() || undefined,
+        postalCode: formData.postalCode?.trim() || undefined,
+        country: "Canada",
+        emergencyContactName:
+          formData.emergencyContactName?.trim() || undefined,
+        emergencyContactPhone:
+          formData.emergencyContactNumber?.trim() || undefined,
+        emergencyContactRelationship:
+          formData.emergencyContactRelationship?.trim() || undefined,
+
+        // CMHA Demographics
+        pronouns: formData.pronouns?.trim() || undefined,
+        isLGBTQ: formData.isLGBTQ?.trim() || undefined,
+        primaryLanguage: formData.primaryLanguage?.trim() || undefined,
+        mentalHealthConcerns:
+          formData.mentalHealthConcerns?.trim() || undefined,
+        supportNeeded: formData.supportNeeded?.trim() || undefined,
+        ethnoculturalBackground:
+          formData.ethnoculturalBackground?.trim() || undefined,
+        canadaStatus: formData.canadaStatus?.trim() || undefined,
+        dateCameToCanada: formData.dateCameToCanada?.trim() || undefined,
+      };
+
+      console.log("🎯 Prepared profile data for API:", profileData);
+
+      // Save to backend API
+      try {
+        const result = await profileAPI.updateClientProfile(
+          user.id,
+          profileData
+        );
 
         if (result.success) {
-          // Also save to local storage as backup
+          // Save to local storage as backup
           await saveProfileDataToStorage();
+          await saveCmhaDataToStorage();
+
+          try {
+            const currentProfileData =
+              await AsyncStorage.getItem("profileData");
+            const parsedProfileData = currentProfileData
+              ? JSON.parse(currentProfileData)
+              : {};
+
+            const updatedProfileData = {
+              ...parsedProfileData,
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              email: formData.email,
+              phoneNumber: formData.phoneNumber,
+              location: formData.location,
+              profileImageUrl: profileImage, // ✅ Include the image URL
+            };
+
+            await AsyncStorage.setItem(
+              "profileData",
+              JSON.stringify(updatedProfileData)
+            );
+            console.log("✅ Updated profileData in AsyncStorage");
+          } catch (syncError) {
+            console.error("Error syncing profileData:", syncError);
+          }
+          // ✅ END OF NEW CODE
+
+          setSuccessMessage("Profile updated successfully!");
+          setShowSuccessModal(true);
           
-          Alert.alert("Success", "Profile updated successfully!");
-          router.back();
+          // Navigate back after a short delay
+          setTimeout(() => {
+            router.back();
+          }, 1500);
         } else {
-          // If API fails, still save to local storage
-          await saveProfileDataToStorage();
-          Alert.alert("Success", "Profile updated locally!");
-          router.back();
+          throw new Error(result.message);
         }
       } catch (apiError) {
-        // If API is not available, just save to local storage
-        console.log('API update failed, saving locally:', apiError);
+        console.log("API update failed, saving locally:", apiError);
+        // If API fails, save to local storage only
         await saveProfileDataToStorage();
-        Alert.alert("Success", "Profile updated locally!");
-        router.back();
+        await saveCmhaDataToStorage();
+
+        try {
+          const currentProfileData = await AsyncStorage.getItem("profileData");
+          const parsedProfileData = currentProfileData
+            ? JSON.parse(currentProfileData)
+            : {};
+
+          const updatedProfileData = {
+            ...parsedProfileData,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phoneNumber: formData.phoneNumber,
+            location: formData.location,
+            profileImageUrl: profileImage,
+          };
+
+          await AsyncStorage.setItem(
+            "profileData",
+            JSON.stringify(updatedProfileData)
+          );
+          console.log(
+            "✅ Updated profileData in AsyncStorage (local fallback)"
+          );
+        } catch (syncError) {
+          console.error("Error syncing profileData:", syncError);
+        }
+        // ✅ END OF NEW CODE
+
+        setSuccessMessage("Profile updated locally!");
+        setShowSuccessModal(true);
+        
+        // Navigate back after a short delay
+        setTimeout(() => {
+          router.back();
+        }, 1500);
       }
     } catch (error) {
-      console.error('Error in handleSaveChanges:', error);
-      Alert.alert("Error", "Failed to update profile. Please try again.");
+      console.error("Error in handleSaveChanges:", error);
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update profile. Please try again.");
+      setShowErrorModal(true);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -373,69 +961,6 @@ export default function EditProfileScreen() {
   };
 
   /**
-   * Opens image picker options for profile photo
-   */
-  const handleEditPhoto = () => {
-    Alert.alert(
-      "Edit Profile Photo",
-      "Choose an option",
-      [
-        { text: "Camera", onPress: openCamera },
-        { text: "Gallery", onPress: openGallery },
-        { text: "Cancel", style: "cancel" },
-      ]
-    );
-  };
-
-  /**
-   * Opens camera to take a new profile photo
-   */
-  const openCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera permission is required to take photos');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const imageUri = result.assets[0].uri;
-      setProfileImage(imageUri);
-      await saveImageToStorage(imageUri);
-    }
-  };
-
-  /**
-   * Opens gallery to select an existing photo
-   */
-  const openGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Gallery permission is required to select photos');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const imageUri = result.assets[0].uri;
-      setProfileImage(imageUri);
-      await saveImageToStorage(imageUri);
-    }
-  };
-
-  /**
    * Generates initials for avatar fallback
    */
   const getInitials = () => {
@@ -448,212 +973,981 @@ export default function EditProfileScreen() {
    * Returns full name for display
    */
   const getFullName = () => {
-    return `${formData.firstName} ${formData.lastName}`.trim() || "User";
+    const firstName = formData.firstName || "";
+    const lastName = formData.lastName || "";
+    return `${firstName} ${lastName}`.trim();
   };
+
+  /**
+   * Validate individual field
+   */
+  const validateField = (fieldName: string, value: string) => {
+    let error = "";
+
+    switch (fieldName) {
+      case "firstName":
+      case "lastName":
+        if (!value.trim()) {
+          error = "This field is required";
+        }
+        break;
+      case "email":
+        if (!value.trim()) {
+          error = "Email is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          error = "Please enter a valid email address";
+        }
+        break;
+      case "phoneNumber":
+        if (!value.trim()) {
+          error = "Phone number is required";
+        } else if (!/^\d{10}$/.test(value.replace(/\D/g, ""))) {
+          error = "Phone number must be 10 digits";
+        }
+        break;
+      case "postalCode":
+        if (!value.trim()) {
+          error = "Postal code is required";
+        } else if (!/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(value)) {
+          error = "Invalid postal code format (e.g., A1A 1A1)";
+        }
+        break;
+      case "emergencyContactNumber":
+        if (!value.trim()) {
+          error = "Emergency contact number is required";
+        } else if (!/^\d{10}$/.test(value.replace(/\D/g, ""))) {
+          error = "Phone number must be 10 digits";
+        }
+        break;
+      case "dateOfBirth":
+      case "gender":
+      case "pronouns":
+      case "isLGBTQ":
+      case "primaryLanguage":
+      case "ethnoculturalBackground":
+      case "mentalHealthConcerns":
+      case "supportNeeded":
+      case "canadaStatus":
+      case "dateCameToCanada":
+      case "streetAddress":
+      case "location":
+      case "emergencyContactName":
+      case "emergencyContactRelationship":
+        if (!value.trim()) {
+          error = "This field is required";
+        }
+        break;
+    }
+
+    setValidationErrors((prev) => ({
+      ...prev,
+      [fieldName]: error,
+    }));
+
+    return error === "";
+  };
+
+  /**
+   * Renders option buttons for selection fields
+   */
+  const renderOptionButtons = (
+    options: string[],
+    selectedValue: string,
+    onSelect: (value: string) => void
+  ) => {
+    return (
+      <View style={styles.optionsContainer}>
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={[
+              styles.optionButton,
+              { 
+                backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8',
+                borderColor: theme.colors.border
+              },
+              selectedValue === option && styles.optionButtonSelected,
+            ]}
+            onPress={() => onSelect(option)}
+          >
+            <Text
+              style={[
+                styles.optionText,
+                { color: theme.colors.textSecondary },
+                selectedValue === option && styles.optionTextSelected,
+              ]}
+            >
+              {option}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  /**
+   * Renders location suggestions list
+   */
+  const renderLocationSuggestions = () => {
+    if (!showLocationSuggestions || locationSuggestions.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.suggestionsContainer}>
+        <View style={styles.suggestionsList}>
+          {loadingLocations ? (
+            <View style={styles.loadingSuggestions}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+              <Text style={styles.loadingText}>Searching locations...</Text>
+            </View>
+          ) : (
+            <View style={styles.suggestionsContainer}>
+              {locationSuggestions.map((item) => (
+                <TouchableOpacity
+                  key={item.id.toString()}
+                  style={styles.suggestionItem}
+                  onPress={() => selectLocation(item)}
+                >
+                  <Ionicons name="location-outline" size={16} color="#666" />
+                  <Text style={styles.suggestionText} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <AppHeader title="Edit Profile" showBack={true} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Edit Profile" showBack={true} />
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Profile Photo Section */}
           <View style={styles.profilePhotoSection}>
             <View style={styles.profilePhotoContainer}>
               {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profilePhoto} />
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.profilePhoto}
+                />
               ) : (
                 <View style={styles.profilePhoto}>
                   <Text style={styles.initialsText}>{getInitials()}</Text>
                 </View>
               )}
-              <TouchableOpacity style={styles.editPhotoButton} onPress={handleEditPhoto}>
-                <Text style={styles.editPhotoText}>Edit Profile</Text>
+              {uploadingImage && (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.editPhotoButton}
+                onPress={handleSelectImage}
+              >
+                <Text style={styles.editPhotoText}>
+                  {uploadingImage ? "Uploading..." : "Edit Photo"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Form Section */}
-          <View style={styles.formSection}>
-            {/* Full Name */}
+          {/* Personal Information Section */}
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Personal Information</Text>
+
+            {/* First Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Full Name</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Text style={[styles.label, { color: theme.colors.text }]}>First Name *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
                 <TextInput
-                  style={styles.input}
-                  value={getFullName()}
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.firstName}
                   onChangeText={(text) => {
-                    const names = text.split(" ");
-                    setFormData({
-                      ...formData,
-                      firstName: names[0] || "",
-                      lastName: names.slice(1).join(" ") || "",
-                    });
+                    setFormData({ ...formData, firstName: text });
+                    validateField("firstName", text);
                   }}
-                  placeholder="Enter your full name"
+                  onBlur={() => validateField("firstName", formData.firstName)}
+                  placeholder="Enter your first name"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
+              {validationErrors.firstName ? (
+                <Text style={styles.errorText}>{validationErrors.firstName}</Text>
+              ) : null}
+            </View>
+
+            {/* Last Name */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Last Name *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.lastName}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, lastName: text });
+                    validateField("lastName", text);
+                  }}
+                  onBlur={() => validateField("lastName", formData.lastName)}
+                  placeholder="Enter your last name"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+              </View>
+              {validationErrors.lastName ? (
+                <Text style={styles.errorText}>{validationErrors.lastName}</Text>
+              ) : null}
             </View>
 
             {/* Email Address */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Text style={[styles.label, { color: theme.colors.text }]}>Email Address *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={formData.email}
-                  onChangeText={(text) => setFormData({ ...formData, email: text })}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, email: text });
+                    validateField("email", text);
+                  }}
+                  onBlur={() => validateField("email", formData.email)}
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
+              {validationErrors.email ? (
+                <Text style={styles.errorText}>{validationErrors.email}</Text>
+              ) : null}
             </View>
 
-            {/* Password */}
+            {/* Phone Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value="••••••••••"
-                  secureTextEntry={!showPassword}
-                  placeholder="Enter your password"
-                  editable={false}
+              <Text style={[styles.label, { color: theme.colors.text }]}>Phone Number *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="call-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons 
-                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                    size={20} 
-                    color="#666" 
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.phoneNumber}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, phoneNumber: text });
+                    validateField("phoneNumber", text);
+                  }}
+                  onBlur={() => validateField("phoneNumber", formData.phoneNumber)}
+                  placeholder="Enter your phone number"
+                  keyboardType="phone-pad"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+              </View>
+              {validationErrors.phoneNumber ? (
+                <Text style={styles.errorText}>{validationErrors.phoneNumber}</Text>
+              ) : null}
+            </View>
+
+            {/* Date of Birth */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Date of Birth *</Text>
+              <TouchableOpacity
+                style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
+                onPress={handleDatePress}
+              >
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <Text
+                  style={[styles.input, { color: dateDisplay ? theme.colors.text : theme.colors.textSecondary }]}
+                >
+                  {dateDisplay || "Tap to select date"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Date Picker - SIMPLIFIED VERSION */}
+              {showDatePicker &&
+                (Platform.OS === "ios" ? (
+                  // iOS: Use modal with native iOS picker behavior (no buttons needed)
+                  <Modal
+                    visible={showDatePicker}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setShowDatePicker(false)}
+                  >
+                    <View style={styles.modalContainer}>
+                      <View style={styles.datePickerContainer}>
+                        <View style={styles.datePickerHeader}>
+                          <Text style={styles.datePickerTitle}>
+                            Select Date of Birth
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setShowDatePicker(false)}
+                            hitSlop={{
+                              top: 10,
+                              bottom: 10,
+                              left: 10,
+                              right: 10,
+                            }}
+                          >
+                            <Ionicons name="close" size={24} color="#666" />
+                          </TouchableOpacity>
+                        </View>
+
+                        <DateTimePicker
+                          value={tempDate}
+                          mode="date"
+                          display="spinner"
+                          onChange={handleDateChange}
+                          maximumDate={new Date()}
+                          style={styles.datePicker}
+                        />
+                      </View>
+                    </View>
+                  </Modal>
+                ) : (
+                  // Android: Use native date picker
+                  <DateTimePicker
+                    value={tempDate}
+                    mode="date"
+                    display="default"
+                    onChange={handleDateChange}
+                    maximumDate={new Date()}
                   />
-                </TouchableOpacity>
+                ))}
+            </View>
+          </View>
+
+          {/* Demographics Section */}
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Demographics</Text>
+
+            {/* Gender */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Gender *</Text>
+              {renderOptionButtons(GENDER_OPTIONS, formData.gender, (value) =>
+                setFormData({ ...formData, gender: value })
+              )}
+            </View>
+
+            {/* Pronouns */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Pronouns *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.pronouns}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, pronouns: text })
+                  }
+                  placeholder="e.g., they/them, he/him, she/her"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
               </View>
             </View>
 
-            {/* Location */}
+            {/* LGBTQ+ Identification */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Location</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="location-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Text style={[styles.label, { color: theme.colors.text }]}>Do you identify as LGBTQ+? *</Text>
+              {renderOptionButtons(
+                ["Yes", "No", "I do not know", "Prefer not to answer"],
+                formData.isLGBTQ,
+                (value) => setFormData({ ...formData, isLGBTQ: value })
+              )}
+            </View>
+
+            {/* Primary Language */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Primary Language *</Text>
+              <TouchableOpacity
+                style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
+                onPress={() => setShowLanguagePicker(true)}
+              >
+                <Ionicons
+                  name="language-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <Text
+                  style={[
+                    styles.input,
+                    { color: formData.primaryLanguage ? theme.colors.text : theme.colors.textSecondary }
+                  ]}
+                >
+                  {formData.primaryLanguage || "Select your primary language"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={theme.colors.icon} />
+              </TouchableOpacity>
+
+              {/* Language Picker Modal */}
+              <Modal
+                visible={showLanguagePicker}
+                transparent={true}
+                animationType="slide"
+              >
+                <View style={styles.modalContainer}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerHeader}>
+                      <Text style={styles.pickerTitle}>
+                        Select Primary Language
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowLanguagePicker(false)}
+                      >
+                        <Ionicons name="close" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.optionsList}>
+                      {LANGUAGE_OPTIONS.map((item) => (
+                        <TouchableOpacity
+                          key={item}
+                          style={[
+                            styles.optionItem,
+                            formData.primaryLanguage === item &&
+                              styles.optionItemSelected,
+                          ]}
+                          onPress={() => {
+                            setFormData({ ...formData, primaryLanguage: item });
+                            setShowLanguagePicker(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.optionItemText,
+                              formData.primaryLanguage === item &&
+                                styles.optionItemTextSelected,
+                            ]}
+                          >
+                            {item}
+                          </Text>
+                          {formData.primaryLanguage === item && (
+                            <Ionicons
+                              name="checkmark"
+                              size={20}
+                              color="#4CAF50"
+                            />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
+            </View>
+          </View>
+
+          {/* Address Information */}
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Address Information</Text>
+
+            {/* Street Address */}
+            {/* Street Address */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Street Address *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="home-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.streetAddress}
+                  onChangeText={handleStreetSearch}
+                  placeholder="Enter your street address"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+              </View>
+              {showStreetSuggestions && streetSuggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {streetSuggestions.map((item) => (
+                    <TouchableOpacity
+                      key={item.id.toString()}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setFormData({
+                          ...formData,
+                          streetAddress: item.description.split(",")[0], // Get just the street part
+                        });
+                        setShowStreetSuggestions(false);
+                      }}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={16}
+                        color="#666"
+                      />
+                      <Text style={styles.suggestionText} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Location/City */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>City *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="location-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
                   value={locationQuery || formData.location}
                   onChangeText={handleLocationSearch}
                   placeholder="Enter your city"
-                  placeholderTextColor="#999"
-                  onFocus={() => {
-                    if (formData.location) {
-                      setLocationQuery(formData.location);
-                      handleLocationSearch(formData.location);
-                    }
-                  }}
+                  placeholderTextColor={theme.colors.textSecondary}
                 />
               </View>
               {/* Location Suggestions Dropdown */}
+              {renderLocationSuggestions()}
             </View>
-            {showLocationSuggestions && locationSuggestions.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              <FlatList
-                data={locationSuggestions}
-                keyExtractor={(item, index) => item.place_id || item.description || index.toString()}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.suggestionItem}
-                    onPress={() => selectLocation(item)}
-                  >
-                    <Ionicons name="location-outline" size={16} color="#666" />
-                    <Text style={styles.suggestionText}>
-                      {item.description || item}  {/* Handle both objects and strings */}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                style={styles.suggestionsList}
-                nestedScrollEnabled={true}
-              />
-            </View>
-            )}
 
-            {/* Save Changes Button */}
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
-              <Text style={styles.saveButtonText}>Save Change</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Notification Section */}
-          <View style={styles.notificationSection}>
-            <Text style={styles.sectionTitle}>Notification</Text>
-            <View style={styles.notificationItem}>
-              <View style={styles.notificationLeft}>
-                <View style={styles.notificationIcon}>
-                  <Ionicons name="notifications-outline" size={16} color="#4CAF50" />
-                </View>
-                <Text style={styles.notificationText}>Sign up for Notifications</Text>
+            {/* Postal Code */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Postal Code *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="navigate-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.postalCode}
+                  onChangeText={(text) => {
+                    handlePostalSearch(text);
+                    validateField("postalCode", text);
+                  }}
+                  onBlur={() => validateField("postalCode", formData.postalCode)}
+                  placeholder="Enter your postal code"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
               </View>
-              <Switch
-                value={formData.notifications}
-                onValueChange={(value) => setFormData({ ...formData, notifications: value })}
-                trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
-                thumbColor="#FFFFFF"
+              {validationErrors.postalCode ? (
+                <Text style={styles.errorText}>{validationErrors.postalCode}</Text>
+              ) : null}
+              {showPostalSuggestions && postalSuggestions.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {postalSuggestions.map((item) => (
+                    <TouchableOpacity
+                      key={item.id.toString()}
+                      style={styles.suggestionItem}
+                      onPress={() => {
+                        setFormData({
+                          ...formData,
+                          postalCode: item.postalCode,
+                        });
+                        validateField("postalCode", item.postalCode);
+                        setShowPostalSuggestions(false);
+                      }}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={16}
+                        color="#666"
+                      />
+                      <Text style={styles.suggestionText} numberOfLines={2}>
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Emergency Contact Section */}
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Emergency Contact</Text>
+
+            {/* Emergency Contact Name */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Emergency Contact Name *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.emergencyContactName}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, emergencyContactName: text })
+                  }
+                  placeholder="Enter emergency contact name"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+              </View>
+            </View>
+
+            {/* Emergency Contact Relationship */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Relationship *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="people-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.emergencyContactRelationship}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, emergencyContactRelationship: text })
+                  }
+                  placeholder="e.g., Parent, Sibling, Friend"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+              </View>
+            </View>
+
+            {/* Emergency Contact Number */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Emergency Contact Number *</Text>
+              <View style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}>
+                <Ionicons
+                  name="call-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { color: theme.colors.text }]}
+                  value={formData.emergencyContactNumber}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, emergencyContactNumber: text });
+                    validateField("emergencyContactNumber", text);
+                  }}
+                  onBlur={() => validateField("emergencyContactNumber", formData.emergencyContactNumber)}
+                  placeholder="Emergency contact phone number"
+                  keyboardType="phone-pad"
+                  placeholderTextColor={theme.colors.textSecondary}
+                />
+              </View>
+              {validationErrors.emergencyContactNumber ? (
+                <Text style={styles.errorText}>{validationErrors.emergencyContactNumber}</Text>
+              ) : null}
+            </View>
+          </View>
+
+          {/* Health Information Section */}
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Health Information</Text>
+
+            {/* Mental Health/Medical Concerns */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Mental Health/Medical Concerns *</Text>
+              {renderOptionButtons(
+                HEALTH_CONCERNS_OPTIONS,
+                formData.mentalHealthConcerns,
+                (value) =>
+                  setFormData({ ...formData, mentalHealthConcerns: value })
+              )}
+            </View>
+
+            {/* Support Needed */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Support Needed *</Text>
+              <TextInput
+                style={[
+                  styles.textArea,
+                  styles.borderedInput,
+                  { 
+                    backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8',
+                    color: theme.colors.text,
+                    borderColor: theme.colors.border
+                  }
+                ]}
+                value={formData.supportNeeded}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, supportNeeded: text })
+                }
+                placeholder="Any access needs or accommodations you'd like us to know about"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                placeholderTextColor={theme.colors.textSecondary}
               />
             </View>
           </View>
 
-          {/* Privacy Settings Section - NEW */}
-          <View style={styles.notificationSection}>
-            <Text style={styles.sectionTitle}>Privacy Settings</Text>
+          {/* Additional Information */}
+          <View style={[styles.formSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Additional Information</Text>
+
+            {/* Ethnocultural Background */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Ethnocultural Background *</Text>
+              <TouchableOpacity
+                style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
+                onPress={() => setShowEthnoculturalPicker(true)}
+              >
+                <Ionicons
+                  name="globe-outline"
+                  size={20}
+                  color={theme.colors.icon}
+                  style={styles.inputIcon}
+                />
+                <Text
+                  style={[
+                    styles.input,
+                    { color: formData.ethnoculturalBackground ? theme.colors.text : theme.colors.textSecondary }
+                  ]}
+                >
+                  {formData.ethnoculturalBackground ||
+                    "Select ethnocultural background"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={theme.colors.icon} />
+              </TouchableOpacity>
+
+              {/* Ethnocultural Picker Modal */}
+              <Modal
+                visible={showEthnoculturalPicker}
+                transparent={true}
+                animationType="slide"
+              >
+                <View style={styles.modalContainer}>
+                  <View style={styles.pickerContainer}>
+                    <View style={styles.pickerHeader}>
+                      <Text style={styles.pickerTitle}>
+                        Select Ethnocultural Background
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowEthnoculturalPicker(false)}
+                      >
+                        <Ionicons name="close" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.optionsList}>
+                      {ETHNOCULTURAL_OPTIONS.map((item) => (
+                        <TouchableOpacity
+                          key={item}
+                          style={[
+                            styles.optionItem,
+                            formData.ethnoculturalBackground === item &&
+                              styles.optionItemSelected,
+                          ]}
+                          onPress={() => {
+                            setFormData({
+                              ...formData,
+                              ethnoculturalBackground: item,
+                            });
+                            setShowEthnoculturalPicker(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.optionItemText,
+                              formData.ethnoculturalBackground === item &&
+                                styles.optionItemTextSelected,
+                            ]}
+                          >
+                            {item}
+                          </Text>
+                          {formData.ethnoculturalBackground === item && (
+                            <Ionicons
+                              name="checkmark"
+                              size={20}
+                              color="#4CAF50"
+                            />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
+            </View>
+
+            {/* Status in Canada */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Status in Canada *</Text>
+              {renderOptionButtons(
+                CANADA_STATUS_OPTIONS,
+                formData.canadaStatus,
+                (value) => setFormData({ ...formData, canadaStatus: value })
+              )}
+            </View>
+
+            {/* Date Came to Canada */}
+            {Boolean(
+              formData.canadaStatus &&
+                formData.canadaStatus !== "Canadian Citizen" &&
+                formData.canadaStatus !== "Do not know" &&
+                formData.canadaStatus !== "Prefer not to answer"
+            ) && (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.text }]}>Date Came to Canada *</Text>
+                <TouchableOpacity
+                  style={[styles.inputContainer, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F8F8F8' }]}
+                  onPress={handleCanadaDatePress}
+                >
+                  <Ionicons
+                    name="calendar-outline"
+                    size={20}
+                    color={theme.colors.icon}
+                    style={styles.inputIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.input,
+                      { color: canadaDateDisplay ? theme.colors.text : theme.colors.textSecondary }
+                    ]}
+                  >
+                    {canadaDateDisplay || "Tap to select date"}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Canada Date Picker */}
+                {showCanadaDatePicker &&
+                  (Platform.OS === "ios" ? (
+                    <Modal
+                      visible={showCanadaDatePicker}
+                      transparent={true}
+                      animationType="slide"
+                      onRequestClose={() => setShowCanadaDatePicker(false)}
+                    >
+                      <View style={styles.modalContainer}>
+                        <View style={styles.datePickerContainer}>
+                          <View style={styles.datePickerHeader}>
+                            <Text style={styles.datePickerTitle}>
+                              Select Date Came to Canada
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => setShowCanadaDatePicker(false)}
+                              hitSlop={{
+                                top: 10,
+                                bottom: 10,
+                                left: 10,
+                                right: 10,
+                              }}
+                            >
+                              <Ionicons name="close" size={24} color="#666" />
+                            </TouchableOpacity>
+                          </View>
+
+                          <DateTimePicker
+                            value={tempCanadaDate}
+                            mode="date"
+                            display="spinner"
+                            onChange={handleCanadaDateChange}
+                            maximumDate={new Date()}
+                            style={styles.datePicker}
+                          />
+                        </View>
+                      </View>
+                    </Modal>
+                  ) : (
+                    <DateTimePicker
+                      value={tempCanadaDate}
+                      mode="date"
+                      display="default"
+                      onChange={handleCanadaDateChange}
+                      maximumDate={new Date()}
+                    />
+                  ))}
+              </View>
+            )}
+          </View>
+
+          {/* Save Changes Button */}
+          <TouchableOpacity
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={handleSaveChanges}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Privacy Settings Section */}
+          <View style={[styles.notificationSection, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Privacy Settings</Text>
             <View style={styles.notificationItem}>
               <View style={styles.notificationLeft}>
                 <View style={styles.notificationIcon}>
                   <Ionicons name="shield-outline" size={16} color="#4CAF50" />
                 </View>
-                <Text style={styles.notificationText}>Share info with support worker</Text>
+                <Text style={[styles.notificationText, { color: theme.colors.text }]}>
+                  Share info with support worker
+                </Text>
               </View>
               <Switch
                 value={formData.shareWithSupportWorker}
-                onValueChange={(value) => setFormData({ ...formData, shareWithSupportWorker: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, shareWithSupportWorker: value })
+                }
                 trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
                 thumbColor="#FFFFFF"
               />
             </View>
-          </View>
-
-          {/* Other Section */}
-          <View style={styles.otherSection}>
-            <Text style={styles.sectionTitle}>Other</Text>
-            
-            <TouchableOpacity style={styles.otherItem}>
-              <View style={styles.otherLeft}>
-                <View style={styles.otherIcon}>
-                  <Ionicons name="call-outline" size={16} color="#666" />
-                </View>
-                <Text style={styles.otherText}>Contact Us</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#666" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.otherItem}>
-              <View style={styles.otherLeft}>
-                <View style={styles.otherIcon}>
-                  <Ionicons name="shield-outline" size={16} color="#666" />
-                </View>
-                <Text style={styles.otherText}>Privacy Policy</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#666" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.otherItem, styles.lastOtherItem]}>
-              <View style={styles.otherLeft}>
-                <View style={styles.otherIcon}>
-                  <Ionicons name="settings-outline" size={16} color="#666" />
-                </View>
-                <Text style={styles.otherText}>Settings</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#666" />
-            </TouchableOpacity>
           </View>
         </ScrollView>
 
@@ -662,6 +1956,56 @@ export default function EditProfileScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        {/* Success Modal */}
+        <Modal
+          visible={showSuccessModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.successModal}>
+              <View style={styles.successIconContainer}>
+                <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+              </View>
+              <Text style={styles.successTitle}>Success!</Text>
+              <Text style={styles.successMessage}>{successMessage}</Text>
+              <TouchableOpacity
+                style={styles.successButton}
+                onPress={() => setShowSuccessModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Error Modal */}
+        <Modal
+          visible={showErrorModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowErrorModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.successModal}>
+              <View style={styles.errorIconContainer}>
+                <Ionicons name="close-circle" size={80} color="#FF3B30" />
+              </View>
+              <Text style={styles.errorTitle}>{errorTitle}</Text>
+              <Text style={styles.successMessage}>{errorMessage}</Text>
+              <TouchableOpacity
+                style={styles.errorButton}
+                onPress={() => setShowErrorModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -671,20 +2015,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
   },
   scrollContainer: {
     paddingBottom: 100,
@@ -725,26 +2059,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
+  uploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   formSection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    // color removed - now uses theme.colors.text via inline override
+    marginBottom: 15,
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#333",
+    fontWeight: "700",
+    // color removed - now uses theme.colors.text via inline override
     marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#FF3B30",
+    marginTop: 5,
+    marginLeft: 5,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8F8F8",
+    // backgroundColor removed - now uses theme via inline override
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 12,
@@ -755,14 +2112,43 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    // color removed - now uses theme.colors.text via inline override
+  },
+  optionsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  optionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    // backgroundColor removed - now uses theme via inline override
+    borderRadius: 20,
+    borderWidth: 1,
+    // borderColor removed - now uses theme via inline override
+  },
+  optionButtonSelected: {
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
+  },
+  optionText: {
+    fontSize: 12,
+    // color removed - now uses theme.colors.textSecondary via inline override
+  },
+  optionTextSelected: {
+    color: "#FFFFFF",
+    fontWeight: "500",
   },
   saveButton: {
     backgroundColor: "#4CAF50",
     borderRadius: 25,
     paddingVertical: 15,
     alignItems: "center",
-    marginTop: 10,
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  saveButtonDisabled: {
+    backgroundColor: "#A5D6A7",
   },
   saveButtonText: {
     color: "#FFFFFF",
@@ -770,17 +2156,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   notificationSection: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 15,
   },
   notificationItem: {
     flexDirection: "row",
@@ -802,60 +2182,26 @@ const styles = StyleSheet.create({
   },
   notificationText: {
     fontSize: 14,
-    color: "#333",
-  },
-  otherSection: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 20,
-    borderRadius: 15,
-    padding: 20,
-  },
-  otherItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  lastOtherItem: {
-    borderBottomWidth: 0,
-  },
-  otherLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  otherIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#F8F8F8",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  otherText: {
-    fontSize: 14,
-    color: "#333",
+    // color removed - now uses theme.colors.text via inline override
   },
   suggestionsContainer: {
     position: "relative",
     zIndex: 1000,
+    marginTop: 5,
   },
   suggestionsList: {
-    maxHeight: 150,
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
-    marginTop: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    maxHeight: 200,
   },
   suggestionItem: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
@@ -865,37 +2211,217 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     marginLeft: 10,
+    flex: 1,
   },
-});
-
-const bottomNavStyles = StyleSheet.create({
-  container: {
+  loadingSuggestions: {
     flexDirection: "row",
-    justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    padding: 15,
+    justifyContent: "center",
+  },
+  loadingText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: "#666",
+  },
+  placeholderText: {
+    color: "#999",
+  },
+  borderedInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 12,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  datePickerContainer: {
+    backgroundColor: "white",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    padding: 20,
+    maxHeight: "80%",
   },
-  tab: {
+  pickerContainer: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  datePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    padding: 8,
+    marginBottom: 20,
   },
-  tabText: {
-    fontSize: 12,
-    marginTop: 4,
+  pickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+  },
+  datePicker: {
+    height: Platform.OS === "ios" ? 200 : 0,
+  },
+  datePickerActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: "#F8F8F8",
+    borderRadius: 10,
+    alignItems: "center",
+    marginRight: 10,
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontWeight: "600",
+  },
+  confirmButton: {
+    flex: 1,
+    padding: 15,
+    backgroundColor: "#4CAF50",
+    borderRadius: 10,
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  confirmButtonText: {
+    color: "white",
+    fontWeight: "600",
+  },
+  optionsList: {
+    maxHeight: 400,
+  },
+  optionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  optionItemSelected: {
+    backgroundColor: "#F0F8F0",
+  },
+  optionItemText: {
+    fontSize: 16,
+    color: "#333",
+    flex: 1,
+  },
+  optionItemTextSelected: {
+    color: "#4CAF50",
+    fontWeight: "500",
+  },
+  textArea: {
+    minHeight: 100,
+    borderRadius: 12,
+    textAlignVertical: "top",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: "#F8F8F8",
+    fontSize: 16,
+    color: "#333",
+  },
+  // Success Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  successModal: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 32,
+    width: "90%",
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  successIconContainer: {
+    marginBottom: 20,
+    transform: [{ scale: 1 }],
+  },
+  errorIconContainer: {
+    marginBottom: 20,
+    transform: [{ scale: 1 }],
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  errorTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  successMessage: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 28,
+    color: "#6B7280",
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  successButton: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  errorButton: {
+    backgroundColor: "#FF3B30",
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowColor: "#FF3B30",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  successButtonText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });

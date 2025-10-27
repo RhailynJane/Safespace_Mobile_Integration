@@ -48,7 +48,6 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -58,6 +57,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../utils/communityForumApi";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 
@@ -83,24 +83,229 @@ type ViewType = "newsfeed" | "my-posts";
  * Main community forum component with dual-view functionality
  * Handles newsfeed browsing and personal post management
  */
-export default function CommunityMainScreen() {
-  // State management for UI and data
-  const [selectedCategory, setSelectedCategory] = useState("Trending"); // Currently selected category filter
-  const [activeView, setActiveView] = useState<ViewType>("newsfeed"); // Active view mode
-  const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set()); // Track user's bookmarked posts
-  const [sideMenuVisible, setSideMenuVisible] = useState(false); // Side navigation menu visibility
-  const [posts, setPosts] = useState<any[]>([]); // Community posts data
-  const [myPosts, setMyPosts] = useState<any[]>([]); // User's personal posts including drafts
-  const [loading, setLoading] = useState(true); // Main loading state
-  const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh state
-  const [categories, setCategories] = useState<any[]>([]); // Available categories from API
-  const fadeAnim = useRef(new Animated.Value(0)).current; // Animation for side menu
-  const [isSigningOut, setIsSigningOut] = useState(false); // Sign-out process state
+function useCommunityMainScreenState() {
+  const [selectedCategory, setSelectedCategory] = useState("Trending");
+  const [activeView, setActiveView] = useState<ViewType>("newsfeed");
+  const [activeTab, setActiveTab] = useState("community-forum");
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<number>>(new Set());
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [successCallback, setSuccessCallback] = useState<(() => void) | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
 
-  // Authentication and user context
+  return {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
+  };
+}
+
+function CommunityMainScreenLogic() {
+  const {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
+  } = useCommunityMainScreenState();
+
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  return {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+    signOut,
+    isSignedIn,
+    user,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
+  };
+}
+
+export default function CommunityMainScreen() {
+  const { theme } = useTheme();
+  const {
+    selectedCategory,
+    setSelectedCategory,
+    activeView,
+    setActiveView,
+    activeTab,
+    setActiveTab,
+    bookmarkedPosts,
+    setBookmarkedPosts,
+    sideMenuVisible,
+    setSideMenuVisible,
+    posts,
+    setPosts,
+    myPosts,
+    setMyPosts,
+    loading,
+    setLoading,
+    refreshing,
+    setRefreshing,
+    categories,
+    setCategories,
+    fadeAnim,
+    isSigningOut,
+    setIsSigningOut,
+    signOut,
+    isSignedIn,
+    user,
+    showSuccessModal,
+    setShowSuccessModal,
+    successMessage,
+    setSuccessMessage,
+    successCallback,
+    setSuccessCallback,
+    showErrorModal,
+    setShowErrorModal,
+    errorMessage,
+    setErrorMessage,
+    errorTitle,
+    setErrorTitle,
+    showConfirmModal,
+    setShowConfirmModal,
+    confirmMessage,
+    setConfirmMessage,
+    confirmTitle,
+    setConfirmTitle,
+    confirmCallback,
+    setConfirmCallback,
+  } = CommunityMainScreenLogic();
 
   /**
    * Load initial data when component mounts
@@ -132,7 +337,9 @@ export default function CommunityMainScreen() {
       await Promise.all([loadCategories(), loadPosts()]);
     } catch (error) {
       console.error("Error loading initial data:", error);
-      Alert.alert("Error", "Failed to load community data");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load community data");
+      setShowErrorModal(true);
     }
   };
 
@@ -162,7 +369,9 @@ export default function CommunityMainScreen() {
       // Special handling for bookmark category
       if (selectedCategory === "Bookmark") {
         if (!user?.id) {
-          Alert.alert("Sign In Required", "Please sign in to view bookmarked posts");
+          setErrorTitle("Sign In Required");
+          setErrorMessage("Please sign in to view bookmarked posts");
+          setShowErrorModal(true);
           setPosts([]);
           return;
         }
@@ -188,7 +397,9 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error loading posts:", error);
-      Alert.alert("Error", "Failed to load posts");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load posts");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -201,7 +412,9 @@ export default function CommunityMainScreen() {
    */
   const loadMyPosts = async () => {
     if (!user?.id) {
-      Alert.alert("Sign In Required", "Please sign in to view your posts");
+      setErrorTitle("Sign In Required");
+      setErrorMessage("Please sign in to view your posts");
+      setShowErrorModal(true);
       setMyPosts([]);
       setLoading(false);
       return;
@@ -213,7 +426,9 @@ export default function CommunityMainScreen() {
       setMyPosts(response.posts || []);
     } catch (error) {
       console.error("Error loading user posts:", error);
-      Alert.alert("Error", "Failed to load your posts");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to load your posts");
+      setShowErrorModal(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -274,7 +489,9 @@ export default function CommunityMainScreen() {
    */
   const handleReactionPress = async (postId: number, emoji: string) => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to react to posts");
+      setErrorTitle("Sign In Required");
+      setErrorMessage("Please sign in to react to posts");
+      setShowErrorModal(true);
       return;
     }
 
@@ -309,7 +526,9 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error reacting to post:", error);
-      Alert.alert("Error", "Failed to update reaction");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update reaction");
+      setShowErrorModal(true);
     }
   };
 
@@ -319,7 +538,9 @@ export default function CommunityMainScreen() {
    */
   const handleBookmarkPress = async (postId: number) => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to bookmark posts");
+      setErrorTitle("Sign In Required");
+      setErrorMessage("Please sign in to bookmark posts");
+      setShowErrorModal(true);
       return;
     }
 
@@ -339,7 +560,9 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error toggling bookmark:", error);
-      Alert.alert("Error", "Failed to update bookmark");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to update bookmark");
+      setShowErrorModal(true);
     }
   };
 
@@ -370,11 +593,14 @@ export default function CommunityMainScreen() {
 
     try {
       await communityApi.updatePost(postId, { isDraft: false });
-      Alert.alert("Success", "Post published successfully!");
-      loadMyPosts(); // Refresh the list to show updated state
+      setSuccessMessage("Post published successfully!");
+      setSuccessCallback(() => () => loadMyPosts());
+      setShowSuccessModal(true);
     } catch (error) {
       console.error("Error publishing draft:", error);
-      Alert.alert("Error", "Failed to publish post");
+      setErrorTitle("Error");
+      setErrorMessage("Failed to publish post");
+      setShowErrorModal(true);
     }
   };
 
@@ -383,33 +609,28 @@ export default function CommunityMainScreen() {
    * Updates UI immediately after successful deletion
    */
   const handleDeletePost = async (postId: number) => {
-    Alert.alert(
-      "Delete Post",
-      "Are you sure you want to delete this post? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await communityApi.deletePost(postId);
-              Alert.alert("Success", "Post deleted successfully!");
+    setConfirmTitle("Delete Post");
+    setConfirmMessage("Are you sure you want to delete this post? This action cannot be undone.");
+    setConfirmCallback(() => async () => {
+      try {
+        await communityApi.deletePost(postId);
+        setSuccessMessage("Post deleted successfully!");
+        setShowSuccessModal(true);
 
-              // Update the UI immediately for better UX
-              if (activeView === "my-posts") {
-                setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-              } else {
-                setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-              }
-            } catch (error) {
-              console.error("Error deleting post:", error);
-              Alert.alert("Error", "Failed to delete post");
-            }
-          },
-        },
-      ]
-    );
+        // Update the UI immediately for better UX
+        if (activeView === "my-posts") {
+          setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+        } else {
+          setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+        }
+      } catch (error) {
+        console.error("Error deleting post:", error);
+        setErrorTitle("Error");
+        setErrorMessage("Failed to delete post");
+        setShowErrorModal(true);
+      }
+    });
+    setShowConfirmModal(true);
   };
 
   /**
@@ -452,20 +673,22 @@ export default function CommunityMainScreen() {
       }
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      setErrorTitle("Logout Failed");
+      setErrorMessage("Unable to sign out. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setIsSigningOut(false);
     }
   };
 
   /**
-   * Confirm sign-out with alert dialog
+   * Confirm sign-out with confirm modal
    */
   const confirmSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: handleLogout },
-    ]);
+    setConfirmTitle("Sign Out");
+    setConfirmMessage("Are you sure you want to sign out?");
+    setConfirmCallback(() => () => { handleLogout(); });
+    setShowConfirmModal(true);
   };
 
   /**
@@ -647,7 +870,7 @@ export default function CommunityMainScreen() {
   const displayPosts = activeView === "newsfeed" ? posts : myPosts;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Community Forum" showBack={true} />
 
@@ -661,7 +884,7 @@ export default function CommunityMainScreen() {
           }
         >
           {/* View Tabs - Switch between Newsfeed and My Posts */}
-          <View style={styles.viewTabsContainer}>
+          <View style={[styles.viewTabsContainer, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity
               style={[
                 styles.viewTab,
@@ -718,7 +941,7 @@ export default function CommunityMainScreen() {
                 <Text style={styles.addPostButtonText}>Add Post</Text>
               </TouchableOpacity>
 
-              <Text style={styles.browseBySectionTitle}>Browse By</Text>
+              <Text style={[styles.browseBySectionTitle, { color: theme.colors.text }]}>Browse By</Text>
 
               <ScrollView
                 horizontal
@@ -731,6 +954,7 @@ export default function CommunityMainScreen() {
                       key={category}
                       style={[
                         styles.categoryButton,
+                        { backgroundColor: theme.colors.surface },
                         selectedCategory === category && styles.categoryButtonActive,
                       ]}
                       onPress={() => setSelectedCategory(category)}
@@ -738,6 +962,7 @@ export default function CommunityMainScreen() {
                       <Text
                         style={[
                           styles.categoryText,
+                          { color: theme.colors.text },
                           selectedCategory === category && styles.categoryTextActive,
                         ]}
                       >
@@ -755,8 +980,8 @@ export default function CommunityMainScreen() {
             <View style={styles.myPostsHeader}>
               <View style={styles.myPostsHeaderContent}>
                 <Ionicons name="document-text" size={24} color="#7CB9A9" />
-                <Text style={styles.myPostsTitle}>My Posts</Text>
-                <Text style={styles.myPostsSubtitle}>
+                <Text style={[styles.myPostsTitle, { color: theme.colors.text }]}>My Posts</Text>
+                <Text style={[styles.myPostsSubtitle, { color: theme.colors.textSecondary }]}>
                   Manage your published posts and drafts
                 </Text>
               </View>
@@ -775,7 +1000,7 @@ export default function CommunityMainScreen() {
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#7CB9A9" />
-                <Text style={styles.loadingText}>
+                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
                   {activeView === "newsfeed"
                     ? "Loading posts..."
                     : "Loading your posts..."}
@@ -792,14 +1017,14 @@ export default function CommunityMainScreen() {
                   size={64}
                   color="#E0E0E0"
                 />
-                <Text style={styles.emptyText}>
+                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
                   {activeView === "newsfeed"
                     ? selectedCategory === "Trending"
                       ? "Be the first to share something with the community!"
                       : `No posts in ${selectedCategory} category yet`
                     : "You haven't created any posts yet"}
                 </Text>
-                <Text style={styles.emptySubtext}>
+                <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                   {activeView === "my-posts" &&
                     "Create your first post to share with the community!"}
                 </Text>
@@ -821,15 +1046,16 @@ export default function CommunityMainScreen() {
                     key={post.id}
                     style={[
                       styles.postCard,
+                      { backgroundColor: theme.colors.surface },
                       post.is_draft && styles.draftPostCard,
                     ]}
                     onPress={() => !post.is_draft && handlePostPress(post.id)}
                   >
                     {/* Draft Badge - Only show for draft posts */}
                     {post.is_draft && (
-                      <View style={styles.draftBadge}>
-                        <Ionicons name="time" size={12} color="#666" />
-                        <Text style={styles.draftBadgeText}>Draft</Text>
+                      <View style={[styles.draftBadge, { backgroundColor: theme.isDark ? 'rgba(255, 167, 38, 0.2)' : '#FFF3CD' }]}>
+                        <Ionicons name="time" size={12} color={theme.isDark ? '#FFB74D' : '#856404'} />
+                        <Text style={[styles.draftBadgeText, { color: theme.isDark ? '#FFB74D' : '#856404' }]}>Draft</Text>
                       </View>
                     )}
 
@@ -841,10 +1067,10 @@ export default function CommunityMainScreen() {
                           </Text>
                         </View>
                         <View style={styles.postTitleContainer}>
-                          <Text style={styles.postTitle} numberOfLines={2}>
+                          <Text style={[styles.postTitle, { color: theme.colors.text }]} numberOfLines={2}>
                             {post.title}
                           </Text>
-                          <Text style={styles.postAuthor}>
+                          <Text style={[styles.postAuthor, { color: theme.colors.textSecondary }]}>
                             {post.author_name} •{" "}
                             {new Date(post.created_at).toLocaleDateString()}
                             {post.is_draft && " • Draft"}
@@ -858,13 +1084,13 @@ export default function CommunityMainScreen() {
                           {post.is_draft ? (
                             <>
                               <TouchableOpacity
-                                style={styles.postActionButton}
+                                style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                                 onPress={() => handleEditPost(post.id)}
                               >
-                                <Ionicons name="create" size={18} color="#666" />
+                                <Ionicons name="create" size={18} color={theme.colors.textSecondary} />
                               </TouchableOpacity>
                               <TouchableOpacity
-                                style={styles.postActionButton}
+                                style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                                 onPress={() => handlePublishDraft(post.id)}
                               >
                                 <Ionicons name="send" size={18} color="#4CAF50" />
@@ -872,14 +1098,14 @@ export default function CommunityMainScreen() {
                             </>
                           ) : (
                             <TouchableOpacity
-                              style={styles.postActionButton}
+                              style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                               onPress={() => handlePostPress(post.id)}
                             >
-                              <Ionicons name="eye" size={18} color="#666" />
+                              <Ionicons name="eye" size={18} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                           )}
                           <TouchableOpacity
-                            style={styles.postActionButton}
+                            style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                             onPress={() => handleDeletePost(post.id)}
                           >
                             <Ionicons name="trash" size={18} color="#FF6B6B" />
@@ -888,7 +1114,7 @@ export default function CommunityMainScreen() {
                       )}
                     </View>
 
-                    <Text style={styles.postContent} numberOfLines={4}>
+                    <Text style={[styles.postContent, { color: theme.colors.textSecondary }]} numberOfLines={4}>
                       {post.content}
                     </Text>
 
@@ -966,20 +1192,21 @@ export default function CommunityMainScreen() {
       >
         <Animated.View style={[styles.fullScreenOverlay, { opacity: fadeAnim }]}>
           <Pressable style={StyleSheet.absoluteFillObject} onPress={hideSideMenu} />
-          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim }]}>
-            <View style={styles.sideMenuHeader}>
+          <Animated.View style={[styles.sideMenu, { backgroundColor: theme.colors.surface, opacity: fadeAnim }]}>
+            <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View style={styles.profileAvatar}>
                 <Text style={styles.profileAvatarText}>{getInitials()}</Text>
               </View>
-              <Text style={styles.profileName}>{getDisplayName()}</Text>
-              <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+              <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+              <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
             </View>
             <ScrollView style={styles.sideMenuContent}>
               {sideMenuItems.map((item, index) => (
                 <TouchableOpacity
-                  key={index}
+                  key={item.title}
                   style={[
                     styles.sideMenuItem,
+                    { borderBottomColor: theme.colors.borderLight },
                     item.disabled && styles.sideMenuItemDisabled,
                   ]}
                   onPress={item.onPress}
@@ -988,13 +1215,14 @@ export default function CommunityMainScreen() {
                   <Ionicons
                     name={item.icon as any}
                     size={20}
-                    color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                    color={item.disabled ? "#CCCCCC" : item.title === "Sign Out" ? theme.colors.error : "#4CAF50"}
                   />
                   <Text
                     style={[
                       styles.sideMenuItemText,
+                      { color: theme.colors.text },
                       item.disabled && styles.sideMenuItemTextDisabled,
-                      item.title === "Sign Out" && styles.signOutText,
+                      item.title === "Sign Out" && { color: theme.colors.error, fontWeight: "600" },
                     ]}
                   >
                     {item.title}
@@ -1013,6 +1241,100 @@ export default function CommunityMainScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
       />
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+            </View>
+            <Text style={styles.successTitle}>Success!</Text>
+            <Text style={styles.successMessage}>{successMessage}</Text>
+            <TouchableOpacity
+              style={styles.successButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                if (successCallback) {
+                  successCallback();
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal
+        visible={showErrorModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowErrorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.errorIconContainer}>
+              <Ionicons name="close-circle" size={80} color="#FF3B30" />
+            </View>
+            <Text style={styles.errorTitle}>{errorTitle}</Text>
+            <Text style={styles.successMessage}>{errorMessage}</Text>
+            <TouchableOpacity
+              style={styles.errorButton}
+              onPress={() => setShowErrorModal(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm Modal */}
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModal}>
+            <View style={styles.confirmIconContainer}>
+              <Ionicons name="alert-circle" size={80} color="#FFA000" />
+            </View>
+            <Text style={styles.confirmTitle}>{confirmTitle}</Text>
+            <Text style={styles.successMessage}>{confirmMessage}</Text>
+            <View style={styles.confirmButtonsContainer}>
+              <TouchableOpacity
+                style={styles.confirmCancelButton}
+                onPress={() => setShowConfirmModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.confirmCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => {
+                  setShowConfirmModal(false);
+                  if (confirmCallback) {
+                    confirmCallback();
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.successButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1024,7 +1346,7 @@ export default function CommunityMainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "transparent",
+    // backgroundColor removed - now uses theme.colors.background
   },
   curvedBackground: {
     position: "absolute",
@@ -1050,7 +1372,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 16,
     marginBottom: 20,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor removed - now uses theme.colors.surface
     borderRadius: 12,
     padding: 4,
     shadowColor: "#000",
@@ -1120,7 +1442,7 @@ const styles = StyleSheet.create({
   browseBySectionTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     marginBottom: 12,
   },
   categoriesContainer: {
@@ -1132,7 +1454,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     justifyContent: "center",
     alignItems: "center",
     minWidth: 80,
@@ -1142,7 +1464,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 14,
-    color: "#000",
+    // color moved to theme.colors.text via inline override
     fontWeight: "500",
     textAlign: "center",
   },
@@ -1164,12 +1486,12 @@ const styles = StyleSheet.create({
   myPostsTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#1A1A1A",
+    // color moved to theme.colors.text via inline override
     marginTop: 8,
   },
   myPostsSubtitle: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 4,
   },
 
@@ -1186,7 +1508,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
   },
   emptyContainer: {
     alignItems: "center",
@@ -1195,21 +1517,21 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 16,
     fontWeight: "600",
     textAlign: "center",
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#999",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 8,
     textAlign: "center",
   },
 
   // Post Cards - Individual post containers
   postCard: {
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -1226,13 +1548,13 @@ const styles = StyleSheet.create({
   draftPostCard: {
     borderColor: "#FFA726",
     borderWidth: 1,
-    backgroundColor: "#FFFBF0",
+    // backgroundColor removed - uses theme override in JSX instead
   },
   draftBadge: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: "#FFF3CD",
+    // backgroundColor moved to theme override in JSX
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -1241,7 +1563,7 @@ const styles = StyleSheet.create({
   },
   draftBadgeText: {
     fontSize: 12,
-    color: "#856404",
+    // color moved to theme override in JSX
     fontWeight: "500",
   },
 
@@ -1277,12 +1599,12 @@ const styles = StyleSheet.create({
   postTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     lineHeight: 20,
   },
   postAuthor: {
     fontSize: 12,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     marginTop: 4,
   },
 
@@ -1294,13 +1616,13 @@ const styles = StyleSheet.create({
   postActionButton: {
     padding: 6,
     borderRadius: 6,
-    backgroundColor: "#F8F9FA",
+    // backgroundColor moved to theme override in JSX
   },
 
   // Post Content - Main post text
   postContent: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme.colors.textSecondary via inline override
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -1379,6 +1701,101 @@ const styles = StyleSheet.create({
     height: 30,
   },
 
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    width: '80%',
+    maxWidth: 400,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  errorIconContainer: {
+    marginBottom: 16,
+  },
+  confirmIconContainer: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginBottom: 8,
+  },
+  confirmTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#FFA000',
+    marginBottom: 8,
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  successButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    width: '100%',
+  },
+  errorButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    width: '100%',
+  },
+  confirmButton: {
+    backgroundColor: '#FFA000',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    flex: 1,
+  },
+  confirmCancelButton: {
+    backgroundColor: '#E0E0E0',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    flex: 1,
+  },
+  confirmButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  successButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  confirmCancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
   // Side Menu Styles - Navigation overlay
   sideMenuItemDisabled: {
     opacity: 0.5,
@@ -1399,13 +1816,13 @@ const styles = StyleSheet.create({
   sideMenu: {
     paddingTop: 60,
     width: width * 0.75,
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
+    // borderBottomColor moved to theme.colors.borderLight via inline override
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
     alignItems: "center",
   },
   profileAvatar: {
@@ -1425,12 +1842,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
   },
   sideMenuContent: {
     padding: 10,
@@ -1441,11 +1858,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     marginLeft: 15,
   },
 });

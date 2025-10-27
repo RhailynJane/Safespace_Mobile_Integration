@@ -7,8 +7,10 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function LoadingScreen() {
+  const { theme } = useTheme();
   // Track loading progress percentage
   const [progress, setProgress] = useState(1);
 
@@ -165,7 +167,7 @@ export default function LoadingScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
         {/* Original decorative circles with scaling animations */}
         <Animated.View
@@ -198,7 +200,7 @@ export default function LoadingScreen() {
         />
 
         {/* Progress percentage display */}
-        <Text style={styles.progressText}>{progress}%</Text>
+        <Text style={[styles.progressText, { color: theme.colors.text }]}>{progress}%</Text>
       </View>
     </SafeAreaView>
   );

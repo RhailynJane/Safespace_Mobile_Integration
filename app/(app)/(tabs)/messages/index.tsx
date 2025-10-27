@@ -1,35 +1,46 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import { useState } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal,
-  Pressable,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
   TextInput,
   Image,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
+import {
+  messagingService,
+  Conversation,
+  Participant,
+} from "../../../../utils/sendbirdService";
+import { useFocusEffect } from "@react-navigation/native";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
-const { width } = Dimensions.get("window");
 export default function MessagesScreen() {
-  const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { theme } = useTheme();
+  const { userId } = useAuth(); // Get actual Clerk user ID
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
+  const [sendbirdStatus, setSendbirdStatus] =
+    useState<string>("Initializing...");
+  const API_BASE_URL =
+    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -38,6 +49,137 @@ export default function MessagesScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  const initializeMessaging = useCallback(async () => {
+    if (!userId) {
+      console.log("❌ No user ID available");
+      setSendbirdStatus("User not authenticated");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
+
+      // Add default profile URL to avoid SendBird error
+      const sendbirdInitialized = await messagingService.initializeSendBird(
+        userId,
+        accessToken,
+        "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
+      );
+      setSendbirdStatus(
+        sendbirdInitialized ? "SendBird Connected" : "Using Backend API"
+      );
+
+      await loadConversations();
+    } catch (error) {
+      console.log("Failed to initialize messaging");
+      setSendbirdStatus("Using Backend API");
+      await loadConversations();
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    initializeMessaging();
+  }, [initializeMessaging]);
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log("💬 MessagesScreen focused, refreshing conversations");
+      loadConversations();
+    }, [userId])
+  );
+
+  // Filter conversations based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredConversations(conversations);
+      return;
+    }
+
+    const filtered = conversations.filter(conversation => {
+      const searchLower = searchQuery.toLowerCase().trim();
+      
+      // Search in participant names
+      const participantNames = conversation.participants
+        .filter(p => p.clerk_user_id !== userId) // Exclude current user
+        .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
+      
+      const hasMatchingParticipant = participantNames.some(name => 
+        name.includes(searchLower)
+      );
+
+      // Search in conversation title
+      const hasMatchingTitle = conversation.title?.toLowerCase().includes(searchLower);
+
+      // Search in last message
+      const hasMatchingLastMessage = conversation.last_message?.toLowerCase().includes(searchLower);
+
+      // Search in participant emails
+      const hasMatchingEmail = conversation.participants.some(p => 
+        p.email?.toLowerCase().includes(searchLower)
+      );
+
+      return hasMatchingParticipant || hasMatchingTitle || hasMatchingLastMessage || hasMatchingEmail;
+    });
+
+    setFilteredConversations(filtered);
+  }, [searchQuery, conversations, userId]);
+
+  const loadConversations = async () => {
+    if (!userId) {
+      console.log("❌ No user ID available for loading conversations");
+      setConversations([]);
+      setFilteredConversations([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log(`💬 Loading conversations for user: ${userId}`);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/messages/conversations/${userId}`
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`💬 Setting ${result.data.length} conversations`);
+        setConversations(result.data);
+        setFilteredConversations(result.data); // Initialize filtered conversations
+
+        // DEBUG: Check what online status is being returned
+        console.log(
+          "🔍 Online status debug:",
+          result.data.map((conv: any) => ({
+            id: conv.id,
+            participants: conv.participants.map((p: any) => ({
+              name: `${p.first_name} ${p.last_name}`,
+              online: p.online,
+              last_active_at: p.last_active_at,
+            })),
+          }))
+        );
+      } else {
+        console.log("💬 Failed to load conversations from backend");
+        setConversations([]);
+        setFilteredConversations([]);
+      }
+    } catch (error) {
+      console.error("💬 Error loading conversations:", error);
+      setConversations([]);
+      setFilteredConversations([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadConversations();
+  };
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -48,140 +190,308 @@ export default function MessagesScreen() {
     }
   };
 
+  const getDisplayName = (conversation: Conversation) => {
+    // Filter out current user from participants list
+    const otherParticipants = conversation.participants.filter(
+      (p) => p.clerk_user_id !== userId
+    );
 
-  const getDisplayName = () => {
-    return "User";
+    // If there are other participants, show their FULL names
+    if (otherParticipants.length > 0) {
+      const fullNames = otherParticipants
+        .map((p) => `${p.first_name} ${p.last_name}`.trim())
+        .join(", ");
+      return fullNames;
+    }
+
+    // If no other participants found, fallback to conversation title
+    if (conversation.title) {
+      return conversation.title;
+    }
+
+    return "Unknown User";
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = (firstName?: string, lastName?: string) => {
+    const first = firstName?.charAt(0) || "";
+    const last = lastName?.charAt(0) || "";
+    return `${first}${last}`.toUpperCase() || "U";
+  };
+
+  // Get avatar display (text for initials or URL for image)
+  const getAvatarDisplay = (participants: Participant[]) => {
+    // Get other participants (not current user)
+    const otherParticipants = participants.filter(
+      (p) => p.clerk_user_id !== userId
+    );
+
+    const displayParticipant =
+      otherParticipants.length > 0 ? otherParticipants[0] : participants[0];
+
+    // If profile image exists, return URL
+    if (displayParticipant?.profile_image_url) {
+      return { type: "image", value: displayParticipant.profile_image_url };
+    }
+
+    // Otherwise return initials for text display
+    const initials = getUserInitials(
+      displayParticipant?.first_name,
+      displayParticipant?.last_name
+    );
+    return { type: "text", value: initials };
+  };
+
+  const formatTime = (timestamp: string) => {
+    if (!timestamp) return "";
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+
+    if (diff < 24 * 60 * 60 * 1000) {
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } else {
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading messages...</Text>
       </View>
     );
   }
 
-  // Sample conversations data
-  const conversations = [
-    {
-      id: 1,
-      name: "Eric Young",
-      lastMessage: "I'm glad you're feeling okay now.",
-      time: "30m ago",
-      unread: 0,
-      online: true,
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    },
-    {
-      id: 2,
-      name: "Support Group",
-      lastMessage: "Jenny: I found this article really helpful...",
-      time: "2d ago",
-      unread: 5,
-      online: false,
-      avatar: "https://randomuser.me/api/portraits/women/4.jpg",
-    },
-    {
-      id: 3,
-      name: "Dr. Sarah Johnson",
-      lastMessage: "Let's schedule our next appointment.",
-      time: "1d ago",
-      unread: 1,
-      online: false,
-      avatar: "https://randomuser.me/api/portraits/women/32.jpg",
-    },
-    {
-      id: 4,
-      name: "Therapist Group",
-      lastMessage: "Mark: Has anyone tried the new technique?",
-      time: "3d ago",
-      unread: 0,
-      online: false,
-      avatar: "https://randomuser.me/api/portraits/men/22.jpg",
-    },
-  ];
-
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground>
-        {/* Header */}
-          <AppHeader 
-            title="Messages" 
-            showBack={true}
-          />
+        <AppHeader title="Messages" showBack={true} />
 
         {/* New Message Button */}
         <View>
           <TouchableOpacity
             style={styles.newMessageButton}
-            onPress={() => router.push("../messages/new-message")}
+            onPress={() => {
+              if (!userId) {
+                Alert.alert("Error", "Please sign in to send messages");
+                return;
+              }
+              router.push("../messages/new-message");
+            }}
           >
             <LinearGradient
-              colors={['#5296EA', '#489EEA', '#459EEA', '#4896EA']}
+              colors={["#5296EA", "#489EEA", "#459EEA", "#4896EA"]}
               style={styles.newMessageButtonGradient}
             >
-              <Text style={styles.newMessageButtonText}>+ New Message</Text>
+              <Text style={[styles.newMessageButtonText, { color: '#FFF' }]}>+ New Message</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
-        
+
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
+          <Ionicons
+            name="search"
+            size={20}
+            color={theme.colors.icon}
+            style={styles.searchIcon}
+          />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.colors.text }]}
             placeholder="Search conversations..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#9E9E9E"
+            placeholderTextColor={theme.colors.textSecondary}
+            returnKeyType="search"
           />
-          <Ionicons
-            name="search"
-            size={22}
-            color="#333"
-            style={styles.searchIcon}
-          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
+            </TouchableOpacity>
+          )}
         </View>
 
+        {/* Search Results Info */}
+        {!!searchQuery.trim() && (
+          <View style={styles.searchResultsInfo}>
+            <Text style={[styles.searchResultsText, { color: theme.colors.textSecondary }]}>
+              {filteredConversations.length === 0 
+                ? "No conversations found" 
+                : (() => {
+                    const conversationText = filteredConversations.length === 1 ? '' : 's';
+                    return `Found ${filteredConversations.length} conversation${conversationText}`;
+                  })()
+              }
+            </Text>
+            <TouchableOpacity onPress={clearSearch}>
+              <Text style={[styles.clearSearchText, { color: theme.colors.primary }]}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Connection Status removed per request */}
+
         {/* Conversation List */}
-        <View style={styles.conversationContainer}>
-          <ScrollView style={styles.conversationList}>
-            {conversations.map((conversation) => (
-              <TouchableOpacity
-                key={conversation.id}
-                style={styles.conversationItem}
-                onPress={() => router.replace(`../messages/message-chat-screen?id=${conversation.id}`)}
-              >
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: conversation.avatar }}
-                    style={styles.avatar}
-                  />
-                  {conversation.online && <View style={styles.onlineIndicator} />}
-                </View>
-
-                <View style={styles.conversationContent}>
-                  <View style={styles.conversationHeader}>
-                    <Text style={styles.conversationName}>{conversation.name}</Text>
-                    <Text style={styles.conversationTime}>{conversation.time}</Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.conversationMessage,
-                      conversation.unread > 0 && styles.unreadMessage,
-                    ]}
-                    numberOfLines={1}
+  <View style={[styles.conversationContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
+          <ScrollView
+            style={styles.conversationList}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[theme.colors.primary]}
+              />
+            }
+          >
+            {filteredConversations.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons 
+                  name={searchQuery.trim() ? "search-outline" : "chatbubble-outline"} 
+                  size={64} 
+                  color={theme.colors.iconDisabled} 
+                />
+                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                  {searchQuery.trim() 
+                    ? "No conversations found" 
+                    : "No conversations yet"
+                  }
+                </Text>
+                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+                  {searchQuery.trim() 
+                    ? "Try adjusting your search terms"
+                    : "Start a new conversation to begin messaging"
+                  }
+                </Text>
+                {searchQuery.trim() ? (
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+                    onPress={clearSearch}
                   >
-                    {conversation.lastMessage}
-                  </Text>
-                </View>
-
-                {conversation.unread > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadCount}>{conversation.unread}</Text>
-                  </View>
+                    <Text style={styles.retryButtonText}>Clear Search</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
+                    onPress={loadConversations}
+                  >
+                    <Text style={styles.retryButtonText}>Refresh</Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            ))}
+              </View>
+            ) : (
+              filteredConversations.map((conversation) => (
+                <TouchableOpacity
+                  key={conversation.id}
+                  style={[styles.conversationItem, { borderBottomColor: theme.colors.borderLight }]}
+                  onPress={() => {
+                    if (!userId) {
+                      Alert.alert("Error", "Please sign in to view messages");
+                      return;
+                    }
+                    router.push({
+                      pathname: "../messages/message-chat-screen",
+                      params: {
+                        id: conversation.id,
+                        title: getDisplayName(conversation),
+                      },
+                    });
+                  }}
+                >
+                  <View style={styles.avatarContainer}>
+                    {(() => {
+                      const avatar = getAvatarDisplay(
+                        conversation.participants
+                      );
+                      if (avatar.type === "image") {
+                        return (
+                          <Image
+                            source={{ uri: avatar.value }}
+                            style={styles.avatar}
+                          />
+                        );
+                      } else {
+                        return (
+                          <View style={[styles.initialsAvatar, { backgroundColor: theme.colors.primary }]}>
+                            <Text style={styles.initialsText}>
+                              {avatar.value}
+                            </Text>
+                          </View>
+                        );
+                      }
+                    })()}
+
+                    {/* Show green dot if online, gray dot if offline */}
+                    {(() => {
+                      const otherParticipants =
+                        conversation.participants.filter(
+                          (p) => p.clerk_user_id !== userId
+                        );
+                      const isOnline = otherParticipants.some(
+                        (p) => p.online === true
+                      );
+
+                      return (
+                        <View
+                          style={[
+                            styles.onlineIndicator,
+                            {
+                              backgroundColor: isOnline
+                                ? theme.colors.primary
+                                : theme.colors.iconDisabled,
+                              borderColor: theme.colors.surface,
+                            },
+                          ]}
+                        />
+                      );
+                    })()}
+                  </View>
+                  <View style={styles.conversationContent}>
+                    <View style={styles.conversationHeader}>
+                      <Text style={[styles.conversationName, { color: theme.colors.text }]}>
+                        {getDisplayName(conversation)}
+                      </Text>
+                      <Text style={[styles.conversationTime, { color: theme.colors.textSecondary }]}>
+                        {formatTime(conversation.updated_at)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.conversationMessage,
+                        { color: theme.colors.textSecondary },
+                        conversation.unread_count > 0 && { color: theme.colors.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {conversation.last_message || "No messages yet"}
+                    </Text>
+                    <Text style={[styles.participantsText, { color: theme.colors.textSecondary }]}>
+                      {conversation.participants.length === 1
+                        ? conversation.participants[0]?.email ?? "Unknown Email"
+                        : `${conversation.participants.length} participants`}
+                    </Text>
+                  </View>
+                  {conversation.unread_count > 0 && (
+                    <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+                      <Text style={styles.unreadCount}>
+                        {conversation.unread_count > 99
+                          ? "99+"
+                          : conversation.unread_count}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
         </View>
 
@@ -198,19 +508,39 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // backgroundColor removed - now uses theme.colors.background
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    // backgroundColor removed - now uses theme.colors.background
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    // color removed - now uses theme.colors.text
+  },
+  statusContainer: {
+    alignItems: "center",
+    marginTop: 5,
+  },
+  statusSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  statusText: {
+    marginTop: 5,
+    fontSize: 14,
+    color: "#999",
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius:30,
-    backgroundColor: "#fff",
-    marginTop: -1,
+    borderRadius: 30,
+    // backgroundColor removed - now uses theme.colors.surface
+    marginTop: 10,
     margin: 15,
     paddingHorizontal: 15,
     height: 50,
@@ -224,93 +554,53 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   searchIcon: {
-    marginRight: .5,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    color: "#333",
-    fontStyle: "italic",
-  },
-
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    backgroundColor:"transparent",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  subtitle: {
     fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
+    // color removed - now uses theme.colors.text
   },
-  modalContainer: {
-    flex: 1,
-    flexDirection: "row",
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  sideMenu: {
-    width: "75%",
-    backgroundColor: "#FFFFFF",
-    height: "100%",
-  },
-  sideMenuHeader: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  searchResultsInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 20,
     marginBottom: 10,
+    paddingHorizontal: 10,
   },
-  profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  profileEmail: {
+  searchResultsText: {
     fontSize: 14,
-    color: "#757575",
+    color: '#666',
+    fontStyle: 'italic',
   },
-  sideMenuContent: {
-    padding: 10,
+  clearSearchText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '600',
   },
-  sideMenuItem: {
+  statusIndicator: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    marginHorizontal: 15,
+    padding: 8,
+    borderRadius: 20,
+    justifyContent: "center",
+    marginBottom: 10,
+    gap: 8,
   },
-  sideMenuItemText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 15,
-  },
-  conversationList: {
-    flex: 1,
-    paddingHorizontal: 5,
+  statusIndicatorText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "600",
   },
   conversationContainer: {
     flex: 1,
-    backgroundColor: "rgba(250, 250, 250, 0.8)", 
+    // backgroundColor moved to theme.colors.surface via inline override
     borderWidth: 1,
     margin: 15,
     padding: 10,
@@ -320,18 +610,51 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
     borderRadius: 10,
-    borderColor: "rgba(0, 0, 0, 0.1)",
+    // borderColor moved to theme.colors.borderLight via inline override
     marginBottom: 100,
     marginTop: 5,
+  },
+  conversationList: {
+    flex: 1,
+    paddingHorizontal: 5,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    // color moved to theme.colors.text via inline override
+    marginTop: 16,
+    fontWeight: "600",
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    // color moved to theme.colors.textSecondary via inline override
+    marginTop: 8,
+    textAlign: "center",
+    marginHorizontal: 20,
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    // backgroundColor moved to theme.colors.primary via inline override
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
   },
   conversationItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 12,
     paddingBottom: 10,
     paddingTop: 3,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0, 0, 0, 0.1)",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
     width: "100%",
   },
   avatarContainer: {
@@ -361,34 +684,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    marginBottom: 10,
+    marginBottom: 4,
   },
   conversationName: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#333",
+    // color moved to theme.colors.text via inline override
   },
   conversationTime: {
     fontSize: 12,
     fontStyle: "italic",
-    color: "#000",
+    // color moved to theme.colors.textSecondary via inline override
   },
   conversationMessage: {
     fontSize: 14,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
+    marginBottom: 2,
   },
   unreadMessage: {
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     fontWeight: "500",
   },
+  participantsText: {
+    fontSize: 12,
+    // color moved to theme.colors.textSecondary via inline override
+  },
   unreadBadge: {
-    backgroundColor: "#4CAF50",
-    width: 20,
+    // backgroundColor moved to theme.colors.primary via inline override
+    minWidth: 20,
     height: 20,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 10,
+    paddingHorizontal: 6,
   },
   unreadCount: {
     color: "#FFF",
@@ -396,9 +725,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   newMessageButton: {
-    marginHorizontal:40,
-    marginTop:10,
-    marginBottom:15,
+    marginHorizontal: 40,
+    marginTop: 10,
+    marginBottom: 15,
     shadowColor: "grey",
     shadowOffset: {
       width: 2,
@@ -416,8 +745,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   newMessageButtonText: {
-    color: "#000",
+    // color moved to inline override for better contrast on gradient
     fontSize: 16,
     fontWeight: "800",
+  },
+  initialsAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 60,
+    // backgroundColor moved to theme.colors.primary via inline override
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  initialsText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  offlineIndicator: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    // colors moved to inline override using theme.colors.iconDisabled and theme.colors.surface
+    borderWidth: 2,
   },
 });

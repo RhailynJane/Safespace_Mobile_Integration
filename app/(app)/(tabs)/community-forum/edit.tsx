@@ -37,7 +37,7 @@
  * Reference: chat.deepseek.com
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -56,6 +56,7 @@ import { communityApi } from "../../../../utils/communityForumApi";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 // Available categories for post organization and filtering
 const CATEGORIES = [
@@ -77,6 +78,7 @@ const CATEGORIES = [
  * with support for draft management and publishing workflows
  */
 export default function EditPostScreen() {
+  const { theme } = useTheme();
   // Extract post data from navigation parameters
   const {
     id,
@@ -164,16 +166,18 @@ export default function EditPostScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            try {
-              await communityApi.deletePost(postId);
-              Alert.alert("Success", "Post deleted successfully!");
-              // Navigate to community forum after successful deletion
-              router.replace("/community-forum");
-            } catch (error) {
-              console.error("Error deleting post:", error);
-              Alert.alert("Error", "Failed to delete post");
-            }
+          onPress: () => {
+            (async () => {
+              try {
+                await communityApi.deletePost(postId);
+                Alert.alert("Success", "Post deleted successfully!");
+                // Navigate to community forum after successful deletion
+                router.replace("/community-forum");
+              } catch (error) {
+                console.error("Error deleting post:", error);
+                Alert.alert("Error", "Failed to delete post");
+              }
+            })();
           },
         },
       ]
@@ -203,7 +207,7 @@ export default function EditPostScreen() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Edit Post" showBack={true} />
 
@@ -216,19 +220,19 @@ export default function EditPostScreen() {
           <View style={styles.content}>
             <View style={styles.form}>
               {/* Title Input Section */}
-              <Text style={styles.label}>Title</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Title</Text>
               <TextInput
-                style={styles.titleInput}
+                style={[styles.titleInput, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                 value={title}
                 onChangeText={setTitle}
                 placeholder="Enter post title..."
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.colors.textDisabled}
                 maxLength={200}
                 multiline
               />
 
               {/* Category Selection Section */}
-              <Text style={styles.label}>Category</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Category</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -240,14 +244,16 @@ export default function EditPostScreen() {
                       key={cat}
                       style={[
                         styles.categoryButton,
-                        category === cat && styles.categoryButtonActive,
+                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                        category === cat && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
                       ]}
                       onPress={() => setCategory(cat)}
                     >
                       <Text
                         style={[
                           styles.categoryText,
-                          category === cat && styles.categoryTextActive,
+                          { color: theme.colors.text },
+                          category === cat && { color: "#FFFFFF" },
                         ]}
                       >
                         {cat}
@@ -258,13 +264,13 @@ export default function EditPostScreen() {
               </ScrollView>
 
               {/* Content Input Section */}
-              <Text style={styles.label}>Content</Text>
+              <Text style={[styles.label, { color: theme.colors.text }]}>Content</Text>
               <TextInput
-                style={styles.contentInput}
+                style={[styles.contentInput, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                 value={content}
                 onChangeText={setContent}
                 placeholder="Share your thoughts..."
-                placeholderTextColor="#999"
+                placeholderTextColor={theme.colors.textDisabled}
                 multiline
                 textAlignVertical="top"
                 numberOfLines={10}
@@ -272,7 +278,7 @@ export default function EditPostScreen() {
 
               {/* Character Count Display */}
               <View style={styles.characterCount}>
-                <Text style={styles.characterCountText}>
+                <Text style={[styles.characterCountText, { color: theme.colors.textSecondary }]}>
                   {content.length} characters
                 </Text>
               </View>
@@ -282,13 +288,13 @@ export default function EditPostScreen() {
           {/* Delete Button Section - Destructive action with warning */}
           <View style={styles.deleteSection}>
             <TouchableOpacity
-              style={styles.deleteButton}
+              style={[styles.deleteButton, { backgroundColor: theme.colors.surface }]}
               onPress={handleDelete}
             >
-              <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
-              <Text style={styles.deleteButtonText}>Delete Post</Text>
+              <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+              <Text style={[styles.deleteButtonText, { color: theme.colors.error }]}>Delete Post</Text>
             </TouchableOpacity>
-            <Text style={styles.deleteWarning}>
+            <Text style={[styles.deleteWarning, { color: theme.colors.error }]}>
               This action cannot be undone
             </Text>
           </View>
@@ -299,7 +305,7 @@ export default function EditPostScreen() {
       <View style={styles.footer}>
         {/* Save as Draft Button */}
         <TouchableOpacity
-          style={[styles.button, styles.saveButton]}
+          style={[styles.button, { backgroundColor: theme.colors.icon }]}
           onPress={() => handleSave(false)}
           disabled={isSaving || isPublishing}
         >
@@ -315,7 +321,7 @@ export default function EditPostScreen() {
 
         {/* Publish Button */}
         <TouchableOpacity
-          style={[styles.button, styles.publishButton]}
+          style={[styles.button, { backgroundColor: theme.colors.primary }]}
           onPress={() => handleSave(true)}
           disabled={isSaving || isPublishing}
         >

@@ -1,7 +1,5 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
+/* eslint-disable react-hooks/exhaustive-deps */
+// app/(app)/(tabs)/profile/settings.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -17,49 +15,30 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
  * SettingsScreen Component
  * 
- * Comprehensive settings screen with various customization options for
- * display, privacy, notifications, and wellbeing features. Features a
- * clean UI with dark/light mode support and curved background.
- * 
- * This is a frontend-only implementation with local storage for all settings.
+ * Comprehensive settings screen with backend integration for
+ * display, privacy, and notification settings.
  */
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
+  const [isLoading, setIsLoading] = useState(false);
+  const { theme, isDarkMode, setDarkMode: setGlobalDarkMode } = useTheme();
 
-  // Display & Accessibility Settings
-  const [darkMode, setDarkMode] = useState(false);
+  // Settings state
   const [textSize, setTextSize] = useState("Medium");
-  const [highContrast, setHighContrast] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  // Privacy & Security Settings
-  const [biometricLock, setBiometricLock] = useState(false);
   const [autoLockTimer, setAutoLockTimer] = useState("5 minutes");
-
-  // Notification Settings
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
   const [quietStartTime, setQuietStartTime] = useState("22:00");
   const [quietEndTime, setQuietEndTime] = useState("08:00");
   const [reminderFrequency, setReminderFrequency] = useState("Daily");
-
-  // Contact Settings
-  const [crisisContact, setCrisisContact] = useState("");
-  const [therapistContact, setTherapistContact] = useState("");
-
-  // Wellbeing Settings
-  const [safeMode, setSafeMode] = useState(false);
-  const [breakReminders, setBreakReminders] = useState(true);
-  const [breathingDuration, setBreathingDuration] = useState("5 minutes");
-  const [breathingStyle, setBreathingStyle] = useState("4-7-8 Technique");
-  const [offlineMode, setOfflineMode] = useState(false);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -69,74 +48,199 @@ export default function SettingsScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Load settings from local storage on component mount
+  // Load settings from backend on component mount
   useEffect(() => {
     loadSettings();
   }, []);
 
-  // Save settings whenever they change
+  // Apply settings when they change
   useEffect(() => {
-    saveSettings();
-  }, [
-    darkMode, textSize, highContrast, reduceMotion, biometricLock, autoLockTimer,
-    notificationsEnabled, quietHoursEnabled, quietStartTime, quietEndTime, reminderFrequency,
-    crisisContact, therapistContact, safeMode, breakReminders, breathingDuration, 
-    breathingStyle, offlineMode
-  ]);
+    applySettings();
+  }, [isDarkMode, textSize, autoLockTimer]);
 
   /**
-   * Loads settings from local storage
+   * Loads settings from backend API
    */
   const loadSettings = async () => {
     try {
-      const settings = await AsyncStorage.getItem('appSettings');
-      if (settings) {
-        const parsedSettings = JSON.parse(settings);
-        
-        // Apply all saved settings
-        Object.keys(parsedSettings).forEach(key => {
-          switch (key) {
-            case 'darkMode': setDarkMode(parsedSettings[key]); break;
-            case 'textSize': setTextSize(parsedSettings[key]); break;
-            case 'highContrast': setHighContrast(parsedSettings[key]); break;
-            case 'reduceMotion': setReduceMotion(parsedSettings[key]); break;
-            case 'biometricLock': setBiometricLock(parsedSettings[key]); break;
-            case 'autoLockTimer': setAutoLockTimer(parsedSettings[key]); break;
-            case 'notificationsEnabled': setNotificationsEnabled(parsedSettings[key]); break;
-            case 'quietHoursEnabled': setQuietHoursEnabled(parsedSettings[key]); break;
-            case 'quietStartTime': setQuietStartTime(parsedSettings[key]); break;
-            case 'quietEndTime': setQuietEndTime(parsedSettings[key]); break;
-            case 'reminderFrequency': setReminderFrequency(parsedSettings[key]); break;
-            case 'crisisContact': setCrisisContact(parsedSettings[key]); break;
-            case 'therapistContact': setTherapistContact(parsedSettings[key]); break;
-            case 'safeMode': setSafeMode(parsedSettings[key]); break;
-            case 'breakReminders': setBreakReminders(parsedSettings[key]); break;
-            case 'breathingDuration': setBreathingDuration(parsedSettings[key]); break;
-            case 'breathingStyle': setBreathingStyle(parsedSettings[key]); break;
-            case 'offlineMode': setOfflineMode(parsedSettings[key]); break;
-          }
-        });
-      }
+      setIsLoading(true);
+      const settings = await settingsAPI.fetchSettings();
+      
+      // Apply all saved settings EXCEPT dark mode (it's managed by ThemeContext)
+      // Dark mode is already loaded from AsyncStorage by ThemeContext
+      // We only update it here if the user explicitly changes it
+      setTextSize(settings.textSize);
+      setAutoLockTimer(settings.autoLockTimer);
+      setNotificationsEnabled(settings.notificationsEnabled);
+      setQuietHoursEnabled(settings.quietHoursEnabled);
+      setQuietStartTime(settings.quietStartTime);
+      setQuietEndTime(settings.quietEndTime);
+      setReminderFrequency(settings.reminderFrequency);
+      
     } catch (error) {
       console.log('Error loading settings:', error);
+      Alert.alert("Error", "Failed to load settings");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   /**
-   * Saves settings to local storage
+   * Saves settings to backend API
    */
   const saveSettings = async () => {
     try {
-      const settings = {
-        darkMode, textSize, highContrast, reduceMotion, biometricLock, autoLockTimer,
-        notificationsEnabled, quietHoursEnabled, quietStartTime, quietEndTime, reminderFrequency,
-        crisisContact, therapistContact, safeMode, breakReminders, breathingDuration, 
-        breathingStyle, offlineMode
+      const settings: UserSettings = {
+        darkMode: isDarkMode,
+        textSize,
+        autoLockTimer,
+        notificationsEnabled,
+        quietHoursEnabled,
+        quietStartTime,
+        quietEndTime,
+        reminderFrequency,
       };
-      await AsyncStorage.setItem('appSettings', JSON.stringify(settings));
+
+      await settingsAPI.saveSettings(settings);
+      console.log('Settings saved successfully');
+      
     } catch (error) {
       console.log('Error saving settings:', error);
+      Alert.alert("Error", "Failed to save settings");
     }
+  };
+
+  /**
+   * Applies all settings globally
+   */
+  const applySettings = async () => {
+    try {
+      // Apply dark mode globally
+      await applyDarkMode(isDarkMode);
+      
+      // Apply text size globally
+      await applyTextSize(textSize);
+      
+      // Apply auto-lock timer
+      await applyAutoLockTimer(autoLockTimer);
+      
+    } catch (error) {
+      console.log('Error applying settings:', error);
+    }
+  };
+
+  /**
+   * Applies dark mode globally across the app
+   */
+  const applyDarkMode = async (isDark: boolean) => {
+    try {
+      // Save to local storage for immediate access
+      await AsyncStorage.setItem('appDarkMode', JSON.stringify(isDark));
+      
+      // Apply to entire app - you might need to modify this based on your app structure
+      // This would typically involve a context or global state management
+      console.log('Dark mode applied globally:', isDark);
+      
+      // Force re-render of all components to apply theme
+      // You might need to implement a theme context for this
+      
+    } catch (error) {
+      console.log('Error applying dark mode:', error);
+    }
+  };
+
+  /**
+   * Applies text size globally
+   */
+  const applyTextSize = async (size: string) => {
+    try {
+      await AsyncStorage.setItem('appTextSize', size);
+      
+      // Calculate font scale based on text size
+      let fontScale = 1.0;
+      switch (size) {
+        case "Small":
+          fontScale = 0.9;
+          break;
+        case "Medium":
+          fontScale = 1.5;
+          break;
+        case "Large":
+          fontScale = 2;
+          break;
+    
+      }
+      
+      await AsyncStorage.setItem('appFontScale', JSON.stringify(fontScale));
+      console.log('Text size applied:', size, 'Scale:', fontScale);
+      
+    } catch (error) {
+      console.log('Error applying text size:', error);
+    }
+  };
+
+  /**
+   * Applies auto-lock timer
+   */
+  const applyAutoLockTimer = async (timer: string) => {
+    try {
+      await AsyncStorage.setItem('appAutoLockTimer', timer);
+      
+      // Convert timer to milliseconds
+      let lockTimeMs;
+      switch (timer) {
+        case "Immediate":
+          lockTimeMs = 0;
+          break;
+        case "1 minute":
+          lockTimeMs = 60 * 1000;
+          break;
+        case "5 minutes":
+          lockTimeMs = 5 * 60 * 1000;
+          break;
+        case "15 minutes":
+          lockTimeMs = 15 * 60 * 1000;
+          break;
+        case "Never":
+          lockTimeMs = -1;
+          break;
+        default:
+          lockTimeMs = 0;
+      }
+      
+      await AsyncStorage.setItem('appAutoLockTimeMs', JSON.stringify(lockTimeMs));
+      console.log('Auto-lock timer applied:', timer, 'MS:', lockTimeMs);
+      
+    } catch (error) {
+      console.log('Error applying auto-lock timer:', error);
+    }
+  };
+
+  /**
+   * Handles dark mode toggle with immediate feedback
+   */
+  const handleDarkModeToggle = (value: boolean) => {
+    setGlobalDarkMode(value);
+    // Apply immediately
+    applyDarkMode(value);
+  };
+
+  /**
+   * Handles text size change with immediate feedback
+   */
+  const handleTextSizeChange = (size: string) => {
+    setTextSize(size);
+    // Apply immediately
+    applyTextSize(size);
+  };
+
+  /**
+   * Handles auto-lock timer change with immediate feedback
+   */
+  const handleAutoLockTimerChange = (timer: string) => {
+    setAutoLockTimer(timer);
+    // Apply immediately
+    applyAutoLockTimer(timer);
   };
 
   /**
@@ -160,37 +264,28 @@ export default function SettingsScreen() {
   const textSizeOptions = ["Small", "Medium", "Large", "Extra Large"];
   const autoLockOptions = ["Immediate", "1 minute", "5 minutes", "15 minutes", "Never"];
   const reminderFrequencyOptions = ["Never", "Daily", "Twice daily", "Weekly"];
-  const breathingDurationOptions = ["2 minutes", "5 minutes", "10 minutes", "15 minutes"];
-  const breathingStyleOptions = ["4-7-8 Technique", "Box Breathing", "Equal Breathing", "Deep Belly"];
-
-  // Define theme colors
-  const theme = {
-    colors: {
-      background: darkMode ? "#121212" : "#F5F5F5",
-      surface: darkMode ? "#1E1E1E" : "#FFFFFF",
-      text: darkMode ? "#FFFFFF" : "#333",
-      textSecondary: darkMode ? "#B3B3B3" : "#666",
-      textDisabled: darkMode ? "#666" : "#999",
-      border: darkMode ? "#333" : "#E0E0E0",
-      borderLight: darkMode ? "#2A2A2A" : "#F0F0F0",
-      icon: darkMode ? "#B3B3B3" : "#666",
-      iconDisabled: darkMode ? "#666" : "#999",
-      primary: "#4CAF50",
-      accent: "#7FDBDA",
-      error: "#FF6B6B",
-    }
-  };
 
   /**
    * Renders a toggle switch row
    */
-  const renderToggleRow = (title: string, subtitle: string, value: boolean, onToggle: (value: boolean) => void, icon: keyof typeof Ionicons.glyphMap, disabled = false) => (
+  const renderToggleRow = (
+    title: string, 
+    subtitle: string, 
+    value: boolean, 
+    onToggle: (value: boolean) => void, 
+    icon: keyof typeof Ionicons.glyphMap, 
+    disabled = false
+  ) => (
     <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }, disabled && styles.disabledRow]}>
       <View style={styles.settingLeft}>
         <Ionicons name={icon} size={20} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: disabled ? theme.colors.textDisabled : theme.colors.text }]}>{title}</Text>
-          <Text style={[styles.settingSubtitle, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>{subtitle}</Text>
+          <Text style={[styles.settingTitle, { color: disabled ? theme.colors.textDisabled : theme.colors.text }]}>
+            {title}
+          </Text>
+          <Text style={[styles.settingSubtitle, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>
+            {subtitle}
+          </Text>
         </View>
       </View>
       <Switch
@@ -206,7 +301,15 @@ export default function SettingsScreen() {
   /**
    * Renders a picker row with options
    */
-  const renderPickerRow = (title: string, subtitle: string, value: string, options: string[], onSelect: (value: string) => void, icon: keyof typeof Ionicons.glyphMap, disabled = false) => (
+  const renderPickerRow = (
+    title: string, 
+    subtitle: string, 
+    value: string, 
+    options: string[], 
+    onSelect: (value: string) => void, 
+    icon: keyof typeof Ionicons.glyphMap, 
+    disabled = false
+  ) => (
     <TouchableOpacity 
       style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }, disabled && styles.disabledRow]}
       onPress={() => {
@@ -227,21 +330,35 @@ export default function SettingsScreen() {
       <View style={styles.settingLeft}>
         <Ionicons name={icon} size={20} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
         <View style={styles.settingTextContainer}>
-          <Text style={[styles.settingTitle, { color: disabled ? theme.colors.textDisabled : theme.colors.text }]}>{title}</Text>
-          <Text style={[styles.settingSubtitle, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>{subtitle}</Text>
+          <Text style={[styles.settingTitle, { color: disabled ? theme.colors.textDisabled : theme.colors.text }]}>
+            {title}
+          </Text>
+          <Text style={[styles.settingSubtitle, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>
+            {subtitle}
+          </Text>
         </View>
       </View>
       <View style={styles.settingRight}>
-        <Text style={[styles.settingValue, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>{value}</Text>
+        <Text style={[styles.settingValue, { color: disabled ? theme.colors.textDisabled : theme.colors.textSecondary }]}>
+          {value}
+        </Text>
         <Ionicons name="chevron-forward" size={16} color={disabled ? theme.colors.iconDisabled : theme.colors.icon} />
       </View>
     </TouchableOpacity>
   );
 
   /**
-   * Renders an input row for text entry
+   * Renders time input row for quiet hours
    */
-  const renderInputRow = (title: string, subtitle: string, value: string, onChangeText: (text: string) => void, icon: keyof typeof Ionicons.glyphMap, placeholder: string) => (
+  const renderTimeInputRow = (
+    title: string,
+    subtitle: string,
+    startValue: string,
+    endValue: string,
+    onStartChange: (text: string) => void,
+    onEndChange: (text: string) => void,
+    icon: keyof typeof Ionicons.glyphMap
+  ) => (
     <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}>
       <View style={styles.settingLeft}>
         <Ionicons name={icon} size={20} color={theme.colors.icon} />
@@ -250,31 +367,47 @@ export default function SettingsScreen() {
           <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
         </View>
       </View>
-      <TextInput
-        style={[styles.settingInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={theme.colors.textSecondary}
-      />
+      <View style={styles.timeInputContainer}>
+        <TextInput
+          style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
+          value={startValue}
+          onChangeText={onStartChange}
+          placeholder="22:00"
+          placeholderTextColor={theme.colors.textSecondary}
+        />
+        <Text style={[styles.timeSeparator, { color: theme.colors.text }]}>to</Text>
+        <TextInput
+          style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
+          value={endValue}
+          onChangeText={onEndChange}
+          placeholder="08:00"
+          placeholderTextColor={theme.colors.textSecondary}
+        />
+      </View>
     </View>
   );
 
   return (
-  <CurvedBackground>
-      <SafeAreaView style={styles.container}>
-          <AppHeader title="Profile Settings" showBack={true} />
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader title="Profile Settings" showBack={true} />
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView 
+          contentContainerStyle={[
+            styles.scrollContainer, 
+            { backgroundColor: theme.colors.background }
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Display & Accessibility */}
           <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Display & Accessibility</Text>
             
             {renderToggleRow(
               "Dark Mode",
-              "Switch between light and dark themes",
-              darkMode,
-              setDarkMode,
+              "Switch between light and dark themes for the entire app",
+              isDarkMode,
+              handleDarkModeToggle,
               "moon"
             )}
 
@@ -283,24 +416,8 @@ export default function SettingsScreen() {
               "Adjust text size for better readability",
               textSize,
               textSizeOptions,
-              setTextSize,
+              handleTextSizeChange,
               "text"
-            )}
-
-            {renderToggleRow(
-              "High Contrast",
-              "Increase contrast for better visibility",
-              highContrast,
-              setHighContrast,
-              "color-filter"
-            )}
-
-            {renderToggleRow(
-              "Reduce Motion",
-              "Minimize animations and transitions",
-              reduceMotion,
-              setReduceMotion,
-              "play-skip-back"
             )}
           </View>
 
@@ -308,33 +425,12 @@ export default function SettingsScreen() {
           <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Privacy & Security</Text>
 
-            <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}>
-              <View style={styles.settingLeft}>
-                <Ionicons name="eye-off" size={20} color={theme.colors.icon} />
-                <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: theme.colors.text }]}>Hide App Content</Text>
-                  <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>Automatically blur app in recent apps</Text>
-                </View>
-              </View>
-              <View style={styles.enabledIndicator}>
-                <Text style={styles.enabledText}>Enabled</Text>
-              </View>
-            </View>
-
-            {renderToggleRow(
-              "Biometric Lock",
-              "Use fingerprint or Face ID to unlock app",
-              biometricLock,
-              setBiometricLock,
-              "finger-print"
-            )}
-
             {renderPickerRow(
               "Auto-Lock Timer",
               "Automatically lock app after inactivity",
               autoLockTimer,
               autoLockOptions,
-              setAutoLockTimer,
+              handleAutoLockTimerChange,
               "time"
             )}
           </View>
@@ -361,24 +457,15 @@ export default function SettingsScreen() {
 
             {quietHoursEnabled && (
               <View style={styles.nestedSettings}>
-                <View style={styles.timeRow}>
-                  <Text style={[styles.timeLabel, { color: theme.colors.text }]}>From:</Text>
-                  <TextInput
-                    style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
-                    value={quietStartTime}
-                    onChangeText={setQuietStartTime}
-                    placeholder="22:00"
-                    placeholderTextColor={theme.colors.textSecondary}
-                  />
-                  <Text style={[styles.timeLabel, { color: theme.colors.text }]}>To:</Text>
-                  <TextInput
-                    style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, color: theme.colors.text }]}
-                    value={quietEndTime}
-                    onChangeText={setQuietEndTime}
-                    placeholder="08:00"
-                    placeholderTextColor={theme.colors.textSecondary}
-                  />
-                </View>
+                {renderTimeInputRow(
+                  "Quiet Hours Time",
+                  "Set start and end time for quiet hours",
+                  quietStartTime,
+                  quietEndTime,
+                  setQuietStartTime,
+                  setQuietEndTime,
+                  "time"
+                )}
               </View>
             )}
 
@@ -392,75 +479,22 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          {/* Emergency Contacts */}
-          <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Emergency Contacts</Text>
+          {/* Save Button */}
+          <TouchableOpacity 
+            style={[styles.saveButton, { backgroundColor: theme.colors.primary }]}
+            onPress={saveSettings}
+          >
+            <Text style={styles.saveButtonText}>Save Settings</Text>
+          </TouchableOpacity>
 
-            {renderInputRow(
-              "Crisis Contact",
-              "Emergency contact for crisis situations",
-              crisisContact,
-              setCrisisContact,
-              "call",
-              "Phone number or name"
-            )}
-
-            {renderInputRow(
-              "Therapist/Provider",
-              "Your therapist or healthcare provider contact",
-              therapistContact,
-              setTherapistContact,
-              "medical",
-              "Contact information"
-            )}
-          </View>
-
-          {/* Wellbeing Features */}
-          <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Wellbeing Features</Text>
-
-            {renderToggleRow(
-              "Safe Mode",
-              "Hide potentially triggering content",
-              safeMode,
-              setSafeMode,
-              "shield-checkmark"
-            )}
-
-            {renderToggleRow(
-              "Break Reminders",
-              "Remind you to take breaks during extended use",
-              breakReminders,
-              setBreakReminders,
-              "pause"
-            )}
-
-            {renderPickerRow(
-              "Breathing Exercise Duration",
-              "Default length for breathing exercises",
-              breathingDuration,
-              breathingDurationOptions,
-              setBreathingDuration,
-              "fitness"
-            )}
-
-            {renderPickerRow(
-              "Breathing Exercise Style",
-              "Preferred breathing technique",
-              breathingStyle,
-              breathingStyleOptions,
-              setBreathingStyle,
-              "leaf"
-            )}
-
-            {renderToggleRow(
-              "Offline Mode",
-              "Use app without internet connection",
-              offlineMode,
-              setOfflineMode,
-              "cloud-offline"
-            )}
-          </View>
+          {/* Loading Indicator */}
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+                Loading settings...
+              </Text>
+            </View>
+          )}
         </ScrollView>
 
         <BottomNavigation
@@ -469,7 +503,7 @@ export default function SettingsScreen() {
           onTabPress={handleTabPress}
         />
       </SafeAreaView>
-    </CurvedBackground>
+    </View>
   );
 }
 
@@ -477,23 +511,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+  safeArea: {
+    flex: 1,
   },
   scrollContainer: {
+    flexGrow: 1,
     paddingBottom: 100,
+    paddingHorizontal: 16,
   },
   section: {
-    marginHorizontal: 20,
     marginVertical: 10,
     borderRadius: 15,
     padding: 20,
@@ -504,7 +530,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
     marginBottom: 15,
   },
@@ -528,11 +554,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
   },
   settingSubtitle: {
-    fontSize: 12,
+    fontSize: 14,
     marginTop: 2,
   },
   settingRight: {
@@ -543,78 +569,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginRight: 8,
   },
-  settingInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    width: 150,
-    textAlign: "right" as const,
-  },
-  enabledIndicator: {
-    backgroundColor: "#E8F5E8",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  enabledText: {
-    fontSize: 12,
-    color: "#4CAF50",
-    fontWeight: "500",
-  },
-  nestedSettings: {
-    marginLeft: 32,
-    paddingTop: 8,
-  },
-  timeRow: {
+  timeInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
-  },
-  timeLabel: {
-    fontSize: 14,
-    marginRight: 8,
   },
   timeInput: {
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 6,
     fontSize: 14,
-    width: 60,
-    textAlign: "center" as const,
-    marginRight: 16,
+    width: 70,
+    textAlign: "center",
   },
-});
-
-const bottomNavStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  timeSeparator: {
+    fontSize: 14,
+    marginHorizontal: 8,
+  },
+  nestedSettings: {
+    marginLeft: 32,
+    paddingTop: 8,
+  },
+  loadingContainer: {
     alignItems: "center",
-    paddingVertical: 16,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    padding: 20,
   },
-  tab: {
+  loadingText: {
+    fontSize: 14,
+    fontStyle: "italic",
+  },
+  saveButton: {
+    margin: 20,
+    padding: 16,
+    borderRadius: 10,
     alignItems: "center",
-    padding: 8,
   },
-  tabText: {
-    fontSize: 12,
-    marginTop: 4,
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

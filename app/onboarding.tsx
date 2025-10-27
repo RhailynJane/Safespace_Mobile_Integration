@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../contexts/ThemeContext";
 /**
  * LLM Prompt: Add concise inline comments to this React Native component. 
  * Reference: chat.deepseek.com
@@ -79,6 +80,7 @@ const onboardingSteps = [
 ];
 
 export default function OnboardingFlow() {
+  const { theme } = useTheme();
   // Track current step index (0-based)
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -100,7 +102,7 @@ export default function OnboardingFlow() {
   const currentStepData = onboardingSteps[currentStep];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* 
         TOP SECTION (75% of screen)
         Full-screen colored background with centered image and optional step indicator
@@ -144,7 +146,7 @@ export default function OnboardingFlow() {
         BOTTOM SECTION (25% of screen)
         Off-white background containing text content, button, and progress indicators
       */}
-      <View style={styles.textSection}>
+      <View style={[styles.textSection, { backgroundColor: theme.colors.surface }]}>
         <SafeAreaView style={styles.textSafeArea}>
           {/*
             PROGRESS LINE
@@ -171,17 +173,17 @@ export default function OnboardingFlow() {
             {currentStepData && (
               <>
                 {/* Main title in dark color */}
-                <Text style={styles.title}>{currentStepData.title}</Text>
+                <Text style={[styles.title, { color: theme.colors.text }]}>{currentStepData.title}</Text>
 
             {/* Subtitle in accent color (teal) - optional */}
             {currentStepData.subtitle && (
-              <Text style={[styles.subtitle, { color: currentStepData.subtitleColor || "#14b8a6" }]}>
+              <Text style={[styles.subtitle, { color: currentStepData.subtitleColor || theme.colors.textSecondary }]}>
                 {currentStepData.subtitle}
               </Text>
             )}
 
                 {/* Description text in gray */}
-                <Text style={styles.description}>
+                <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
                   {currentStepData.description}
                 </Text>
               </>

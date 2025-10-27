@@ -22,6 +22,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalTemplate } from "../../../utils/journalApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 type CreateStep = "create" | "success";
@@ -60,6 +61,7 @@ const tabs = [
 const MAX_CHARACTERS = 1000;
 
 export default function JournalCreateScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
@@ -221,26 +223,26 @@ export default function JournalCreateScreen() {
       onRequestClose={handleSuccessClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.successModal}>
+        <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.successIcon}>
-            <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
+            <Ionicons name="checkmark-circle" size={64} color={theme.colors.primary} />
           </View>
-          <Text style={styles.successTitle}>Success!</Text>
-          <Text style={styles.successMessage}>{successMessage}</Text>
+          <Text style={[styles.successTitle, { color: theme.colors.text }]}>Success!</Text>
+          <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>{successMessage}</Text>
           {journalData.shareWithSupportWorker && (
-            <View style={styles.sharedInfo}>
-              <Ionicons name="people" size={20} color={Colors.primary} />
-              <Text style={styles.sharedInfoText}>
+            <View style={[styles.sharedInfo, { backgroundColor: theme.colors.primary + '20' }]}>
+              <Ionicons name="people" size={20} color={theme.colors.primary} />
+              <Text style={[styles.sharedInfoText, { color: theme.colors.primary }]}>
                 Your support worker has been notified
               </Text>
             </View>
           )}
           <TouchableOpacity
-            style={styles.successButton}
+            style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleSuccessClose}
             activeOpacity={0.8}
           >
-            <Text style={styles.successButtonText}>View All Entries</Text>
+            <Text style={[styles.successButtonText, { color: theme.colors.surface }]}>View All Entries</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -249,16 +251,16 @@ export default function JournalCreateScreen() {
 
   const renderCreateStep = () => (
     <View style={styles.createContainer}>
-      <Text style={styles.pageTitle}>Add New Journal</Text>
-      <Text style={styles.pageSubtitle}>
+      <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Add New Journal</Text>
+      <Text style={[styles.pageSubtitle, { color: theme.colors.textSecondary }]}>
         Express your thoughts and feelings
       </Text>
 
       {/* Template Selection */}
       {!loadingTemplates && templates.length > 0 && (
         <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Choose a Template (Optional)</Text>
-          <Text style={styles.templateSubtext}>
+          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Choose a Template (Optional)</Text>
+          <Text style={[styles.templateSubtext, { color: theme.colors.textSecondary }]}>
             Select a template to get started with guided prompts
           </Text>
           <ScrollView 
@@ -271,8 +273,11 @@ export default function JournalCreateScreen() {
                 key={template.id}
                 style={[
                   styles.templateCard,
-                  journalData.templateId === template.id &&
+                  { backgroundColor: theme.colors.surface },
+                  journalData.templateId === template.id && [
                     styles.templateCardSelected,
+                    { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '08' }
+                  ],
                 ]}
                 onPress={() => handleTemplateSelect(template)}
                 activeOpacity={0.8}
@@ -283,16 +288,19 @@ export default function JournalCreateScreen() {
                     size={20}
                     color={
                       journalData.templateId === template.id
-                        ? Colors.primary
-                        : Colors.textSecondary
+                        ? theme.colors.primary
+                        : theme.colors.textSecondary
                     }
                   />
                 </View>
                 <Text
                   style={[
                     styles.templateName,
-                    journalData.templateId === template.id &&
+                    { color: theme.colors.textSecondary },
+                    journalData.templateId === template.id && [
                       styles.templateNameSelected,
+                      { color: theme.colors.primary }
+                    ],
                   ]}
                   numberOfLines={1}
                 >
@@ -306,28 +314,35 @@ export default function JournalCreateScreen() {
 
       {loadingTemplates && (
         <View style={styles.templatesLoadingContainer}>
-          <ActivityIndicator size="small" color={Colors.primary} />
-          <Text style={styles.templatesLoadingText}>Loading templates...</Text>
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+          <Text style={[styles.templatesLoadingText, { color: theme.colors.textSecondary }]}>Loading templates...</Text>
         </View>
       )}
 
       <View style={styles.fieldContainer}>
-        <Text style={styles.fieldLabel}>Journal Title *</Text>
+        <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Journal Title *</Text>
         <TextInput
-          style={styles.titleInput}
+          style={[
+            styles.titleInput, 
+            { 
+              backgroundColor: theme.colors.surface,
+              color: theme.colors.text,
+              borderColor: theme.colors.border
+            }
+          ]}
           placeholder="Give your entry a title..."
           value={journalData.title}
           onChangeText={handleTitleChange}
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={theme.colors.textSecondary}
         />
       </View>
 
       <View style={styles.fieldContainer}>
         <View style={styles.labelRow}>
           <View>
-            <Text style={styles.fieldLabel}>Write your Entry *</Text>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Write your Entry *</Text>
             {selectedTemplate && (
-              <Text style={styles.templatePromptHint}>
+              <Text style={[styles.templatePromptHint, { color: theme.colors.primary }]}>
                 Using template: {selectedTemplate.name}
               </Text>
             )}
@@ -336,7 +351,8 @@ export default function JournalCreateScreen() {
             <Text
               style={[
                 styles.characterCount,
-                characterCount >= MAX_CHARACTERS && styles.characterCountMax,
+                { color: theme.colors.textSecondary },
+                characterCount >= MAX_CHARACTERS && [styles.characterCountMax, { color: theme.colors.error }],
               ]}
             >
               {characterCount}/{MAX_CHARACTERS}
@@ -345,28 +361,38 @@ export default function JournalCreateScreen() {
         </View>
         
         <TextInput
-          style={styles.contentInput}
+          style={[
+            styles.contentInput, 
+            { 
+              backgroundColor: theme.colors.surface,
+              color: theme.colors.text,
+              borderColor: theme.colors.border
+            }
+          ]}
           placeholder="Write about your day, feelings or anything on your mind..."
           value={journalData.content}
           onChangeText={handleContentChange}
           multiline
           textAlignVertical="top"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={theme.colors.textSecondary}
           maxLength={MAX_CHARACTERS}
         />
       </View>
 
       <View style={styles.fieldContainer}>
-        <Text style={styles.fieldLabel}>How are you feeling? *</Text>
-        <Text style={styles.emotionSubtext}>Select your current mood</Text>
+        <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>How are you feeling? *</Text>
+        <Text style={[styles.emotionSubtext, { color: theme.colors.textSecondary }]}>Select your current mood</Text>
         <View style={styles.emotionsContainer}>
           {emotionOptions.map((emotion) => (
             <TouchableOpacity
               key={emotion.id}
               style={[
                 styles.emotionButton,
-                journalData.emotion === emotion.id &&
+                { backgroundColor: theme.colors.surface },
+                journalData.emotion === emotion.id && [
                   styles.emotionButtonSelected,
+                  { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '08' }
+                ],
               ]}
               onPress={() => handleEmotionSelect(emotion)}
               activeOpacity={0.8}
@@ -374,7 +400,8 @@ export default function JournalCreateScreen() {
               <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
               <Text style={[
                 styles.emotionLabel,
-                journalData.emotion === emotion.id && styles.emotionLabelSelected
+                { color: theme.colors.textSecondary },
+                journalData.emotion === emotion.id && [styles.emotionLabelSelected, { color: theme.colors.primary }]
               ]}>
                 {emotion.label}
               </Text>
@@ -384,21 +411,27 @@ export default function JournalCreateScreen() {
       </View>
 
       <View style={styles.fieldContainer}>
-        <View style={styles.shareContainer}>
+        <View style={[
+          styles.shareContainer, 
+          { 
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border
+          }
+        ]}>
           <View style={styles.shareTextContainer}>
-            <Text style={styles.fieldLabel}>Share with Support Worker</Text>
-            <Text style={styles.shareSubtext}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Share with Support Worker</Text>
+            <Text style={[styles.shareSubtext, { color: theme.colors.textSecondary }]}>
               Your support worker will be able to view this entry
             </Text>
           </View>
           <Switch
             value={journalData.shareWithSupportWorker}
             onValueChange={handleToggleShare}
-            trackColor={{ false: Colors.disabled, true: Colors.primary + "50" }}
+            trackColor={{ false: theme.colors.textDisabled, true: theme.colors.primary + "50" }}
             thumbColor={
               journalData.shareWithSupportWorker
-                ? Colors.primary
-                : Colors.surface
+                ? theme.colors.primary
+                : theme.colors.surface
             }
           />
         </View>
@@ -412,23 +445,33 @@ export default function JournalCreateScreen() {
     return (
       <View style={styles.actionButtons}>
         <TouchableOpacity 
-          style={styles.cancelButton} 
+          style={[
+            styles.cancelButton, 
+            { 
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border
+            }
+          ]} 
           onPress={handleCancel}
           activeOpacity={0.8}
         >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
+          <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.saveButton, loading && styles.disabledButton]}
+          style={[
+            styles.saveButton, 
+            { backgroundColor: theme.colors.primary },
+            loading && styles.disabledButton
+          ]}
           onPress={handleSave}
           disabled={loading}
           activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator color={Colors.surface} />
+            <ActivityIndicator color={theme.colors.surface} />
           ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={[styles.saveButtonText, { color: theme.colors.surface }]}>Save</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -437,9 +480,9 @@ export default function JournalCreateScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          style={styles.container}
+          style={[styles.container, { backgroundColor: theme.colors.background }]}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <AppHeader title="Journal" showBack={true} showMenu={true} />
@@ -487,7 +530,6 @@ const styles = StyleSheet.create({
   pageSubtitle: {
     ...Typography.caption,
     textAlign: "center",
-    color: Colors.textSecondary,
     marginBottom: Spacing.xxl,
   },
   fieldContainer: {
@@ -509,41 +551,31 @@ const styles = StyleSheet.create({
   },
   characterCount: {
     ...Typography.caption,
-    color: Colors.textSecondary,
   },
   characterCountMax: {
-    color: Colors.error,
     fontWeight: "600",
   },
   titleInput: {
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
-    color: Colors.textPrimary,
     borderWidth: 1,
-    borderColor: Colors.disabled,
   },
   contentInput: {
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     ...Typography.body,
-    color: Colors.textPrimary,
     height: 450,
     borderWidth: 1,
-    borderColor: Colors.disabled,
     textAlignVertical: 'top',
   },
   // Template Styles
   templateSubtext: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginBottom: Spacing.lg,
   },
   templatePromptHint: {
     ...Typography.caption,
-    color: Colors.primary,
     fontStyle: 'italic',
     marginTop: 2,
   },
@@ -551,7 +583,6 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.xl,
   },
   templateCard: {
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     marginRight: Spacing.md,
@@ -562,19 +593,16 @@ const styles = StyleSheet.create({
   },
   templateCardSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primary + "08",
   },
   templateIconContainer: {
     marginBottom: Spacing.sm,
   },
   templateName: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     textAlign: "center",
     fontSize: 12,
   },
   templateNameSelected: {
-    color: Colors.primary,
     fontWeight: "600",
   },
   templatesLoadingContainer: {
@@ -585,13 +613,11 @@ const styles = StyleSheet.create({
   },
   templatesLoadingText: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginLeft: Spacing.sm,
   },
   // Emotion Styles
   emotionSubtext: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginBottom: Spacing.lg,
   },
   emotionsContainer: {
@@ -603,7 +629,6 @@ const styles = StyleSheet.create({
   emotionButton: {
     flex: 1,
     minWidth: "30%",
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.md,
     alignItems: "center",
@@ -612,7 +637,6 @@ const styles = StyleSheet.create({
   },
   emotionButtonSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primary + "08",
   },
   emotionEmoji: {
     fontSize: 28,
@@ -620,23 +644,19 @@ const styles = StyleSheet.create({
   },
   emotionLabel: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     textAlign: "center",
     fontSize: 12,
   },
   emotionLabelSelected: {
-    color: Colors.primary,
     fontWeight: "600",
   },
   shareContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.disabled,
   },
   shareTextContainer: {
     flex: 1,
@@ -644,7 +664,6 @@ const styles = StyleSheet.create({
   },
   shareSubtext: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginTop: 4,
   },
   actionButtons: {
@@ -655,20 +674,16 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.disabled,
   },
   cancelButtonText: {
     ...Typography.button,
-    color: Colors.textSecondary,
   },
   saveButton: {
     flex: 1,
-    backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
     alignItems: "center",
@@ -688,7 +703,6 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   successModal: {
-    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: Spacing.xxl,
     width: "100%",
@@ -707,13 +721,11 @@ const styles = StyleSheet.create({
     ...Typography.body,
     textAlign: "center",
     marginBottom: Spacing.lg,
-    color: Colors.textSecondary,
     lineHeight: 22,
   },
   sharedInfo: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.primary + "20",
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.xl,
@@ -721,12 +733,10 @@ const styles = StyleSheet.create({
   },
   sharedInfoText: {
     ...Typography.caption,
-    color: Colors.primary,
     marginLeft: Spacing.sm,
     flex: 1,
   },
   successButton: {
-    backgroundColor: Colors.primary,
     borderRadius: 12,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,

@@ -4,7 +4,7 @@
 CREATE TABLE assessments (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    assessment_type VARCHAR(50) NOT NULL DEFAULT 'pre-survey',
+    assessment_type VARCHAR(50) NOT NULL DEFAULT 'pre_survey',
     
     responses JSONB NOT NULL,
     total_score INTEGER,
@@ -19,7 +19,7 @@ CREATE TABLE assessments (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    CONSTRAINT chk_assessment_type CHECK (assessment_type IN ('pre-survey', 'post-survey', 'periodic-check')),
+    CONSTRAINT chk_assessment_type CHECK (assessment_type IN ('pre_survey', 'post_survey', 'periodic_check')),
     CONSTRAINT chk_total_score CHECK (total_score >= 7 AND total_score <= 35)
 );
 

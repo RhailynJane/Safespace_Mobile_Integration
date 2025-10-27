@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -12,10 +13,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
+import { syncUserWithDatabase } from "../../../../utils/userSync";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -37,9 +40,11 @@ export default function ProfileScreen() {
     location: "",
   });
   const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const { signOut } = useAuth();
   const { user } = useUser();
+  const { theme } = useTheme();
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -49,145 +54,164 @@ export default function ProfileScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Sync user data with backend
-  const syncUserWithBackend = async () => {
-    if (!user?.id) {
-      console.log('No user ID available');
-      return;
+  // Use the existing sync function from userSync.ts
+  const syncUserWithBackend = async (): Promise<boolean> => {
+    if (!user) {
+      console.log("❌ No user available for sync");
+      return false;
     }
 
     try {
-      console.log('Attempting to sync user with backend...');
-      
-      const userData = {
-        clerkUserId: user.id,
-        email: user.emailAddresses[0]?.emailAddress,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber,
-      };
+      console.log("🔄 Using userSync.ts to sync user...");
+      await syncUserWithDatabase(user);
+      console.log("✅ User synced successfully via userSync.ts");
+      return true;
+    } catch (error) {
+      console.error("❌ Error syncing user via userSync.ts:", error);
+      return false;
+    }
+  };
 
-      console.log('Sending user data:', userData);
+  // Simple function to fetch client profile directly
+  const fetchClientProfile = async (clerkUserId: string): Promise<any> => {
+    try {
+      console.log("📋 Fetching client profile for:", clerkUserId);
 
-      // Fixed URL - removed duplicate /api
-      const response = await fetch(`${API_URL}/sync-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
+      const response = await fetch(
+        `${API_URL}/api/client-profile/${clerkUserId}`
+      );
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+      console.log("Profile response status:", response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server response error:', errorText);
-        throw new Error(`Failed to sync user with backend: ${response.status} - ${errorText}`);
+        if (response.status === 404) {
+          console.log("Profile not found, might be new user");
+          return null;
+        }
+        throw new Error(`Failed to fetch profile: ${response.status}`);
       }
 
-      const data = await response.json();
-      console.log('User synced successfully:', data);
-      return data;
+      const result = await response.json();
+
+      if (result.success) {
+        return result.data;
+      } else {
+        throw new Error(result.message);
+      }
     } catch (error) {
-      console.error('Error syncing user:', error);
-      // Don't throw the error here to prevent breaking the profile loading
+      console.error("Error fetching client profile:", error);
+      return null;
     }
   };
 
   // Fetch profile data from backend
-const fetchProfileData = useCallback(async () => {
-  if (!user?.id) return;
-
-  // Move syncUserWithBackend inside the callback
-  const syncUserWithBackend = async () => {
+  const fetchProfileData = useCallback(async () => {
     if (!user?.id) {
-      console.log('No user ID available');
+      console.log("❌ No user available");
+      setLoading(false);
       return;
     }
 
     try {
-      console.log('Attempting to sync user with backend...');
-      
-      const userData = {
-        clerkUserId: user.id,
-        email: user.emailAddresses[0]?.emailAddress,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber,
-      };
+      setLoading(true);
+      console.log("📋 Starting profile data fetch...");
 
-      console.log('Sending user data:', userData);
+      // First try to sync user (but don't block if it fails)
+      const syncSuccess = await syncUserWithBackend();
+      console.log("Sync success:", syncSuccess);
 
-      const response = await fetch(`${API_URL}/sync-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server response error:', errorText);
-        throw new Error(`Failed to sync user with backend: ${response.status} - ${errorText}`);
+      // ✅ Load profile image from AsyncStorage FIRST (highest priority)
+      let localProfileImage: string | undefined;
+      try {
+        const savedImage = await AsyncStorage.getItem("profileImage");
+        if (savedImage) {
+          localProfileImage = savedImage;
+          console.log("📸 Found local profile image");
+        }
+      } catch (storageError) {
+        console.error(
+          "Error loading profile image from storage:",
+          storageError
+        );
       }
 
-      const data = await response.json();
-      console.log('User synced successfully:', data);
-      return data;
+      // Try to load from backend API using direct function call
+      try {
+        const backendProfile = await fetchClientProfile(user.id);
+
+        if (backendProfile) {
+          setProfileData((prev) => ({
+            ...prev,
+            firstName: backendProfile.firstName || user.firstName || "User",
+            lastName: backendProfile.lastName || user.lastName || "",
+            email:
+              backendProfile.email ||
+              user.emailAddresses[0]?.emailAddress ||
+              "",
+            phoneNumber:
+              backendProfile.phoneNumber || user.phoneNumbers[0]?.phoneNumber,
+            // ✅ Priority: Local > Backend > Clerk
+            profileImageUrl:
+              localProfileImage ||
+              backendProfile.profileImage ||
+              user.imageUrl ||
+              prev.profileImageUrl,
+          }));
+        } else {
+          // Fallback to Clerk data
+          console.log("Using Clerk data as fallback");
+          setProfileData((prev) => ({
+            ...prev,
+            firstName: user.firstName || prev.firstName || "User",
+            lastName: user.lastName || prev.lastName || "",
+            email: user.emailAddresses[0]?.emailAddress || prev.email || "",
+            phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
+            // ✅ Priority: Local > Clerk
+            profileImageUrl:
+              localProfileImage || user.imageUrl || prev.profileImageUrl,
+          }));
+        }
+      } catch (apiError) {
+        console.error("❌ API error, using Clerk data:", apiError);
+        // Use Clerk data as final fallback
+        setProfileData((prev) => ({
+          ...prev,
+          firstName: user.firstName || prev.firstName || "User",
+          lastName: user.lastName || prev.lastName || "",
+          email: user.emailAddresses[0]?.emailAddress || prev.email || "",
+          phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
+          // ✅ Priority: Local > Clerk
+          profileImageUrl:
+            localProfileImage || user.imageUrl || prev.profileImageUrl,
+        }));
+      }
+
+      // Load local storage data for other fields
+      try {
+        const savedProfileData = await AsyncStorage.getItem("profileData");
+        if (savedProfileData) {
+          const parsedData = JSON.parse(savedProfileData);
+          setProfileData((prev) => ({
+            ...prev,
+            ...parsedData,
+            // ✅ Keep the profile image we already set (don't overwrite)
+            profileImageUrl: prev.profileImageUrl,
+          }));
+        }
+      } catch (storageError) {
+        console.error("Error loading local storage:", storageError);
+      }
     } catch (error) {
-      console.error('Error syncing user:', error);
+      console.error("❌ Error in fetchProfileData:", error);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  try {
-    setLoading(true);
-    
-    // First sync user with backend (non-blocking)
-    try {
-      await syncUserWithBackend();
-    } catch (syncError) {
-      console.log('Sync failed, continuing with local data...');
-      // Continue loading profile even if sync fails
-    }
-    
-    // Load local storage for additional data
-    const savedProfileData = await AsyncStorage.getItem('profileData');
-    if (savedProfileData) {
-      const parsedData = JSON.parse(savedProfileData);
-      setProfileData(prev => ({
-        ...prev,
-        ...parsedData
-      }));
-    }
-
-    // Set data from Clerk user object
-    setProfileData(prev => ({
-      ...prev,
-      firstName: user.firstName || prev.firstName || "User",
-      lastName: user.lastName || prev.lastName || "",
-      email: user.emailAddresses[0]?.emailAddress || prev.email || "",
-      phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
-      profileImageUrl: user.imageUrl || prev.profileImageUrl,
-    }));
-
-  } catch (error) {
-    console.error('Error fetching profile data:', error);
-  } finally {
-    setLoading(false);
-  }
-}, [user]); // Only user is needed as dependency now
+  }, [user]);
 
   useEffect(() => {
     fetchProfileData();
   }, [fetchProfileData]);
 
-  // ... rest of your component code remains the same
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -197,26 +221,50 @@ const fetchProfileData = useCallback(async () => {
     }
   };
 
-  const handleLogout = async () => {
+    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+
+  const handleLogout = async (user: any) => {
     try {
       console.log('Signout initiated...');
       
-      if (signOut) {
-        await signOut();
-        console.log('Clerk signout successful');
+      // Get current user info before signing out
+      const clerkUserId = user?.id;
+    
+    // Update logout timestamp in database
+    if (clerkUserId) {
+      try {
+        await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('Logout timestamp updated in database');
+      } catch (dbError) {
+        console.error('Failed to update logout timestamp:', dbError);
+        // Continue with logout even if DB update fails
       }
-      
-      await AsyncStorage.clear();
-      console.log('AsyncStorage cleared');
-      
-      router.replace("/(auth)/login");
-      console.log('Navigation to login completed');
-      
-    } catch (error) {
-      console.error("Signout error:", error);
-      Alert.alert("Sign Out Failed", "Unable to sign out. Please try again.");
     }
+    
+    await AsyncStorage.clear();
+    console.log('AsyncStorage cleared');
+    
+    if (signOut) {
+      await signOut();
+      console.log('Clerk signout successful');
+    }
+    
+    router.navigate("/(auth)/login");
+    console.log('Navigation to login completed');
+    
+  } catch (error) {
+    console.error("Signout error:", error);
+    router.navigate("/(auth)/login");
+  }
+
+
   };
+
 
   const getFullName = () => {
     if (profileData.firstName && profileData.lastName) {
@@ -228,23 +276,23 @@ const fetchProfileData = useCallback(async () => {
   const getInitials = () => {
     const firstName = profileData.firstName || "";
     const lastName = profileData.lastName || "";
-    
+
     if (firstName && lastName) {
       return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     } else if (firstName) {
       return firstName.charAt(0).toUpperCase();
     }
-    
+
     return "U";
   };
 
   if (loading) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.loadingText}>Loading profile...</Text>
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading profile...</Text>
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -253,64 +301,63 @@ const fetchProfileData = useCallback(async () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Profile Information Section */}
-          <View style={styles.profileSection}>
+          <View style={[styles.profileSection, { backgroundColor: theme.colors.surface }]}>
             {profileData.profileImageUrl ? (
-              <Image 
-                source={{ uri: profileData.profileImageUrl }} 
-                style={styles.profileImage} 
+              <Image
+                source={{ uri: profileData.profileImageUrl }}
+                style={styles.profileImage}
               />
             ) : (
               <View style={styles.profileInitials}>
                 <Text style={styles.initialsText}>{getInitials()}</Text>
               </View>
             )}
-            <Text style={styles.name}>{getFullName()}</Text>
-            <Text style={styles.email}>{profileData.email}</Text>
+            <Text style={[styles.name, { color: theme.colors.text }]}>{getFullName()}</Text>
+            <Text style={[styles.email, { color: theme.colors.textSecondary }]}>{profileData.email}</Text>
             {profileData.location && (
               <View style={styles.locationContainer}>
-                <Ionicons name="location-outline" size={14} color="#666" />
-                <Text style={styles.location}>{profileData.location}</Text>
+                <Ionicons name="location-outline" size={14} color={theme.colors.icon} />
+                <Text style={[styles.location, { color: theme.colors.textSecondary }]}>{profileData.location}</Text>
               </View>
             )}
           </View>
 
           {/* Menu Items Section */}
-          <View style={styles.menuSection}>
+          <View style={[styles.menuSection, { backgroundColor: theme.colors.surface }]}>
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: theme.colors.borderLight }]}
               onPress={() => router.push("/profile/edit")}
             >
-              <Ionicons name="person-outline" size={24} color="#666" />
-              <Text style={styles.menuText}>Edit Profile</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
+              <Ionicons name="person-outline" size={24} color={theme.colors.icon} />
+              <Text style={[styles.menuText, { color: theme.colors.text }]}>Edit Profile</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: theme.colors.borderLight }]}
               onPress={() => router.push("/profile/settings")}
             >
-              <Ionicons name="settings-outline" size={24} color="#666" />
-              <Text style={styles.menuText}>Settings</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
+              <Ionicons name="settings-outline" size={24} color={theme.colors.icon} />
+              <Text style={[styles.menuText, { color: theme.colors.text }]}>Settings</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.menuItem}
+              style={[styles.menuItem, { borderBottomColor: theme.colors.borderLight }]}
               onPress={() => router.push("/profile/help-support")}
             >
-              <Ionicons name="help-circle-outline" size={24} color="#666" />
-              <Text style={styles.menuText}>Help & Support</Text>
-              <Ionicons name="chevron-forward" size={20} color="#666" />
+              <Ionicons name="help-circle-outline" size={24} color={theme.colors.icon} />
+              <Text style={[styles.menuText, { color: theme.colors.text }]}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.menuItem, styles.logoutItem]}
-              onPress={handleLogout}
+              onPress={() => handleLogout(user)}
             >
-              <Ionicons name="log-out-outline" size={24} color="#FF6B6B" />
               <Text style={[styles.menuText, styles.logoutText]}>Sign Out</Text>
             </TouchableOpacity>
           </View>
@@ -337,13 +384,13 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   profileSection: {
     alignItems: "center",

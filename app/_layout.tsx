@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ThemeProvider } from "../contexts/ThemeContext";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -17,16 +18,32 @@ if (!publishableKey) {
 
 // Component to handle user synchronization with PostgreSQL
 function UserSyncHandler() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
 
   useEffect(() => {
-    if (isLoaded && isSignedIn && user) {
-      syncUserWithDatabase(user);
-      // Mark onboarding as completed when user is created
-      AsyncStorage.setItem("hasCompletedOnboarding", "true");
+    async function handleUserSync() {
+      if (isLoaded && isSignedIn && user) {
+        try {
+          const token = await getToken();
+          if (token) {
+            await syncUserWithDatabase(user, token);
+          } else {
+            console.warn("⚠️ Token is null, skipping user sync.");
+          }
+          // Mark onboarding as completed when user is created
+          await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+          console.log("✅ User synced successfully");
+        } catch (error) {
+          console.error("❌ Failed to sync user:", error);
+          // Don't block the app if sync fails - user might already exist
+          await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+        }
+      }
     }
-  }, [isLoaded, isSignedIn, user]);
+
+    handleUserSync();
+  }, [isLoaded, isSignedIn, user, getToken]);
 
   return null;
 }
@@ -65,8 +82,8 @@ function RootLayoutNav() {
     } else if (!isSignedIn && !inAuthGroup) {
       // User is signed out but not in auth group
       if (hasCompletedOnboarding) {
-        // User has an account, go to sign-in
-        router.replace("/(auth)/sign-in");
+        // User has an account, go to login
+        router.replace("/(auth)/login");
       }
     }
   }, [isLoaded, isSignedIn, segments, hasCompletedOnboarding, router]);
@@ -97,34 +114,10 @@ export default function RootLayout() {
     LogBox.ignoreLogs([
       'useInsertionEffect must not schedule updates',
       'Non-serializable values were found in the navigation state',
-      '[clerk/telemetry]', // Add this to suppress Clerk telemetry errors
+      '[clerk/telemetry]',
+      'Due to changes in Androids permission requirements',
+      'Expo Go can no longer provide full access to the media library',
     ]);
-
-    // Additional telemetry error suppression for development
-    if (__DEV__) {
-      const originalError = console.error;
-      const originalWarn = console.warn;
-
-      console.error = (...args) => {
-        if (
-          typeof args[0] === 'string' && 
-          args[0].includes('[clerk/telemetry]')
-        ) {
-          return;
-        }
-        originalError(...args);
-      };
-
-      console.warn = (...args) => {
-        if (
-          typeof args[0] === 'string' && 
-          args[0].includes('[clerk/telemetry]')
-        ) {
-          return;
-        }
-        originalWarn(...args);
-      };
-    }
   }, []);
 
   return (
@@ -133,8 +126,10 @@ export default function RootLayout() {
       tokenCache={tokenCache}
     >
       <SafeAreaProvider>
-        <UserSyncHandler />
-        <RootLayoutNav />
+        <ThemeProvider>
+          <UserSyncHandler />
+          <RootLayoutNav />
+        </ThemeProvider>
       </SafeAreaProvider>
     </ClerkProvider>
   );

@@ -15,6 +15,7 @@ import {
 import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 // Type definition for a Notification object.
 interface Notification {
@@ -32,6 +33,7 @@ interface Notification {
  * appointment reminders, system updates, or journal/mood reminders.
  */
 export default function NotificationsScreen() {
+  const { theme } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -169,12 +171,12 @@ export default function NotificationsScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Notifications" showBack={true} />
 
         {/* Top bar showing unread count & "Mark all as read" action */}
         <View style={styles.headerActions}>
-          <Text style={styles.unreadText}>
+          <Text style={[styles.unreadText, { color: theme.colors.text }]}>
             {unreadCount} unread{" "}
             {unreadCount === 1 ? "notification" : "notifications"}
           </Text>

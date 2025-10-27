@@ -17,8 +17,10 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSignIn } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ForgotPasswordScreen() {
+  const { theme } = useTheme();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
@@ -88,7 +90,7 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
       <KeyboardAvoidingView
@@ -101,32 +103,36 @@ export default function ForgotPasswordScreen() {
             onPress={() => router.back()}
             disabled={loading}
           >
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
 
           <View style={styles.logoContainer}>
             <SafeSpaceLogo size={218} />
           </View>
 
-          <Text style={styles.title}>Reset Your Password</Text>
-          <Text style={styles.subtitle}>
-            Enter your email address and we'll send you a link to reset your
+          <Text style={[styles.title, { color: theme.colors.text }]}>Reset Your Password</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+            Enter your email address and we&apos;ll send you a link to reset your
             password.
           </Text>
 
           <View style={styles.formContainer}>
-            <Text style={styles.inputLabel}>Email Address</Text>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Email Address</Text>
 
-            <View style={styles.inputWrapper}>
+            <View style={[styles.inputWrapper, { 
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.borderLight
+            }]}>
               <Ionicons
                 name="mail-outline"
                 size={20}
-                color="#999"
+                color={theme.colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: theme.colors.text }]}
                 placeholder="Enter your email address"
+                placeholderTextColor={theme.colors.textSecondary}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -147,7 +153,7 @@ export default function ForgotPasswordScreen() {
             ) : null}
 
             <TouchableOpacity
-              style={[styles.resetButton, loading && styles.disabledButton]}
+              style={[styles.resetButton, { backgroundColor: theme.colors.primary }, loading && styles.disabledButton]}
               onPress={handleResetPassword}
               disabled={loading || !isLoaded}
             >
@@ -161,9 +167,9 @@ export default function ForgotPasswordScreen() {
                 onPress={() => router.back()}
                 disabled={loading}
               >
-                <Text style={styles.footerText}>
+                <Text style={[styles.footerText, { color: theme.colors.textSecondary }]}>
                   Remember your password?{" "}
-                  <Text style={styles.linkText}>Back to Sign In</Text>
+                  <Text style={[styles.linkText, { color: theme.colors.error }]}>Back to Sign In</Text>
                 </Text>
               </TouchableOpacity>
             </View>

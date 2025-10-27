@@ -22,6 +22,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import { BlurView } from "expo-blur";
 import { assessmentTracker } from "../../../utils/assessmentTracker";
 import { useUser } from "@clerk/clerk-expo";
+import { useTheme } from "../../../contexts/ThemeContext";
 const { width } = Dimensions.get("window");
 
 // Survey questions based on Short Warwick-Edinburgh Mental Wellbeing Scale
@@ -45,6 +46,7 @@ const responseOptions = [
 ];
 
 export default function PreSurveyScreen() {
+  const { theme } = useTheme();
   // Store responses for all questions (question id -> selected value)
   const [responses, setResponses] = useState<{ [key: number]: number }>({});
   const [activeTab, setActiveTab] = useState("assessment");
@@ -123,29 +125,40 @@ export default function PreSurveyScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
-        <AppHeader title="Pre-Self Assessment Test" showBack={true} />
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+        <AppHeader title="Self Assessment" showBack={true} />
 
         <ScrollView
           style={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: theme.colors.text }]}>
               Short Warwick-Edinburgh Mental Wellbeing Scale
             </Text>
-            <Text style={styles.instructions}>
+            <Text style={[styles.instructions, { color: theme.colors.textSecondary }]}>
               Please rate how you&apos;ve been feeling over the last 2 weeks.
             </Text>
 
             {/* Survey Questions */}
             <View style={styles.questionsContainer}>
               {surveyQuestions.map((question, index) => (
-                <View key={question.id} style={styles.questionBlock}>
-                  <Text style={styles.questionNumber}>
+                <View 
+                  key={question.id} 
+                  style={[
+                    styles.questionBlock, 
+                    { 
+                      backgroundColor: theme.colors.surface,
+                      shadowColor: theme.isDark ? "#000" : "#000",
+                    }
+                  ]}
+                >
+                  <Text style={[styles.questionNumber, { color: theme.colors.primary }]}>
                     Question {index + 1}
                   </Text>
-                  <Text style={styles.questionText}>{question.text}</Text>
+                  <Text style={[styles.questionText, { color: theme.colors.text }]}>
+                    {question.text}
+                  </Text>
 
                   {/* Response Options */}
                   <View style={styles.optionsContainer}>
@@ -154,8 +167,14 @@ export default function PreSurveyScreen() {
                         key={option.value}
                         style={[
                           styles.optionButton,
-                          responses[question.id] === option.value &&
+                          { backgroundColor: theme.colors.borderLight },
+                          responses[question.id] === option.value && [
                             styles.optionButtonSelected,
+                            { 
+                              backgroundColor: theme.isDark ? '#1B5E20' : '#E8F5E9',
+                              borderColor: theme.colors.primary 
+                            }
+                          ],
                         ]}
                         onPress={() =>
                           handleResponse(question.id, option.value)
@@ -164,67 +183,36 @@ export default function PreSurveyScreen() {
                         <View
                           style={[
                             styles.radioCircle,
-                            responses[question.id] === option.value &&
+                            { borderColor: theme.colors.textDisabled },
+                            responses[question.id] === option.value && [
                               styles.radioCircleSelected,
+                              { borderColor: theme.colors.primary }
+                            ],
                           ]}
                         >
                           {responses[question.id] === option.value && (
-                            <View style={styles.radioInner} />
+                            <View 
+                              style={[
+                                styles.radioInner, 
+                                { backgroundColor: theme.colors.primary }
+                              ]} 
+                            />
                           )}
                         </View>
                         <Text
                           style={[
                             styles.optionLabel,
-                            responses[question.id] === option.value &&
+                            { color: theme.colors.textSecondary },
+                            responses[question.id] === option.value && [
                               styles.optionLabelSelected,
+                              { color: theme.colors.text }
+                            ],
                           ]}
                         >
                           {option.label}
                         </Text>
                       </TouchableOpacity>
                     ))}
-
-                    {/* Success Modal */}
-                    <Modal
-                      visible={showSuccessModal}
-                      transparent={true}
-                      animationType="fade"
-                      onRequestClose={() => setShowSuccessModal(false)}
-                    >
-                      <BlurView intensity={80} style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                          <View style={styles.successIconContainer}>
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={64}
-                              color="#4CAF50"
-                            />
-                          </View>
-
-                          <Text style={styles.modalTitle}>
-                            Survey Submitted Successfully!
-                          </Text>
-
-                          <Text style={styles.modalMessage}>
-                            Your assessment has been completed and will be
-                            reviewed by your assigned support worker. You can
-                            expect to hear from them soon.
-                          </Text>
-
-                          <TouchableOpacity
-                            style={styles.modalButton}
-                            onPress={() => {
-                              setShowSuccessModal(false);
-                              router.replace("/(app)/(tabs)/home");
-                            }}
-                          >
-                            <Text style={styles.modalButtonText}>
-                              Return to Home
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      </BlurView>
-                    </Modal>
                   </View>
                 </View>
               ))}
@@ -234,7 +222,11 @@ export default function PreSurveyScreen() {
             <TouchableOpacity
               style={[
                 styles.submitButton,
-                !isComplete() && styles.submitButtonDisabled,
+                { backgroundColor: theme.colors.primary },
+                !isComplete() && [
+                  styles.submitButtonDisabled,
+                  { backgroundColor: theme.colors.textDisabled }
+                ],
               ]}
               onPress={handleSubmit}
               disabled={!isComplete()}
@@ -251,6 +243,48 @@ export default function PreSurveyScreen() {
             <View style={styles.bottomPadding} />
           </View>
         </ScrollView>
+
+        {/* Success Modal */}
+        <Modal
+          visible={showSuccessModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <BlurView intensity={80} style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.successIconContainer}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={64}
+                  color={theme.colors.primary}
+                />
+              </View>
+
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                Survey Submitted Successfully!
+              </Text>
+
+              <Text style={[styles.modalMessage, { color: theme.colors.textSecondary }]}>
+                Your assessment has been completed and will be
+                reviewed by your assigned support worker. You can
+                expect to hear from them soon.
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.replace("/(app)/(tabs)/home");
+                }}
+              >
+                <Text style={styles.modalButtonText}>
+                  Return to Home
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </Modal>
 
         <BottomNavigation
           tabs={tabs}
@@ -277,13 +311,11 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
     textAlign: "center",
     marginBottom: 10,
   },
   instructions: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
     marginBottom: 30,
     lineHeight: 20,
@@ -292,10 +324,8 @@ const styles = StyleSheet.create({
     gap: 25,
   },
   questionBlock: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 20,
-    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -307,7 +337,6 @@ const styles = StyleSheet.create({
   questionNumber: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#4CAF50",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -315,7 +344,6 @@ const styles = StyleSheet.create({
   questionText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#333",
     marginBottom: 20,
     lineHeight: 22,
   },
@@ -327,12 +355,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 10,
     borderRadius: 12,
-    backgroundColor: "#F5F5F5",
     borderWidth: 2,
     borderColor: "transparent",
   },
   optionButtonSelected: {
-    backgroundColor: "#E8F5E9",
     borderColor: "#4CAF50",
   },
   radioCircle: {
@@ -340,7 +366,6 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#BDBDBD",
     marginRight: 12,
     justifyContent: "center",
     alignItems: "center",
@@ -352,25 +377,20 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#4CAF50",
   },
   optionLabel: {
     fontSize: 14,
-    color: "#666",
     textAlign: "center",
     lineHeight: 18,
   },
   optionLabelSelected: {
-    color: "#333",
     fontWeight: "500",
   },
   submitButton: {
-    backgroundColor: "#4CAF50",
     padding: 18,
     borderRadius: 12,
     alignItems: "center",
     marginTop: 30,
-    shadowColor: "#4CAF50",
     shadowOffset: {
       width: 0,
       height: 4,
@@ -380,7 +400,6 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   submitButtonDisabled: {
-    backgroundColor: "#BDBDBD",
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -400,7 +419,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 30,
     width: "100%",
@@ -420,25 +438,21 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#333",
     textAlign: "center",
     marginBottom: 15,
   },
   modalMessage: {
     fontSize: 15,
-    color: "#666",
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 25,
   },
   modalButton: {
-    backgroundColor: "#4CAF50",
     paddingVertical: 14,
     paddingHorizontal: 40,
     borderRadius: 12,
     width: "100%",
     alignItems: "center",
-    shadowColor: "#4CAF50",
     shadowOffset: {
       width: 0,
       height: 2,

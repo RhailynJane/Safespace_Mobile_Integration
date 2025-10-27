@@ -1,41 +1,60 @@
 // utils/userSync.ts
 import type { UserResource as User } from '@clerk/types';
 
-// Mock function - replace with your actual API call
-export async function syncUserWithDatabase(clerkUser: User) {
+export async function syncUserWithDatabase(clerkUser: User, authToken?: string) {
   try {
     const userData = {
       clerk_user_id: clerkUser.id,
       email: clerkUser.primaryEmailAddress?.emailAddress,
-      first_name: clerkUser.firstName,
-      last_name: clerkUser.lastName,
-      phone_number: clerkUser.primaryPhoneNumber?.phoneNumber,
+      first_name: clerkUser.firstName || '',
+      last_name: clerkUser.lastName || '',
+      phone_number: clerkUser.primaryPhoneNumber?.phoneNumber || null,
+      profile_image_url: clerkUser.imageUrl,
+      email_verified: clerkUser.emailAddresses?.[0]?.verification?.status === 'verified',
       created_at: new Date().toISOString(),
     };
 
     console.log('Syncing user with database:', userData);
 
-    // TODO: Replace with your actual API endpoint
-    // Example API call:
-    /*
-    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/users/sync`, {
+    // Validate required fields
+    if (!userData.email) {
+      throw new Error('User email is required');
+    }
+
+    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3001';
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    // Only add authorization if token is provided
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const response = await fetch(`${API_URL}/api/sync-user`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await clerkUser.getToken()}`
-      },
-      body: JSON.stringify(userData)
+      headers,
+      body: JSON.stringify({
+        clerkUserId: userData.clerk_user_id,
+        email: userData.email,
+        firstName: userData.first_name,
+        lastName: userData.last_name,
+        phoneNumber: userData.phone_number
+      })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to sync user with database');
+      const errorText = await response.text();
+      console.error('API Response error:', errorText);
+      throw new Error(`Failed to sync user with database: ${response.status} ${response.statusText}`);
     }
-    */
 
-    // For now, just log the data
-    console.log('User data ready for PostgreSQL sync:', userData);
+    const result = await response.json();
+    return result;
     
   } catch (error) {
     console.error('Error syncing user with database:', error);
+    throw error;
   }
 }

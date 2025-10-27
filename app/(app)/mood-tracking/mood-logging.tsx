@@ -11,7 +11,6 @@ import {
   SafeAreaView,
   ScrollView,
   TextInput,
-  Alert,
   ActivityIndicator,
   Switch,
   Dimensions,
@@ -26,6 +25,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { moodApi } from "../../../utils/moodApi";
+import { useTheme } from "../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -66,6 +66,7 @@ const tabs = [
 ];
 
 export default function MoodLoggingScreen() {
+  const { theme } = useTheme();
   const { user } = useUser();
   const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
 
@@ -81,7 +82,9 @@ export default function MoodLoggingScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("mood");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Handle intensity slider value change
   const handleIntensityChange = (value: number) => {
@@ -119,7 +122,8 @@ export default function MoodLoggingScreen() {
   // Handle form submission with API call
   const handleSubmit = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "User not authenticated");
+      setErrorMessage("User not authenticated");
+      setShowErrorModal(true);
       return;
     }
 
@@ -144,10 +148,8 @@ export default function MoodLoggingScreen() {
       
       setShowSuccessModal(true);
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error.message || "Failed to log mood. Please try again."
-      );
+      setErrorMessage(error.message || "Failed to log mood. Please try again.");
+      setShowErrorModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -162,26 +164,53 @@ export default function MoodLoggingScreen() {
       onRequestClose={handleSuccessClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.successModal}>
+        <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.successIcon}>
-            <Ionicons name="checkmark-circle" size={64} color="#4CAF50" />
+            <Ionicons name="checkmark-circle" size={64} color={theme.colors.primary} />
           </View>
-          <Text style={styles.successTitle}>Success!</Text>
-          <Text style={styles.successMessage}>{successMessage}</Text>
+          <Text style={[styles.successTitle, { color: theme.colors.text }]}>Success!</Text>
+          <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>{successMessage}</Text>
           {moodData.shareWithSupportWorker && (
             <View style={styles.sharedInfo}>
-              <Ionicons name="people" size={20} color="#4CAF50" />
+              <Ionicons name="people" size={20} color={theme.colors.primary} />
               <Text style={styles.sharedInfoText}>
                 Your support worker has been notified
               </Text>
             </View>
           )}
           <TouchableOpacity
-            style={styles.successButton}
+            style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleSuccessClose}
             activeOpacity={0.8}
           >
             <Text style={styles.successButtonText}>View Mood History</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Render error modal
+  const renderErrorModal = () => (
+    <Modal
+      visible={showErrorModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowErrorModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.successIcon}>
+            <Ionicons name="close-circle" size={64} color="#F44336" />
+          </View>
+          <Text style={[styles.successTitle, { color: theme.colors.text }]}>Error</Text>
+          <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>{errorMessage}</Text>
+          <TouchableOpacity
+            style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
+            onPress={() => setShowErrorModal(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.successButtonText}>Close</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -203,8 +232,8 @@ export default function MoodLoggingScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <StatusBar
             barStyle="dark-content"
             backgroundColor="#FFFFFF"
@@ -217,20 +246,20 @@ export default function MoodLoggingScreen() {
         {/* Main Content */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Mood display section showing selected mood */}
-          <View style={styles.moodDisplay}>
+          <View style={[styles.moodDisplay, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
             <Text style={styles.moodEmoji}>
               {moodConfig[moodData.type].emoji}
             </Text>
-            <Text style={styles.moodLabel}>
+            <Text style={[styles.moodLabel, { color: theme.colors.text }]}>
               {moodConfig[moodData.type].label}
             </Text>
           </View>
 
           {/* Intensity selection section with slider */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Intensity (1-5)</Text>
+          <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Intensity (1-5)</Text>
             <View style={styles.sliderContainer}>
-              <Text style={styles.sliderLabel}>1</Text>
+              <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>1</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={1}
@@ -238,23 +267,23 @@ export default function MoodLoggingScreen() {
                 step={1}
                 value={moodData.intensity}
                 onValueChange={handleIntensityChange}
-                minimumTrackTintColor="#4CAF50"
-                maximumTrackTintColor="#E0E0E0"
-                thumbTintColor="#4CAF50"
+                minimumTrackTintColor={theme.colors.primary}
+                maximumTrackTintColor={theme.isDark ? "#444" : "#E0E0E0"}
+                thumbTintColor={theme.colors.primary}
               />
-              <Text style={styles.sliderLabel}>5</Text>
+              <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>5</Text>
             </View>
-            <Text style={styles.intensityValue}>
+            <Text style={[styles.intensityValue, { color: theme.colors.primary }]}>
               Current: {moodData.intensity}
             </Text>
           </View>
 
           {/* Mood factors selection section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
+          <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
               What&apos;s affecting your mood?
             </Text>
-            <Text style={styles.sectionSubtitle}>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
               Select all that apply
             </Text>
             <View style={styles.factorsContainer}>
@@ -263,14 +292,16 @@ export default function MoodLoggingScreen() {
                   key={factor}
                   style={[
                     styles.factorButton,
+                    { backgroundColor: theme.isDark ? "#2A2A2A" : "#F5F5F5", borderColor: theme.colors.borderLight },
                     moodData.factors.includes(factor) &&
-                      styles.selectedFactorButton,
+                      { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
                   ]}
                   onPress={() => handleFactorToggle(factor)}
                 >
                   <Text
                     style={[
                       styles.factorText,
+                      { color: theme.colors.textSecondary },
                       moodData.factors.includes(factor) &&
                         styles.selectedFactorText,
                     ]}
@@ -283,12 +314,13 @@ export default function MoodLoggingScreen() {
           </View>
 
           {/* Notes input section with character counter */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
             <View style={styles.notesHeader}>
-              <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Notes (Optional)</Text>
               <Text
                 style={[
                   styles.charCounter,
+                  { color: theme.colors.textSecondary },
                   notesCharCount >= NOTES_MAX_LENGTH && styles.charCounterMax,
                 ]}
               >
@@ -296,9 +328,16 @@ export default function MoodLoggingScreen() {
               </Text>
             </View>
             <TextInput
-              style={styles.notesInput}
+              style={[
+                styles.notesInput,
+                { 
+                  backgroundColor: theme.isDark ? "#2A2A2A" : "#FFFFFF",
+                  borderColor: theme.colors.borderLight,
+                  color: theme.colors.text,
+                }
+              ]}
               placeholder="Add any notes about your mood..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textSecondary}
               value={moodData.notes}
               onChangeText={handleNotesChange}
               multiline
@@ -307,29 +346,29 @@ export default function MoodLoggingScreen() {
           </View>
 
           {/* Share with support worker toggle */}
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
             <View style={styles.shareContainer}>
               <View style={styles.shareTextContainer}>
-                <Text style={styles.sectionTitle}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                   Share with Support Worker
                 </Text>
-                <Text style={styles.shareSubtext}>
+                <Text style={[styles.shareSubtext, { color: theme.colors.textSecondary }]}>
                   Allow your support worker to view this mood entry
                 </Text>
               </View>
               <Switch
                 value={moodData.shareWithSupportWorker}
                 onValueChange={handleShareToggle}
-                trackColor={{ false: "#E0E0E0", true: "#A5D6A7" }}
+                trackColor={{ false: theme.isDark ? "#444" : "#E0E0E0", true: "#A5D6A7" }}
                 thumbColor={
-                  moodData.shareWithSupportWorker ? "#4CAF50" : "#F5F5F5"
+                  moodData.shareWithSupportWorker ? theme.colors.primary : theme.isDark ? "#666" : "#F5F5F5"
                 }
-                ios_backgroundColor="#E0E0E0"
+                ios_backgroundColor={theme.isDark ? "#444" : "#E0E0E0"}
               />
             </View>
             {moodData.shareWithSupportWorker && (
               <View style={styles.shareNotice}>
-                <Ionicons name="information-circle" size={16} color="#2E7D32" />
+                <Ionicons name="information-circle" size={16} color={theme.colors.primary} />
                 <Text style={styles.shareNoticeText}>
                   Your support worker will be notified about this mood entry
                 </Text>
@@ -341,6 +380,7 @@ export default function MoodLoggingScreen() {
           <TouchableOpacity
             style={[
               styles.submitButton,
+              { backgroundColor: theme.colors.primary, shadowColor: theme.colors.primary },
               isSubmitting && styles.submitButtonDisabled,
             ]}
             onPress={handleSubmit}
@@ -364,6 +404,9 @@ export default function MoodLoggingScreen() {
 
         {/* Success Modal */}
         {renderSuccessModal()}
+        
+        {/* Error Modal */}
+        {renderErrorModal()}
 
         {/* Bottom navigation bar */}
         <BottomNavigation
@@ -390,10 +433,8 @@ const styles = StyleSheet.create({
   moodDisplay: {
     alignItems: "center",
     marginVertical: 24,
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 24,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -406,14 +447,11 @@ const styles = StyleSheet.create({
   moodLabel: {
     fontSize: 22,
     fontWeight: "600",
-    color: "#333",
   },
   section: {
     marginBottom: 20,
-    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
@@ -422,12 +460,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 13,
-    color: "#999",
     marginBottom: 12,
   },
   sliderContainer: {
@@ -438,7 +474,6 @@ const styles = StyleSheet.create({
   },
   sliderLabel: {
     fontSize: 14,
-    color: "#666",
     fontWeight: "500",
   },
   slider: {
@@ -449,7 +484,6 @@ const styles = StyleSheet.create({
   intensityValue: {
     textAlign: "center",
     marginTop: 8,
-    color: "#4CAF50",
     fontSize: 15,
     fontWeight: "600",
   },
@@ -462,16 +496,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: "#F5F5F5",
     borderWidth: 1.5,
-    borderColor: "#E0E0E0",
   },
   selectedFactorButton: {
-    backgroundColor: "#4CAF50",
-    borderColor: "#4CAF50",
+    // Removed - using inline styles
   },
   factorText: {
-    color: "#666",
     fontSize: 13,
     fontWeight: "500",
   },
@@ -487,7 +517,6 @@ const styles = StyleSheet.create({
   },
   charCounter: {
     fontSize: 13,
-    color: "#999",
     fontWeight: "500",
   },
   charCounterMax: {
@@ -497,12 +526,10 @@ const styles = StyleSheet.create({
   notesInput: {
     minHeight: 100,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
     borderRadius: 8,
     padding: 12,
     textAlignVertical: "top",
     fontSize: 15,
-    color: "#333",
   },
   shareContainer: {
     flexDirection: "row",
@@ -515,7 +542,6 @@ const styles = StyleSheet.create({
   },
   shareSubtext: {
     fontSize: 13,
-    color: "#999",
     marginTop: 4,
   },
   shareNotice: {
@@ -533,7 +559,6 @@ const styles = StyleSheet.create({
     color: "#2E7D32",
   },
   submitButton: {
-    backgroundColor: "#4CAF50",
     borderRadius: 12,
     padding: 16,
     flexDirection: "row",
@@ -541,7 +566,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 12,
     marginBottom: 32,
-    shadowColor: "#4CAF50",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -567,7 +591,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   successModal: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 24,
     width: "100%",
@@ -585,7 +608,6 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#333",
     marginBottom: 12,
     textAlign: "center",
   },
@@ -593,7 +615,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     marginBottom: 16,
-    color: "#666",
     lineHeight: 22,
   },
   sharedInfo: {
@@ -612,7 +633,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   successButton: {
-    backgroundColor: "#4CAF50",
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 24,

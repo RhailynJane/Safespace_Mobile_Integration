@@ -1,5 +1,5 @@
 {
-  "name": "assignment2",
+  "name": "safespace-prototype",
   "version": "1.0.0",
   "type": "module",
   "main": "expo-router/entry",
@@ -25,7 +25,6 @@
     "@react-native-picker/picker": "2.11.1",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/native": "^7.1.6",
-    "@sendbird/calls-react-native": "^1.1.11",
     "@supabase/supabase-js": "^2.54.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",

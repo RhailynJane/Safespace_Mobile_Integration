@@ -15,6 +15,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -23,7 +24,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Alert } from "react-native";
+import { useTheme } from "../../../../contexts/ThemeContext";
 
 /**
  * BookAppointment Component
@@ -36,6 +37,7 @@ import { Alert } from "react-native";
  * Features an elegant curved background and intuitive interface.
  */
 export default function BookAppointment() {
+  const { theme } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -128,7 +130,7 @@ export default function BookAppointment() {
   const confirmSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+      { text: "Sign Out", style: "destructive", onPress: () => { handleLogout(); } },
     ]);
   };
 
@@ -262,11 +264,11 @@ export default function BookAppointment() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Book Appointment" showBack={true} />
 
-        <ScrollView style={styles.container}>
-          <Text style={styles.title}>
+        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>
 
@@ -301,17 +303,17 @@ export default function BookAppointment() {
           </View>
 
           {/* Search Bar */}
-          <View style={styles.searchContainer}>
+          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
             <Ionicons
               name="search"
               size={20}
-              color="#666"
+              color={theme.colors.icon}
               style={styles.searchIcon}
             />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: theme.colors.text }]}
               placeholder="Search support worker..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -321,7 +323,7 @@ export default function BookAppointment() {
           {filteredSupportWorkers.map((supportWorker) => (
             <TouchableOpacity
               key={supportWorker.id}
-              style={styles.supportWorkerCard}
+              style={[styles.supportWorkerCard, { backgroundColor: theme.colors.surface }]}
               onPress={() => handleSelectSupportWorker(supportWorker.id)}
             >
               {/* Support Worker Avatar and Info */}
@@ -331,10 +333,10 @@ export default function BookAppointment() {
                   style={styles.avatar}
                 />
                 <View style={styles.supportWorkerInfo}>
-                  <Text style={styles.supportWorkerName}>
+                  <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
                     {supportWorker.name}
                   </Text>
-                  <Text style={styles.supportWorkerTitle}>
+                  <Text style={[styles.supportWorkerTitle, { color: theme.colors.textSecondary }]}>
                     {supportWorker.title}
                   </Text>
                 </View>
@@ -342,15 +344,15 @@ export default function BookAppointment() {
 
               {/* Support Worker Specialties */}
               <View style={styles.specialtiesContainer}>
-                {supportWorker.specialties.map((specialty, index) => (
-                  <Text key={index} style={styles.specialtyText}>
+                {supportWorker.specialties.map((specialty) => (
+                  <Text key={specialty} style={styles.specialtyText}>
                     {specialty}
                   </Text>
                 ))}
               </View>
 
               {/* Selection Prompt */}
-              <Text style={styles.selectText}>Select Support Worker</Text>
+              <Text style={[styles.selectText, { color: theme.colors.text }]}>Select Support Worker</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -367,17 +369,18 @@ export default function BookAppointment() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={styles.sideMenu}>
-              <View style={styles.sideMenuHeader}>
-                <Text style={styles.profileName}>{getDisplayName()}</Text>
-                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
+            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
+                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
                   <TouchableOpacity
-                    key={index}
+                    key={item.title}
                     style={[
                       styles.sideMenuItem,
+                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -386,13 +389,14 @@ export default function BookAppointment() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                      color={item.disabled ? theme.colors.iconDisabled : (item.title === "Sign Out" ? theme.colors.error : theme.colors.icon)}
                     />
                     <Text
                       style={[
                         styles.sideMenuItemText,
+                        { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && styles.signOutText,
+                        item.title === "Sign Out" && { color: theme.colors.error },
                       ]}
                     >
                       {item.title}
@@ -425,10 +429,10 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   sideMenuItemTextDisabled: {
-    color: "#CCCCCC",
+    // color handled by iconDisabled in inline override
   },
   signOutText: {
-    color: "#FF6B6B",
+    // color handled by theme.colors.error in inline override
     fontWeight: "600",
   },
   loadingContainer: {
@@ -437,7 +441,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   supportWorkerCard: {
-    backgroundColor: "#f0f8ff",
+    // backgroundColor moved to theme.colors.surface via inline override
     borderRadius: 10,
     padding: 16,
     marginHorizontal: 15,
@@ -471,13 +475,13 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "#FFFFFF",
+    // backgroundColor moved to theme.colors.surface via inline override
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
     alignItems: "center",
   },
   menuProfileImage: {
@@ -489,12 +493,12 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#212121",
+    // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: 14,
-    color: "#757575",
+    // color moved to theme.colors.textSecondary via inline override
   },
   sideMenuContent: {
     padding: 10,
@@ -505,11 +509,11 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    // borderBottomColor moved to theme.colors.borderLight via inline override
   },
   sideMenuItemText: {
     fontSize: 16,
-    color: "#333",
+    // color moved to theme.colors.text via inline override
     marginLeft: 15,
   },
   buttonContainer: {
@@ -592,7 +596,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
+    // backgroundColor moved to theme via inline override
     margin: 15,
     borderRadius: 10,
     paddingHorizontal: 15,
@@ -604,12 +608,12 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    // color moved to theme via inline override
   },
   supportWorkerName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    // color moved to theme via inline override
     marginBottom: 4,
   },
   supportWorkerNameHeading: {
@@ -621,7 +625,7 @@ const styles = StyleSheet.create({
   },
   supportWorkerTitle: {
     fontSize: 14,
-    color: "#666",
+    // color moved to theme via inline override
     marginBottom: 0,
   },
   specialtiesContainer: {
@@ -639,7 +643,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   selectText: {
-    color: "#00000",
+    // color moved to theme via inline override
     fontWeight: "600",
     textAlign: "center",
   },

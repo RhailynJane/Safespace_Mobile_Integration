@@ -1,4 +1,6 @@
 // utils/resourcesApi.ts
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export interface Resource {
   id: string;
   title: string;
@@ -417,7 +419,7 @@ class ExternalApiService {
       const response = await fetch(`${this.zenQuotesUrl}/random`);
       const data = await response.json();
       
-      if (data && data[0]) {
+      if (data?.[0]) {
         return {
           quote: data[0].q,
           author: data[0].a
@@ -489,21 +491,40 @@ class ExternalApiService {
   // Simple caching using AsyncStorage
   private async getCachedQuote(date: string): Promise<Resource | null> {
     try {
-      // If you have AsyncStorage or similar
-      // const cached = await AsyncStorage.getItem(`quote-${date}`);
-      // return cached ? JSON.parse(cached) : null;
-      return null; // Implement based on your storage solution
-    // eslint-disable-next-line no-unreachable
+      const cached = await AsyncStorage.getItem(`quote-${date}`);
+      return cached ? JSON.parse(cached) : null;
     } catch (error) {
+      console.error('Error retrieving cached quote:', error);
       return null;
     }
   }
 
   private async cacheQuote(quote: Resource, date: string): Promise<void> {
     try {
-      // await AsyncStorage.setItem(`quote-${date}`, JSON.stringify(quote));
+      await AsyncStorage.setItem(`quote-${date}`, JSON.stringify(quote));
     } catch (error) {
-      console.error('Error caching quote:', error);
+      console.error('Error caching quote:', error);             
+    }
+  }
+
+  // Clear old cached quotes
+  async clearOldCachedQuotes(): Promise<void> {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const quoteKeys = keys.filter(key => key.startsWith('quote-'));
+      
+      // Keep only today's and yesterday's quotes
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      const keysToKeep = [`quote-${today}`, `quote-${yesterday}`];
+      
+      const keysToDelete = quoteKeys.filter(key => !keysToKeep.includes(key));
+      
+      if (keysToDelete.length > 0) {
+        await AsyncStorage.multiRemove(keysToDelete);
+      }
+    } catch (error) {
+      console.error('Error clearing old cached quotes:', error);
     }
   }
 }
@@ -591,5 +612,33 @@ export async function getRandomQuote(): Promise<Resource> {
           backgroundColor: '#FFFFFF',
           tags: []
         };
+  }
+}
+
+// Utility functions for resource management
+export async function getResourceById(id: string): Promise<Resource | null> {
+  await delay(100);
+  return ALL_RESOURCES.find(resource => resource.id === id) || null;
+}
+
+export async function getResourcesByType(type: Resource['type']): Promise<Resource[]> {
+  await delay(150);
+  return ALL_RESOURCES.filter(resource => resource.type === type);
+}
+
+export async function getCategoriesWithCounts(): Promise<Array<Category & { count: number }>> {
+  await delay(100);
+  return CATEGORIES.map(category => ({
+    ...category,
+    count: ALL_RESOURCES.filter(resource => resource.category === category.id).length
+  }));
+}
+
+// Initialize cache cleanup on app start
+export async function initializeResourceCache(): Promise<void> {
+  try {
+    await externalApiService.clearOldCachedQuotes();
+  } catch (error) {
+    console.error('Error initializing resource cache:', error);
   }
 }

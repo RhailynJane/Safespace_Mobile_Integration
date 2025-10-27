@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { useTheme } from "../contexts/ThemeContext";
 
 interface EmailVerificationStepProps {
   email: string;
@@ -30,6 +31,7 @@ export default function EmailVerificationStep({
   loading = false,
   onResendCode,
 }: EmailVerificationStepProps) {
+  const { theme } = useTheme();
   const [resendLoading, setResendLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState("");
@@ -79,36 +81,45 @@ export default function EmailVerificationStep({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Verify Your Email</Text>
-      <Text style={styles.subtitle}>Step {stepNumber} of 4</Text>
+      <Text style={[styles.title, { color: theme.colors.text }]}>Verify Your Email</Text>
+      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Step {stepNumber} of 4</Text>
 
-      <Text style={styles.description}>
-        We've sent a 6-digit verification code to{" "}
-        <Text style={styles.email}>{email}</Text>
+      <Text style={[styles.description, { color: theme.colors.textSecondary }]}>
+        We&apos;ve sent a 6-digit verification code to{" "}
+        <Text style={[styles.email, { color: theme.colors.primary }]}>{email}</Text>
       </Text>
 
       {/* Code Input */}
       <View style={styles.codeInputContainer}>
         <TextInput
-          style={[styles.codeInput, error && styles.errorInput]}
+          style={[
+            styles.codeInput, 
+            { 
+              borderColor: theme.colors.primary, 
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surface
+            },
+            error && { borderColor: theme.colors.error }
+          ]}
           value={verificationCode}
           onChangeText={handleCodeChange}
           placeholder="000000"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.colors.textSecondary}
           keyboardType="number-pad"
           maxLength={6}
           autoFocus={true}
           editable={!loading}
         />
-        <Text style={styles.codeHint}>Enter the 6-digit code</Text>
+        <Text style={[styles.codeHint, { color: theme.colors.textSecondary }]}>Enter the 6-digit code</Text>
       </View>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text> : null}
 
       {/* Verify Button */}
       <TouchableOpacity
         style={[
           styles.button,
+          { backgroundColor: theme.colors.primary },
           (loading || verificationCode.length !== 6) && styles.disabledButton,
         ]}
         onPress={onNext}
@@ -122,8 +133,8 @@ export default function EmailVerificationStep({
       </TouchableOpacity>
 
       {/* Resend Code Section */}
-      <View style={styles.resendContainer}>
-        <Text style={styles.resendPrompt}>Didn't receive the code?</Text>
+      <View style={[styles.resendContainer, { backgroundColor: theme.colors.borderLight }]}>
+        <Text style={[styles.resendPrompt, { color: theme.colors.textSecondary }]}>Didn&apos;t receive the code?</Text>
         <TouchableOpacity
           onPress={handleResend}
           disabled={resendLoading || cooldown > 0}
@@ -131,6 +142,7 @@ export default function EmailVerificationStep({
           <Text
             style={[
               styles.resendLink,
+              { color: theme.colors.primary },
               (resendLoading || cooldown > 0) && styles.disabledLink,
             ]}
           >
@@ -149,7 +161,7 @@ export default function EmailVerificationStep({
         onPress={onBack}
         disabled={loading}
       >
-        <Text style={styles.backButtonText}>Back</Text>
+        <Text style={[styles.backButtonText, { color: theme.colors.textSecondary }]}>Back</Text>
       </TouchableOpacity>
     </View>
   );
