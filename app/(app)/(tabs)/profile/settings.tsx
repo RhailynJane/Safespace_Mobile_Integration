@@ -74,6 +74,15 @@ export default function SettingsScreen() {
   // Generic selection modal state to replace Alert pickers
   const [selectionModal, setSelectionModal] = useState<{visible:boolean; title:string; options:string[]; onSelect:(v:string)=>void}>({visible:false, title:'', options:[], onSelect:()=>{}});
 
+  // Collapsible section state
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    moodReminder: false,
+    journalReminder: false,
+  });
+  
+  // Track which reminder frequency options to show (only Daily and Custom for reminders)
+  const reminderFrequencyOptionsLimited = ["Daily", "Custom"];
+
   // Text size slider mapping
   const textSizeLabels = ["Extra Small", "Small", "Medium", "Large"] as const;
   type TextSizeLabel = typeof textSizeLabels[number];
@@ -625,313 +634,296 @@ export default function SettingsScreen() {
               "notifications"
             )}
 
-            {/* Category toggles */}
-            <View style={[styles.nestedSettings, !notificationsEnabled && styles.disabledRow]}>
-              {renderToggleRow(
-                "All Notifications",
-                "Master toggle for all categories",
-                notifAll,
-                (val) => {
-                  setNotifAll(val);
-                  setNotifMoodTracking(val);
-                  setNotifJournaling(val);
-                  setNotifMessages(val);
-                  setNotifPostReactions(val);
-                  setNotifAppointments(val);
-                  setNotifSelfAssessment(val);
-                },
-                "notifications",
-                !notificationsEnabled
-              )}
-              {renderToggleRow(
-                "Mood Tracking",
-                "Moods, streaks and reminders",
-                notifMoodTracking,
-                (val) => {
-                  setNotifMoodTracking(val);
-                  // auto-update master when all toggles are true/false
-                  const nextAll = val && notifJournaling && notifMessages && notifPostReactions && notifAppointments && notifSelfAssessment;
-                  if (val) setNotifAll(nextAll);
-                  else setNotifAll(false);
-                },
-                "happy",
-                !notificationsEnabled
-              )}
-              {/* Mood reminders controls */}
-              <View style={[styles.nestedSettings, !notificationsEnabled && styles.disabledRow]}>
-                {renderToggleRow(
-                  "Mood reminder",
-                  "Schedule a daily/weekly mood check-in",
-                  moodReminderEnabled,
-                  setMoodReminderEnabled,
-                  "time",
-                  !notificationsEnabled || !notifMoodTracking
-                )}
-                {moodReminderEnabled && (
-                  <>
-                    {renderPickerRow(
-                      "Mood reminder frequency",
-                      "How often to get mood reminders",
-                      moodReminderFrequency,
-                      reminderFrequencyOptions,
-                      setMoodReminderFrequency,
-                      "repeat",
-                      !notificationsEnabled || !notifMoodTracking
-                    )}
-                    {/* Show time picker for non-Custom frequencies */}
-                    {moodReminderFrequency !== 'Custom' && moodReminderFrequency !== 'Hourly' && moodReminderFrequency !== 'Never' && (
-                      <View style={styles.nestedSettings}>
-                        {renderTimePickerRow(
-                          "Mood reminder time",
-                          "Time of day",
-                          moodReminderTime,
-                          setMoodReminderTime,
-                          moodTimePickerVisible,
-                          setMoodTimePickerVisible,
-                          "time",
-                          !notificationsEnabled || !notifMoodTracking
-                        )}
-                      </View>
-                    )}
-                    {/* Show custom per-day schedule for Custom frequency */}
-                    {moodReminderFrequency === 'Custom' && (
-                      <View style={styles.nestedSettings}>
-                        <Text style={[styles.customScheduleTitle, { color: theme.colors.text }]}>
-                          Select days and times:
-                        </Text>
-                        {daysOfWeek.map((day) => {
-                          const dayTime = moodReminderCustomSchedule[day.key] || '';
-                          const isEnabled = !!dayTime;
-                          return (
-                            <View key={day.key} style={[styles.customDayRow, { borderBottomColor: theme.colors.borderLight }]}>
-                              <View style={styles.customDayLeft}>
-                                <Switch
-                                  value={isEnabled}
-                                  onValueChange={(val) => {
-                                    if (val) {
-                                      setMoodReminderCustomSchedule(prev => ({ ...prev, [day.key]: '09:00' }));
-                                    } else {
-                                      const newSchedule = { ...moodReminderCustomSchedule };
-                                      delete newSchedule[day.key];
-                                      setMoodReminderCustomSchedule(newSchedule);
-                                    }
-                                  }}
-                                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                                  thumbColor="#FFFFFF"
-                                />
-                                <Text style={[styles.customDayLabel, { color: theme.colors.text }]}>{day.label}</Text>
-                              </View>
-                              {isEnabled && (
-                                <TouchableOpacity
-                                  style={[styles.customDayTime, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-                                  onPress={() => setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: true }))}
-                                >
-                                  <Text style={[styles.customDayTimeText, { color: theme.colors.text }]}>{dayTime}</Text>
-                                  <Ionicons name="time" size={16} color={theme.colors.icon} />
-                                </TouchableOpacity>
-                              )}
-                              {isEnabled && (
-                                <TimePickerModal
-                                  visible={moodCustomDayPickers[day.key] || false}
-                                  value={dayTime}
-                                  onSelect={(time) => {
-                                    setMoodReminderCustomSchedule(prev => ({ ...prev, [day.key]: time }));
-                                    setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: false }));
-                                  }}
-                                  onCancel={() => setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: false }))}
-                                />
-                              )}
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </>
-                )}
-              </View>
-              {renderToggleRow(
-                "Journaling",
-                "Prompts and entry activity",
-                notifJournaling,
-                (val) => {
-                  setNotifJournaling(val);
-                  const nextAll = notifMoodTracking && val && notifMessages && notifPostReactions && notifAppointments && notifSelfAssessment;
-                  if (val) setNotifAll(nextAll); else setNotifAll(false);
-                },
-                "book",
-                !notificationsEnabled
-              )}
-              {/* Journaling reminders controls */}
-              <View style={[styles.nestedSettings, !notificationsEnabled && styles.disabledRow]}>
-                {renderToggleRow(
-                  "Journaling reminder",
-                  "Schedule prompts to write entries",
-                  journalReminderEnabled,
-                  setJournalReminderEnabled,
-                  "time",
-                  !notificationsEnabled || !notifJournaling
-                )}
-                {journalReminderEnabled && (
-                  <>
-                    {renderPickerRow(
-                      "Journal reminder frequency",
-                      "How often to get journaling reminders",
-                      journalReminderFrequency,
-                      reminderFrequencyOptions,
-                      setJournalReminderFrequency,
-                      "repeat",
-                      !notificationsEnabled || !notifJournaling
-                    )}
-                    {/* Show time picker for non-Custom frequencies */}
-                    {journalReminderFrequency !== 'Custom' && journalReminderFrequency !== 'Hourly' && journalReminderFrequency !== 'Never' && (
-                      <View style={styles.nestedSettings}>
-                        {renderTimePickerRow(
-                          "Journal reminder time",
-                          "Time of day",
-                          journalReminderTime,
-                          setJournalReminderTime,
-                          journalTimePickerVisible,
-                          setJournalTimePickerVisible,
-                          "time",
-                          !notificationsEnabled || !notifJournaling
-                        )}
-                      </View>
-                    )}
-                    {/* Show custom per-day schedule for Custom frequency */}
-                    {journalReminderFrequency === 'Custom' && (
-                      <View style={styles.nestedSettings}>
-                        <Text style={[styles.customScheduleTitle, { color: theme.colors.text }]}>
-                          Select days and times:
-                        </Text>
-                        {daysOfWeek.map((day) => {
-                          const dayTime = journalReminderCustomSchedule[day.key] || '';
-                          const isEnabled = !!dayTime;
-                          return (
-                            <View key={day.key} style={[styles.customDayRow, { borderBottomColor: theme.colors.borderLight }]}>
-                              <View style={styles.customDayLeft}>
-                                <Switch
-                                  value={isEnabled}
-                                  onValueChange={(val) => {
-                                    if (val) {
-                                      setJournalReminderCustomSchedule(prev => ({ ...prev, [day.key]: '20:00' }));
-                                    } else {
-                                      const newSchedule = { ...journalReminderCustomSchedule };
-                                      delete newSchedule[day.key];
-                                      setJournalReminderCustomSchedule(newSchedule);
-                                    }
-                                  }}
-                                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                                  thumbColor="#FFFFFF"
-                                />
-                                <Text style={[styles.customDayLabel, { color: theme.colors.text }]}>{day.label}</Text>
-                              </View>
-                              {isEnabled && (
-                                <TouchableOpacity
-                                  style={[styles.customDayTime, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-                                  onPress={() => setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: true }))}
-                                >
-                                  <Text style={[styles.customDayTimeText, { color: theme.colors.text }]}>{dayTime}</Text>
-                                  <Ionicons name="time" size={16} color={theme.colors.icon} />
-                                </TouchableOpacity>
-                              )}
-                              {isEnabled && (
-                                <TimePickerModal
-                                  visible={journalCustomDayPickers[day.key] || false}
-                                  value={dayTime}
-                                  onSelect={(time) => {
-                                    setJournalReminderCustomSchedule(prev => ({ ...prev, [day.key]: time }));
-                                    setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: false }));
-                                  }}
-                                  onCancel={() => setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: false }))}
-                                />
-                              )}
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </>
-                )}
-              </View>
-              {renderToggleRow(
-                "Messages",
-                "New messages and replies",
-                notifMessages,
-                (val) => {
-                  setNotifMessages(val);
-                  const nextAll = notifMoodTracking && notifJournaling && val && notifPostReactions && notifAppointments && notifSelfAssessment;
-                  if (val) setNotifAll(nextAll); else setNotifAll(false);
-                },
-                "chatbubbles",
-                !notificationsEnabled
-              )}
-              {renderToggleRow(
-                "Post Reactions",
-                "Likes and reactions to your posts",
-                notifPostReactions,
-                (val) => {
-                  setNotifPostReactions(val);
-                  const nextAll = notifMoodTracking && notifJournaling && notifMessages && val && notifAppointments && notifSelfAssessment;
-                  if (val) setNotifAll(nextAll); else setNotifAll(false);
-                },
-                "heart",
-                !notificationsEnabled
-              )}
-              {renderToggleRow(
-                "Appointments",
-                "Reminders and updates for sessions",
-                notifAppointments,
-                (val) => {
-                  setNotifAppointments(val);
-                  const nextAll = notifMoodTracking && notifJournaling && notifMessages && notifPostReactions && val && notifSelfAssessment;
-                  if (val) setNotifAll(nextAll); else setNotifAll(false);
-                },
-                "calendar",
-                !notificationsEnabled
-              )}
-              {renderToggleRow(
-                "Self Assessment",
-                "Due dates and results",
-                notifSelfAssessment,
-                (val) => {
-                  setNotifSelfAssessment(val);
-                  const nextAll = notifMoodTracking && notifJournaling && notifMessages && notifPostReactions && notifAppointments && val;
-                  if (val) setNotifAll(nextAll); else setNotifAll(false);
-                },
-                "checkmark-circle",
-                !notificationsEnabled
-              )}
-            </View>
-
-            {renderToggleRow(
-              "Quiet Hours",
-              "No notifications during specified times",
-              quietHoursEnabled,
-              setQuietHoursEnabled,
-              "moon"
-            )}
-
-            {quietHoursEnabled && (
+            {/* Quick notification categories with frequency */}
+            {notificationsEnabled && (
               <View style={styles.nestedSettings}>
-                {renderTimeInputRow(
-                  "Quiet Hours Time",
-                  "Set start and end time for quiet hours",
-                  quietStartTime,
-                  quietEndTime,
-                  setQuietStartTime,
-                  setQuietEndTime,
-                  "time"
+                <Text style={[styles.sectionSubtitle, { color: theme.colors.text }]}>Notification Categories</Text>
+                
+                {/* Mood Tracking */}
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryLeft}>
+                      <Ionicons name="happy" size={18} color={theme.colors.primary} />
+                      <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Mood Tracking</Text>
+                    </View>
+                    <Switch
+                      value={notifMoodTracking}
+                      onValueChange={setNotifMoodTracking}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                  {notifMoodTracking && (
+                    <View style={styles.categoryContent}>
+                      {renderPickerRow(
+                        "Frequency",
+                        "How often",
+                        moodReminderFrequency,
+                        reminderFrequencyOptionsLimited,
+                        setMoodReminderFrequency,
+                        "repeat"
+                      )}
+                      
+                      {(moodReminderFrequency === 'Daily' || moodReminderFrequency === 'Custom') && (
+                        <View style={styles.nestedSettings}>
+                          {moodReminderFrequency === 'Daily' && (
+                            renderTimePickerRow(
+                              "Reminder Time",
+                              "Time of day for mood check-in",
+                              moodReminderTime,
+                              (time) => {
+                                setMoodReminderTime(time);
+                              },
+                              moodTimePickerVisible,
+                              setMoodTimePickerVisible,
+                              "time"
+                            )
+                          )}
+                          
+                          {moodReminderFrequency === 'Custom' && (
+                            <>
+                              <Text style={[styles.customScheduleTitle, { color: theme.colors.text }]}>
+                                Select days and times:
+                              </Text>
+                              {daysOfWeek.map((day) => {
+                                const dayTime = moodReminderCustomSchedule[day.key] || '';
+                                const isEnabled = !!dayTime;
+                                return (
+                                  <View key={day.key} style={[styles.customDayRow, { borderBottomColor: theme.colors.borderLight }]}>
+                                    <View style={styles.customDayLeft}>
+                                      <Switch
+                                        value={isEnabled}
+                                        onValueChange={(val) => {
+                                          if (val) {
+                                            setMoodReminderCustomSchedule(prev => ({ ...prev, [day.key]: moodReminderTime || '09:00' }));
+                                          } else {
+                                            const newSchedule = { ...moodReminderCustomSchedule };
+                                            delete newSchedule[day.key];
+                                            setMoodReminderCustomSchedule(newSchedule);
+                                          }
+                                        }}
+                                        trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                                        thumbColor="#FFFFFF"
+                                      />
+                                      <Text style={[styles.customDayLabel, { color: theme.colors.text }]}>{day.label}</Text>
+                                    </View>
+                                    {isEnabled && (
+                                      <TouchableOpacity
+                                        style={[styles.customDayTime, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                                        onPress={() => setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: true }))}
+                                      >
+                                        <Text style={[styles.customDayTimeText, { color: theme.colors.text }]}>{dayTime}</Text>
+                                        <Ionicons name="time" size={16} color={theme.colors.icon} />
+                                      </TouchableOpacity>
+                                    )}
+                                    {isEnabled && (
+                                      <TimePickerModal
+                                        visible={moodCustomDayPickers[day.key] || false}
+                                        value={dayTime}
+                                        onSelect={(time) => {
+                                          setMoodReminderCustomSchedule(prev => ({ ...prev, [day.key]: time }));
+                                          setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: false }));
+                                        }}
+                                        onCancel={() => setMoodCustomDayPickers(prev => ({ ...prev, [day.key]: false }))}
+                                      />
+                                    )}
+                                  </View>
+                                );
+                              })}
+                            </>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                {/* Journaling */}
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryLeft}>
+                      <Ionicons name="book" size={18} color={theme.colors.primary} />
+                      <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Journaling</Text>
+                    </View>
+                    <Switch
+                      value={notifJournaling}
+                      onValueChange={setNotifJournaling}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                  {notifJournaling && (
+                    <View style={styles.categoryContent}>
+                      {renderPickerRow(
+                        "Frequency",
+                        "How often",
+                        journalReminderFrequency,
+                        reminderFrequencyOptionsLimited,
+                        setJournalReminderFrequency,
+                        "repeat"
+                      )}
+                      
+                      {(journalReminderFrequency === 'Daily' || journalReminderFrequency === 'Custom') && (
+                        <View style={styles.nestedSettings}>
+                          {journalReminderFrequency === 'Daily' && (
+                            renderTimePickerRow(
+                              "Reminder Time",
+                              "Time of day for journaling",
+                              journalReminderTime,
+                              (time) => {
+                                setJournalReminderTime(time);
+                              },
+                              journalTimePickerVisible,
+                              setJournalTimePickerVisible,
+                              "time"
+                            )
+                          )}
+                          
+                          {journalReminderFrequency === 'Custom' && (
+                            <>
+                              <Text style={[styles.customScheduleTitle, { color: theme.colors.text }]}>
+                                Select days and times:
+                              </Text>
+                              {daysOfWeek.map((day) => {
+                                const dayTime = journalReminderCustomSchedule[day.key] || '';
+                                const isEnabled = !!dayTime;
+                                return (
+                                  <View key={day.key} style={[styles.customDayRow, { borderBottomColor: theme.colors.borderLight }]}>
+                                    <View style={styles.customDayLeft}>
+                                      <Switch
+                                        value={isEnabled}
+                                        onValueChange={(val) => {
+                                          if (val) {
+                                            setJournalReminderCustomSchedule(prev => ({ ...prev, [day.key]: journalReminderTime || '09:00' }));
+                                          } else {
+                                            const newSchedule = { ...journalReminderCustomSchedule };
+                                            delete newSchedule[day.key];
+                                            setJournalReminderCustomSchedule(newSchedule);
+                                          }
+                                        }}
+                                        trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                                        thumbColor="#FFFFFF"
+                                      />
+                                      <Text style={[styles.customDayLabel, { color: theme.colors.text }]}>{day.label}</Text>
+                                    </View>
+                                    {isEnabled && (
+                                      <TouchableOpacity
+                                        style={[styles.customDayTime, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+                                        onPress={() => setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: true }))}
+                                      >
+                                        <Text style={[styles.customDayTimeText, { color: theme.colors.text }]}>{dayTime}</Text>
+                                        <Ionicons name="time" size={16} color={theme.colors.icon} />
+                                      </TouchableOpacity>
+                                    )}
+                                    {isEnabled && (
+                                      <TimePickerModal
+                                        visible={journalCustomDayPickers[day.key] || false}
+                                        value={dayTime}
+                                        onSelect={(time) => {
+                                          setJournalReminderCustomSchedule(prev => ({ ...prev, [day.key]: time }));
+                                          setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: false }));
+                                        }}
+                                        onCancel={() => setJournalCustomDayPickers(prev => ({ ...prev, [day.key]: false }))}
+                                      />
+                                    )}
+                                  </View>
+                                );
+                              })}
+                            </>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                {/* Messages */}
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryLeft}>
+                      <Ionicons name="chatbubbles" size={18} color={theme.colors.primary} />
+                      <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Messages</Text>
+                    </View>
+                    <Switch
+                      value={notifMessages}
+                      onValueChange={setNotifMessages}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+
+                {/* Post Reactions */}
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryLeft}>
+                      <Ionicons name="heart" size={18} color={theme.colors.primary} />
+                      <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Post Reactions</Text>
+                    </View>
+                    <Switch
+                      value={notifPostReactions}
+                      onValueChange={setNotifPostReactions}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+
+                {/* Appointments */}
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryLeft}>
+                      <Ionicons name="calendar" size={18} color={theme.colors.primary} />
+                      <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Appointments</Text>
+                    </View>
+                    <Switch
+                      value={notifAppointments}
+                      onValueChange={setNotifAppointments}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+
+                {/* Self Assessment */}
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryLeft}>
+                      <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
+                      <Text style={[styles.categoryTitle, { color: theme.colors.text }]}>Self Assessment</Text>
+                    </View>
+                    <Switch
+                      value={notifSelfAssessment}
+                      onValueChange={setNotifSelfAssessment}
+                      trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                  </View>
+                </View>
+
+                {renderToggleRow(
+                  "Quiet Hours",
+                  "Silence notifications during your rest time",
+                  quietHoursEnabled,
+                  setQuietHoursEnabled,
+                  "moon",
+                  false
+                )}
+
+                {quietHoursEnabled && (
+                  <View style={styles.nestedSettings}>
+                    {renderTimeInputRow(
+                      "Quiet Hours Time",
+                      "Set start and end time",
+                      quietStartTime,
+                      quietEndTime,
+                      setQuietStartTime,
+                      setQuietEndTime,
+                      "time"
+                    )}
+                  </View>
                 )}
               </View>
-            )}
-
-            {renderPickerRow(
-              "Reminder Frequency",
-              "How often to receive wellness reminders",
-              reminderFrequency,
-              reminderFrequencyOptions,
-              setReminderFrequency,
-              "repeat"
             )}
           </View>
 
@@ -1208,5 +1200,84 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   customDayTimeText: {
     fontSize: scaledFontSize(15),
     fontWeight: '500',
+  },
+  // Quick notification badges
+  quickNotificationGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  notifBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+  },
+  notifBadgeActive: {
+    backgroundColor: 'rgba(178, 190, 156, 0.1)',
+  },
+  notifBadgeText: {
+    fontSize: scaledFontSize(13),
+    fontWeight: '500',
+  },
+  // Expandable header
+  expandableHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  expandableLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  // Category card styles
+  sectionSubtitle: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '500',
+    marginBottom: 12,
+    marginLeft: 4,
+  },
+  categoryCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 0,
+    overflow: 'hidden',
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+    minHeight: 50,
+  },
+  categoryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+    marginRight: 8,
+  },
+  categoryTitle: {
+    fontSize: scaledFontSize(15),
+    fontWeight: '600',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  categoryContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
 });

@@ -156,7 +156,10 @@ class SettingsAPI {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ settings: mappedSettings })
+        body: JSON.stringify({ 
+          clerk_user_id: clerkUserId,
+          settings: mappedSettings 
+        })
       });
 
       console.log('🔧 Save response status:', response.status, response.statusText);

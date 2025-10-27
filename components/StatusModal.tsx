@@ -2,7 +2,7 @@
  * StatusModal - Reusable modal component for displaying success/error messages
  * Replaces Alert.alert() with a consistent, theme-aware modal UI
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -38,8 +38,14 @@ export default function StatusModal({
   onSecondaryButtonPress,
   secondaryButtonType = 'default',
 }: StatusModalProps) {
-  const { theme, isDarkMode } = useTheme();
+  const { theme, isDarkMode, scaledFontSize } = useTheme();
   
+  /**
+   * Create styles dynamically based on text size scaling
+   * Uses useMemo for performance optimization
+   */
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
   const getIconName = () => {
     switch (type) {
       case 'success':
@@ -154,7 +160,11 @@ export default function StatusModal({
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stylesheet for StatusModal component
+ * Now includes dynamic font scaling via scaledFontSize parameter
+ */
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     // backgroundColor removed - now uses theme via inline override
@@ -179,7 +189,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
     fontWeight: '700',
     // color removed - now uses theme via inline override
     marginBottom: 12,
@@ -187,7 +197,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   message: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     textAlign: 'center',
     marginBottom: 28,
     // color removed - now uses theme via inline override
@@ -219,12 +229,12 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 17,
+    fontSize: scaledFontSize(17),
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   secondaryButtonText: {
-    fontSize: 17,
+    fontSize: scaledFontSize(17),
     fontWeight: '600',
     letterSpacing: 0.5,
   },
