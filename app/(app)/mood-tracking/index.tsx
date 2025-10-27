@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import { moodApi, MoodEntry } from "../../../utils/moodApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
+import StatusModal from "../../../components/StatusModal";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -41,12 +42,30 @@ interface MoodOption {
 }
 
 const MoodTrackingScreen = () => {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   const [activeEmoji, setActiveEmoji] = useState<MoodType | null>(null);
   const [activeTab, setActiveTab] = useState("mood");
   const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   // Navigation tabs configuration
   const tabs = [
@@ -120,7 +139,7 @@ const MoodTrackingScreen = () => {
       setRecentEntries(data.moods || []);
     } catch (error) {
       console.error("Error loading recent moods:", error);
-      // Silent fail - just show empty state
+      showStatusModal('error', 'Load Failed', 'Unable to load recent moods. Please try again.');
       setRecentEntries([]);
     } finally {
       setLoading(false);
@@ -334,6 +353,16 @@ const MoodTrackingScreen = () => {
           <View style={styles.bottomPadding} />
         </ScrollView>
 
+        {/* Status Modal for error handling */}
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
+
         {/* Bottom navigation bar */}
         <BottomNavigation
           tabs={tabs}
@@ -345,7 +374,8 @@ const MoodTrackingScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -368,17 +398,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   sectionTitle: {
-    ...Typography.title,
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
   },
   sectionSubtitle: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     marginBottom: Spacing.lg,
+    color: "#666",
   },
   entriesCount: {
-    ...Typography.caption,
-    fontSize: 12,
+    fontSize: scaledFontSize(12), // Base size 12px
   },
   moodGrid: {
     marginTop: Spacing.md,
@@ -400,7 +429,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   emojiLabel: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     fontWeight: "500",
   },
   loadingContainer: {
@@ -409,8 +438,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   loadingText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: Spacing.sm,
+    color: "#666",
   },
   recentMoodsContainer: {
     // Container for recent moods cards
@@ -427,19 +457,20 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   moodCardEmoji: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28), // Base size 28px
     marginRight: Spacing.md,
   },
   moodCardContent: {
     flex: 1,
   },
   moodCardTitle: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "500",
     marginBottom: Spacing.xs,
   },
   moodCardDate: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
+    color: "#666",
   },
   emptyState: {
     borderRadius: 12,
@@ -448,14 +479,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyStateText: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     marginTop: Spacing.md,
     fontWeight: "500",
+    color: "#666",
   },
   emptyStateSubtext: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: Spacing.xs,
     textAlign: "center",
+    color: "#666",
   },
   historyLink: {
     flexDirection: "row",
@@ -471,7 +504,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   historyLinkText: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "500",
   },
   bottomPadding: {
