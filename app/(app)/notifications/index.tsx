@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,7 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUser } from '@clerk/clerk-expo';
 import { getApiBaseUrl } from '../../../utils/apiBaseUrl';
+import StatusModal from "../../../components/StatusModal";
 
 // Type definition for a Notification object.
 interface Notification {
@@ -35,18 +37,39 @@ interface Notification {
  * appointment reminders, system updates, or journal/mood reminders.
  */
 export default function NotificationsScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { user } = useUser();
   const baseURL = getApiBaseUrl();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   const loadNotifications = useCallback(async () => {
     if (!user?.id) return;
     try {
+      setLoading(true);
       const res = await fetch(`${baseURL}/api/notifications/${user.id}`);
       if (!res.ok) {
         console.log('Failed to load notifications:', res.status);
+        showStatusModal('error', 'Load Failed', 'Unable to load notifications. Please try again.');
         return;
       }
       const json = await res.json();
@@ -62,6 +85,9 @@ export default function NotificationsScreen() {
       setNotifications(mapped);
     } catch (e) {
       console.log('Error loading notifications:', e);
+      showStatusModal('error', 'Connection Error', 'Unable to connect to server. Please check your internet connection.');
+    } finally {
+      setLoading(false);
     }
   }, [user?.id, baseURL]);
 
@@ -94,8 +120,11 @@ export default function NotificationsScreen() {
             : notification
         )
       );
+      // Show success feedback for the action
+      showStatusModal('success', 'Notification Read', 'Notification marked as read.');
     } catch (e) {
       console.log('Failed to mark notification as read:', e);
+      showStatusModal('error', 'Update Failed', 'Unable to mark notification as read. Please try again.');
     }
   };
 
@@ -114,8 +143,10 @@ export default function NotificationsScreen() {
           isRead: true,
         }))
       );
+      showStatusModal('success', 'All Notifications Read', 'All notifications have been marked as read.');
     } catch (e) {
       console.log('Failed to mark all as read:', e);
+      showStatusModal('error', 'Update Failed', 'Unable to mark all notifications as read. Please try again.');
     }
   };
 
@@ -196,8 +227,16 @@ export default function NotificationsScreen() {
             />
           }
         >
-          {/* Empty state when no notifications are available */}
-          {notifications.length === 0 ? (
+          {/* Loading state */}
+          {loading && notifications.length === 0 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+                Loading notifications...
+              </Text>
+            </View>
+          ) : notifications.length === 0 ? (
+            /* Empty state when no notifications are available */
             <View style={styles.emptyState}>
               <Ionicons
                 name="notifications-off-outline"
@@ -265,6 +304,16 @@ export default function NotificationsScreen() {
             ))
           )}
         </ScrollView>
+
+        {/* Status Modal for error handling and success feedback */}
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -274,7 +323,7 @@ export default function NotificationsScreen() {
  * Stylesheet for NotificationsScreen.
  * Handles layout, spacing, typography, and visual states (unread/read).
  */
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -287,14 +336,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   unreadText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
   },
   markAllText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     fontWeight: "500",
   },
   notificationsList: {
     flex: 1,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 100,
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontSize: scaledFontSize(16), // Base size 16px
+    marginTop: 16,
   },
   emptyState: {
     alignItems: "center",
@@ -303,13 +362,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18), // Base size 18px
     fontWeight: "600",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtext: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     textAlign: "center",
   },
   notificationItem: {
@@ -333,17 +392,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notificationTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
     marginBottom: 4,
   },
   notificationMessage: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: 4,
     lineHeight: 20,
   },
   notificationTime: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12), // Base size 12px
   },
   unreadIndicator: {
     width: 8,
