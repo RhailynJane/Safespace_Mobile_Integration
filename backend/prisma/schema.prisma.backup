@@ -1,0 +1,253 @@
+// =======================
+// Prisma Client Generator
+// =======================
+generator client {
+  provider = "prisma-client-js"
+}
+
+// =======================
+// Database Connection
+// =======================
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =======================
+// MODELS
+// =======================
+
+model User {
+  id                         Int           @id @default(autoincrement())
+  clerk_user_id              String?       @unique
+  first_name                 String
+  last_name                  String
+  email                      String        @unique
+  last_login                 DateTime?
+  created_at                 DateTime      @default(now())
+  updated_at                 DateTime      @updatedAt
+  role_id                    Int
+  role                       Role          @relation(fields: [role_id], references: [id])
+  clients                    Client[]
+  notes                      Note[]        @relation("AuthoredNotes")
+  processed_referrals        Referral[]    @relation("ProcessedByUser")
+  appointments               Appointment[] @relation("ScheduledAppointments")
+  initiated_crisis_events    CrisisEvent[] @relation("InitiatedCrisisEvents")
+  supervised_crisis_events   CrisisEvent[] @relation("SupervisedCrisisEvents")
+  notifications              Notification[]
+
+  @@map("users")
+}
+
+model Role {
+  id          Int     @id @default(autoincrement())
+  role_name   String  @unique
+  description String?
+  users       User[]
+
+  @@map("roles")
+}
+
+model PriorityLevel {
+  id         Int    @id @default(autoincrement())
+  level_name String @unique
+  order_rank Int?
+
+  @@map("priority_levels")
+}
+
+model ReferralStatus {
+  id          Int     @id @default(autoincrement())
+  status_name String  @unique
+  description String?
+
+  @@map("referral_statuses")
+}
+
+model SessionType {
+  id        Int    @id @default(autoincrement())
+  type_name String @unique
+
+  @@map("session_types")
+}
+
+model RiskLevel {
+  id          Int     @id @default(autoincrement())
+  level_name  String  @unique
+  description String?
+
+  @@map("risk_levels")
+}
+
+model Client {
+  id                        Int           @id @default(autoincrement())
+  client_id                 Int?          @unique
+  client_first_name         String
+  client_last_name          String
+  status                    String?
+  last_session_date         DateTime?
+  risk_level                String?
+  phone                     String?
+  email                     String?       @unique
+  address                   String?
+  emergency_contact_name    String?
+  emergency_contact_phone   String?
+  created_at                DateTime      @default(now())
+  updated_at                DateTime      @updatedAt
+  user_id                   Int?
+  user                      User?         @relation(fields: [user_id], references: [id])
+  notes                     Note[]
+  referrals                 Referral[]    @relation("ClientReferrals")
+  appointments              Appointment[]
+  crisis_events             CrisisEvent[] @relation("ClientCrisisEvents")
+
+  @@map("clients")
+}
+
+model Referral {
+  id                   Int        @id @default(autoincrement())
+  client_id            Int?
+  client_first_name    String
+  client_last_name     String
+  age                  Int?
+  phone                String?
+  address              String?
+  email                String?
+  emergency_first_name String?
+  emergency_last_name  String?
+  emergency_phone      String?
+  referral_source      String
+  reason_for_referral  String
+  additional_notes     String?
+  submitted_date       DateTime?
+  status               String     @default("Pending")
+  processed_date       DateTime?
+  processed_by_user_id Int?
+  created_at           DateTime   @default(now())
+  updated_at           DateTime   @updatedAt
+  referral_timeline    Timeline[]
+  client               Client?    @relation("ClientReferrals", fields: [client_id], references: [id])
+  processed_by         User?      @relation("ProcessedByUser", fields: [processed_by_user_id], references: [id])
+
+  @@map("referrals")
+}
+
+model Timeline {
+  id         Int      @id @default(autoincrement())
+  referralId Int
+  message    String
+  createdAt  DateTime @default(now())
+  referrals  Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+
+  @@map("referral_timeline")
+}
+
+model Note {
+  id               Int      @id @default(autoincrement())
+  client_id        Int
+  author_user_id   Int
+  note_date        DateTime @db.Date
+  session_type     String?
+  duration_minutes Int?
+  summary          String?
+  detailed_notes   String?
+  risk_assessment  String?
+  next_steps       String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  author           User     @relation("AuthoredNotes", fields: [author_user_id], references: [id])
+  client           Client   @relation(fields: [client_id], references: [id])
+
+  @@map("notes")
+}
+
+model SystemAlert {
+  id        Int      @id @default(autoincrement())
+  message   String
+  timestamp DateTime @default(now())
+  type      String
+  is_read   Boolean  @default(false)
+
+  @@map("system_alerts")
+}
+
+model Appointment {
+  id                   Int       @id @default(autoincrement())
+  client_id            Int
+  scheduled_by_user_id Int?
+  appointment_date     DateTime  @db.Date
+  appointment_time     DateTime  @db.Time
+  type                 String?
+  duration             String?
+  details              String?
+  status               String?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime? @updatedAt
+  client               Client    @relation(fields: [client_id], references: [id])
+  scheduled_by         User?     @relation("ScheduledAppointments", fields: [scheduled_by_user_id], references: [id])
+
+  @@map("appointments")
+}
+
+model CrisisEvent {
+  id                           Int       @id @default(autoincrement())
+  client_id                    Int?
+  initiator_user_id            Int?
+  event_type                   String
+  event_date                   DateTime  @default(now())
+  description                  String?
+  risk_level_at_event          String?
+  intervention_details         String?
+  contact_method               String?
+  contact_purpose              String?
+  urgency_level                String?
+  supervisor_contacted_user_id Int?
+  created_at                   DateTime  @default(now())
+  updated_at                   DateTime  @updatedAt
+
+  client                       Client?   @relation("ClientCrisisEvents", fields: [client_id], references: [id])
+  initiator                    User?     @relation("InitiatedCrisisEvents", fields: [initiator_user_id], references: [id])
+  supervisor_contacted         User?     @relation("SupervisedCrisisEvents", fields: [supervisor_contacted_user_id], references: [id])
+
+  @@map("crisis_events")
+}
+
+model Notification {
+  id          Int       @id @default(autoincrement())
+  user_id     Int
+  title       String
+  message     String
+  type        String     // e.g., "pending_referral", "high_risk", "upcoming_appointment"
+  related_id  Int?       // optional: link to Referral, Appointment, or Client
+  created_at  DateTime   @default(now())
+  is_read     Boolean    @default(false)
+  user        User       @relation(fields: [user_id], references: [id])
+
+  @@map("notifications")
+}
+
+// =======================
+// NEW MODEL: SupportWorker
+// =======================
+model SupportWorker {
+  id                   Int       @id @default(autoincrement())
+  first_name           String    @db.VarChar(100)
+  last_name            String    @db.VarChar(100)
+  email                String    @unique @db.VarChar(255)
+  phone_number         String?   @db.VarChar(20)
+  specialization       String?   @db.Text
+  bio                  String?   @db.Text
+  years_of_experience  Int?
+  avatar_url           String?   @db.Text
+  status               String    @default("active") @db.VarChar(20)
+  availability         Json?
+  hourly_rate          Decimal?  @db.Decimal(10, 2)
+  languages_spoken     String[]
+  certifications       String[]
+  education            String?   @db.Text
+  license_number       String?   @db.VarChar(100)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  @@map("support_workers")
+}

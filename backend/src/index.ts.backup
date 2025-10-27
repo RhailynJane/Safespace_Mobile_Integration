@@ -902,6 +902,15 @@ app.get(
   }
 );
 
+// Start server
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("\nSafeSpace Backend Server Started!");
+  console.log(`Server running on: http://localhost:${PORT}`);
+  console.log(`Android emulator URL: http://10.0.2.2:${PORT}`);
+  console.log(`Test in browser: http://localhost:${PORT}/api/users`);
+  console.log("Server logs will appear below...\n");
+});
+
 // Handle server shutdown gracefully
 process.on("SIGINT", async () => {
   console.log("\nShutting down server...");
@@ -4106,9 +4115,8 @@ app.get('/api/help-sections/:sectionId/items', async (req, res) => {
   }
 });
 
-
-// Help search endpoint (from HEAD)
-app.get('/api/help/search', async (req: Request, res: Response) => {
+<<<<<<< HEAD
+app.get('/api/help/search', async (req, res) => {
   try {
     const { q } = req.query;
     
@@ -4134,7 +4142,7 @@ app.get('/api/help/search', async (req: Request, res: Response) => {
       
       const searchResult = await client.query(searchQuery, [`%${q}%`]);
 
-      const items: HelpItem[] = searchResult.rows.map((item: any) => ({
+      const items: HelpItem[] = searchResult.rows.map(item => ({
         id: item.id,
         title: item.title,
         content: item.content,
@@ -4153,10 +4161,7 @@ app.get('/api/help/search', async (req: Request, res: Response) => {
     res.status(500).json({ 
       error: 'Failed to search help content',
       details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
+=======
 // =============================================
 // APPOINTMENTS ENDPOINTS
 // =============================================
@@ -4209,7 +4214,7 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
     const result = await pool.query(query, [userId]);
 
     // Format appointments for frontend
-    const appointments = result.rows.map((row: any) => ({
+    const appointments = result.rows.map(row => ({
       id: row.id,
       supportWorker: `${row.support_worker_first_name} ${row.support_worker_last_name}`,
       supportWorkerId: row.support_worker_id,
@@ -4237,13 +4242,13 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
     res.status(500).json({
       error: "Failed to fetch appointments",
       details: error.message,
+>>>>>>> backend/appointments
     });
   }
 });
 
-
-// Help section view tracking (from HEAD)
-app.post('/api/help-sections/:sectionId/view', async (req: Request, res: Response) => {
+<<<<<<< HEAD
+app.post('/api/help-sections/:sectionId/view', async (req, res) => {
   try {
     const { sectionId } = req.params;
     const client = await pool.connect();
@@ -4279,8 +4284,7 @@ app.post('/api/help-sections/:sectionId/view', async (req: Request, res: Respons
   }
 });
 
-// Logout endpoint (from HEAD)
-app.post('/api/users/:clerkUserId/logout', async (req: Request, res: Response) => {
+app.post('/api/users/:clerkUserId/logout', async (req, res) => {
   try {
     const { clerkUserId } = req.params;
     const client = await pool.connect();
@@ -4314,11 +4318,8 @@ app.post('/api/users/:clerkUserId/logout', async (req: Request, res: Response) =
     res.status(500).json({ 
       error: 'Failed to update logout timestamp',
       details: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Create a new appointment (from backend/appointments)
+=======
+// Create a new appointment
 app.post("/api/appointments", async (req: Request, res: Response) => {
   try {
     const {
@@ -4452,13 +4453,13 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
     res.status(500).json({
       error: "Failed to create appointment",
       details: error.message,
+>>>>>>> backend/appointments
     });
   }
 });
 
-
-// Login endpoint (from HEAD)
-app.post('/api/users/:clerkUserId/login', async (req: Request, res: Response) => {
+<<<<<<< HEAD
+app.post('/api/users/:clerkUserId/login', async (req, res) => {
   try {
     const { clerkUserId } = req.params;
     const client = await pool.connect();
@@ -4496,8 +4497,8 @@ app.post('/api/users/:clerkUserId/login', async (req: Request, res: Response) =>
     });
   }
 });
-
-// Reschedule an appointment (from backend/appointments)
+=======
+// Reschedule an appointment
 app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -4602,7 +4603,7 @@ app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) 
   }
 });
 
-// Cancel an appointment (from backend/appointments)
+// Cancel an appointment
 app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -4665,428 +4666,13 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
   }
 });
 
-// =============================================
-// SUPPORT WORKER ENDPOINTS
-// =============================================
-
-// Get all support workers
-app.get("/api/support-workers", async (req: Request, res: Response) => {
-  try {
-    const { specialization, status } = req.query;
-    
-    let query = `
-      SELECT 
-        id, first_name, last_name, email, phone_number,
-        specialization, bio, years_of_experience,
-        avatar_url, status, availability, hourly_rate,
-        languages_spoken, certifications, created_at, updated_at
-      FROM support_workers
-      WHERE 1=1
-    `;
-    
-    const queryParams: any[] = [];
-    let paramIndex = 1;
-
-    if (specialization) {
-      query += ` AND specialization ILIKE $${paramIndex}`;
-      queryParams.push(`%${specialization}%`);
-      paramIndex++;
-    }
-
-    if (status) {
-      query += ` AND status = $${paramIndex}`;
-      queryParams.push(status);
-    } else {
-      query += ` AND status = 'active'`;
-    }
-
-    query += ` ORDER BY first_name, last_name`;
-
-    const result = await pool.query(query, queryParams);
-
-    const supportWorkers = result.rows.map(worker => ({
-      id: worker.id,
-      name: `${worker.first_name} ${worker.last_name}`,
-      firstName: worker.first_name,
-      lastName: worker.last_name,
-      email: worker.email,
-      phoneNumber: worker.phone_number,
-      specialization: worker.specialization,
-      specialties: worker.specialization ? worker.specialization.split(',').map((s: string) => s.trim()) : [],
-      bio: worker.bio,
-      yearsOfExperience: worker.years_of_experience,
-      avatar: worker.avatar_url,
-      avatarUrl: worker.avatar_url,
-      status: worker.status,
-      availability: worker.availability,
-      hourlyRate: worker.hourly_rate,
-      languagesSpoken: worker.languages_spoken,
-      certifications: worker.certifications,
-      createdAt: worker.created_at,
-      updatedAt: worker.updated_at
-    }));
-
-    res.json({
-      success: true,
-      count: supportWorkers.length,
-      supportWorkers
-    });
-
-  } catch (error: any) {
-    console.error("Error fetching support workers:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch support workers",
-      details: error.message,
-    });
-  }
-});
-
-// Get a specific support worker by ID
-app.get("/api/support-workers/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const result = await pool.query(
-      `SELECT 
-        id, first_name, last_name, email, phone_number,
-        specialization, bio, years_of_experience,
-        avatar_url, status, availability, hourly_rate,
-        languages_spoken, certifications, education,
-        license_number, created_at, updated_at
-      FROM support_workers 
-      WHERE id = $1`,
-      [id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Support worker not found" });
-    }
-
-    const worker = result.rows[0];
-
-    // Get appointment statistics
-    const statsResult = await pool.query(
-      `SELECT 
-        COUNT(*) as total_appointments,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_appointments,
-        COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as upcoming_appointments
-      FROM appointments 
-      WHERE support_worker_id = $1`,
-      [id]
-    );
-
-    const stats = statsResult.rows[0];
-
-    const supportWorker = {
-      id: worker.id,
-      name: `${worker.first_name} ${worker.last_name}`,
-      firstName: worker.first_name,
-      lastName: worker.last_name,
-      email: worker.email,
-      phoneNumber: worker.phone_number,
-      specialization: worker.specialization,
-      specialties: worker.specialization ? worker.specialization.split(',').map((s: string) => s.trim()) : [],
-      bio: worker.bio,
-      yearsOfExperience: worker.years_of_experience,
-      avatar: worker.avatar_url,
-      avatarUrl: worker.avatar_url,
-      status: worker.status,
-      availability: worker.availability,
-      hourlyRate: worker.hourly_rate,
-      languagesSpoken: worker.languages_spoken,
-      certifications: worker.certifications,
-      education: worker.education,
-      licenseNumber: worker.license_number,
-      createdAt: worker.created_at,
-      updatedAt: worker.updated_at,
-      statistics: {
-        totalAppointments: parseInt(stats.total_appointments),
-        completedAppointments: parseInt(stats.completed_appointments),
-        upcomingAppointments: parseInt(stats.upcoming_appointments)
-      }
-    };
-
-    res.json({ success: true, supportWorker });
-
-  } catch (error: any) {
-    console.error("Error fetching support worker:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch support worker",
-      details: error.message,
-    });
-  }
-});
-
-// Create a new support worker
-app.post("/api/support-workers", async (req: Request, res: Response) => {
-  try {
-    const {
-      firstName, lastName, email, phoneNumber,
-      specialization, bio, yearsOfExperience,
-      avatarUrl, status = 'active', availability,
-      hourlyRate, languagesSpoken, certifications,
-      education, licenseNumber
-    } = req.body;
-
-    if (!firstName || !lastName || !email) {
-      return res.status(400).json({
-        error: "firstName, lastName, and email are required"
-      });
-    }
-
-    const existingWorker = await pool.query(
-      "SELECT id FROM support_workers WHERE email = $1",
-      [email]
-    );
-
-    if (existingWorker.rows.length > 0) {
-      return res.status(409).json({
-        error: "Support worker with this email already exists"
-      });
-    }
-
-    const insertQuery = `
-      INSERT INTO support_workers (
-        first_name, last_name, email, phone_number,
-        specialization, bio, years_of_experience,
-        avatar_url, status, availability, hourly_rate,
-        languages_spoken, certifications, education,
-        license_number, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING *
-    `;
-
-    const result = await pool.query(insertQuery, [
-      firstName, lastName, email, phoneNumber,
-      specialization, bio, yearsOfExperience,
-      avatarUrl, status, availability, hourlyRate,
-      languagesSpoken, certifications, education,
-      licenseNumber
-    ]);
-
-    const worker = result.rows[0];
-
-    res.status(201).json({
-      success: true,
-      message: "Support worker created successfully",
-      supportWorker: {
-        id: worker.id,
-        name: `${worker.first_name} ${worker.last_name}`,
-        firstName: worker.first_name,
-        lastName: worker.last_name,
-        email: worker.email,
-        specialization: worker.specialization,
-        status: worker.status
-      }
-    });
-
-  } catch (error: any) {
-    console.error("Error creating support worker:", error.message);
-    res.status(500).json({
-      error: "Failed to create support worker",
-      details: error.message,
-    });
-  }
-});
-
-// Update a support worker
-app.put("/api/support-workers/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const updateFields = req.body;
-
-    const existingWorker = await pool.query(
-      "SELECT id FROM support_workers WHERE id = $1",
-      [id]
-    );
-
-    if (existingWorker.rows.length === 0) {
-      return res.status(404).json({ error: "Support worker not found" });
-    }
-
-    const updates: string[] = [];
-    const values: any[] = [];
-    let paramIndex = 1;
-
-    const fieldMappings: { [key: string]: string } = {
-      firstName: 'first_name',
-      lastName: 'last_name',
-      email: 'email',
-      phoneNumber: 'phone_number',
-      specialization: 'specialization',
-      bio: 'bio',
-      yearsOfExperience: 'years_of_experience',
-      avatarUrl: 'avatar_url',
-      status: 'status',
-      availability: 'availability',
-      hourlyRate: 'hourly_rate',
-      languagesSpoken: 'languages_spoken',
-      certifications: 'certifications',
-      education: 'education',
-      licenseNumber: 'license_number'
-    };
-
-    Object.keys(updateFields).forEach(key => {
-      if (fieldMappings[key] && updateFields[key] !== undefined) {
-        updates.push(`${fieldMappings[key]} = $${paramIndex}`);
-        values.push(updateFields[key]);
-        paramIndex++;
-      }
-    });
-
-    if (updates.length === 0) {
-      return res.status(400).json({ error: "No fields to update" });
-    }
-
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    values.push(id);
-
-    const updateQuery = `
-      UPDATE support_workers 
-      SET ${updates.join(', ')}
-      WHERE id = $${paramIndex}
-      RETURNING *
-    `;
-
-    const result = await pool.query(updateQuery, values);
-    const worker = result.rows[0];
-
-    res.json({
-      success: true,
-      message: "Support worker updated successfully",
-      supportWorker: {
-        id: worker.id,
-        name: `${worker.first_name} ${worker.last_name}`,
-        status: worker.status
-      }
-    });
-
-  } catch (error: any) {
-    console.error("Error updating support worker:", error.message);
-    res.status(500).json({
-      error: "Failed to update support worker",
-      details: error.message,
-    });
-  }
-});
-
-// Delete/Deactivate a support worker
-app.delete("/api/support-workers/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { permanent = false } = req.query;
-
-    const existingWorker = await pool.query(
-      "SELECT id FROM support_workers WHERE id = $1",
-      [id]
-    );
-
-    if (existingWorker.rows.length === 0) {
-      return res.status(404).json({ error: "Support worker not found" });
-    }
-
-    const activeAppointments = await pool.query(
-      `SELECT COUNT(*) as count 
-       FROM appointments 
-       WHERE support_worker_id = $1 
-       AND status IN ('scheduled', 'confirmed')`,
-      [id]
-    );
-
-    if (parseInt(activeAppointments.rows[0].count) > 0) {
-      return res.status(400).json({
-        error: "Cannot delete support worker with active appointments"
-      });
-    }
-
-    if (permanent === 'true') {
-      await pool.query("DELETE FROM support_workers WHERE id = $1", [id]);
-      res.json({ success: true, message: "Support worker permanently deleted" });
-    } else {
-      await pool.query(
-        "UPDATE support_workers SET status = 'inactive', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-        [id]
-      );
-      res.json({ success: true, message: "Support worker deactivated" });
-    }
-
-  } catch (error: any) {
-    console.error("Error deleting support worker:", error.message);
-    res.status(500).json({
-      error: "Failed to delete support worker",
-      details: error.message,
-    });
-  }
-});
-
-// Get support worker availability
-app.get("/api/support-workers/:id/availability", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { date } = req.query;
-
-    const workerCheck = await pool.query(
-      "SELECT id, first_name, last_name, availability FROM support_workers WHERE id = $1",
-      [id]
-    );
-
-    if (workerCheck.rows.length === 0) {
-      return res.status(404).json({ error: "Support worker not found" });
-    }
-
-    const worker = workerCheck.rows[0];
-
-    let appointmentsQuery = `
-      SELECT appointment_date, appointment_time, duration_minutes, status
-      FROM appointments
-      WHERE support_worker_id = $1
-      AND status IN ('scheduled', 'confirmed')
-    `;
-
-    const queryParams: any[] = [id];
-
-    if (date) {
-      appointmentsQuery += ` AND appointment_date = $2`;
-      queryParams.push(date);
-    } else {
-      appointmentsQuery += ` AND appointment_date >= CURRENT_DATE AND appointment_date <= CURRENT_DATE + INTERVAL '30 days'`;
-    }
-
-    appointmentsQuery += ` ORDER BY appointment_date, appointment_time`;
-
-    const appointments = await pool.query(appointmentsQuery, queryParams);
-
-    res.json({
-      success: true,
-      supportWorker: {
-        id: worker.id,
-        name: `${worker.first_name} ${worker.last_name}`,
-        availability: worker.availability
-      },
-      bookedSlots: appointments.rows.map(apt => ({
-        date: apt.appointment_date,
-        time: apt.appointment_time,
-        duration: apt.duration_minutes,
-        status: apt.status
-      }))
-    });
-
-  } catch (error: any) {
-    console.error("Error fetching availability:", error.message);
-    res.status(500).json({
-      error: "Failed to fetch availability",
-      details: error.message,
-    });
-  }
+// Start the server
+app.listen(PORT, () => {
+  console.log(`SafeSpace API server running on http://localhost:${PORT}`);
+  console.log(`API documentation: http://localhost:${PORT}/`);
+  console.log('Press Ctrl+C to stop the server');
 });
 
 
-// Start server
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("\nSafeSpace Backend Server Started!");
-  console.log(`Server running on: http://localhost:${PORT}`);
-  console.log(`Android emulator URL: http://10.0.2.2:${PORT}`);
-  console.log(`Test in browser: http://localhost:${PORT}/api/support-workers`);
-  console.log("Server logs will appear below...\n");
-});
 
+>>>>>>> backend/appointments
