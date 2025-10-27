@@ -29,13 +29,12 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { communityApi } from "../../../../utils/communityForumApi";
 import { useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
@@ -44,6 +43,7 @@ import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import OptimizedImage from "../../../../components/OptimizedImage";
+import StatusModal from "../../../../components/StatusModal";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -52,7 +52,7 @@ const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
  * Main component for displaying post details with interactive features
  */
 export default function PostDetailScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // Extract post ID from navigation parameters
   const params = useLocalSearchParams();
   const postId = parseInt(params.id as string, 10);
@@ -67,6 +67,33 @@ export default function PostDetailScreen() {
   const [bookmarked, setBookmarked] = useState(false); // Bookmark status
   const [reacting, setReacting] = useState(false); // Reaction update in progress
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Modal states
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  /**
+   * Show error modal with custom title and message
+   */
+  const showError = (title: string, message: string) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
+
+  /**
+   * Show success modal with custom message
+   */
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
 
   // Load and subscribe to profile image updates for current user (for self-authored posts fallback)
   useEffect(() => {
@@ -134,7 +161,7 @@ export default function PostDetailScreen() {
       
     } catch (error) {
       console.error('Error loading post:', error);
-      Alert.alert("Error", "Failed to load post");
+      showError("Error", "Failed to load post. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -175,7 +202,7 @@ export default function PostDetailScreen() {
    */
   const handleReactionPress = async (emoji: string) => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to react to posts");
+      showError("Sign In Required", "Please sign in to react to posts");
       return;
     }
 
@@ -200,9 +227,10 @@ export default function PostDetailScreen() {
       setUserReaction(response.userReaction);
       
       setReactionPickerVisible(false);
+      showSuccess(`Reaction ${response.reactionChange > 0 ? 'added' : 'removed'} successfully!`);
     } catch (error) {
       console.error('Error updating reaction:', error);
-      Alert.alert("Error", "Failed to update reaction");
+      showError("Reaction Failed", "Failed to update reaction. Please try again.");
     } finally {
       setReacting(false);
     }
@@ -213,16 +241,17 @@ export default function PostDetailScreen() {
    */
   const handleBookmarkPress = async () => {
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to bookmark posts");
+      showError("Sign In Required", "Please sign in to bookmark posts");
       return;
     }
 
     try {
       const response = await communityApi.toggleBookmark(postId, user.id);
       setBookmarked(response.bookmarked);
+      showSuccess(response.bookmarked ? "Post bookmarked!" : "Bookmark removed");
     } catch (error) {
       console.error('Error toggling bookmark:', error);
-      Alert.alert("Error", "Failed to update bookmark");
+      showError("Bookmark Failed", "Failed to update bookmark. Please try again.");
     }
   };
 
@@ -295,7 +324,7 @@ export default function PostDetailScreen() {
         <CurvedBackground style={styles.curvedBackground} />
         <AppHeader title="Post Detail" showBack={true} />
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color="#E0E0E0" />
+          <Ionicons name="alert-circle-outline" size={scaledFontSize(64)} color="#E0E0E0" />
           <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>Post not found</Text>
           <TouchableOpacity
             style={styles.backButton}
@@ -384,7 +413,7 @@ export default function PostDetailScreen() {
               >
                 <Ionicons
                   name={bookmarked ? "bookmark" : "bookmark-outline"}
-                  size={24}
+                  size={scaledFontSize(24)}
                   color={bookmarked ? "#FFA000" : "#666"}
                 />
               </TouchableOpacity>
@@ -434,7 +463,7 @@ export default function PostDetailScreen() {
               >
                 <Ionicons 
                   name="add-circle" 
-                  size={20} 
+                  size={scaledFontSize(20)} 
                   color={reacting ? "#CCC" : "#4CAF50"} 
                 />
               </TouchableOpacity>
@@ -500,7 +529,7 @@ export default function PostDetailScreen() {
                       by {relatedPost.author_name} • {getTotalReactions(relatedPost.reactions)} reactions
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                  <Ionicons name="chevron-forward" size={scaledFontSize(20)} color="#999" />
                 </TouchableOpacity>
               ))}
             </View>
@@ -518,6 +547,26 @@ export default function PostDetailScreen() {
           onPress={() => setReactionPickerVisible(false)}
         />
       )}
+
+      {/* Success Modal */}
+      <StatusModal
+        visible={showSuccessModal}
+        type="success"
+        title="Success!"
+        message={successMessage}
+        onClose={() => setShowSuccessModal(false)}
+        buttonText="OK"
+      />
+
+      {/* Error Modal */}
+      <StatusModal
+        visible={showErrorModal}
+        type="error"
+        title={errorTitle}
+        message={errorMessage}
+        onClose={() => setShowErrorModal(false)}
+        buttonText="OK"
+      />
     </SafeAreaView>
   );
 }
@@ -526,7 +575,7 @@ export default function PostDetailScreen() {
  * Stylesheet for PostDetailScreen component
  * Uses consistent color scheme and responsive design patterns
  */
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -556,7 +605,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme.colors.textSecondary via inline override
     marginTop: 12,
   },
@@ -567,7 +616,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     // color moved to theme.colors.textSecondary via inline override
     marginTop: 16,
     marginBottom: 24,
@@ -580,7 +629,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   postCard: {
@@ -618,20 +667,20 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "bold",
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "700",
     // color moved to theme.colors.text via inline override
     marginBottom: 2,
   },
   postMeta: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     // color moved to theme.colors.textSecondary via inline override
   },
   bookmarkButton: {
@@ -646,19 +695,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   categoryText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
     color: "#4CAF50",
   },
   postTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "800",
     // color moved to theme.colors.text via inline override
     marginBottom: 12,
     lineHeight: 28,
   },
   postContent: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     // color moved to theme.colors.textSecondary via inline override
     lineHeight: 24,
     marginBottom: 20,
@@ -694,10 +743,10 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   reactionStatEmoji: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
   },
   reactionStatCount: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
     color: "#666",
   },
@@ -720,7 +769,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   userReactionText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#2E7D32",
     fontWeight: "600",
   },
@@ -739,7 +788,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   reactionPickerTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     // color moved to theme.colors.text via inline override
     marginBottom: 12,
@@ -761,7 +810,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.1 }],
   },
   emojiText: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
   },
   reactionOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -781,7 +830,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   relatedTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "700",
     // color moved to theme.colors.text via inline override
     marginBottom: 16,
@@ -804,20 +853,20 @@ const styles = StyleSheet.create({
   },
   relatedAvatarText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "bold",
   },
   relatedContent: {
     flex: 1,
   },
   relatedPostTitle: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
     // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   relatedPostMeta: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     // color moved to theme.colors.textSecondary via inline override
   },
   bottomSpacing: {

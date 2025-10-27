@@ -21,6 +21,10 @@ interface StatusModalProps {
   message: string;
   onClose: () => void;
   buttonText?: string;
+  // Optional secondary action (e.g., destructive confirm)
+  secondaryButtonText?: string;
+  onSecondaryButtonPress?: () => void;
+  secondaryButtonType?: 'destructive' | 'default';
 }
 
 export default function StatusModal({
@@ -30,6 +34,9 @@ export default function StatusModal({
   message,
   onClose,
   buttonText = 'OK',
+  secondaryButtonText,
+  onSecondaryButtonPress,
+  secondaryButtonType = 'default',
 }: StatusModalProps) {
   const { theme, isDarkMode } = useTheme();
   
@@ -72,6 +79,14 @@ export default function StatusModal({
     }
   };
 
+  const getSecondaryButtonColors = () => {
+    if (secondaryButtonType === 'destructive') {
+      return { backgroundColor: 'transparent', borderColor: '#FF3B30', textColor: '#FF3B30' };
+    }
+    // default subtle style
+    return { backgroundColor: 'transparent', borderColor: isDarkMode ? '#6B7280' : '#D1D5DB', textColor: isDarkMode ? '#E5E7EB' : '#374151' };
+  };
+
   return (
     <Modal
       visible={visible}
@@ -104,12 +119,35 @@ export default function StatusModal({
             {message}
           </Text>
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: getButtonColor() }]}
-            onPress={onClose}
-          >
-            <Text style={styles.buttonText}>{buttonText}</Text>
-          </TouchableOpacity>
+          {/* Buttons */}
+          {secondaryButtonText ? (
+            <View style={styles.buttonsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.secondaryButton,
+                  { borderColor: getSecondaryButtonColors().borderColor },
+                ]}
+                onPress={onSecondaryButtonPress}
+              >
+                <Text style={[styles.secondaryButtonText, { color: getSecondaryButtonColors().textColor }]}>
+                  {secondaryButtonText}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: getButtonColor() }]}
+                onPress={onClose}
+              >
+                <Text style={styles.buttonText}>{buttonText}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.button, { backgroundColor: getButtonColor() }]}
+              onPress={onClose}
+            >
+              <Text style={styles.buttonText}>{buttonText}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -167,8 +205,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
+  buttonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondaryButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    minWidth: 120,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
   buttonText: {
     color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  secondaryButtonText: {
     fontSize: 17,
     fontWeight: '600',
     letterSpacing: 0.5,

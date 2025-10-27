@@ -65,7 +65,9 @@ async function ensureUserSettingsSchema() {
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_frequency VARCHAR(20) DEFAULT 'Daily'",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_custom_schedule JSONB DEFAULT '{}'",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_mood_reminder_at TIMESTAMP NULL",
-      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_journal_reminder_at TIMESTAMP NULL"
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_journal_reminder_at TIMESTAMP NULL",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS self_assessment_reminder_time VARCHAR(5) DEFAULT '09:00'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_self_assessment_reminder_at TIMESTAMP NULL"
     ];
     for (const sql of alterSqls) {
       await pool.query(sql);
@@ -293,7 +295,6 @@ async function runRemindersTick() {
         us.*, u.id as uid
       FROM user_settings us
       JOIN users u ON u.id = us.user_id
-      WHERE (us.mood_reminder_enabled = TRUE OR us.journal_reminder_enabled = TRUE)
     `);
     for (const row of res.rows) {
       const lastMoodSent = row.last_mood_reminder_at ? new Date(row.last_mood_reminder_at) : null;
@@ -317,6 +318,33 @@ async function runRemindersTick() {
           await createAndPushNotification(row.uid, 'journaling', 'Journal reminder', 'Write a quick entry to reflect on your day.');
           await pool.query(`UPDATE user_settings SET last_journal_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
         }
+      }
+
+      // Self-assessment reminders (6-month cadence)
+      try {
+        const selfAssessEnabled = row.notif_self_assessment !== false;
+        if (selfAssessEnabled) {
+          const lastSelfSent = row.last_self_assessment_reminder_at ? new Date(row.last_self_assessment_reminder_at) : null;
+          const dueRes = await pool.query("SELECT is_assessment_due($1) as is_due", [row.uid]);
+          const isDue = !!(dueRes.rows && dueRes.rows[0] && dueRes.rows[0].is_due);
+          if (isDue) {
+            const time = row.self_assessment_reminder_time || '09:00';
+            // Only send at configured time, and at most once per day
+            const atTime = shouldSendAtTime('Daily', now, time, lastSelfSent);
+            const minGap = !lastSelfSent || (now.getTime() - lastSelfSent.getTime()) >= (24 * 60 * 60 * 1000);
+            if (atTime && minGap) {
+              await createAndPushNotification(
+                row.uid,
+                'self_assessment',
+                "It's time for your 6‑month check‑in",
+                'Take a quick self‑assessment to track your progress.'
+              );
+              await pool.query(`UPDATE user_settings SET last_self_assessment_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
+            }
+          }
+        }
+      } catch (se: any) {
+        console.warn('⚠️ Self-assessment reminder check failed:', se.message);
       }
     }
   } catch (e: any) {
@@ -418,7 +446,8 @@ app.get('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
         notif_all, notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
         quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
         mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
-        journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule
+        journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
+        self_assessment_reminder_time, last_self_assessment_reminder_at
        FROM user_settings WHERE user_id = $1`,
       [userId]
     );
@@ -449,6 +478,7 @@ app.get('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
         journal_reminder_time: '20:00',
         journal_reminder_frequency: 'Daily',
         journal_reminder_custom_schedule: {},
+        self_assessment_reminder_time: '09:00',
       }});
     }
 
@@ -477,10 +507,11 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
       mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
       journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
+      self_assessment_reminder_time,
       updated_at
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-      $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP
+      $17, $18, $19, $20, $21, $22, $23, $24, $25, CURRENT_TIMESTAMP
     )
     ON CONFLICT (user_id)
     DO UPDATE SET 
@@ -507,6 +538,7 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       journal_reminder_time = EXCLUDED.journal_reminder_time,
       journal_reminder_frequency = EXCLUDED.journal_reminder_frequency,
       journal_reminder_custom_schedule = EXCLUDED.journal_reminder_custom_schedule,
+      self_assessment_reminder_time = EXCLUDED.self_assessment_reminder_time,
       updated_at = CURRENT_TIMESTAMP
     `;
 
@@ -535,6 +567,7 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       settings.journalReminderTime ?? '20:00',
       settings.journalReminderFrequency ?? 'Daily',
       JSON.stringify(settings.journalReminderCustomSchedule ?? {}),
+      settings.selfAssessmentReminderTime ?? '09:00',
     ];
 
     await pool.query(query, params);
@@ -658,6 +691,8 @@ app.post(
             journal_reminder_time,
             journal_reminder_frequency,
             journal_reminder_custom_schedule,
+            self_assessment_reminder_time,
+            last_self_assessment_reminder_at,
             created_at,
             updated_at
           )
@@ -687,6 +722,8 @@ app.post(
             '20:00',
             'Daily',
             '{}'::jsonb,
+            '09:00',
+            NULL,
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
           FROM users
@@ -4762,6 +4799,7 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           quiet_start_time: "22:00",
           quiet_end_time: "08:00",
           reminder_frequency: "Daily",
+          self_assessment_reminder_time: "09:00",
         },
       });
     }

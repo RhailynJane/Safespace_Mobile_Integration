@@ -33,7 +33,7 @@
  */
 
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -61,6 +61,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import OptimizedImage from "../../../../components/OptimizedImage";
+import StatusModal from "../../../../components/StatusModal";
 
 const { width, height } = Dimensions.get("window");
 
@@ -104,7 +105,6 @@ function useCommunityMainScreenState() {
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [successCallback, setSuccessCallback] = useState<(() => void) | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [errorTitle, setErrorTitle] = useState("Error");
@@ -143,8 +143,6 @@ function useCommunityMainScreenState() {
     setShowSuccessModal,
     successMessage,
     setSuccessMessage,
-    successCallback,
-    setSuccessCallback,
     showErrorModal,
     setShowErrorModal,
     errorMessage,
@@ -193,8 +191,6 @@ function CommunityMainScreenLogic() {
     setShowSuccessModal,
     successMessage,
     setSuccessMessage,
-    successCallback,
-    setSuccessCallback,
     showErrorModal,
     setShowErrorModal,
     errorMessage,
@@ -247,8 +243,6 @@ function CommunityMainScreenLogic() {
     setShowSuccessModal,
     successMessage,
     setSuccessMessage,
-    successCallback,
-    setSuccessCallback,
     showErrorModal,
     setShowErrorModal,
     errorMessage,
@@ -267,7 +261,7 @@ function CommunityMainScreenLogic() {
 }
 
 export default function CommunityMainScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const {
     selectedCategory,
     setSelectedCategory,
@@ -301,8 +295,6 @@ export default function CommunityMainScreen() {
     setShowSuccessModal,
     successMessage,
     setSuccessMessage,
-    successCallback,
-    setSuccessCallback,
     showErrorModal,
     setShowErrorModal,
     errorMessage,
@@ -318,6 +310,9 @@ export default function CommunityMainScreen() {
     confirmCallback,
     setConfirmCallback,
   } = CommunityMainScreenLogic();
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   /**
    * Load initial data when component mounts
@@ -413,6 +408,32 @@ export default function CommunityMainScreen() {
     return uri;
   };
 
+  /**
+   * Show error modal with custom title and message
+   */
+  const showError = (title: string, message: string) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
+
+  /**
+   * Show success modal with custom message
+   */
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
+
+  /**
+   * Show confirmation modal for destructive actions
+   */
+  const showConfirmation = (title: string, message: string, callback: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmCallback(() => callback);
+    setShowConfirmModal(true);
+  };
 
   /**
    * Initial data loading sequence
@@ -423,9 +444,7 @@ export default function CommunityMainScreen() {
       await Promise.all([loadCategories(), loadPosts()]);
     } catch (error) {
       console.error("Error loading initial data:", error);
-      setErrorTitle("Error");
-      setErrorMessage("Failed to load community data");
-      setShowErrorModal(true);
+      showError("Error", "Failed to load community data");
     }
   };
 
@@ -455,9 +474,7 @@ export default function CommunityMainScreen() {
       // Special handling for bookmark category
       if (selectedCategory === "Bookmark") {
         if (!user?.id) {
-          setErrorTitle("Sign In Required");
-          setErrorMessage("Please sign in to view bookmarked posts");
-          setShowErrorModal(true);
+          showError("Sign In Required", "Please sign in to view bookmarked posts");
           setPosts([]);
           return;
         }
@@ -483,9 +500,7 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error loading posts:", error);
-      setErrorTitle("Error");
-      setErrorMessage("Failed to load posts");
-      setShowErrorModal(true);
+      showError("Error", "Failed to load posts");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -498,9 +513,7 @@ export default function CommunityMainScreen() {
    */
   const loadMyPosts = async () => {
     if (!user?.id) {
-      setErrorTitle("Sign In Required");
-      setErrorMessage("Please sign in to view your posts");
-      setShowErrorModal(true);
+      showError("Sign In Required", "Please sign in to view your posts");
       setMyPosts([]);
       setLoading(false);
       return;
@@ -512,9 +525,7 @@ export default function CommunityMainScreen() {
       setMyPosts(response.posts || []);
     } catch (error) {
       console.error("Error loading user posts:", error);
-      setErrorTitle("Error");
-      setErrorMessage("Failed to load your posts");
-      setShowErrorModal(true);
+      showError("Error", "Failed to load your posts");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -575,9 +586,7 @@ export default function CommunityMainScreen() {
    */
   const handleReactionPress = async (postId: number, emoji: string) => {
     if (!user?.id) {
-      setErrorTitle("Sign In Required");
-      setErrorMessage("Please sign in to react to posts");
-      setShowErrorModal(true);
+      showError("Sign In Required", "Please sign in to react to posts");
       return;
     }
 
@@ -612,9 +621,7 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error reacting to post:", error);
-      setErrorTitle("Error");
-      setErrorMessage("Failed to update reaction");
-      setShowErrorModal(true);
+      showError("Error", "Failed to update reaction");
     }
   };
 
@@ -624,9 +631,7 @@ export default function CommunityMainScreen() {
    */
   const handleBookmarkPress = async (postId: number) => {
     if (!user?.id) {
-      setErrorTitle("Sign In Required");
-      setErrorMessage("Please sign in to bookmark posts");
-      setShowErrorModal(true);
+      showError("Sign In Required", "Please sign in to bookmark posts");
       return;
     }
 
@@ -646,9 +651,7 @@ export default function CommunityMainScreen() {
       }
     } catch (error) {
       console.error("Error toggling bookmark:", error);
-      setErrorTitle("Error");
-      setErrorMessage("Failed to update bookmark");
-      setShowErrorModal(true);
+      showError("Error", "Failed to update bookmark");
     }
   };
 
@@ -679,14 +682,11 @@ export default function CommunityMainScreen() {
 
     try {
       await communityApi.updatePost(postId, { isDraft: false });
-      setSuccessMessage("Post published successfully!");
-      setSuccessCallback(() => () => loadMyPosts());
-      setShowSuccessModal(true);
+      showSuccess("Post published successfully!");
+      loadMyPosts();
     } catch (error) {
       console.error("Error publishing draft:", error);
-      setErrorTitle("Error");
-      setErrorMessage("Failed to publish post");
-      setShowErrorModal(true);
+      showError("Error", "Failed to publish post");
     }
   };
 
@@ -695,13 +695,10 @@ export default function CommunityMainScreen() {
    * Updates UI immediately after successful deletion
    */
   const handleDeletePost = async (postId: number) => {
-    setConfirmTitle("Delete Post");
-    setConfirmMessage("Are you sure you want to delete this post? This action cannot be undone.");
-    setConfirmCallback(() => async () => {
+    showConfirmation("Delete Post", "Are you sure you want to delete this post? This action cannot be undone.", async () => {
       try {
         await communityApi.deletePost(postId);
-        setSuccessMessage("Post deleted successfully!");
-        setShowSuccessModal(true);
+        showSuccess("Post deleted successfully!");
 
         // Update the UI immediately for better UX
         if (activeView === "my-posts") {
@@ -711,12 +708,9 @@ export default function CommunityMainScreen() {
         }
       } catch (error) {
         console.error("Error deleting post:", error);
-        setErrorTitle("Error");
-        setErrorMessage("Failed to delete post");
-        setShowErrorModal(true);
+        showError("Error", "Failed to delete post");
       }
     });
-    setShowConfirmModal(true);
   };
 
   /**
@@ -759,9 +753,7 @@ export default function CommunityMainScreen() {
       }
       router.replace("/(auth)/login");
     } catch (error) {
-      setErrorTitle("Logout Failed");
-      setErrorMessage("Unable to sign out. Please try again.");
-      setShowErrorModal(true);
+      showError("Logout Failed", "Unable to sign out. Please try again.");
     } finally {
       setIsSigningOut(false);
     }
@@ -771,10 +763,7 @@ export default function CommunityMainScreen() {
    * Confirm sign-out with confirm modal
    */
   const confirmSignOut = () => {
-    setConfirmTitle("Sign Out");
-    setConfirmMessage("Are you sure you want to sign out?");
-    setConfirmCallback(() => () => { handleLogout(); });
-    setShowConfirmModal(true);
+    showConfirmation("Sign Out", "Are you sure you want to sign out?", () => { handleLogout(); });
   };
 
   /**
@@ -980,7 +969,7 @@ export default function CommunityMainScreen() {
             >
               <Ionicons
                 name="newspaper"
-                size={20}
+                size={scaledFontSize(20)}
                 color={activeView === "newsfeed" ? "#FFFFFF" : "#7CB9A9"}
               />
               <Text
@@ -1002,7 +991,7 @@ export default function CommunityMainScreen() {
             >
               <Ionicons
                 name="person"
-                size={20}
+                size={scaledFontSize(20)}
                 color={activeView === "my-posts" ? "#FFFFFF" : "#7CB9A9"}
               />
               <Text
@@ -1023,7 +1012,7 @@ export default function CommunityMainScreen() {
                 style={styles.addPostButton}
                 onPress={() => router.push("/community-forum/create")}
               >
-                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Ionicons name="add" size={scaledFontSize(16)} color="#FFFFFF" />
                 <Text style={styles.addPostButtonText}>Add Post</Text>
               </TouchableOpacity>
 
@@ -1065,7 +1054,7 @@ export default function CommunityMainScreen() {
           {activeView === "my-posts" && (
             <View style={styles.myPostsHeader}>
               <View style={styles.myPostsHeaderContent}>
-                <Ionicons name="document-text" size={24} color="#7CB9A9" />
+                <Ionicons name="document-text" size={scaledFontSize(24)} color="#7CB9A9" />
                 <Text style={[styles.myPostsTitle, { color: theme.colors.text }]}>My Posts</Text>
                 <Text style={[styles.myPostsSubtitle, { color: theme.colors.textSecondary }]}>
                   Manage your published posts and drafts
@@ -1075,7 +1064,7 @@ export default function CommunityMainScreen() {
                 style={styles.addPostButton}
                 onPress={() => router.push("/community-forum/create")}
               >
-                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Ionicons name="add" size={scaledFontSize(16)} color="#FFFFFF" />
                 <Text style={styles.addPostButtonText}>New Post</Text>
               </TouchableOpacity>
             </View>
@@ -1100,7 +1089,7 @@ export default function CommunityMainScreen() {
                       ? "document-text-outline"
                       : "create-outline"
                   }
-                  size={64}
+                  size={scaledFontSize(64)}
                   color="#E0E0E0"
                 />
                 <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
@@ -1140,7 +1129,7 @@ export default function CommunityMainScreen() {
                     {/* Draft Badge - Only show for draft posts */}
                     {post.is_draft && (
                       <View style={[styles.draftBadge, { backgroundColor: theme.isDark ? 'rgba(255, 167, 38, 0.2)' : '#FFF3CD' }]}>
-                        <Ionicons name="time" size={12} color={theme.isDark ? '#FFB74D' : '#856404'} />
+                        <Ionicons name="time" size={scaledFontSize(12)} color={theme.isDark ? '#FFB74D' : '#856404'} />
                         <Text style={[styles.draftBadgeText, { color: theme.isDark ? '#FFB74D' : '#856404' }]}>Draft</Text>
                       </View>
                     )}
@@ -1221,13 +1210,13 @@ export default function CommunityMainScreen() {
                                 style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                                 onPress={() => handleEditPost(post.id)}
                               >
-                                <Ionicons name="create" size={18} color={theme.colors.textSecondary} />
+                                <Ionicons name="create" size={scaledFontSize(18)} color={theme.colors.textSecondary} />
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                                 onPress={() => handlePublishDraft(post.id)}
                               >
-                                <Ionicons name="send" size={18} color="#4CAF50" />
+                                <Ionicons name="send" size={scaledFontSize(18)} color="#4CAF50" />
                               </TouchableOpacity>
                             </>
                           ) : (
@@ -1235,14 +1224,14 @@ export default function CommunityMainScreen() {
                               style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                               onPress={() => handlePostPress(post.id)}
                             >
-                              <Ionicons name="eye" size={18} color={theme.colors.textSecondary} />
+                              <Ionicons name="eye" size={scaledFontSize(18)} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                           )}
                           <TouchableOpacity
                             style={[styles.postActionButton, { backgroundColor: theme.colors.surface }]}
                             onPress={() => handleDeletePost(post.id)}
                           >
-                            <Ionicons name="trash" size={18} color="#FF6B6B" />
+                            <Ionicons name="trash" size={scaledFontSize(18)} color="#FF6B6B" />
                           </TouchableOpacity>
                         </View>
                       )}
@@ -1291,7 +1280,7 @@ export default function CommunityMainScreen() {
                                   ? "bookmark"
                                   : "bookmark-outline"
                               }
-                              size={24}
+                              size={scaledFontSize(24)}
                               color={bookmarkedPosts.has(post.id) ? "#FFA000" : "#666"}
                             />
                           </TouchableOpacity>
@@ -1359,7 +1348,7 @@ export default function CommunityMainScreen() {
                 >
                   <Ionicons
                     name={item.icon as any}
-                    size={20}
+                    size={scaledFontSize(20)}
                     color={item.disabled ? "#CCCCCC" : item.title === "Sign Out" ? theme.colors.error : "#4CAF50"}
                   />
                   <Text
@@ -1388,98 +1377,42 @@ export default function CommunityMainScreen() {
       />
 
       {/* Success Modal */}
-      <Modal
+      <StatusModal
         visible={showSuccessModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSuccessModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.successModal}>
-            <View style={styles.successIconContainer}>
-              <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
-            </View>
-            <Text style={styles.successTitle}>Success!</Text>
-            <Text style={styles.successMessage}>{successMessage}</Text>
-            <TouchableOpacity
-              style={styles.successButton}
-              onPress={() => {
-                setShowSuccessModal(false);
-                if (successCallback) {
-                  successCallback();
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.successButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        type="success"
+        title="Success!"
+        message={successMessage}
+        onClose={() => setShowSuccessModal(false)}
+        buttonText="Done"
+      />
 
       {/* Error Modal */}
-      <Modal
+      <StatusModal
         visible={showErrorModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowErrorModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.successModal}>
-            <View style={styles.errorIconContainer}>
-              <Ionicons name="close-circle" size={80} color="#FF3B30" />
-            </View>
-            <Text style={styles.errorTitle}>{errorTitle}</Text>
-            <Text style={styles.successMessage}>{errorMessage}</Text>
-            <TouchableOpacity
-              style={styles.errorButton}
-              onPress={() => setShowErrorModal(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.successButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        type="error"
+        title={errorTitle}
+        message={errorMessage}
+        onClose={() => setShowErrorModal(false)}
+        buttonText="OK"
+      />
 
       {/* Confirm Modal */}
-      <Modal
+      <StatusModal
         visible={showConfirmModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowConfirmModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.successModal}>
-            <View style={styles.confirmIconContainer}>
-              <Ionicons name="alert-circle" size={80} color="#FFA000" />
-            </View>
-            <Text style={styles.confirmTitle}>{confirmTitle}</Text>
-            <Text style={styles.successMessage}>{confirmMessage}</Text>
-            <View style={styles.confirmButtonsContainer}>
-              <TouchableOpacity
-                style={styles.confirmCancelButton}
-                onPress={() => setShowConfirmModal(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.confirmCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={() => {
-                  setShowConfirmModal(false);
-                  if (confirmCallback) {
-                    confirmCallback();
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.successButtonText}>Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        type="info"
+        title={confirmTitle}
+        message={confirmMessage}
+        onClose={() => setShowConfirmModal(false)}
+        buttonText="Cancel"
+        secondaryButtonText="Confirm"
+        onSecondaryButtonPress={() => {
+          setShowConfirmModal(false);
+          if (confirmCallback) {
+            confirmCallback();
+          }
+        }}
+        secondaryButtonType="default"
+      />
     </SafeAreaView>
   );
 }
@@ -1488,7 +1421,7 @@ export default function CommunityMainScreen() {
  * Stylesheet for CommunityMainScreen component
  * Organized by component sections with consistent theming
  */
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     // backgroundColor removed - now uses theme.colors.background
@@ -1540,7 +1473,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#7CB9A9",
   },
   viewTabText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
     color: "#7CB9A9",
   },
@@ -1580,12 +1513,12 @@ const styles = StyleSheet.create({
   },
   addPostButtonText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     marginLeft: 8,
   },
   browseBySectionTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "800",
     // color moved to theme.colors.text via inline override
     marginBottom: 12,
@@ -1608,7 +1541,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#757575",
   },
   categoryText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.text via inline override
     fontWeight: "500",
     textAlign: "center",
@@ -1629,13 +1562,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   myPostsTitle: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24),
     fontWeight: "700",
     // color moved to theme.colors.text via inline override
     marginTop: 8,
   },
   myPostsSubtitle: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
     marginTop: 4,
   },
@@ -1652,7 +1585,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme.colors.textSecondary via inline override
   },
   emptyContainer: {
@@ -1661,14 +1594,14 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     // color moved to theme.colors.textSecondary via inline override
     marginTop: 16,
     fontWeight: "600",
     textAlign: "center",
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
     marginTop: 8,
     textAlign: "center",
@@ -1707,7 +1640,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   draftBadgeText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     // color moved to theme override in JSX
     fontWeight: "500",
   },
@@ -1740,20 +1673,20 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "bold",
   },
   postTitleContainer: {
     flex: 1,
   },
   postTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "700",
     // color moved to theme.colors.text via inline override
     lineHeight: 20,
   },
   postAuthor: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     // color moved to theme.colors.textSecondary via inline override
     marginTop: 4,
   },
@@ -1771,7 +1704,7 @@ const styles = StyleSheet.create({
 
   // Post Content - Main post text
   postContent: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
     lineHeight: 20,
     marginBottom: 12,
@@ -1801,15 +1734,15 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reactionEmoji: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
   },
   reactionCount: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#666",
     fontWeight: "500",
   },
   moreReactions: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#999",
     fontStyle: "italic",
   },
@@ -1827,7 +1760,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   categoryBadgeText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
     color: "#4CAF50",
   },
@@ -1842,108 +1775,13 @@ const styles = StyleSheet.create({
   },
   createFirstPostButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
 
   // Bottom Spacing - Scroll view padding
   bottomSpacing: {
     height: 30,
-  },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successModal: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    width: '80%',
-    maxWidth: 400,
-  },
-  successIconContainer: {
-    marginBottom: 16,
-  },
-  errorIconContainer: {
-    marginBottom: 16,
-  },
-  confirmIconContainer: {
-    marginBottom: 16,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#FF3B30',
-    marginBottom: 8,
-  },
-  confirmTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#FFA000',
-    marginBottom: 8,
-  },
-  successMessage: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  successButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    width: '100%',
-  },
-  errorButton: {
-    backgroundColor: '#FF3B30',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    width: '100%',
-  },
-  confirmButton: {
-    backgroundColor: '#FFA000',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    flex: 1,
-  },
-  confirmCancelButton: {
-    backgroundColor: '#E0E0E0',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    flex: 1,
-  },
-  confirmButtonsContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
-  },
-  successButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  confirmCancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
   },
 
   // Side Menu Styles - Navigation overlay
@@ -1991,17 +1829,17 @@ const styles = StyleSheet.create({
   },
   profileAvatarText: {
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "bold",
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
   },
   sideMenuContent: {
@@ -2016,7 +1854,7 @@ const styles = StyleSheet.create({
     // borderBottomColor moved to theme.colors.borderLight via inline override
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme.colors.text via inline override
     marginLeft: 15,
   },
