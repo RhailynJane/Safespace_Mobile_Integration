@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Switch,
@@ -23,6 +22,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalTemplate } from "../../../utils/journalApi";
 import { useTheme } from "../../../contexts/ThemeContext";
+import StatusModal from "../../../components/StatusModal";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 type CreateStep = "create" | "success";
@@ -61,7 +61,7 @@ const tabs = [
 const MAX_CHARACTERS = 1000;
 
 export default function JournalCreateScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
@@ -81,23 +81,41 @@ export default function JournalCreateScreen() {
   const [selectedTemplate, setSelectedTemplate] = useState<JournalTemplate | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        setLoadingTemplates(true);
+        const response = await journalApi.getTemplates();
+        setTemplates(response.templates || []);
+      } catch (error) {
+        console.error("Error fetching templates:", error);
+        showStatusModal('error', 'Load Failed', 'Unable to load journal templates. Please try again.');
+      } finally {
+        setLoadingTemplates(false);
+      }
+    };
+    
     fetchTemplates();
   }, []);
-
-  const fetchTemplates = async () => {
-    try {
-      setLoadingTemplates(true);
-      const response = await journalApi.getTemplates();
-      setTemplates(response.templates || []);
-    } catch (error) {
-      console.error("Error fetching templates:", error);
-      Alert.alert("Error", "Failed to load journal templates");
-    } finally {
-      setLoadingTemplates(false);
-    }
-  };
 
   const handleTitleChange = (text: string) => {
     setJournalData((prev) => ({ ...prev, title: text }));
@@ -153,12 +171,12 @@ export default function JournalCreateScreen() {
       !journalData.content.trim() ||
       !journalData.emotion
     ) {
-      Alert.alert("Missing Fields", "Please fill all required fields");
+      showStatusModal('error', 'Missing Fields', 'Please fill all required fields before saving.');
       return;
     }
 
     if (!user?.id) {
-      Alert.alert("Error", "User not authenticated");
+      showStatusModal('error', 'Authentication Error', 'Please sign in to save journal entries.');
       return;
     }
 
@@ -189,7 +207,7 @@ export default function JournalCreateScreen() {
       }
     } catch (error: any) {
       console.error("Error saving journal entry:", error);
-      Alert.alert("Error", error.message || "Failed to save journal entry");
+      showStatusModal('error', 'Save Failed', error.message || "Unable to save journal entry. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -201,18 +219,11 @@ export default function JournalCreateScreen() {
   };
 
   const handleCancel = () => {
-    Alert.alert(
-      "Discard Entry?",
-      "Are you sure you want to discard this journal entry?",
-      [
-        { text: "Keep Writing", style: "cancel" },
-        {
-          text: "Discard",
-          style: "destructive",
-          onPress: () => router.back(),
-        },
-      ]
+    showStatusModal('info', 'Discard Entry?', 
+      'Are you sure you want to discard this journal entry? Your changes will be lost.'
     );
+    // Note: If you need custom button handling, consider using the StatusModal's onClose callback
+    // or navigating after confirmation in the actual usage
   };
 
   const renderSuccessModal = () => (
@@ -498,6 +509,15 @@ export default function JournalCreateScreen() {
 
         {renderSuccessModal()}
 
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
+
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -508,7 +528,8 @@ export default function JournalCreateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -523,20 +544,22 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xl,
   },
   pageTitle: {
-    ...Typography.title,
+    fontSize: scaledFontSize(24), // Base size 24px
+    fontWeight: "700",
     textAlign: "center",
     marginBottom: Spacing.md,
   },
   pageSubtitle: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     textAlign: "center",
     marginBottom: Spacing.xxl,
+    color: "#666",
   },
   fieldContainer: {
     marginBottom: Spacing.xxl,
   },
   fieldLabel: {
-    ...Typography.subtitle,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
     marginBottom: Spacing.sm,
   },
@@ -550,7 +573,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   characterCount: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(12), // Base size 12px
   },
   characterCountMax: {
     fontWeight: "600",
@@ -558,24 +581,25 @@ const styles = StyleSheet.create({
   titleInput: {
     borderRadius: 12,
     padding: Spacing.lg,
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     borderWidth: 1,
   },
   contentInput: {
     borderRadius: 12,
     padding: Spacing.lg,
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     height: 450,
     borderWidth: 1,
     textAlignVertical: 'top',
   },
   // Template Styles
   templateSubtext: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: Spacing.lg,
+    color: "#666",
   },
   templatePromptHint: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(12), // Base size 12px
     fontStyle: 'italic',
     marginTop: 2,
   },
@@ -598,9 +622,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   templateName: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(12), // Base size 12px
     textAlign: "center",
-    fontSize: 12,
   },
   templateNameSelected: {
     fontWeight: "600",
@@ -612,13 +635,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
   },
   templatesLoadingText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginLeft: Spacing.sm,
+    color: "#666",
   },
   // Emotion Styles
   emotionSubtext: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: Spacing.lg,
+    color: "#666",
   },
   emotionsContainer: {
     flexDirection: "row",
@@ -639,13 +664,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   emotionEmoji: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28), // Base size 28px
     marginBottom: Spacing.xs,
   },
   emotionLabel: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(12), // Base size 12px
     textAlign: "center",
-    fontSize: 12,
   },
   emotionLabelSelected: {
     fontWeight: "600",
@@ -663,36 +687,43 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   shareSubtext: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: 4,
+    color: "#666",
   },
   actionButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: Spacing.lg,
-    marginBottom: Spacing.huge,
+    gap: Spacing.xl,
+    marginBottom: 100,
+    marginTop: Spacing.xxl,
+    paddingHorizontal: Spacing.md,
   },
   cancelButton: {
     flex: 1,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     alignItems: "center",
     borderWidth: 1,
   },
   cancelButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
   saveButton: {
     flex: 1,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     alignItems: "center",
   },
   disabledButton: {
     opacity: 0.6,
   },
   saveButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
   // Success Modal Styles
   modalOverlay: {
@@ -713,15 +744,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   successTitle: {
-    ...Typography.title,
+    fontSize: scaledFontSize(24), // Base size 24px
+    fontWeight: "700",
     marginBottom: Spacing.md,
     textAlign: "center",
   },
   successMessage: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
     marginBottom: Spacing.lg,
     lineHeight: 22,
+    color: "#666",
   },
   sharedInfo: {
     flexDirection: "row",
@@ -732,7 +765,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   sharedInfoText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginLeft: Spacing.sm,
     flex: 1,
   },
@@ -744,6 +777,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   successButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
@@ -18,6 +17,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../../utils/journalApi";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -28,12 +28,30 @@ const tabs = [
 ];
 
 export default function JournalEntryScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { id } = useLocalSearchParams();
   const [entry, setEntry] = useState<JournalEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journal");
   const [deleting, setDeleting] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   useEffect(() => {
     const fetchEntry = async () => {
@@ -43,9 +61,7 @@ export default function JournalEntryScreen() {
         setEntry(response.entry);
       } catch (error) {
         console.error("Error fetching journal entry:", error);
-        Alert.alert("Error", "Failed to load journal entry", [
-          { text: "OK", onPress: () => router.back() },
-        ]);
+        showStatusModal('error', 'Load Failed', 'Unable to load journal entry. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -66,37 +82,24 @@ export default function JournalEntryScreen() {
   };
 
   const handleDelete = async () => {
-    Alert.alert(
-      "Delete Entry",
-      "Are you sure you want to delete this journal entry? This action cannot be undone.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setDeleting(true);
-              await journalApi.deleteEntry(id as string);
-              Alert.alert("Success", "Journal entry deleted successfully", [
-                {
-                  text: "OK",
-                  onPress: () => router.replace("/(app)/journal"),
-                },
-              ]);
-            } catch (error) {
-              console.error("Error deleting journal entry:", error);
-              Alert.alert("Error", "Failed to delete journal entry");
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ]
+    showStatusModal('info', 'Delete Entry', 
+      'Are you sure you want to delete this journal entry? This action cannot be undone.'
     );
+    
+    // Note: For confirmation dialog functionality, consider implementing a separate 
+    // confirmation modal component that allows custom button handling
+    setDeleting(true);
+    try {
+      await journalApi.deleteEntry(id as string);
+      showStatusModal('success', 'Entry Deleted', 'Journal entry deleted successfully.');
+      setTimeout(() => {
+        router.replace("/(app)/journal");
+      }, 1500);
+    } catch (error) {
+      console.error("Error deleting journal entry:", error);
+      showStatusModal('error', 'Delete Failed', 'Unable to delete journal entry. Please try again.');
+      setDeleting(false);
+    }
   };
 
   const handleEdit = () => {
@@ -241,6 +244,15 @@ export default function JournalEntryScreen() {
           </View>
         </ScrollView>
 
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
+
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -251,7 +263,8 @@ export default function JournalEntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -270,8 +283,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: Spacing.md,
+    color: "#666",
   },
   notFoundContainer: {
     flex: 1,
@@ -280,9 +294,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   notFoundText: {
-    ...Typography.title,
+    fontSize: scaledFontSize(20), // Base size 20px
+    fontWeight: "600",
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
+    color: "#666",
   },
   backButton: {
     borderRadius: 12,
@@ -290,27 +306,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   backButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
   entryHeader: {
     marginBottom: Spacing.xl,
   },
   entryDate: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: Spacing.sm,
+    color: "#666",
   },
   entryTitle: {
-    ...Typography.title,
-    fontSize: 24,
+    fontSize: scaledFontSize(24), // Base size 24px
     fontWeight: "600",
     marginBottom: Spacing.sm,
   },
   entryMood: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     textTransform: "capitalize",
+    color: "#666",
   },
   entryContent: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     lineHeight: 24,
     marginBottom: Spacing.xl,
   },
@@ -326,7 +344,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   tagText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
   },
   sharedCard: {
     flexDirection: "row",
@@ -336,7 +354,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   sharedCardText: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     marginLeft: Spacing.md,
     flex: 1,
   },
@@ -357,7 +375,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   editButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
     marginLeft: Spacing.sm,
     fontWeight: "600",
   },
@@ -374,7 +392,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   deleteButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
     marginLeft: Spacing.sm,
     fontWeight: "600",
   },
