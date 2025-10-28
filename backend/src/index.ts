@@ -305,6 +305,9 @@ async function runRemindersTick() {
         const freq = row.mood_reminder_frequency || 'Daily';
         const customSched = row.mood_reminder_custom_schedule || {};
         if (frequencyMatches(freq, now, lastMoodSent, customSched) && shouldSendAtTime(freq, now, row.mood_reminder_time || '09:00', lastMoodSent, customSched)) {
+          try {
+            console.log(`⏰ Mood reminder due -> userId=${row.uid} time=${hhmm(now)} freq=${freq} configured=${row.mood_reminder_time || '09:00'}`);
+          } catch { /* no-op */ }
           await createAndPushNotification(row.uid, 'mood', 'Mood check-in', 'How are you feeling right now? Take a quick mood check.');
           await pool.query(`UPDATE user_settings SET last_mood_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
         }
@@ -315,6 +318,9 @@ async function runRemindersTick() {
         const freq = row.journal_reminder_frequency || 'Daily';
         const customSched = row.journal_reminder_custom_schedule || {};
         if (frequencyMatches(freq, now, lastJournalSent, customSched) && shouldSendAtTime(freq, now, row.journal_reminder_time || '20:00', lastJournalSent, customSched)) {
+          try {
+            console.log(`⏰ Journal reminder due -> userId=${row.uid} time=${hhmm(now)} freq=${freq} configured=${row.journal_reminder_time || '20:00'}`);
+          } catch { /* no-op */ }
           await createAndPushNotification(row.uid, 'journaling', 'Journal reminder', 'Write a quick entry to reflect on your day.');
           await pool.query(`UPDATE user_settings SET last_journal_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
         }
@@ -364,6 +370,9 @@ async function createAndPushNotification(
   data?: Record<string, any>
 ) {
   try {
+    try {
+      console.log(`🔔 createAndPushNotification: userId=${userId} category=${category} title=${title}`);
+    } catch { /* no-op */ }
     // Read settings and quiet hours
     const sRes = await pool.query(
       `SELECT 
@@ -403,14 +412,22 @@ async function createAndPushNotification(
 
     const categoryAllowed = byCategory[category] !== false;
     let canPush = allEnabled && categoryAllowed;
+    if (!allEnabled) {
+      try { console.log(`🔕 Push suppressed (global disabled): userId=${userId} category=${category}`); } catch { /* no-op */ }
+    }
+    if (!categoryAllowed) {
+      try { console.log(`🔕 Push suppressed (category disabled): userId=${userId} category=${category}`); } catch { /* no-op */ }
+    }
     if (canPush && sRes.rows.length > 0 && s.quiet_hours_enabled) {
       const now = new Date();
       if (isWithinQuietHours(now, s.quiet_start_time, s.quiet_end_time)) {
         canPush = false;
+        try { console.log(`🔕 Push suppressed (quiet hours ${s.quiet_start_time}-${s.quiet_end_time}): userId=${userId} category=${category} now=${hhmm(now)}`); } catch { /* no-op */ }
       }
     }
 
     if (canPush) {
+      try { console.log(`📤 Sending push -> userId=${userId} category=${category}`); } catch { /* no-op */ }
       await sendPushToUser(userId, title, message, { type: category, ...(data || {}) });
     }
   } catch (e: any) {
