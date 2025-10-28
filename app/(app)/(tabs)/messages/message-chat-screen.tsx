@@ -48,6 +48,7 @@ import {
   Dimensions,
   Modal,
   Keyboard,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -126,6 +127,10 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingRef = useRef<any>(null);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [pendingRecordingUri, setPendingRecordingUri] = useState<string | null>(null);
+  const [pendingRecordingDuration, setPendingRecordingDuration] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ uri: string; name: string; size?: number }>>([]);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('smileys');
   const emojiScrollRef = useRef<ScrollView>(null);
@@ -237,14 +242,13 @@ export default function ChatScreen() {
   // Load messages
   const loadMessages = useCallback(async () => {
     if (!conversationId || !userId) {
-      console.log("âŒ Missing conversationId or userId");
+      console.log("Missing conversationId or userId");
       setLoading(false);
       return;
     }
 
     try {
-      console.log(`ðŸ’¬ [${Date.now()}] Loading messages for conversation ${conversationId}`);
-
+      console.log(`[${Date.now()}] Loading messages for conversation ${conversationId}`)
       // Start all non-blocking operations in parallel
       const startTime = Date.now();
       
@@ -259,7 +263,7 @@ export default function ChatScreen() {
       if (response.ok) {
         const result = await response.json();
         const loadTime = Date.now() - startTime;
-        console.log(`ðŸ’¬ [${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
+        console.log(`[${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
         setMessages(result.data);
 
         // Fire and forget: mark as read in background (don't block UI)
@@ -306,11 +310,11 @@ export default function ChatScreen() {
           setContact(fallbackContact);
         }
       } else {
-        console.error("ðŸ’¬ Failed to load messages:", response.status);
+        console.error("Failed to load messages:", response.status);
         showStatusModal('error', 'Load Error', 'Failed to load messages. Please try again.');
       }
     } catch (error) {
-      console.error("ðŸ’¬ Error loading messages:", error);
+      console.error("Error loading messages:", error);
       showStatusModal('error', 'Connection Error', 'Failed to load messages. Please check your connection.');
     } finally {
       setLoading(false);
@@ -414,9 +418,18 @@ export default function ChatScreen() {
         copyToCacheDirectory: true,
       });
 
-      if (result.assets?.[0]) {
-        const asset = result.assets[0];
-        await uploadAttachment(asset.uri, "file", asset.name);
+      const assets = result.assets || (result as any).assets || [];
+      if (assets.length > 0) {
+        const toAdd: Array<{ uri: string; name: string; size?: number }> = [];
+        for (const asset of assets) {
+          try {
+            const info = await getFileInfo(asset.uri);
+            toAdd.push({ uri: asset.uri, name: asset.name || `file_${Date.now()}`, size: info.size });
+          } catch {
+            toAdd.push({ uri: asset.uri, name: asset.name || `file_${Date.now()}` });
+          }
+        }
+        setPendingFiles((prev) => [...prev, ...toAdd]);
       }
     } catch (error) {
       console.error("Error picking document:", error);
@@ -600,7 +613,7 @@ export default function ChatScreen() {
 
     try {
       setSending(true);
-      // console.log(`ðŸ’¬ Sending message: "${newMessage}"`);
+      // console.log(`Sending message: "${newMessage}"`);
 
       // Update activity when sending message
       await updateUserActivity();
@@ -621,7 +634,7 @@ export default function ChatScreen() {
 
       if (response.ok) {
         const result = await response.json();
-        // console.log("ðŸ’¬ Message sent successfully");
+        // console.log("Message sent successfully");
         setMessages((prev) => [...prev, result.data]);
         setNewMessage("");
         setIsTyping(false); // Reset typing state after sending
@@ -629,11 +642,11 @@ export default function ChatScreen() {
         // Reload messages to ensure both parties see the same
         setTimeout(() => loadMessages(), 500);
       } else {
-        console.error("ðŸ’¬ Failed to send message:", response.status);
+        console.error("Failed to send message:", response.status);
         showStatusModal('error', 'Send Error', 'Failed to send message');
       }
     } catch (error) {
-      console.error("ðŸ’¬ Error sending message:", error);
+      console.error("Error sending message:", error);
       showStatusModal('error', 'Send Error', 'Failed to send message');
     } finally {
       setSending(false);
@@ -650,7 +663,7 @@ export default function ChatScreen() {
     setEmojiPickerVisible(false);
   };
 
-  // Handle voice recording
+  // Handle voice recording (start/stop)
   const handleMicPress = async () => {
     if (isRecording) {
       // Stop recording
@@ -660,43 +673,13 @@ export default function ChatScreen() {
           const uri = recordingRef.current.getURI();
           recordingRef.current = null;
           setIsRecording(false);
-          setRecordingDuration(0);
-          
+          if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+          // Move to pending state so user can preview/cancel/send from UI
           if (uri) {
-            // Show option to send or cancel
-            Alert.alert(
-              'Voice Message',
-              `Recording completed (${Math.floor(recordingDuration)}s). Send this voice message?`,
-              [
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                  onPress: () => {
-                    // Delete the recording file
-                    FileSystem.deleteAsync(uri, { idempotent: true }).catch(console.error);
-                  }
-                },
-                {
-                  text: 'Send',
-                  onPress: async () => {
-                    try {
-                      setUploading(true);
-                      const fileName = `voice_${Date.now()}.m4a`;
-                      await uploadAttachment(uri, 'file', fileName);
-                      showStatusModal('success', 'Sent', 'Voice message sent successfully');
-                    } catch (error) {
-                      console.error('Error sending voice message:', error);
-                      showStatusModal('error', 'Error', 'Failed to send voice message');
-                    } finally {
-                      setUploading(false);
-                      // Clean up the recording file
-                      FileSystem.deleteAsync(uri, { idempotent: true }).catch(console.error);
-                    }
-                  }
-                }
-              ]
-            );
+            setPendingRecordingUri(uri);
+            setPendingRecordingDuration(Math.max(1, Math.floor(recordingDuration)));
           }
+          setRecordingDuration(0);
         }
       } catch (error) {
         console.error('Error stopping recording:', error);
@@ -735,6 +718,7 @@ export default function ChatScreen() {
             });
           }
         }, 100);
+        recordingTimerRef.current = durationInterval as unknown as NodeJS.Timeout;
         
         // Auto-stop after 2 minutes
         setTimeout(async () => {
@@ -749,6 +733,69 @@ export default function ChatScreen() {
         showStatusModal('error', 'Error', 'Failed to start recording. Please check your microphone permissions.');
         setIsRecording(false);
       }
+    }
+  };
+
+  // Cancel/remove pending recording (or abort active recording)
+  const cancelPendingRecording = async () => {
+    try {
+      if (isRecording && recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+        setIsRecording(false);
+      }
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+      if (pendingRecordingUri) {
+        await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }).catch(() => {});
+      }
+    } finally {
+      setPendingRecordingUri(null);
+      setPendingRecordingDuration(0);
+      setRecordingDuration(0);
+    }
+  };
+
+  // Send the prepared recording
+  const sendPendingRecording = async () => {
+    if (!pendingRecordingUri) return;
+    try {
+      setUploading(true);
+      const fileName = `voice_${Date.now()}.m4a`;
+      await uploadAttachment(pendingRecordingUri, 'file', fileName);
+      showStatusModal('success', 'Sent', 'Voice message sent successfully');
+    } catch (error) {
+      console.error('Error sending voice message:', error);
+      showStatusModal('error', 'Error', 'Failed to send voice message');
+    } finally {
+      setUploading(false);
+      try { await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }); } catch { /* noop */ }
+      setPendingRecordingUri(null);
+      setPendingRecordingDuration(0);
+    }
+  };
+
+  // Send pending files and/or message
+  const handleMainSend = async () => {
+    if (sending || uploading) return;
+    try {
+      // Send files first
+      if (pendingFiles.length > 0) {
+        setUploading(true);
+        for (const f of pendingFiles) {
+          await uploadAttachment(f.uri, 'file', f.name);
+        }
+        setPendingFiles([]);
+        setUploading(false);
+      }
+      // Then send text if any
+      if (newMessage.trim().length > 0) {
+        await handleSendMessage();
+      }
+    } catch (e) {
+      console.error('Send error:', e);
+      showStatusModal('error', 'Error', 'Failed to send');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -958,6 +1005,84 @@ export default function ChatScreen() {
 
   // Enhanced renderMessageContent function
   const renderMessageContent = (message: ExtendedMessage) => {
+    // Helper: detect audio files by extension/name
+    const isAudioFile = (name?: string, url?: string) => {
+      const target = (name || url || '').toLowerCase();
+      return ['.m4a', '.mp3', '.wav', '.ogg', '.aac'].some(ext => target.includes(ext))
+        || (url || '').startsWith('data:audio')
+        || (url || '').includes('/audio/');
+    };
+
+    // Inline component for playing audio messages
+    const AudioBubble = ({ uri }: { uri: string }) => {
+      const [playing, setPlaying] = useState(false);
+      const [barAnim] = useState([new Animated.Value(2), new Animated.Value(8), new Animated.Value(4)]);
+      const soundRef = useRef<Audio.Sound | null>(null);
+
+      const startWave = () => {
+        const loops = barAnim.map((v, i) => Animated.loop(
+          Animated.sequence([
+            Animated.timing(v, { toValue: 14 - i * 2, duration: 250, useNativeDriver: false }),
+            Animated.timing(v, { toValue: 2 + i * 2, duration: 250, useNativeDriver: false }),
+          ])
+        ));
+        Animated.parallel(loops).start();
+      };
+
+      const stopWave = () => {
+        barAnim.forEach(v => v.stopAnimation());
+      };
+
+      const toggle = async () => {
+        try {
+          if (!soundRef.current) {
+            const { sound } = await Audio.Sound.createAsync({ uri: resolveRemoteUri(uri) });
+            soundRef.current = sound;
+            await sound.playAsync();
+            setPlaying(true);
+            startWave();
+            sound.setOnPlaybackStatusUpdate((st: any) => {
+              if (st.didJustFinish) {
+                setPlaying(false);
+                stopWave();
+              }
+            });
+          } else {
+            const status: any = await soundRef.current.getStatusAsync();
+            if (status.isPlaying) {
+              await soundRef.current.pauseAsync();
+              setPlaying(false);
+              stopWave();
+            } else {
+              await soundRef.current.playAsync();
+              setPlaying(true);
+              startWave();
+            }
+          }
+        } catch (_e) {
+          // ignore
+        }
+      };
+
+      useEffect(() => {
+        return () => { try { soundRef.current?.unloadAsync(); } catch { /* noop */ } };
+      }, []);
+
+      return (
+        <View style={styles.audioBubble}>
+          <TouchableOpacity style={styles.audioPlayButton} onPress={toggle}>
+            <Ionicons name={playing ? 'pause' : 'play'} size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.audioBars}>
+            {barAnim.map((v, idx) => (
+              <Animated.View key={idx} style={[styles.audioBar, { height: v }]} />
+            ))}
+          </View>
+          <Text style={styles.audioDurationText}>Voice</Text>
+        </View>
+      );
+    };
+
     // Handle image attachments
     if (message.message_type === "image" && message.attachment_url) {
       return (
@@ -994,53 +1119,42 @@ export default function ChatScreen() {
       );
     }
 
-    // Handle file attachments
+    // Handle audio attachments (voice notes)
+    if (message.message_type === 'file' && message.attachment_url && isAudioFile(message.file_name, message.attachment_url)) {
+      return <AudioBubble uri={message.attachment_url} />;
+    }
+
+    // Handle other file attachments - dark bubble with icon, name and size
     if (message.message_type === "file" && message.attachment_url) {
       return (
         <TouchableOpacity
-          style={styles.fileAttachment}
           onPress={() => handleDownloadFile(message)}
           onLongPress={() => {
             Alert.alert(
               "File Options",
               `File: ${message.file_name || "Unknown file"}`,
               [
-                {
-                  text: "Download & Share",
-                  onPress: () => { handleDownloadFile(message); },
-                },
-                {
-                  text: "Open in Browser",
-                  onPress: () => {
-                    WebBrowser.openBrowserAsync(message.attachment_url!);
-                  },
-                },
+                { text: "Download & Share", onPress: () => { handleDownloadFile(message); } },
+                { text: "Open in Browser", onPress: () => { WebBrowser.openBrowserAsync(message.attachment_url!); } },
                 { text: "Cancel", style: "cancel" },
               ]
             );
           }}
+          activeOpacity={0.8}
         >
-          <View style={styles.fileIconContainer}>
-            <Ionicons
-              name={getFileIcon(message.file_name)}
-              size={24}
-              color="#4CAF50"
-            />
-          </View>
-          <View style={styles.fileInfo}>
-            <Text style={styles.fileName} numberOfLines={1}>
-              {message.file_name || "Download file"}
-            </Text>
-            {message.file_size && (
-              <Text style={styles.fileSize}>
-                {formatFileSize(message.file_size)}
+          <View style={styles.fileBubbleRow}>
+            <View style={styles.fileIconCircle}>
+              <Ionicons name={getFileIcon(message.file_name)} size={18} color="#FFFFFF" />
+            </View>
+            <View style={styles.fileTexts}>
+              <Text style={styles.fileNameDark} numberOfLines={1}>
+                {message.file_name || "Document"}
               </Text>
-            )}
-            <Text style={styles.fileHint}>
-              {getFileTypeText(message.file_name)} â€¢ Tap to download
-            </Text>
+              <Text style={styles.fileSizeDark}>
+                {message.file_size ? formatFileSize(message.file_size) : getFileTypeText(message.file_name)}
+              </Text>
+            </View>
           </View>
-          <Ionicons name="download-outline" size={20} color="#666" />
         </TouchableOpacity>
       );
     }
@@ -1313,6 +1427,17 @@ export default function ChatScreen() {
             keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => {
               const myMessage = isMyMessage(item);
+              // Decide bubble style: for non-audio files use a dark file bubble like the mock
+              const looksLikeAudio = (
+                item.message_type === 'file' && item.attachment_url && (
+                  (item.file_name || '').toLowerCase().match(/\.(m4a|mp3|wav|ogg|aac)$/) ||
+                  (item.attachment_url || '').toLowerCase().match(/\.(m4a|mp3|wav|ogg|aac)$/)
+                )
+              );
+              const isFileButNotAudio = item.message_type === 'file' && item.attachment_url && !looksLikeAudio;
+              const bubbleStyle = isFileButNotAudio
+                ? (myMessage ? styles.myFileMessage : styles.theirFileMessage)
+                : (myMessage ? styles.myMessage : styles.theirMessage);
               return (
                 <View
                   style={[
@@ -1341,12 +1466,7 @@ export default function ChatScreen() {
                     </View>
                   )}
 
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      myMessage ? styles.myMessage : styles.theirMessage,
-                    ]}
-                  >
+                  <View style={[styles.messageBubble, bubbleStyle]}>
                     {renderMessageContent(item)}
                     <Text
                       style={[
@@ -1463,6 +1583,13 @@ export default function ChatScreen() {
 
                 <TouchableOpacity
                   style={styles.iconButton}
+                  onPress={pickDocument}
+                >
+                  <Ionicons name="document-text" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.iconButton}
                   onPress={handleMicPress}
                 >
                   <Ionicons 
@@ -1481,12 +1608,40 @@ export default function ChatScreen() {
                 borderColor: isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.15)'
               }
             ]}>
-              {isRecording ? (
-                <View style={styles.recordingIndicator}>
-                  <View style={styles.recordingDot} />
-                  <Text style={[styles.recordingText, { color: theme.colors.text }]}>
-                    Recording... {Math.floor(recordingDuration)}s
-                  </Text>
+              {/* Pending document chips */}
+              {pendingFiles.length > 0 && !isRecording && !pendingRecordingUri && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pendingFilesScroll} contentContainerStyle={styles.pendingFilesRow}>
+                  {pendingFiles.map((f, idx) => (
+                    <View key={`${f.uri}-${idx}`} style={styles.pendingChip}>
+                      <Ionicons name="document-text" size={16} color="#FFFFFF" style={styles.pendingChipIcon} />
+                      <Text numberOfLines={1} style={styles.pendingChipText}>{f.name}</Text>
+                      <TouchableOpacity style={styles.pendingChipClose} onPress={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}>
+                        <Ionicons name="close" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
+              {(isRecording || pendingRecordingUri) ? (
+                <View style={styles.recordingBar}>
+                  {/* Cancel */}
+                  <TouchableOpacity style={styles.recCircleButton} onPress={cancelPendingRecording}>
+                    <Ionicons name="close" size={18} color="#0B6E8B" />
+                  </TouchableOpacity>
+
+                  {/* Middle pill */}
+                  <View style={styles.recordingPill}>
+                    <View style={styles.pillMeter} />
+                    <Text style={styles.pillTime}>
+                      {isRecording ? `${Math.floor(recordingDuration)}s` : `${Math.max(1, pendingRecordingDuration)}s`}
+                    </Text>
+                  </View>
+
+                  {/* Send */}
+                  <TouchableOpacity style={[styles.recCircleButton, !pendingRecordingUri && { opacity: 0.5 }]} onPress={sendPendingRecording} disabled={!pendingRecordingUri}>
+                    <Ionicons name="send" size={18} color="#0B6E8B" />
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <TextInput
@@ -1503,7 +1658,6 @@ export default function ChatScreen() {
                     }
                   }}
                   onBlur={() => {
-                    // Keep icons hidden if there's still text
                     if (newMessage.length === 0) {
                       setIsTyping(false);
                     }
@@ -1526,10 +1680,10 @@ export default function ChatScreen() {
               <Ionicons name="happy-outline" size={28} color={theme.colors.primary} />
             </TouchableOpacity>
 
-            {newMessage.trim() !== "" && (
+            {(newMessage.trim() !== "" || pendingFiles.length > 0) && (
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={handleSendMessage}
+                onPress={handleMainSend}
                 disabled={sending || uploading}
               >
                 {sending ? (
@@ -2185,6 +2339,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   theirMessageTime: {
     color: "#999",
   },
+  // Dark file message bubble styles (match desired mock)
+  myFileMessage: {
+    backgroundColor: '#2C2F33',
+    borderTopRightRadius: 4,
+    minWidth: 220,
+  },
+  theirFileMessage: {
+    backgroundColor: '#2C2F33',
+    borderTopLeftRadius: 4,
+    elevation: 0,
+    shadowOpacity: 0,
+    minWidth: 220,
+  },
   // Bottom input section - all items in one row
   bottomInputSection: {
     flexDirection: 'row',
@@ -2252,6 +2419,33 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     marginBottom: 4,
     borderWidth: 1,
     borderColor: "#E9ECEF",
+  },
+  // Inner layout for file content inside dark bubble
+  fileBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fileIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  fileTexts: {
+    flex: 1,
+  },
+  fileNameDark: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+  },
+  fileSizeDark: {
+    color: '#BFC7D1',
+    fontSize: scaledFontSize(12),
+    marginTop: 2,
   },
   fileIconContainer: {
     marginRight: 12,
@@ -2550,6 +2744,112 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   recordingText: {
     fontSize: scaledFontSize(16),
     fontWeight: '500',
+  },
+  // New recording toolbar styles
+  recordingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  recCircleButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#B9F5FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordingPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#00CFE8',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  pillControl: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E0FBFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillMeter: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 3,
+    marginHorizontal: 10,
+  },
+  pillTime: {
+    color: '#0B6E8B',
+    fontWeight: '600',
+  },
+  // Audio message bubble (for sent/received audio files)
+  audioBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  audioPlayButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#2196F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 18,
+    gap: 4,
+  },
+  audioBar: {
+    width: 4,
+    backgroundColor: '#2196F3',
+    borderRadius: 2,
+  },
+  audioDurationText: {
+    fontSize: scaledFontSize(12),
+    color: '#555',
+  },
+  // Pending file chips
+  pendingFilesScroll: {
+    maxHeight: 60,
+    marginBottom: 6,
+  },
+  pendingFilesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pendingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2C2F33',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  pendingChipIcon: {
+    marginRight: 6,
+  },
+  pendingChipText: {
+    color: '#FFFFFF',
+    maxWidth: 140,
+  },
+  pendingChipClose: {
+    marginLeft: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
