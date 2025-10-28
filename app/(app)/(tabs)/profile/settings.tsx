@@ -36,7 +36,6 @@ export default function SettingsScreen() {
   const { theme, isDarkMode, setDarkMode: setGlobalDarkMode, textSize, setTextSize: setGlobalTextSize, scaledFontSize } = useTheme();
 
   // Settings state
-  const [autoLockTimer, setAutoLockTimer] = useState("5 minutes");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   // Granular notification toggles
   const [notifAll, setNotifAll] = useState(true);
@@ -46,9 +45,6 @@ export default function SettingsScreen() {
   const [notifPostReactions, setNotifPostReactions] = useState(true);
   const [notifAppointments, setNotifAppointments] = useState(true);
   const [notifSelfAssessment, setNotifSelfAssessment] = useState(true);
-  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
-  const [quietStartTime, setQuietStartTime] = useState("22:00");
-  const [quietEndTime, setQuietEndTime] = useState("08:00");
   const [reminderFrequency, setReminderFrequency] = useState("Daily");
   // Per-category reminder settings
   const [moodReminderEnabled, setMoodReminderEnabled] = useState(false);
@@ -61,8 +57,6 @@ export default function SettingsScreen() {
   const [journalReminderCustomSchedule, setJournalReminderCustomSchedule] = useState<Record<string, string>>({});
   const { user } = useUser();
   // Time picker modal visibility state
-  const [quietStartPickerVisible, setQuietStartPickerVisible] = useState(false);
-  const [quietEndPickerVisible, setQuietEndPickerVisible] = useState(false);
   const [moodTimePickerVisible, setMoodTimePickerVisible] = useState(false);
   const [journalTimePickerVisible, setJournalTimePickerVisible] = useState(false);
   // Custom schedule per-day picker visibility
@@ -112,7 +106,7 @@ export default function SettingsScreen() {
   // Apply settings when they change
   useEffect(() => {
     applySettings();
-  }, [isDarkMode, textSize, autoLockTimer]);
+  }, [isDarkMode, textSize]);
 
   /**
    * Loads settings from backend API
@@ -124,7 +118,6 @@ export default function SettingsScreen() {
       
       // Apply all saved settings EXCEPT dark mode and text size (managed by ThemeContext)
       // Do not override current theme/context values here to avoid reverting user changes
-      setAutoLockTimer(settings.autoLockTimer);
       setNotificationsEnabled(settings.notificationsEnabled);
       // granular notifications
       setNotifAll(settings.notifAll ?? true);
@@ -134,9 +127,6 @@ export default function SettingsScreen() {
       setNotifPostReactions(settings.notifPostReactions ?? true);
       setNotifAppointments(settings.notifAppointments ?? true);
       setNotifSelfAssessment(settings.notifSelfAssessment ?? true);
-      setQuietHoursEnabled(settings.quietHoursEnabled);
-      setQuietStartTime(settings.quietStartTime);
-      setQuietEndTime(settings.quietEndTime);
       setReminderFrequency(settings.reminderFrequency);
       setMoodReminderEnabled(settings.moodReminderEnabled);
       setMoodReminderTime(settings.moodReminderTime);
@@ -163,7 +153,6 @@ export default function SettingsScreen() {
       const settings: UserSettings = {
         darkMode: isDarkMode,
         textSize,
-        autoLockTimer,
         notificationsEnabled,
         notifAll,
         notifMoodTracking,
@@ -172,9 +161,6 @@ export default function SettingsScreen() {
         notifPostReactions,
         notifAppointments,
         notifSelfAssessment,
-        quietHoursEnabled,
-        quietStartTime,
-        quietEndTime,
         reminderFrequency,
         moodReminderEnabled,
         moodReminderTime,
@@ -209,9 +195,6 @@ export default function SettingsScreen() {
       
       // Apply text size globally
       await applyTextSize(textSize);
-      
-      // Apply auto-lock timer
-      await applyAutoLockTimer(autoLockTimer);
       
     } catch (error) {
       console.log('Error applying settings:', error);
@@ -271,43 +254,6 @@ export default function SettingsScreen() {
   };
 
   /**
-   * Applies auto-lock timer
-   */
-  const applyAutoLockTimer = async (timer: string) => {
-    try {
-      await AsyncStorage.setItem('appAutoLockTimer', timer);
-      
-      // Convert timer to milliseconds
-      let lockTimeMs;
-      switch (timer) {
-        case "Immediate":
-          lockTimeMs = 0;
-          break;
-        case "1 minute":
-          lockTimeMs = 60 * 1000;
-          break;
-        case "5 minutes":
-          lockTimeMs = 5 * 60 * 1000;
-          break;
-        case "15 minutes":
-          lockTimeMs = 15 * 60 * 1000;
-          break;
-        case "Never":
-          lockTimeMs = -1;
-          break;
-        default:
-          lockTimeMs = 0;
-      }
-      
-      await AsyncStorage.setItem('appAutoLockTimeMs', JSON.stringify(lockTimeMs));
-      console.log('Auto-lock timer applied:', timer, 'MS:', lockTimeMs);
-      
-    } catch (error) {
-      console.log('Error applying auto-lock timer:', error);
-    }
-  };
-
-  /**
    * Handles dark mode toggle with immediate feedback
    */
   const handleDarkModeToggle = (value: boolean) => {
@@ -322,15 +268,6 @@ export default function SettingsScreen() {
   const handleTextSizeChange = (size: string) => {
     setGlobalTextSize(size);
     setTextSizeSlider(textSizeToSlider(size));
-  };
-
-  /**
-   * Handles auto-lock timer change with immediate feedback
-   */
-  const handleAutoLockTimerChange = (timer: string) => {
-    setAutoLockTimer(timer);
-    // Apply immediately
-    applyAutoLockTimer(timer);
   };
 
   /**
@@ -352,7 +289,6 @@ export default function SettingsScreen() {
   };
 
   const textSizeOptions = ["Extra Small", "Small", "Medium", "Large"];
-  const autoLockOptions = ["Immediate", "1 minute", "5 minutes", "15 minutes", "Never"];
   const reminderFrequencyOptions = ["Never", "Hourly", "Daily", "Weekdays", "Weekends", "Weekly", "Custom"];
   const daysOfWeek = [
     { key: 'mon', label: 'Monday' },
@@ -489,64 +425,6 @@ export default function SettingsScreen() {
     </>
   );
 
-  /**
-   * Renders time input row for quiet hours (dual time pickers)
-   */
-  const renderTimeInputRow = (
-    title: string,
-    subtitle: string,
-    startValue: string,
-    endValue: string,
-    onStartChange: (text: string) => void,
-    onEndChange: (text: string) => void,
-    icon: keyof typeof Ionicons.glyphMap
-  ) => (
-    <>
-      <View style={[styles.settingRow, { borderBottomColor: theme.colors.borderLight }]}>
-        <View style={styles.settingLeft}>
-          <Ionicons name={icon} size={20} color={theme.colors.icon} />
-          <View style={styles.settingTextContainer}>
-            <Text style={[styles.settingTitle, { color: theme.colors.text }]}>{title}</Text>
-            <Text style={[styles.settingSubtitle, { color: theme.colors.textSecondary }]}>{subtitle}</Text>
-          </View>
-        </View>
-        <View style={styles.timeInputContainer}>
-          <TouchableOpacity
-            style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-            onPress={() => setQuietStartPickerVisible(true)}
-          >
-            <Text style={[styles.timeInputText, { color: theme.colors.text }]}>{startValue}</Text>
-          </TouchableOpacity>
-          <Text style={[styles.timeSeparator, { color: theme.colors.text }]}>to</Text>
-          <TouchableOpacity
-            style={[styles.timeInput, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-            onPress={() => setQuietEndPickerVisible(true)}
-          >
-            <Text style={[styles.timeInputText, { color: theme.colors.text }]}>{endValue}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <TimePickerModal
-        visible={quietStartPickerVisible}
-        value={startValue}
-        onSelect={(time) => {
-          onStartChange(time);
-          setQuietStartPickerVisible(false);
-        }}
-        onCancel={() => setQuietStartPickerVisible(false)}
-      />
-      <TimePickerModal
-        visible={quietEndPickerVisible}
-        value={endValue}
-        onSelect={(time) => {
-          onEndChange(time);
-          setQuietEndPickerVisible(false);
-        }}
-        onCancel={() => setQuietEndPickerVisible(false)}
-      />
-    </>
-  );
-
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <SafeAreaView style={styles.safeArea}>
@@ -606,20 +484,6 @@ export default function SettingsScreen() {
                 ))}
               </View>
             </View>
-          </View>
-
-          {/* Privacy & Security */}
-          <View style={[styles.section, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Privacy & Security</Text>
-
-            {renderPickerRow(
-              "Auto-Lock Timer",
-              "Automatically lock app after inactivity",
-              autoLockTimer,
-              autoLockOptions,
-              handleAutoLockTimerChange,
-              "time"
-            )}
           </View>
 
           {/* Notifications */}
@@ -900,29 +764,6 @@ export default function SettingsScreen() {
                     />
                   </View>
                 </View>
-
-                {renderToggleRow(
-                  "Quiet Hours",
-                  "Silence notifications during your rest time",
-                  quietHoursEnabled,
-                  setQuietHoursEnabled,
-                  "moon",
-                  false
-                )}
-
-                {quietHoursEnabled && (
-                  <View style={styles.nestedSettings}>
-                    {renderTimeInputRow(
-                      "Quiet Hours Time",
-                      "Set start and end time",
-                      quietStartTime,
-                      quietEndTime,
-                      setQuietStartTime,
-                      setQuietEndTime,
-                      "time"
-                    )}
-                  </View>
-                )}
               </View>
             )}
           </View>

@@ -28,13 +28,11 @@ export default function TimePickerModal({
   const [hours, setHours] = useState<number>(hh);
   const [minutes, setMinutes] = useState<number>(isNaN(mm) ? 0 : mm);
 
-  // Keep temp state in sync when value changes while hidden
+  // Update state when modal opens or when value changes
   useEffect(() => {
-    if (!visible) {
-      setHours(hh);
-      setMinutes(isNaN(mm) ? 0 : mm);
-    }
-  }, [visible, hh, mm]);
+    setHours(hh);
+    setMinutes(isNaN(mm) ? 0 : mm);
+  }, [visible, value, hh, mm]);
 
   const handleHourChange = useCallback((picked: { hours?: number; minutes?: number; seconds?: number } & any) => {
     console.log('Hour picker change:', picked);
@@ -87,6 +85,7 @@ export default function TimePickerModal({
               {/* Hour picker */}
               <View style={{ width: 50 }}>
                 <TimerPicker
+                  key={`hour-${value}`}
                   allowFontScaling={false}
                   padWithNItems={2}
                   hideSeconds
@@ -95,7 +94,7 @@ export default function TimePickerModal({
                   hourLabel=""
                   minuteLabel=""
                   secondLabel=""
-                  initialValue={{ hours: hh, minutes: 0 }}
+                  initialValue={{ hours, minutes: 0 }}
                   onDurationChange={handleHourChange}
                   styles={{
                     theme: 'light',
@@ -127,6 +126,7 @@ export default function TimePickerModal({
               {/* Minute picker */}
               <View style={{ width: 50 }}>
                 <TimerPicker
+                  key={`minute-${value}`}
                   allowFontScaling={false}
                   padWithNItems={2}
                   hideSeconds
@@ -135,7 +135,7 @@ export default function TimePickerModal({
                   hourLabel=""
                   minuteLabel=""
                   secondLabel=""
-                  initialValue={{ hours: 0, minutes: isNaN(mm) ? 0 : mm }}
+                  initialValue={{ hours: 0, minutes }}
                   onDurationChange={handleMinuteChange}
                   styles={{
                     theme: 'light',
@@ -164,28 +164,33 @@ export default function TimePickerModal({
           </View>
 
           {/* Actions */}
-          <View style={{ flexDirection: 'row', justifyContent: 'center', padding: 10, gap: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', padding: 12, gap: 20, zIndex: 999 }}>
             <Pressable 
               onPress={onCancel} 
-              hitSlop={8}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 24,
+              android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
+              style={({ pressed }) => ({
+                paddingVertical: 12,
+                paddingHorizontal: 28,
                 borderRadius: 8,
-                backgroundColor: theme.colors.background,
-              }}
+                backgroundColor: pressed ? theme.colors.background : theme.colors.background,
+                opacity: pressed ? 0.7 : 1,
+              })}
             >
               <Text style={{ color: theme.colors.textSecondary, fontSize: 16, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
             <Pressable 
-              onPress={handleConfirm} 
-              hitSlop={8}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 24,
-                borderRadius: 8,
-                backgroundColor: theme.colors.primary,
+              onPress={() => {
+                console.log('Confirm button pressed - hours:', hours, 'minutes:', minutes);
+                handleConfirm();
               }}
+              android_ripple={{ color: 'rgba(255,255,255,0.3)' }}
+              style={({ pressed }) => ({
+                paddingVertical: 12,
+                paddingHorizontal: 28,
+                borderRadius: 8,
+                backgroundColor: pressed ? theme.colors.primary : theme.colors.primary,
+                opacity: pressed ? 0.8 : 1,
+              })}
             >
               <Text style={{ color: theme.colors.surface, fontSize: 16, fontWeight: '700' }}>Confirm</Text>
             </Pressable>

@@ -14,9 +14,6 @@ export interface UserSettings {
   // Display & Accessibility
   darkMode: boolean;
   textSize: string;
-  
-  // Privacy & Security
-  autoLockTimer: string;
 
   // Notifications
   notificationsEnabled: boolean;
@@ -28,9 +25,6 @@ export interface UserSettings {
   notifPostReactions: boolean;
   notifAppointments: boolean;
   notifSelfAssessment: boolean;
-  quietHoursEnabled: boolean;
-  quietStartTime: string;
-  quietEndTime: string;
   reminderFrequency: string;
   // Per-category reminders
   moodReminderEnabled: boolean;
@@ -297,9 +291,6 @@ class SettingsAPI {
       // Display & Accessibility
       darkMode: serverData.dark_mode ?? false,
       textSize: serverData.text_size ?? 'Medium',
-      
-      // Privacy & Security
-      autoLockTimer: serverData.auto_lock_timer ?? '5 minutes',
 
       // Notifications
       notificationsEnabled: serverData.notifications_enabled ?? true,
@@ -310,9 +301,6 @@ class SettingsAPI {
       notifPostReactions: serverData.notif_post_reactions ?? true,
       notifAppointments: serverData.notif_appointments ?? true,
       notifSelfAssessment: serverData.notif_self_assessment ?? true,
-      quietHoursEnabled: serverData.quiet_hours_enabled ?? false,
-      quietStartTime: serverData.quiet_start_time ?? '22:00',
-      quietEndTime: serverData.quiet_end_time ?? '08:00',
       reminderFrequency: serverData.reminder_frequency ?? 'Daily',
       moodReminderEnabled: serverData.mood_reminder_enabled ?? false,
       moodReminderTime: serverData.mood_reminder_time ?? '09:00',
@@ -334,9 +322,6 @@ class SettingsAPI {
       // Display & Accessibility
       darkMode: clientSettings.darkMode,
       textSize: clientSettings.textSize,
-      
-      // Privacy & Security
-      autoLockTimer: clientSettings.autoLockTimer,
 
       // Notifications
       notificationsEnabled: clientSettings.notificationsEnabled,
@@ -347,9 +332,6 @@ class SettingsAPI {
       notifPostReactions: clientSettings.notifPostReactions,
       notifAppointments: clientSettings.notifAppointments,
       notifSelfAssessment: clientSettings.notifSelfAssessment,
-      quietHoursEnabled: clientSettings.quietHoursEnabled,
-      quietStartTime: clientSettings.quietStartTime,
-      quietEndTime: clientSettings.quietEndTime,
       reminderFrequency: clientSettings.reminderFrequency,
       moodReminderEnabled: clientSettings.moodReminderEnabled,
       moodReminderTime: clientSettings.moodReminderTime,
@@ -366,7 +348,6 @@ class SettingsAPI {
     return {
       darkMode: false,
       textSize: 'Medium',
-      autoLockTimer: '5 minutes',
       notificationsEnabled: true,
       notifAll: true,
       notifMoodTracking: true,
@@ -375,9 +356,6 @@ class SettingsAPI {
       notifPostReactions: true,
       notifAppointments: true,
       notifSelfAssessment: true,
-      quietHoursEnabled: false,
-      quietStartTime: '22:00',
-      quietEndTime: '08:00',
       reminderFrequency: 'Daily',
       moodReminderEnabled: false,
       moodReminderTime: '09:00',
