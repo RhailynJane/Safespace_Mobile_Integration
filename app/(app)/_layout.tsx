@@ -1,5 +1,5 @@
 // app/(app)/_layout.tsx
-import { Stack, Redirect } from "expo-router";
+import { Stack, Redirect, router } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import { ActivityIndicator, View, AppState, Text, TouchableOpacity } from "react-native";
 import { useEffect, useRef, useState } from "react";
@@ -125,8 +125,53 @@ export default function AppLayout() {
           setBanner({ visible: true, title: title || 'Notification', body: body || '' });
           setTimeout(() => setBanner(b => ({ ...b, visible: false })), 3500);
         },
-        // on tap (optional: navigate by data.type)
-        (_data) => {}
+        // on tap: deep-link based on notification type
+        (data) => {
+          try {
+            const type = data?.type as string | undefined;
+            if (!type) return;
+            // Messages -> open chat by conversationId
+            if (type === 'message' && data?.conversationId) {
+              const cid = String(data.conversationId);
+              router.push(`/(app)/(tabs)/messages/message-chat-screen?id=${encodeURIComponent(cid)}`);
+              return;
+            }
+            // Post reactions -> open post detail
+            if (type === 'post_reactions') {
+              const postId = data?.postId ?? data?.post_id;
+              if (postId) {
+                router.push(`/(app)/(tabs)/community-forum/post-detail?id=${encodeURIComponent(String(postId))}`);
+                return;
+              }
+              router.push('/(app)/(tabs)/community-forum');
+              return;
+            }
+            // Appointments -> open appointments tab
+            if (type === 'appointment') {
+              router.push('/(app)/(tabs)/appointments');
+              return;
+            }
+            // Mood tracking reminder
+            if (type === 'mood') {
+              router.push('/(app)/mood-tracking');
+              return;
+            }
+            // Journaling reminder
+            if (type === 'journaling') {
+              router.push('/(app)/journal');
+              return;
+            }
+            // Self assessment reminder
+            if (type === 'self_assessment') {
+              router.push('/(app)/self-assessment');
+              return;
+            }
+            // Fallback: notifications screen if present
+            router.push('/(app)/notifications');
+          } catch (_e) {
+            // no-op
+          }
+        }
       );
       pushSubsRef.current = subs;
     })();

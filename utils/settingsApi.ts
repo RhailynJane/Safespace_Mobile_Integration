@@ -18,7 +18,6 @@ export interface UserSettings {
   // Notifications
   notificationsEnabled: boolean;
   // Granular notification categories
-  notifAll: boolean;
   notifMoodTracking: boolean;
   notifJournaling: boolean;
   notifMessages: boolean;
@@ -35,6 +34,9 @@ export interface UserSettings {
   journalReminderTime: string;
   journalReminderFrequency: string;
   journalReminderCustomSchedule: Record<string, string>;
+  // Appointment reminders
+  appointmentReminderEnabled: boolean;
+  appointmentReminderAdvanceMinutes: number;
 }
 
 class SettingsAPI {
@@ -315,7 +317,6 @@ class SettingsAPI {
 
       // Notifications
       notificationsEnabled: serverData.notifications_enabled ?? true,
-      notifAll: serverData.notif_all ?? true,
       notifMoodTracking: serverData.notif_mood_tracking ?? true,
       notifJournaling: serverData.notif_journaling ?? true,
       notifMessages: serverData.notif_messages ?? true,
@@ -335,6 +336,8 @@ class SettingsAPI {
       journalReminderCustomSchedule: typeof serverData.journal_reminder_custom_schedule === 'string'
         ? JSON.parse(serverData.journal_reminder_custom_schedule)
         : (serverData.journal_reminder_custom_schedule ?? {}),
+      appointmentReminderEnabled: serverData.appointment_reminder_enabled ?? true,
+      appointmentReminderAdvanceMinutes: serverData.appointment_reminder_advance_minutes ?? 60,
     };
   }
 
@@ -346,7 +349,6 @@ class SettingsAPI {
 
       // Notifications
       notificationsEnabled: clientSettings.notificationsEnabled,
-      notifAll: clientSettings.notifAll,
       notifMoodTracking: clientSettings.notifMoodTracking,
       notifJournaling: clientSettings.notifJournaling,
       notifMessages: clientSettings.notifMessages,
@@ -362,6 +364,8 @@ class SettingsAPI {
       journalReminderTime: clientSettings.journalReminderTime,
       journalReminderFrequency: clientSettings.journalReminderFrequency,
       journalReminderCustomSchedule: clientSettings.journalReminderCustomSchedule,
+      appointmentReminderEnabled: clientSettings.appointmentReminderEnabled,
+      appointmentReminderAdvanceMinutes: clientSettings.appointmentReminderAdvanceMinutes,
     };
   }
 
@@ -370,7 +374,6 @@ class SettingsAPI {
       darkMode: false,
       textSize: 'Medium',
       notificationsEnabled: true,
-      notifAll: true,
       notifMoodTracking: true,
       notifJournaling: true,
       notifMessages: true,
@@ -386,6 +389,8 @@ class SettingsAPI {
       journalReminderTime: '20:00',
       journalReminderFrequency: 'Daily',
       journalReminderCustomSchedule: {},
+      appointmentReminderEnabled: true,
+      appointmentReminderAdvanceMinutes: 60,
     };
   }
 }

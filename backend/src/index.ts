@@ -48,7 +48,6 @@ const pool = new Pool({
 async function ensureUserSettingsSchema() {
   try {
     const alterSqls = [
-      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_all BOOLEAN DEFAULT TRUE",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_mood_tracking BOOLEAN DEFAULT TRUE",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_journaling BOOLEAN DEFAULT TRUE",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_messages BOOLEAN DEFAULT TRUE",
@@ -67,7 +66,10 @@ async function ensureUserSettingsSchema() {
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_mood_reminder_at TIMESTAMP NULL",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_journal_reminder_at TIMESTAMP NULL",
       "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS self_assessment_reminder_time VARCHAR(5) DEFAULT '09:00'",
-      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_self_assessment_reminder_at TIMESTAMP NULL"
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_self_assessment_reminder_at TIMESTAMP NULL",
+      // Appointment reminder settings
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS appointment_reminder_enabled BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS appointment_reminder_advance_minutes INTEGER DEFAULT 60"
     ];
     for (const sql of alterSqls) {
       await pool.query(sql);
@@ -118,6 +120,40 @@ async function ensurePushTokensSchema() {
     console.log('✅ Ensured push_tokens table exists');
   } catch (e: any) {
     console.error('⚠️ Failed to ensure push_tokens schema:', e.message);
+  }
+}
+
+// Ensure database schema for appointments
+async function ensureAppointmentsSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS appointments (
+        id SERIAL PRIMARY KEY,
+        client_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        worker_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        appointment_date DATE NOT NULL,
+        appointment_time TIME NOT NULL,
+        duration_minutes INTEGER DEFAULT 60,
+        appointment_type VARCHAR(50) DEFAULT 'consultation',
+        status VARCHAR(20) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'confirmed', 'cancelled', 'completed', 'no-show')),
+        notes TEXT,
+        location VARCHAR(255),
+        is_virtual BOOLEAN DEFAULT FALSE,
+        meeting_link TEXT,
+        reminder_sent BOOLEAN DEFAULT FALSE,
+        reminder_sent_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_appointments_client_id ON appointments(client_id);
+      CREATE INDEX IF NOT EXISTS idx_appointments_worker_id ON appointments(worker_id);
+      CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+      CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+      CREATE INDEX IF NOT EXISTS idx_appointments_reminder ON appointments(reminder_sent, appointment_date, appointment_time);
+    `);
+    console.log('✅ Ensured appointments table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure appointments schema:', e.message);
   }
 }
 
@@ -181,29 +217,16 @@ pool.connect((err, client, release) => {
 ensureUserSettingsSchema();
 ensureNotificationsSchema();
 ensurePushTokensSchema();
-
-// Unified helper: check quiet hours window
-function isWithinQuietHours(now: Date, start: string, end: string): boolean {
-  // start/end as 'HH:MM'
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  const startMin = sh * 60 + sm;
-  const endMin = eh * 60 + em;
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  if (startMin === endMin) return false; // no quiet
-  if (startMin < endMin) {
-    return nowMin >= startMin && nowMin < endMin;
-  } else {
-    // wraps midnight
-    return nowMin >= startMin || nowMin < endMin;
-  }
-}
+ensureAppointmentsSchema();
 
 // Send Expo push notification to all active tokens for a user
 async function sendPushToUser(userId: number, title: string, body: string, data?: Record<string, any>) {
   try {
     const tokensRes = await pool.query(`SELECT token FROM push_tokens WHERE user_id = $1 AND revoked = FALSE`, [userId]);
-    if (tokensRes.rows.length === 0) return;
+    if (tokensRes.rows.length === 0) {
+      try { console.log(`🔕 No active push tokens for userId=${userId}; push skipped.`); } catch { /* no-op */ }
+      return;
+    }
 
     const messages = tokensRes.rows.map((r) => ({
       to: r.token,
@@ -224,6 +247,20 @@ async function sendPushToUser(userId: number, title: string, body: string, data?
     if (!response.ok) {
       const txt = await response.text();
       console.warn('⚠️ Expo push send failed:', response.status, txt);
+    } else {
+      // Inspect ticket results to surface per-token errors (DeviceNotRegistered, MessageTooBig, etc.)
+      try {
+        const result = await response.json();
+        const tickets = (result && (result.data || result.tickets)) || [];
+        const failures = tickets.filter((t: any) => t && t.status !== 'ok');
+        if (failures.length > 0) {
+          console.warn('⚠️ Expo push ticket failures:', JSON.stringify(failures));
+        } else {
+          try { console.log(`✅ Expo push enqueued ${tickets.length || messages.length} message(s)`); } catch (_ignore) { /* no-op */ }
+        }
+      } catch (_e) {
+        // ignore JSON parse issues; not critical
+      }
     }
   } catch (e: any) {
     console.warn('⚠️ sendPushToUser error:', e.message);
@@ -259,6 +296,15 @@ function shouldSendAtTime(freq: string, now: Date, configTime: string, lastSent:
   const day = now.getDay();
   const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   const nowHHMM = hhmm(now);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const withinOneMinute = (target: string) => {
+    const [th, tm] = target.split(':').map((n: string) => parseInt(n, 10));
+    const targetMin = th * 60 + tm;
+    let diff = Math.abs(nowMin - targetMin);
+    // wrap around midnight
+    if (diff > 720) diff = 1440 - diff;
+    return diff <= 1; // allow 1-minute tolerance
+  };
   
   if (freq === 'Hourly') {
     // send at top of every hour if at least 55 minutes since last
@@ -274,11 +320,11 @@ function shouldSendAtTime(freq: string, now: Date, configTime: string, lastSent:
     const todayKey = dayNames[day];
     const todayTime = customSchedule[todayKey];
     if (!todayTime) return false; // not scheduled today
-    return nowHHMM === todayTime;
+    return nowHHMM === todayTime || withinOneMinute(todayTime);
   }
   
   // Daily, Weekdays, Weekends, Weekly: use configTime
-  return nowHHMM === configTime;
+  return nowHHMM === configTime || withinOneMinute(configTime);
 }
 
 function hhmm(now: Date): string {
@@ -289,13 +335,24 @@ function hhmm(now: Date): string {
 
 async function runRemindersTick() {
   try {
-    const now = new Date();
+    // Get current time in Mountain Standard Time (UTC-7)
+    const nowUTC = new Date();
+    const now = new Date(nowUTC.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+    const currentTime = hhmm(now);
+    const day = now.getDay();
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    
+    console.log(`⏰ Reminder tick: ${currentTime} MST (${dayNames[day]})`);
+    
     const res = await pool.query(`
       SELECT 
-        us.*, u.id as uid
+        us.*, u.id as uid, u.clerk_user_id
       FROM user_settings us
       JOIN users u ON u.id = us.user_id
     `);
+    
+    console.log(`⏰ Checking reminders for ${res.rows.length} users`);
+    
     for (const row of res.rows) {
       const lastMoodSent = row.last_mood_reminder_at ? new Date(row.last_mood_reminder_at) : null;
       const lastJournalSent = row.last_journal_reminder_at ? new Date(row.last_journal_reminder_at) : null;
@@ -304,10 +361,12 @@ async function runRemindersTick() {
       if (row.mood_reminder_enabled) {
         const freq = row.mood_reminder_frequency || 'Daily';
         const customSched = row.mood_reminder_custom_schedule || {};
-        if (frequencyMatches(freq, now, lastMoodSent, customSched) && shouldSendAtTime(freq, now, row.mood_reminder_time || '09:00', lastMoodSent, customSched)) {
-          try {
-            console.log(`⏰ Mood reminder due -> userId=${row.uid} time=${hhmm(now)} freq=${freq} configured=${row.mood_reminder_time || '09:00'}`);
-          } catch { /* no-op */ }
+        const configTime = row.mood_reminder_time || '09:00';
+        
+        console.log(`  📊 User ${row.clerk_user_id}: Mood reminder enabled, freq=${freq}, time=${configTime}, currentTime=${currentTime}`);
+        
+        if (frequencyMatches(freq, now, lastMoodSent, customSched) && shouldSendAtTime(freq, now, configTime, lastMoodSent, customSched)) {
+          console.log(`  ✅ SENDING mood reminder to userId=${row.uid}`);
           await createAndPushNotification(row.uid, 'mood', 'Mood check-in', 'How are you feeling right now? Take a quick mood check.');
           await pool.query(`UPDATE user_settings SET last_mood_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
         }
@@ -317,10 +376,18 @@ async function runRemindersTick() {
       if (row.journal_reminder_enabled) {
         const freq = row.journal_reminder_frequency || 'Daily';
         const customSched = row.journal_reminder_custom_schedule || {};
-        if (frequencyMatches(freq, now, lastJournalSent, customSched) && shouldSendAtTime(freq, now, row.journal_reminder_time || '20:00', lastJournalSent, customSched)) {
-          try {
-            console.log(`⏰ Journal reminder due -> userId=${row.uid} time=${hhmm(now)} freq=${freq} configured=${row.journal_reminder_time || '20:00'}`);
-          } catch { /* no-op */ }
+        const configTime = row.journal_reminder_time || '20:00';
+        
+        console.log(`  📝 User ${row.clerk_user_id}: Journal reminder enabled, freq=${freq}, time=${configTime}, currentTime=${currentTime}`);
+        
+        if (freq === 'Custom') {
+          const todayKey = dayNames[day];
+          const todayTime = customSched[todayKey];
+          console.log(`    Custom schedule for ${todayKey}: ${todayTime || 'not scheduled'}`);
+        }
+        
+        if (frequencyMatches(freq, now, lastJournalSent, customSched) && shouldSendAtTime(freq, now, configTime, lastJournalSent, customSched)) {
+          console.log(`  ✅ SENDING journal reminder to userId=${row.uid}`);
           await createAndPushNotification(row.uid, 'journaling', 'Journal reminder', 'Write a quick entry to reflect on your day.');
           await pool.query(`UPDATE user_settings SET last_journal_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
         }
@@ -352,6 +419,67 @@ async function runRemindersTick() {
       } catch (se: any) {
         console.warn('⚠️ Self-assessment reminder check failed:', se.message);
       }
+
+      // Appointment reminders
+      try {
+        const appointmentReminderEnabled = row.appointment_reminder_enabled !== false;
+        if (appointmentReminderEnabled) {
+          const advanceMinutes = row.appointment_reminder_advance_minutes || 60;
+          
+          // Query upcoming appointments that need reminders
+          const appointmentsRes = await pool.query(`
+            SELECT id, appointment_date, appointment_time, appointment_type, location, is_virtual, meeting_link
+            FROM appointments
+            WHERE (client_id = $1 OR worker_id = $1)
+            AND status IN ('scheduled', 'confirmed')
+            AND reminder_sent = FALSE
+            AND appointment_date >= CURRENT_DATE
+            ORDER BY appointment_date, appointment_time
+            LIMIT 10
+          `, [row.uid]);
+
+          for (const apt of appointmentsRes.rows) {
+            // Combine date and time to create appointment datetime in MST
+            const aptDateStr = apt.appointment_date.toISOString().split('T')[0]; // YYYY-MM-DD
+            const aptTimeStr = apt.appointment_time; // HH:MM:SS
+            const aptDatetimeStr = `${aptDateStr}T${aptTimeStr}`;
+            const aptDatetimeUTC = new Date(aptDatetimeStr + 'Z'); // Parse as UTC first
+            const aptDatetimeMST = new Date(aptDatetimeUTC.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+            
+            // Calculate reminder time (appointment time minus advance minutes)
+            const reminderTime = new Date(aptDatetimeMST.getTime() - (advanceMinutes * 60 * 1000));
+            const reminderTimeMST = new Date(reminderTime.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+            
+            // Check if it's time to send the reminder (within 1 minute tolerance)
+            const timeDiff = Math.abs(now.getTime() - reminderTimeMST.getTime());
+            if (timeDiff <= 60 * 1000) {
+              const aptType = apt.appointment_type || 'appointment';
+              const aptLocation = apt.is_virtual ? 'Virtual meeting' : (apt.location || 'Office');
+              const title = `Appointment Reminder`;
+              const message = `Your ${aptType} is in ${advanceMinutes} minutes at ${aptLocation}`;
+              
+              console.log(`  📅 SENDING appointment reminder to userId=${row.uid} for appointment #${apt.id}`);
+              
+              await createAndPushNotification(
+                row.uid,
+                'appointment',
+                title,
+                message,
+                { appointmentId: apt.id, meetingLink: apt.meeting_link }
+              );
+              
+              // Mark reminder as sent
+              await pool.query(`
+                UPDATE appointments 
+                SET reminder_sent = TRUE, reminder_sent_at = CURRENT_TIMESTAMP 
+                WHERE id = $1
+              `, [apt.id]);
+            }
+          }
+        }
+      } catch (ae: any) {
+        console.warn('⚠️ Appointment reminder check failed:', ae.message);
+      }
     }
   } catch (e: any) {
     console.warn('⚠️ Reminder tick failed:', e.message);
@@ -370,29 +498,30 @@ async function createAndPushNotification(
   data?: Record<string, any>
 ) {
   try {
+    // Get current time in Mountain Standard Time for logging
+    const nowUTC = new Date();
+    const nowMST = new Date(nowUTC.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+    
     try {
-      console.log(`🔔 createAndPushNotification: userId=${userId} category=${category} title=${title}`);
+      console.log(`🔔 createAndPushNotification: userId=${userId} category=${category} title=${title} time=${hhmm(nowMST)} MST`);
     } catch { /* no-op */ }
-    // Read settings and quiet hours
+    // Read settings (no quiet hours check anymore)
     const sRes = await pool.query(
       `SELECT 
          COALESCE(notifications_enabled, TRUE) as notifications_enabled,
-         COALESCE(notif_all, TRUE) as notif_all,
          COALESCE(notif_messages, TRUE) as notif_messages,
          COALESCE(notif_journaling, TRUE) as notif_journaling,
          COALESCE(notif_mood_tracking, TRUE) as notif_mood_tracking,
          COALESCE(notif_post_reactions, TRUE) as notif_post_reactions,
          COALESCE(notif_appointments, TRUE) as notif_appointments,
-         COALESCE(notif_self_assessment, TRUE) as notif_self_assessment,
-         COALESCE(quiet_hours_enabled, FALSE) as quiet_hours_enabled,
-         COALESCE(quiet_start_time, '22:00') as quiet_start_time,
-         COALESCE(quiet_end_time, '08:00') as quiet_end_time
+         COALESCE(notif_self_assessment, TRUE) as notif_self_assessment
        FROM user_settings WHERE user_id = $1`,
       [userId]
     );
 
-    const s = sRes.rows[0] || {};
-    const allEnabled = s.notifications_enabled !== false && s.notif_all !== false;
+  const s = sRes.rows[0] || {};
+  // Global gate: notifications_enabled must be true for any notifications to be sent
+  const globalEnabled = s.notifications_enabled !== false;
     const byCategory: Record<string, boolean> = {
       message: s.notif_messages !== false,
       journaling: s.notif_journaling !== false,
@@ -411,19 +540,12 @@ async function createAndPushNotification(
     );
 
     const categoryAllowed = byCategory[category] !== false;
-    let canPush = allEnabled && categoryAllowed;
-    if (!allEnabled) {
-      try { console.log(`🔕 Push suppressed (global disabled): userId=${userId} category=${category}`); } catch { /* no-op */ }
+    let canPush = globalEnabled && categoryAllowed;
+    if (!globalEnabled) {
+      try { console.log(`🔕 Push suppressed (notifications_enabled=false): userId=${userId} category=${category}`); } catch { /* no-op */ }
     }
     if (!categoryAllowed) {
       try { console.log(`🔕 Push suppressed (category disabled): userId=${userId} category=${category}`); } catch { /* no-op */ }
-    }
-    if (canPush && sRes.rows.length > 0 && s.quiet_hours_enabled) {
-      const now = new Date();
-      if (isWithinQuietHours(now, s.quiet_start_time, s.quiet_end_time)) {
-        canPush = false;
-        try { console.log(`🔕 Push suppressed (quiet hours ${s.quiet_start_time}-${s.quiet_end_time}): userId=${userId} category=${category} now=${hhmm(now)}`); } catch { /* no-op */ }
-      }
     }
 
     if (canPush) {
@@ -444,6 +566,15 @@ app.get("/", (req: Request, res: Response) => {
   });
 });
 
+// Simple health endpoint for uptime checks/ngrok
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).send('ok');
+});
+
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+
 // Lightweight test endpoint for settings API
 app.get('/api/test-settings', (req: Request, res: Response) => {
   res.json({ success: true, message: 'Settings API reachable' });
@@ -459,12 +590,13 @@ app.get('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
 
     const sRes = await pool.query(
       `SELECT 
-        dark_mode, text_size, auto_lock_timer, notifications_enabled,
-        notif_all, notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
-        quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+        dark_mode, text_size, notifications_enabled,
+        notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+        reminder_frequency,
         mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
         journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
-        self_assessment_reminder_time, last_self_assessment_reminder_at
+        self_assessment_reminder_time, last_self_assessment_reminder_at,
+        appointment_reminder_enabled, appointment_reminder_advance_minutes
        FROM user_settings WHERE user_id = $1`,
       [userId]
     );
@@ -474,18 +606,13 @@ app.get('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       return res.json({ success: true, settings: {
         dark_mode: false,
         text_size: 'Medium',
-        auto_lock_timer: '5 minutes',
         notifications_enabled: true,
-        notif_all: true,
         notif_mood_tracking: true,
         notif_journaling: true,
         notif_messages: true,
         notif_post_reactions: true,
         notif_appointments: true,
         notif_self_assessment: true,
-        quiet_hours_enabled: false,
-        quiet_start_time: '22:00',
-        quiet_end_time: '08:00',
         reminder_frequency: 'Daily',
         mood_reminder_enabled: false,
         mood_reminder_time: '09:00',
@@ -496,6 +623,8 @@ app.get('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
         journal_reminder_frequency: 'Daily',
         journal_reminder_custom_schedule: {},
         self_assessment_reminder_time: '09:00',
+        appointment_reminder_enabled: true,
+        appointment_reminder_advance_minutes: 60,
       }});
     }
 
@@ -520,33 +649,29 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
     const query = `INSERT INTO user_settings (
       user_id,
       clerk_user_id,
-      dark_mode, text_size, auto_lock_timer, notifications_enabled,
-      notif_all, notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
-      quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+      dark_mode, text_size, notifications_enabled,
+      notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+      reminder_frequency,
       mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
       journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
       self_assessment_reminder_time,
+      appointment_reminder_enabled, appointment_reminder_advance_minutes,
       updated_at
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-      $18, $19, $20, $21, $22, $23, $24, $25, $26, CURRENT_TIMESTAMP
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+      $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, CURRENT_TIMESTAMP
     )
     ON CONFLICT (user_id)
     DO UPDATE SET 
       dark_mode = EXCLUDED.dark_mode,
       text_size = EXCLUDED.text_size,
-      auto_lock_timer = EXCLUDED.auto_lock_timer,
       notifications_enabled = EXCLUDED.notifications_enabled,
-      notif_all = EXCLUDED.notif_all,
       notif_mood_tracking = EXCLUDED.notif_mood_tracking,
       notif_journaling = EXCLUDED.notif_journaling,
       notif_messages = EXCLUDED.notif_messages,
       notif_post_reactions = EXCLUDED.notif_post_reactions,
       notif_appointments = EXCLUDED.notif_appointments,
       notif_self_assessment = EXCLUDED.notif_self_assessment,
-      quiet_hours_enabled = EXCLUDED.quiet_hours_enabled,
-      quiet_start_time = EXCLUDED.quiet_start_time,
-      quiet_end_time = EXCLUDED.quiet_end_time,
       reminder_frequency = EXCLUDED.reminder_frequency,
       mood_reminder_enabled = EXCLUDED.mood_reminder_enabled,
       mood_reminder_time = EXCLUDED.mood_reminder_time,
@@ -557,6 +682,8 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       journal_reminder_frequency = EXCLUDED.journal_reminder_frequency,
       journal_reminder_custom_schedule = EXCLUDED.journal_reminder_custom_schedule,
       self_assessment_reminder_time = EXCLUDED.self_assessment_reminder_time,
+      appointment_reminder_enabled = EXCLUDED.appointment_reminder_enabled,
+      appointment_reminder_advance_minutes = EXCLUDED.appointment_reminder_advance_minutes,
       updated_at = CURRENT_TIMESTAMP
     `;
 
@@ -565,18 +692,13 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       clerkUserId,
       settings.darkMode ?? false,
       settings.textSize ?? 'Medium',
-      settings.autoLockTimer ?? '5 minutes',
       settings.notificationsEnabled ?? true,
-      settings.notifAll ?? true,
       settings.notifMoodTracking ?? true,
       settings.notifJournaling ?? true,
       settings.notifMessages ?? true,
       settings.notifPostReactions ?? true,
       settings.notifAppointments ?? true,
       settings.notifSelfAssessment ?? true,
-      settings.quietHoursEnabled ?? false,
-      settings.quietStartTime ?? '22:00',
-      settings.quietEndTime ?? '08:00',
       settings.reminderFrequency ?? 'Daily',
       settings.moodReminderEnabled ?? false,
       settings.moodReminderTime ?? '09:00',
@@ -587,6 +709,8 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       settings.journalReminderFrequency ?? 'Daily',
       JSON.stringify(settings.journalReminderCustomSchedule ?? {}),
       settings.selfAssessmentReminderTime ?? '09:00',
+      settings.appointmentReminderEnabled ?? true,
+      settings.appointmentReminderAdvanceMinutes ?? 60,
     ];
 
     await pool.query(query, params);
@@ -594,6 +718,28 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
   } catch (e: any) {
     console.error('❌ Settings PUT failed:', e.message);
     res.status(500).json({ success: false, message: 'Failed to save settings', error: e.message });
+  }
+});
+
+// Debug: trigger a test notification for a category (bypasses scheduler)
+app.post('/api/debug/notify', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, category, title, message, data } = req.body as { clerkUserId?: string; category?: string; title?: string; message?: string; data?: any };
+    if (!clerkUserId || !category) {
+      return res.status(400).json({ success: false, message: 'clerkUserId and category are required' });
+    }
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+    const userId = userRes.rows[0].id as number;
+
+    const cat = String(category) as any;
+    const t = title || `Test: ${cat}`;
+    const m = message || `This is a test ${cat} notification.`;
+    await createAndPushNotification(userId, cat, t, m, data || {});
+    res.json({ success: true, message: 'Notification triggered' });
+  } catch (e: any) {
+    console.error('❌ Debug notify failed:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to trigger notification', error: e.message });
   }
 });
 
@@ -691,7 +837,6 @@ app.post(
             text_size,
             auto_lock_timer,
             notifications_enabled,
-            notif_all,
             notif_mood_tracking,
             notif_journaling,
             notif_messages,
@@ -721,7 +866,6 @@ app.post(
             false,
             'Medium',
             '5 minutes',
-            true,
             true,
             true,
             true,
@@ -1624,8 +1768,29 @@ app.post(
                 const authorUserId = authorUserRes.rows[0].id;
                 const emojiLabel = emoji;
                 const title = 'New reaction on your post';
-                const message = `Someone reacted ${emojiLabel} to: ${postTitle || 'your post'}`;
-                await createAndPushNotification(authorUserId, 'post_reactions', title, message, { postId: Number.parseInt(id), emoji: emojiLabel });
+                // Look up reactor's display name (prefer client_profiles.display_name, fallback to users table)
+                let reactorName = 'Someone';
+                try {
+                  const nameRes = await pool.query(
+                    `SELECT COALESCE(cp.display_name, NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), 'Someone') AS name
+                     FROM users u
+                     LEFT JOIN client_profiles cp ON cp.clerk_user_id = u.clerk_user_id
+                     WHERE u.clerk_user_id = $1
+                     LIMIT 1`,
+                    [clerkUserId]
+                  );
+                  if (nameRes.rows.length > 0 && nameRes.rows[0].name) {
+                    reactorName = nameRes.rows[0].name as string;
+                  }
+                } catch (_e) { /* no-op, keep default */ }
+                const message = `${reactorName} reacted ${emojiLabel} to: ${postTitle || 'your post'}`;
+                await createAndPushNotification(
+                  authorUserId,
+                  'post_reactions',
+                  title,
+                  message,
+                  { postId: Number.parseInt(id), emoji: emojiLabel, reactorName }
+                );
               }
             }
           }
@@ -4934,7 +5099,6 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           text_size: "Medium",
           auto_lock_timer: "5 minutes",
           notifications_enabled: true,
-          notif_all: true,
           notif_mood_tracking: true,
           notif_journaling: true,
           notif_messages: true,
@@ -4945,6 +5109,15 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           quiet_start_time: "22:00",
           quiet_end_time: "08:00",
           reminder_frequency: "Daily",
+          // Include per-category reminder defaults
+          mood_reminder_enabled: false,
+          mood_reminder_time: '09:00',
+          mood_reminder_frequency: 'Daily',
+          mood_reminder_custom_schedule: {},
+          journal_reminder_enabled: false,
+          journal_reminder_time: '20:00',
+          journal_reminder_frequency: 'Daily',
+          journal_reminder_custom_schedule: {},
           self_assessment_reminder_time: "09:00",
         },
       });
@@ -5017,26 +5190,32 @@ app.put(
              text_size = COALESCE($2, text_size),
              auto_lock_timer = COALESCE($3, auto_lock_timer),
              notifications_enabled = COALESCE($4, notifications_enabled),
-             notif_all = COALESCE($5, notif_all),
-             notif_mood_tracking = COALESCE($6, notif_mood_tracking),
-             notif_journaling = COALESCE($7, notif_journaling),
-             notif_messages = COALESCE($8, notif_messages),
-             notif_post_reactions = COALESCE($9, notif_post_reactions),
-             notif_appointments = COALESCE($10, notif_appointments),
-             notif_self_assessment = COALESCE($11, notif_self_assessment),
-             quiet_hours_enabled = COALESCE($12, quiet_hours_enabled),
-             quiet_start_time = COALESCE($13, quiet_start_time),
-             quiet_end_time = COALESCE($14, quiet_end_time),
-             reminder_frequency = COALESCE($15, reminder_frequency),
+             notif_mood_tracking = COALESCE($5, notif_mood_tracking),
+             notif_journaling = COALESCE($6, notif_journaling),
+             notif_messages = COALESCE($7, notif_messages),
+             notif_post_reactions = COALESCE($8, notif_post_reactions),
+             notif_appointments = COALESCE($9, notif_appointments),
+             notif_self_assessment = COALESCE($10, notif_self_assessment),
+             quiet_hours_enabled = COALESCE($11, quiet_hours_enabled),
+             quiet_start_time = COALESCE($12, quiet_start_time),
+             quiet_end_time = COALESCE($13, quiet_end_time),
+             reminder_frequency = COALESCE($14, reminder_frequency),
+             mood_reminder_enabled = COALESCE($15, mood_reminder_enabled),
+             mood_reminder_time = COALESCE($16, mood_reminder_time),
+             mood_reminder_frequency = COALESCE($17, mood_reminder_frequency),
+             mood_reminder_custom_schedule = COALESCE($18, mood_reminder_custom_schedule),
+             journal_reminder_enabled = COALESCE($19, journal_reminder_enabled),
+             journal_reminder_time = COALESCE($20, journal_reminder_time),
+             journal_reminder_frequency = COALESCE($21, journal_reminder_frequency),
+             journal_reminder_custom_schedule = COALESCE($22, journal_reminder_custom_schedule),
              updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $16
+           WHERE user_id = $23
            RETURNING *`,
           [
             settings.darkMode,
             settings.textSize,
             settings.autoLockTimer,
             settings.notificationsEnabled,
-            (settings as any).notifAll,
             (settings as any).notifMoodTracking,
             (settings as any).notifJournaling,
             (settings as any).notifMessages,
@@ -5047,6 +5226,14 @@ app.put(
             settings.quietStartTime,
             settings.quietEndTime,
             settings.reminderFrequency,
+            (settings as any).moodReminderEnabled,
+            (settings as any).moodReminderTime,
+            (settings as any).moodReminderFrequency,
+            (settings as any).moodReminderCustomSchedule,
+            (settings as any).journalReminderEnabled,
+            (settings as any).journalReminderTime,
+            (settings as any).journalReminderFrequency,
+            (settings as any).journalReminderCustomSchedule,
             userId
           ]
         );
@@ -5057,15 +5244,19 @@ app.put(
             user_id, clerk_user_id, 
             dark_mode, text_size, auto_lock_timer,
             notifications_enabled,
-            notif_all,
             notif_mood_tracking,
             notif_journaling,
             notif_messages,
             notif_post_reactions,
             notif_appointments,
             notif_self_assessment,
-            quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+            mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+            journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule
+          ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+          $17, $18, $19, $20, $21, $22, $23, $24
+          )
           RETURNING *`,
           [
             userId,
@@ -5074,7 +5265,6 @@ app.put(
             settings.textSize ?? 'Medium',
             settings.autoLockTimer ?? '5 minutes',
             settings.notificationsEnabled ?? true,
-            (settings as any).notifAll ?? true,
             (settings as any).notifMoodTracking ?? true,
             (settings as any).notifJournaling ?? true,
             (settings as any).notifMessages ?? true,
@@ -5084,7 +5274,15 @@ app.put(
             settings.quietHoursEnabled ?? false,
             settings.quietStartTime ?? '22:00',
             settings.quietEndTime ?? '08:00',
-            settings.reminderFrequency ?? 'Daily'
+            settings.reminderFrequency ?? 'Daily',
+            (settings as any).moodReminderEnabled ?? false,
+            (settings as any).moodReminderTime ?? '09:00',
+            (settings as any).moodReminderFrequency ?? 'Daily',
+            (settings as any).moodReminderCustomSchedule ?? {},
+            (settings as any).journalReminderEnabled ?? false,
+            (settings as any).journalReminderTime ?? '20:00',
+            (settings as any).journalReminderFrequency ?? 'Daily',
+            (settings as any).journalReminderCustomSchedule ?? {}
           ]
         );
       }
@@ -5541,5 +5739,22 @@ app.post('/api/push/register', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('❌ Error registering push token:', error.message);
     res.status(500).json({ success: false, message: 'Failed to register token', error: error.message });
+  }
+});
+
+// Debug: list push tokens for a user by clerkUserId
+app.get('/api/push/tokens/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+    const tokensRes = await pool.query(`SELECT id, token, platform, revoked, created_at FROM push_tokens WHERE user_id = $1 ORDER BY created_at DESC`, [userId]);
+    res.json({ success: true, count: tokensRes.rows.length, tokens: tokensRes.rows });
+  } catch (e: any) {
+    console.error('❌ Error listing push tokens:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to list tokens', error: e.message });
   }
 });

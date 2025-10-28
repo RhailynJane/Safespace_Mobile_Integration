@@ -38,7 +38,6 @@ export default function SettingsScreen() {
   // Settings state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   // Granular notification toggles
-  const [notifAll, setNotifAll] = useState(true);
   const [notifMoodTracking, setNotifMoodTracking] = useState(true);
   const [notifJournaling, setNotifJournaling] = useState(true);
   const [notifMessages, setNotifMessages] = useState(true);
@@ -55,6 +54,10 @@ export default function SettingsScreen() {
   const [journalReminderTime, setJournalReminderTime] = useState("20:00");
   const [journalReminderFrequency, setJournalReminderFrequency] = useState("Daily");
   const [journalReminderCustomSchedule, setJournalReminderCustomSchedule] = useState<Record<string, string>>({});
+  // Appointment reminder settings
+  const [appointmentReminderEnabled, setAppointmentReminderEnabled] = useState(true);
+  const [appointmentReminderAdvanceMinutes, setAppointmentReminderAdvanceMinutes] = useState(60);
+  
   const { user } = useUser();
   // Time picker modal visibility state
   const [moodTimePickerVisible, setMoodTimePickerVisible] = useState(false);
@@ -116,7 +119,6 @@ export default function SettingsScreen() {
           darkMode: isDarkMode,
           textSize,
           notificationsEnabled,
-          notifAll,
           notifMoodTracking,
           notifJournaling,
           notifMessages,
@@ -132,6 +134,8 @@ export default function SettingsScreen() {
           journalReminderTime,
           journalReminderFrequency,
           journalReminderCustomSchedule,
+          appointmentReminderEnabled,
+          appointmentReminderAdvanceMinutes,
         };
         console.log('🔔 Auto-saving notification settings:', settings);
         await settingsAPI.saveSettings(settings, user?.id);
@@ -146,7 +150,7 @@ export default function SettingsScreen() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [notificationsEnabled, notifMoodTracking, notifJournaling, notifMessages, notifPostReactions, notifAppointments, notifSelfAssessment, moodReminderEnabled, moodReminderTime, moodReminderFrequency, moodReminderCustomSchedule, journalReminderEnabled, journalReminderTime, journalReminderFrequency, journalReminderCustomSchedule, user?.id]);
+  }, [notificationsEnabled, notifMoodTracking, notifJournaling, notifMessages, notifPostReactions, notifAppointments, notifSelfAssessment, moodReminderEnabled, moodReminderTime, moodReminderFrequency, moodReminderCustomSchedule, journalReminderEnabled, journalReminderTime, journalReminderFrequency, journalReminderCustomSchedule, appointmentReminderEnabled, appointmentReminderAdvanceMinutes, user?.id]);
 
   /**
    * Loads settings from backend API
@@ -160,7 +164,6 @@ export default function SettingsScreen() {
       // Do not override current theme/context values here to avoid reverting user changes
       setNotificationsEnabled(settings.notificationsEnabled);
       // granular notifications
-      setNotifAll(settings.notifAll ?? true);
       setNotifMoodTracking(settings.notifMoodTracking ?? true);
       setNotifJournaling(settings.notifJournaling ?? true);
       setNotifMessages(settings.notifMessages ?? true);
@@ -176,6 +179,8 @@ export default function SettingsScreen() {
       setJournalReminderTime(settings.journalReminderTime);
       setJournalReminderFrequency(settings.journalReminderFrequency);
       setJournalReminderCustomSchedule(settings.journalReminderCustomSchedule ?? {});
+      setAppointmentReminderEnabled(settings.appointmentReminderEnabled);
+      setAppointmentReminderAdvanceMinutes(settings.appointmentReminderAdvanceMinutes);
       
     } catch (error) {
       console.log('Error loading settings:', error);
@@ -194,7 +199,6 @@ export default function SettingsScreen() {
         darkMode: isDarkMode,
         textSize,
         notificationsEnabled,
-        notifAll,
         notifMoodTracking,
         notifJournaling,
         notifMessages,
@@ -210,6 +214,8 @@ export default function SettingsScreen() {
         journalReminderTime,
         journalReminderFrequency,
         journalReminderCustomSchedule,
+        appointmentReminderEnabled,
+        appointmentReminderAdvanceMinutes,
       };
 
       const result = await settingsAPI.saveSettings(settings, user?.id);
@@ -552,7 +558,10 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                       value={notifMoodTracking}
-                      onValueChange={setNotifMoodTracking}
+                      onValueChange={(val) => {
+                        setNotifMoodTracking(val);
+                        setMoodReminderEnabled(val);
+                      }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
                     />
@@ -651,7 +660,10 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                       value={notifJournaling}
-                      onValueChange={setNotifJournaling}
+                      onValueChange={(val) => {
+                        setNotifJournaling(val);
+                        setJournalReminderEnabled(val);
+                      }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
                     />
@@ -750,7 +762,7 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                       value={notifMessages}
-                      onValueChange={setNotifMessages}
+                      onValueChange={(val) => { setNotifMessages(val); }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
                     />
@@ -766,7 +778,7 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                       value={notifPostReactions}
-                      onValueChange={setNotifPostReactions}
+                      onValueChange={(val) => { setNotifPostReactions(val); }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
                     />
@@ -782,11 +794,33 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                       value={notifAppointments}
-                      onValueChange={setNotifAppointments}
+                      onValueChange={(val) => { 
+                        setNotifAppointments(val); 
+                        setAppointmentReminderEnabled(val);
+                      }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
                     />
                   </View>
+                  {notifAppointments && (
+                    <View style={styles.categoryContent}>
+                      {renderPickerRow(
+                        "Reminder Time",
+                        "How long before appointment",
+                        appointmentReminderAdvanceMinutes === 15 ? "15 minutes" :
+                        appointmentReminderAdvanceMinutes === 30 ? "30 minutes" :
+                        appointmentReminderAdvanceMinutes === 120 ? "2 hours" : "1 hour",
+                        ["15 minutes", "30 minutes", "1 hour", "2 hours"],
+                        (val) => {
+                          const minutes = val === "15 minutes" ? 15 :
+                                         val === "30 minutes" ? 30 :
+                                         val === "2 hours" ? 120 : 60;
+                          setAppointmentReminderAdvanceMinutes(minutes);
+                        },
+                        "time"
+                      )}
+                    </View>
+                  )}
                 </View>
 
                 {/* Self Assessment */}
@@ -798,7 +832,7 @@ export default function SettingsScreen() {
                     </View>
                     <Switch
                       value={notifSelfAssessment}
-                      onValueChange={setNotifSelfAssessment}
+                      onValueChange={(val) => { setNotifSelfAssessment(val); }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
                     />
@@ -1046,6 +1080,35 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(14),
   },
   // Custom schedule styles
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  warningTitle: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  warningText: {
+    fontSize: scaledFontSize(13),
+  },
+  warningAction: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'center',
+    marginLeft: 8,
+  },
+  warningActionText: {
+    fontSize: scaledFontSize(13),
+    fontWeight: '600',
+  },
   customScheduleTitle: {
     fontSize: scaledFontSize(14),
     fontWeight: '600',
