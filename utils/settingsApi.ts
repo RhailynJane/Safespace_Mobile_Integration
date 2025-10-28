@@ -50,38 +50,48 @@ class SettingsAPI {
       // Method 1: Check AsyncStorage first (most reliable for React Native)
       const authData = await AsyncStorage.getItem('authData');
       if (authData) {
-        const parsed = JSON.parse(authData);
-        if (parsed.clerkUserId) {
-          console.log('🔧 Found Clerk user ID from storage:', parsed.clerkUserId);
-          return parsed.clerkUserId;
+        try {
+          const parsed = JSON.parse(authData);
+          if (parsed.clerkUserId && parsed.clerkUserId !== 'undefined') {
+            console.log('🔧 Found Clerk user ID from storage:', parsed.clerkUserId);
+            return parsed.clerkUserId;
+          }
+        } catch (e) {
+          console.log('🔧 Error parsing authData:', e);
         }
       }
 
       // Method 2: Check for any user data in storage
       const userData = await AsyncStorage.getItem('userData');
       if (userData) {
-        const parsed = JSON.parse(userData);
-        if (parsed.clerkUserId || parsed.id) {
-          const userId = parsed.clerkUserId || parsed.id;
-          console.log('🔧 Found user ID from user data:', userId);
-          return userId;
+        try {
+          const parsed = JSON.parse(userData);
+          if ((parsed.clerkUserId || parsed.id) && (parsed.clerkUserId !== 'undefined' && parsed.id !== 'undefined')) {
+            const userId = parsed.clerkUserId || parsed.id;
+            console.log('🔧 Found user ID from user data:', userId);
+            return userId;
+          }
+        } catch (e) {
+          console.log('🔧 Error parsing userData:', e);
         }
       }
 
-      // Method 3: Try to get from Clerk hooks (if in React component context)
-      try {
-        // Note: This will only work if called from a React component
-        // For utils file, we'll rely on the storage methods above
-        console.log('🔧 Attempting to get user ID from Clerk context...');
-        
-        // For now, we'll use the actual user ID from your logs
-        // In a real app, you'd pass the user ID as a parameter or use a different approach
-      } catch (clerkError) {
-        console.log('🔧 Clerk context not available in utils file');
+      // Method 3: Try to get from Clerk user object stored in storage
+      const clerkUserData = await AsyncStorage.getItem('clerkUser');
+      if (clerkUserData) {
+        try {
+          const parsed = JSON.parse(clerkUserData);
+          if (parsed.id && parsed.id !== 'undefined') {
+            console.log('🔧 Found Clerk user ID from clerk user data:', parsed.id);
+            return parsed.id;
+          }
+        } catch (e) {
+          console.log('🔧 Error parsing clerkUser:', e);
+        }
       }
 
-      // If no user ID found, use the actual user ID from your logs
-      console.log('🔧 Using actual user ID from logs');
+      // Fallback: use the actual user ID from your logs
+      console.log('🔧 Using fallback user ID');
       return 'user_344imQE8qo1PA0Blw6bsT9YC1qe';
       
     } catch (error) {
@@ -138,8 +148,20 @@ class SettingsAPI {
   async saveSettings(settings: UserSettings, providedClerkUserId?: string): Promise<SettingsAPIResponse> {
     try {
       const clerkUserId = providedClerkUserId || await this.getClerkUserId();
+      
+      // Validate that we have a valid user ID
+      if (!clerkUserId || clerkUserId === 'undefined' || clerkUserId === 'null') {
+        console.error('❌ Invalid clerk user ID:', clerkUserId);
+        return {
+          success: false,
+          message: 'Invalid user ID',
+          error: 'Cannot save settings without valid user ID'
+        };
+      }
+
       const url = `${this.baseURL}/api/settings/${clerkUserId}`;
       console.log('🔧 Saving settings to:', url);
+      console.log('🔧 Clerk User ID:', clerkUserId);
       console.log('🔧 Settings to save:', settings);
       
       const mappedSettings = this.mapClientToServer(settings);
@@ -151,7 +173,6 @@ class SettingsAPI {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          clerk_user_id: clerkUserId,
           settings: mappedSettings 
         })
       });

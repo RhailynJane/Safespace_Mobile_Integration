@@ -502,6 +502,7 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
 
     const query = `INSERT INTO user_settings (
       user_id,
+      clerk_user_id,
       dark_mode, text_size, auto_lock_timer, notifications_enabled,
       notif_all, notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
       quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
@@ -510,8 +511,8 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
       self_assessment_reminder_time,
       updated_at
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-      $17, $18, $19, $20, $21, $22, $23, $24, $25, CURRENT_TIMESTAMP
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+      $18, $19, $20, $21, $22, $23, $24, $25, $26, CURRENT_TIMESTAMP
     )
     ON CONFLICT (user_id)
     DO UPDATE SET 
@@ -544,6 +545,7 @@ app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
 
     const params = [
       userId,
+      clerkUserId,
       settings.darkMode ?? false,
       settings.textSize ?? 'Medium',
       settings.autoLockTimer ?? '5 minutes',
@@ -2262,6 +2264,50 @@ app.post("/api/notifications/:clerkUserId/read-all", async (req: Request, res: R
   } catch (error: any) {
     console.error('❌ Error marking all notifications as read:', error.message);
     res.status(500).json({ success: false, message: 'Failed to mark all as read', error: error.message });
+  }
+});
+
+// Clear (delete) all notifications for a user
+app.delete("/api/notifications/:clerkUserId/clear-all", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userResult.rows[0].id;
+    await pool.query(`DELETE FROM notifications WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error clearing notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clear notifications', error: error.message });
+  }
+});
+
+// Manual test: send a sample push notification and create a feed row
+app.post("/api/test-push/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+
+    await createAndPushNotification(
+      userId,
+      'system',
+      'Test notification',
+      'If you see this, your push pipeline works!',
+      { source: 'api/test-push' }
+    );
+    res.json({ success: true, message: 'Test notification triggered' });
+  } catch (error: any) {
+    console.error('❌ Error sending test push:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send test push', error: error.message });
   }
 });
 

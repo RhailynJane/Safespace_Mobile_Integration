@@ -108,6 +108,46 @@ export default function SettingsScreen() {
     applySettings();
   }, [isDarkMode, textSize]);
 
+  // Auto-save notification settings when they change
+  useEffect(() => {
+    const saveNotificationChanges = async () => {
+      try {
+        const settings: UserSettings = {
+          darkMode: isDarkMode,
+          textSize,
+          notificationsEnabled,
+          notifAll,
+          notifMoodTracking,
+          notifJournaling,
+          notifMessages,
+          notifPostReactions,
+          notifAppointments,
+          notifSelfAssessment,
+          reminderFrequency,
+          moodReminderEnabled,
+          moodReminderTime,
+          moodReminderFrequency,
+          moodReminderCustomSchedule,
+          journalReminderEnabled,
+          journalReminderTime,
+          journalReminderFrequency,
+          journalReminderCustomSchedule,
+        };
+        console.log('🔔 Auto-saving notification settings:', settings);
+        await settingsAPI.saveSettings(settings, user?.id);
+      } catch (error) {
+        console.log('Auto-save notification settings failed:', error);
+      }
+    };
+
+    // Debounce the save to avoid too many API calls (500ms delay)
+    const timer = setTimeout(() => {
+      saveNotificationChanges();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [notificationsEnabled, notifMoodTracking, notifJournaling, notifMessages, notifPostReactions, notifAppointments, notifSelfAssessment, moodReminderEnabled, moodReminderTime, moodReminderFrequency, moodReminderCustomSchedule, journalReminderEnabled, journalReminderTime, journalReminderFrequency, journalReminderCustomSchedule, user?.id]);
+
   /**
    * Loads settings from backend API
    */
@@ -504,7 +544,7 @@ export default function SettingsScreen() {
                 <Text style={[styles.sectionSubtitle, { color: theme.colors.text }]}>Notification Categories</Text>
                 
                 {/* Mood Tracking */}
-                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
                   <View style={styles.categoryHeader}>
                     <View style={styles.categoryLeft}>
                       <Ionicons name="happy" size={18} color={theme.colors.primary} />
@@ -603,7 +643,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Journaling */}
-                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
                   <View style={styles.categoryHeader}>
                     <View style={styles.categoryLeft}>
                       <Ionicons name="book" size={18} color={theme.colors.primary} />
@@ -702,7 +742,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Messages */}
-                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
                   <View style={styles.categoryHeader}>
                     <View style={styles.categoryLeft}>
                       <Ionicons name="chatbubbles" size={18} color={theme.colors.primary} />
@@ -718,7 +758,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Post Reactions */}
-                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
                   <View style={styles.categoryHeader}>
                     <View style={styles.categoryLeft}>
                       <Ionicons name="heart" size={18} color={theme.colors.primary} />
@@ -734,7 +774,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Appointments */}
-                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
                   <View style={styles.categoryHeader}>
                     <View style={styles.categoryLeft}>
                       <Ionicons name="calendar" size={18} color={theme.colors.primary} />
@@ -750,7 +790,7 @@ export default function SettingsScreen() {
                 </View>
 
                 {/* Self Assessment */}
-                <View style={[styles.categoryCard, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+                <View style={[styles.categoryCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
                   <View style={styles.categoryHeader}>
                     <View style={styles.categoryLeft}>
                       <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} />
@@ -987,13 +1027,16 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(18),
     fontWeight: '600',
     marginBottom: 8,
+    textAlign: 'center',
   },
   selectionOption: {
     paddingVertical: 12,
     borderBottomWidth: 1,
+    alignItems: 'center',
   },
   selectionOptionText: {
     fontSize: scaledFontSize(16),
+    textAlign: 'center',
   },
   selectionCancelBtn: {
     paddingVertical: 12,

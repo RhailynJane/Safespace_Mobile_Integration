@@ -129,6 +129,23 @@ export default function NotificationsScreen() {
   };
 
   /**
+   * clearAllNotifications
+   * Deletes all notifications from the list.
+   * Triggered when user presses the "Clear all" button.
+   */
+  const clearAllNotifications = async () => {
+    if (!user?.id) return;
+    try {
+      await fetch(`${baseURL}/api/notifications/${user.id}/clear-all`, { method: 'DELETE' });
+      setNotifications([]);
+      showStatusModal('success', 'Notifications Cleared', 'All notifications have been deleted.');
+    } catch (e) {
+      console.log('Failed to clear notifications:', e);
+      showStatusModal('error', 'Delete Failed', 'Unable to clear notifications. Please try again.');
+    }
+  };
+
+  /**
    * markAllAsRead
    * Marks all notifications in the list as read.
    * Triggered when user presses the "Mark all as read" button.
@@ -197,7 +214,7 @@ export default function NotificationsScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Notifications" showBack={true} />
 
-        {/* Top bar showing unread count & "Mark all as read" action */}
+        {/* Top bar showing unread count & action buttons */}
         <View style={[styles.headerActions, { 
           borderBottomColor: theme.colors.border,
           backgroundColor: theme.colors.surface 
@@ -206,13 +223,25 @@ export default function NotificationsScreen() {
             {unreadCount} unread{" "}
             {unreadCount === 1 ? "notification" : "notifications"}
           </Text>
-          {unreadCount > 0 && (
-            <TouchableOpacity onPress={markAllAsRead}>
-              <Text style={[styles.markAllText, { color: theme.colors.primary }]}>
-                Mark all as read
-              </Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.actionButtons}>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={markAllAsRead}>
+                <Text style={[styles.actionText, { color: theme.colors.primary }]}>
+                  Mark all as read
+                </Text>
+              </TouchableOpacity>
+            )}
+            {notifications.length > 0 && (
+              <>
+                {unreadCount > 0 && <Text style={[styles.separator, { color: theme.colors.border }]}>|</Text>}
+                <TouchableOpacity onPress={clearAllNotifications}>
+                  <Text style={[styles.actionText, { color: theme.colors.error }]}>
+                    Clear all
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
 
         {/* Main notifications list (scrollable with pull-to-refresh) */}
@@ -337,6 +366,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   unreadText: {
     fontSize: scaledFontSize(14), // Base size 14px
+  },
+  actionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  actionText: {
+    fontSize: scaledFontSize(14), // Base size 14px
+    fontWeight: "500",
+  },
+  separator: {
+    fontSize: scaledFontSize(14),
+    fontWeight: "300",
   },
   markAllText: {
     fontSize: scaledFontSize(14), // Base size 14px
