@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getApiBaseUrl } from './apiBaseUrl';
+import notificationEvents from './notificationEvents';
 
 // Check if running in Expo Go
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -131,6 +132,8 @@ export function addNotificationListeners(
     receiveSub = Notifications.addNotificationReceivedListener((notification: any) => {
       const { title, body } = notification.request.content;
       if (title || body) onReceive(title || 'Notification', body || '');
+      // Let interested parts of the app refresh (e.g., bell badge)
+      try { notificationEvents.publish({ type: 'received', title, body }); } catch { /* no-op */ }
     });
 
     responseSub = Notifications.addNotificationResponseReceivedListener((response: any) => {

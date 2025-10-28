@@ -1586,6 +1586,37 @@ app.post(
 
       await client.query("COMMIT");
 
+      // Notify post author on new reaction (do not notify on removal)
+      try {
+        if (reactionChange > 0) {
+          // Get post author (stored as clerk_user_id on community_posts.author_id)
+          const postRes = await pool.query(
+            `SELECT cp.title, cp.author_id AS author_clerk_id
+             FROM community_posts cp
+             WHERE cp.id = $1`,
+            [Number.parseInt(id)]
+          );
+          if (postRes.rows.length > 0) {
+            const authorClerkId = postRes.rows[0].author_clerk_id as string;
+            const postTitle = postRes.rows[0].title as string;
+
+            // Don't notify if reactor is the author
+            if (authorClerkId && authorClerkId !== clerkUserId) {
+              const authorUserRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [authorClerkId]);
+              if (authorUserRes.rows.length > 0) {
+                const authorUserId = authorUserRes.rows[0].id;
+                const emojiLabel = emoji;
+                const title = 'New reaction on your post';
+                const message = `Someone reacted ${emojiLabel} to: ${postTitle || 'your post'}`;
+                await createAndPushNotification(authorUserId, 'post_reactions', title, message, { postId: Number.parseInt(id), emoji: emojiLabel });
+              }
+            }
+          }
+        }
+      } catch (notifyErr: any) {
+        console.warn('⚠️ Failed to notify post reaction:', notifyErr.message);
+      }
+
       res.json({
         success: true,
         message: reactionChange > 0 ? "Reaction added" : "Reaction removed",
@@ -2284,6 +2315,58 @@ app.delete("/api/notifications/:clerkUserId/clear-all", async (req: Request, res
   } catch (error: any) {
     console.error('❌ Error clearing notifications:', error.message);
     res.status(500).json({ success: false, message: 'Failed to clear notifications', error: error.message });
+  }
+});
+
+// Fire an appointment notification immediately (no DB schema required)
+app.post("/api/appointments/notify", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, title, message, data } = req.body as {
+      clerkUserId?: string;
+      title?: string;
+      message?: string;
+      data?: Record<string, any>;
+    };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+
+    await createAndPushNotification(userId, 'appointment', title, message, data || {});
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error sending appointment notification:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send appointment notification', error: error.message });
+  }
+});
+
+// Force-create a reminder notification for testing (mood or journaling)
+app.post("/api/test-reminder/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { type } = req.body as { type?: 'mood' | 'journaling' };
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+
+    const category = type === 'journaling' ? 'journaling' : 'mood';
+    const title = category === 'mood' ? 'Mood check-in' : 'Journal reminder';
+    const message = category === 'mood' 
+      ? 'How are you feeling right now? Take a quick mood check.'
+      : 'Write a quick entry to reflect on your day.';
+
+    await createAndPushNotification(userId, category as any, title, message, { source: 'api/test-reminder' });
+    res.json({ success: true, message: `Test ${category} reminder created` });
+  } catch (error: any) {
+    console.error('❌ Error sending test reminder:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send test reminder', error: error.message });
   }
 });
 

@@ -28,7 +28,7 @@ interface Notification {
   message: string;
   time: string;
   isRead: boolean;
-  type: "message" | "appointment" | "system" | "reminder";
+  type: "message" | "appointment" | "system" | "reminder" | "mood" | "journaling" | "post_reactions" | "self_assessment";
 }
 
 /**
@@ -178,6 +178,14 @@ export default function NotificationsScreen() {
         return "chatbubble-outline";
       case "appointment":
         return "calendar-outline";
+      case "mood":
+        return "happy-outline";
+      case "journaling":
+        return "document-text-outline";
+      case "post_reactions":
+        return "heart-outline";
+      case "self_assessment":
+        return "checkmark-circle-outline";
       case "reminder":
         return "notifications-outline";
       case "system":
@@ -197,6 +205,14 @@ export default function NotificationsScreen() {
         return "#4FC3F7";
       case "appointment":
         return "#9575CD";
+      case "mood":
+        return "#66BB6A";
+      case "journaling":
+        return "#42A5F5";
+      case "post_reactions":
+        return "#EF5350";
+      case "self_assessment":
+        return "#26A69A";
       case "reminder":
         return "#4CAF50";
       case "system":

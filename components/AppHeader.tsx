@@ -25,6 +25,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import activityApi from "../utils/activityApi";
 import { getApiBaseUrl, makeAbsoluteUrl } from "../utils/apiBaseUrl";
 import avatarEvents from "../utils/avatarEvents";
+import notificationEvents from "../utils/notificationEvents";
 
 const { width } = Dimensions.get("window");
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
@@ -300,6 +301,21 @@ export const AppHeader = ({
       return () => {};
     }, [fetchUnreadCount])
   );
+
+  // Poll for unread count periodically to keep the bell badge fresh
+  useEffect(() => {
+    if (!user?.id) return;
+    const id = setInterval(fetchUnreadCount, 15000); // every 15s
+    return () => clearInterval(id);
+  }, [user?.id, fetchUnreadCount]);
+
+  // React immediately when a push arrives (low-latency badge updates)
+  useEffect(() => {
+    const unsubscribe = notificationEvents.subscribe(() => {
+      fetchUnreadCount();
+    });
+    return () => { unsubscribe(); };
+  }, [fetchUnreadCount]);
 
   // Base menu items
   const baseMenuItems = [

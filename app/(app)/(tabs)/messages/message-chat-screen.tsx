@@ -47,6 +47,7 @@ import {
   Alert,
   Dimensions,
   Modal,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -137,6 +138,7 @@ export default function ChatScreen() {
 
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // Create styles dynamically based on text size
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,6 +165,23 @@ export default function ChatScreen() {
   };
 
   const headerHeight = getHeaderHeight();
+  // Use a smaller keyboard offset to avoid excessive gap between input and keyboard
+  const keyboardOffset = Platform.OS === 'ios' ? insets.top + 50 : 0;
+
+  // Track keyboard visibility to adjust bottom spacing only when keyboard is hidden
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    // Also listen to 'will' events on iOS for smoother transitions
+    const willShowSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const willHideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      willShowSub.remove();
+      willHideSub.remove();
+    };
+  }, []);
 
   // Request permissions on component mount
   useEffect(() => {
@@ -1162,9 +1181,9 @@ export default function ChatScreen() {
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.select({ ios: "padding", android: "height" })}
           style={styles.container}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+          keyboardVerticalOffset={keyboardOffset}
         >
           {/* Status Modal */}
           <Modal
@@ -1397,14 +1416,12 @@ export default function ChatScreen() {
 
           {showScrollToLatest && (
             <TouchableOpacity
-              style={styles.scrollToLatestButton}
               onPress={() => {
                 messagesListRef.current?.scrollToEnd?.({ animated: true });
                 setShowScrollToLatest(false);
                 setUserNearBottom(true);
               }}
             >
-              <Ionicons name="arrow-down" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           )}
 
@@ -1412,8 +1429,9 @@ export default function ChatScreen() {
           <View style={[
             styles.bottomInputSection, 
             { 
-              backgroundColor: theme.colors.surface,
-              paddingBottom: Math.max(insets.bottom, 4),
+              backgroundColor: 'transparent',
+              // When keyboard hidden, keep input 10px above safe-area bottom; when shown, keep it tight
+              paddingBottom: keyboardVisible ? Math.max(insets.bottom, 4) : insets.bottom + 10,
             }
           ]}>
             {/* Show expand button when icons are hidden */}
@@ -1456,7 +1474,13 @@ export default function ChatScreen() {
               </>
             )}
 
-            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background }]}>
+            <View style={[
+              styles.inputWrapper,
+              { 
+                backgroundColor: theme.colors.background,
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.15)'
+              }
+            ]}>
               {isRecording ? (
                 <View style={styles.recordingIndicator}>
                   <View style={styles.recordingDot} />
@@ -2184,6 +2208,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingHorizontal: 14,
     paddingVertical: 8,
     minHeight: 44,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+    backgroundColor: 'transparent',
   },
   textInput: {
     flex: 1,
@@ -2402,22 +2429,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   viewerFooterText: {
     color: "#CCCCCC",
     fontSize: scaledFontSize(12),
-  },
-  scrollToLatestButton: {
-    position: "absolute",
-    right: 16,
-    bottom: 90,
-    backgroundColor: "#4CAF50",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
   },
   centeredOverlay: {
     flex: 1,
