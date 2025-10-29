@@ -1,4 +1,8 @@
-﻿import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+﻿/**
+ * LLM Prompt: Add concise comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 // Utility function to get file icon based on file name or extension
 const getFileIcon = (

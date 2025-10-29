@@ -1,5 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 // app/(app)/(tabs)/profile/settings.tsx
+/**
+ * LLM Prompt: Add concise comments to this React Native component. 
+ * Reference: chat.deepseek.com
+ */
 import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
