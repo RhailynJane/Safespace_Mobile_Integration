@@ -32,7 +32,7 @@ export interface MoodFilters {
   offset?: number;
 }
 
-axios.defaults.timeout = 10000;
+axios.defaults.timeout = 50000;
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 export const moodApi = {
