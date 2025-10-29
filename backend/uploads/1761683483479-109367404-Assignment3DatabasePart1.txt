@@ -1,0 +1,110 @@
+DECLARE
+    -- Outer cursor
+    CURSOR outer_curr IS
+        SELECT DISTINCT transaction_no, transaction_date, description
+        FROM new_transactions
+        ORDER BY transaction_no;
+
+    -- Inner cursor
+    CURSOR inner_curr(p_transaction_no new_transactions.transaction_no%TYPE) IS
+        SELECT
+            nt.transaction_no,
+            nt.account_no,
+            nt.transaction_type,
+            nt.transaction_amount,
+            at.default_trans_type    
+        FROM new_transactions nt
+        JOIN account a ON a.account_no = nt.account_no
+        JOIN account_type at ON a.account_type_code = at.account_type_code
+        WHERE nt.transaction_no = p_transaction_no;
+
+    -- Balance cursor: fetch current account balance without using SELECT INTO
+    CURSOR balance_curr(p_account_no account.account_no%TYPE) IS
+        SELECT account_balance
+        FROM account
+        WHERE account_no = p_account_no;
+
+    -- Variables to hold data from outer cursor (transaction header info)
+    v_transaction_no     new_transactions.transaction_no%TYPE;
+    v_transaction_date   new_transactions.transaction_date%TYPE;
+    v_transaction_desc   new_transactions.description%TYPE;
+
+    -- Variables to hold data from inner cursor (transaction detail info)
+    v_account_no         new_transactions.account_no%TYPE;
+    v_transaction_type   new_transactions.transaction_type%TYPE;
+    v_transaction_amount new_transactions.transaction_amount%TYPE;
+    v_default_type       account_type.default_trans_type%TYPE;
+    v_current_balance    account.account_balance%TYPE;
+    v_new_balance        NUMBER;
+
+BEGIN
+    -- Loop through each distinct transaction using FOR loop with cursor
+    FOR tx IN outer_curr LOOP
+        -- Store transaction header information
+        v_transaction_no   := tx.transaction_no;
+        v_transaction_date := tx.transaction_date;
+        v_transaction_desc := tx.description;
+
+        INSERT INTO transaction_history (
+            transaction_no,
+            transaction_date,
+            description
+        ) VALUES (
+            v_transaction_no,
+            v_transaction_date,
+            v_transaction_desc
+        );
+
+        -- Process each transaction detail line for this transaction
+        FOR dt IN inner_curr(v_transaction_no) LOOP
+            -- Assign variables from inner cursor
+            v_account_no         := dt.account_no;
+            v_transaction_type   := dt.transaction_type;
+            v_transaction_amount := dt.transaction_amount;
+            v_default_type       := dt.default_trans_type;
+
+            -- Use cursor loop to get current balance without SELECT INTO
+            FOR bal IN balance_curr(v_account_no) LOOP
+                v_current_balance := bal.account_balance;
+            END LOOP;
+
+
+            IF v_transaction_type = v_default_type THEN
+                v_new_balance := v_current_balance + v_transaction_amount;
+            ELSE
+                v_new_balance := v_current_balance - v_transaction_amount;
+            END IF;
+
+            -- Update the account balance with the new calculated balance
+            UPDATE account
+               SET account_balance = v_new_balance
+             WHERE account_no = v_account_no;
+
+            -- Insert detail record
+            INSERT INTO transaction_detail (
+                transaction_no,
+                account_no,
+                transaction_type,
+                transaction_amount
+            ) VALUES (
+                v_transaction_no,
+                v_account_no,
+                v_transaction_type,
+                v_transaction_amount
+            );
+        END LOOP; -- End of detail processing for this transaction
+
+    END LOOP; -- End of transaction processing
+
+    DELETE FROM new_transactions;
+
+    -- Commit all changes to make them permanent
+    COMMIT;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Rollback on any unexpected error
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('Error occurred: ' || SQLERRM);
+END;
+/

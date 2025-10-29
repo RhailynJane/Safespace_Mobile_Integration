@@ -10,18 +10,32 @@ import {
   Image,
   Animated,
   Dimensions,
+  Platform,
+  StatusBar,
   Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { assessmentTracker } from "../utils/assessmentTracker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
+import activityApi from "../utils/activityApi";
+import { getApiBaseUrl, makeAbsoluteUrl } from "../utils/apiBaseUrl";
+import avatarEvents from "../utils/avatarEvents";
+import notificationEvents from "../utils/notificationEvents";
 
 const { width } = Dimensions.get("window");
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
+const normalizeImageUri = (uri?: string | null) => {
+  if (!uri) return null;
+  if (uri.startsWith('http')) return uri;
+  if (uri.startsWith('/')) return makeAbsoluteUrl(uri);
+  if (uri.startsWith('data:image')) return null; // avoid rendering large base64 in header
+  return uri;
+};
 
 export interface AppHeaderProps {
   title?: string;
@@ -39,7 +53,8 @@ export const AppHeader = ({
   showNotifications = true,
   rightActions,
 }: AppHeaderProps) => {
-  const { theme } = useTheme();
+  const { theme, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -97,6 +112,16 @@ export const AppHeader = ({
     try {
       setIsSigningOut(true);
       hideSideMenu();
+      
+      // Record logout activity
+      if (user?.id) {
+        try {
+          await activityApi.recordLogout(user.id);
+        } catch (_e) {
+          // Continue with logout even if tracking fails
+        }
+      }
+      
       await AsyncStorage.clear();
       await signOut();
       router.replace("/(auth)/login");
@@ -140,9 +165,16 @@ export const AppHeader = ({
       // Priority 1: Check AsyncStorage "profileImage" (set by edit screen)
       const savedImage = await AsyncStorage.getItem("profileImage");
       if (savedImage) {
-        console.log("📸 AppHeader: Found profile image in AsyncStorage");
-        setProfileImage(savedImage);
-        return;
+        
+        // ✅ FIX: If it's base64 (starts with data:image), it's too large - remove it
+        if (savedImage.startsWith('data:image')) {
+          console.warn("⚠️ Removing large base64 image from AsyncStorage to prevent OOM");
+          await AsyncStorage.removeItem("profileImage");
+          // Fall through to use Clerk image
+        } else {
+          setProfileImage(savedImage);
+          return;
+        }
       }
 
       // Priority 2: Check "profileData" in AsyncStorage
@@ -150,7 +182,6 @@ export const AppHeader = ({
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
         if (parsedData.profileImageUrl) {
-          console.log("📸 AppHeader: Found profile image in profileData");
           setProfileImage(parsedData.profileImageUrl);
           return;
         }
@@ -162,7 +193,6 @@ export const AppHeader = ({
           `profileImage_${user.id}`
         );
         if (userSpecificImage) {
-          console.log("📸 AppHeader: Found user-specific profile image");
           setProfileImage(userSpecificImage);
           return;
         }
@@ -170,12 +200,10 @@ export const AppHeader = ({
 
       // Priority 4: Use Clerk image as fallback
       if (user?.imageUrl) {
-        console.log("📸 AppHeader: Using Clerk profile image");
         setProfileImage(user.imageUrl);
         return;
       }
 
-      console.log("📸 AppHeader: No profile image found");
       setProfileImage(null);
     } catch (error) {
       console.log("Error loading profile image:", error);
@@ -191,26 +219,35 @@ export const AppHeader = ({
 
   useFocusEffect(
     useCallback(() => {
-      console.log("🔄 AppHeader: Screen focused, reloading profile image");
       if (user?.id) {
         loadProfileImage();
       }
+      // Subscribe to avatar updates so header reflects changes immediately
+      const unsubscribe = avatarEvents.subscribe((url) => {
+        console.log('📸 AppHeader received avatar event:', url);
+        // If event sends a URL, store it and update state; if null, clear
+        if (url && typeof url === 'string') {
+          AsyncStorage.setItem('profileImage', url).catch(() => {});
+          setProfileImage(url);
+          console.log('✅ AppHeader profileImage updated to:', url);
+        } else {
+          setProfileImage(null);
+          console.log('✅ AppHeader profileImage cleared');
+        }
+      });
+
+      return () => {
+        unsubscribe();
+      };
     }, [user?.id, loadProfileImage])
   );
 
   const getInitials = () => {
-    console.log("User data:", {
-      firstName: user?.firstName,
-      lastName: user?.lastName,
-      fullName: user?.fullName,
-      email: user?.primaryEmailAddress?.emailAddress,
-    });
 
     if (user?.firstName && user?.lastName) {
       const initials = `${user.firstName.charAt(0)}${user.lastName.charAt(
         0
       )}`.toUpperCase();
-      console.log("Using first+last name initials:", initials);
       return initials;
     }
     if (user?.fullName) {
@@ -221,10 +258,8 @@ export const AppHeader = ({
               names[names.length - 1]?.charAt(0) ?? ""
             }`.toUpperCase()
           : (names[0]?.charAt(0) ?? "").toUpperCase();
-      console.log("Using full name initials:", initials);
       return initials;
     }
-    console.log("Using fallback 'U'");
     return "U";
   };
 
@@ -241,6 +276,46 @@ export const AppHeader = ({
       "No email"
     );
   };
+
+  // Unread notifications badge
+  const [unreadCount, setUnreadCount] = useState(0);
+  const baseURL = getApiBaseUrl();
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${baseURL}/api/notifications/${user.id}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      const rows = (json.data || []) as Array<{ is_read: boolean }>; 
+      const count = rows.reduce((acc, r) => acc + (r.is_read ? 0 : 1), 0);
+      setUnreadCount(count);
+    } catch (e) {
+      // ignore
+    }
+  }, [user?.id, baseURL]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadCount();
+      return () => {};
+    }, [fetchUnreadCount])
+  );
+
+  // Poll for unread count periodically to keep the bell badge fresh
+  useEffect(() => {
+    if (!user?.id) return;
+    const id = setInterval(fetchUnreadCount, 15000); // every 15s
+    return () => clearInterval(id);
+  }, [user?.id, fetchUnreadCount]);
+
+  // React immediately when a push arrives (low-latency badge updates)
+  useEffect(() => {
+    const unsubscribe = notificationEvents.subscribe(() => {
+      fetchUnreadCount();
+    });
+    return () => { unsubscribe(); };
+  }, [fetchUnreadCount]);
 
   // Base menu items
   const baseMenuItems = [
@@ -378,8 +453,8 @@ export const AppHeader = ({
   }
 
   return (
-    <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.surface }]}>
+    <View style={[styles.safeArea, { backgroundColor: "transparent", paddingTop: insets.top }]}>
+      <View style={[styles.header, { backgroundColor: "transparent" }]}>
         {showBack ? (
           <TouchableOpacity
             onPress={() => router.back()}
@@ -390,9 +465,9 @@ export const AppHeader = ({
         ) : (
           <TouchableOpacity onPress={() => router.push("/(tabs)/profile/edit")}>
             <View style={styles.profileImageContainer}>
-              {profileImage ? (
+              {profileImage && normalizeImageUri(profileImage) ? (
                 <Image
-                  source={{ uri: profileImage }}
+                  source={{ uri: normalizeImageUri(profileImage)! }}
                   style={styles.profileImage}
                 />
               ) : user?.imageUrl ? (
@@ -419,8 +494,15 @@ export const AppHeader = ({
           {rightActions}
 
           {showNotifications && (
-            <TouchableOpacity onPress={() => router.push("/notifications")}>
+            <TouchableOpacity onPress={() => router.push("/notifications")} style={{ position: 'relative', padding: 4 }}>
               <Ionicons name="notifications-outline" size={24} color={theme.colors.icon} />
+              {unreadCount > 0 && (
+                <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+                  <Text style={styles.unreadBadgeText} numberOfLines={1}>
+                    {unreadCount > 9 ? '9+' : String(unreadCount)}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 
@@ -448,7 +530,14 @@ export const AppHeader = ({
             onPress={hideSideMenu}
           />
 
-          <Animated.View style={[styles.sideMenu, { opacity: fadeAnim, backgroundColor: theme.colors.surface }]}>
+          <Animated.View style={[
+            styles.sideMenu, 
+            { 
+              opacity: fadeAnim, 
+              backgroundColor: theme.colors.surface,
+              paddingTop: Math.max(insets.top, 20) // Use safe area top with minimum 20px
+            }
+          ]}>
             {/* FIXED: Added avatar with initials to side menu header */}
             <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View
@@ -457,9 +546,9 @@ export const AppHeader = ({
                   { borderWidth: 2, borderColor: "red" },
                 ]}
               >
-                {profileImage ? (
+                {profileImage && normalizeImageUri(profileImage) ? (
                   <Image
-                    source={{ uri: profileImage }}
+                    source={{ uri: normalizeImageUri(profileImage)! }}
                     style={styles.profileAvatarImage}
                   />
                 ) : user?.imageUrl ? (
@@ -475,7 +564,10 @@ export const AppHeader = ({
               <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
             </View>
 
-            <ScrollView style={styles.sideMenuContent}>
+            <ScrollView 
+              style={styles.sideMenuContent}
+              contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 20, 40) }}
+            >
               {sideMenuItems.map((item, index) => (
                 <TouchableOpacity
                   key={index}
@@ -514,7 +606,7 @@ export const AppHeader = ({
           </Animated.View>
         </Animated.View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -525,7 +617,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    marginBottom: 8,
     height: 56,
     // backgroundColor removed - now uses theme.colors.surface
   },
@@ -591,6 +682,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "#FF6B6B",
   },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   fullScreenOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -598,7 +705,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   sideMenu: {
-    paddingTop: 40,
+    // paddingTop removed - now dynamic based on safe area
     width: width * 0.75,
     // backgroundColor removed - now uses theme.colors.surface
     height: "100%",

@@ -14,13 +14,15 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSignIn } from "@clerk/clerk-expo";
+import { useSignIn, useUser } from "@clerk/clerk-expo";
+import activityApi from "../../utils/activityApi";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 import { useTheme } from "../../contexts/ThemeContext";
 
 export default function LoginScreen() {
   const { theme } = useTheme();
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { user } = useUser();
 
   // Form state management
   const [email, setEmail] = useState("");
@@ -29,23 +31,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
-
-  // Function to update login timestamp
-  const updateLoginTimestamp = async (clerkUserId: string) => {
-    try {
-      await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      console.log('Login timestamp updated successfully');
-    } catch (error) {
-      console.error('Failed to update login timestamp:', error);
-      // Don't throw error - continue with login even if timestamp update fails
-    }
-  };
+  // No direct base URL; delegate to activityApi
 
   const handleSignIn = async () => {
     if (!isLoaded) {
@@ -66,9 +52,14 @@ export default function LoginScreen() {
         await setActive({ session: signInAttempt.createdSessionId });
         
         // Update login timestamp after successful login
-        const clerkUserId = signInAttempt.createdSessionId;
+        let clerkUserId = (signInAttempt as any).createdUserId || (signInAttempt as any).userId || user?.id;
+        if (!clerkUserId) {
+          // Give Clerk hooks a tick to update after setActive
+          await new Promise((r) => setTimeout(r, 300));
+          clerkUserId = user?.id;
+        }
         if (clerkUserId) {
-          await updateLoginTimestamp(clerkUserId);
+          try { await activityApi.recordLogin(clerkUserId); } catch (_e) { /* ignore */ }
         }
         
         router.replace("/(app)/(tabs)/home");

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -21,7 +21,9 @@ import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { moodApi, MoodEntry, MoodFilters } from "../../../utils/moodApi";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
+import StatusModal from "../../../components/StatusModal";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -40,7 +42,7 @@ const moodTypes = [
 ];
 
 export default function MoodHistoryScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const [allFactors, setAllFactors] = useState<string[]>([]);
@@ -48,10 +50,13 @@ export default function MoodHistoryScreen() {
   const [activeTab, setActiveTab] = useState("mood");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
   const [selectedMoodId, setSelectedMoodId] = useState<string>("");
-  const [modalMessage, setModalMessage] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
   
   // Filter states
   const [selectedMoodType, setSelectedMoodType] = useState<string>("");
@@ -68,6 +73,18 @@ export default function MoodHistoryScreen() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const LIMIT = 20;
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   // Load mood history with filters
   const loadMoodHistory = useCallback(async (reset: boolean = false) => {
@@ -132,8 +149,7 @@ export default function MoodHistoryScreen() {
       console.error("Failed to load mood history:", error);
       if (reset && moodHistory.length === 0) {
         // Only show alert on initial load if there's an error
-        setModalMessage("Unable to load mood history. Please try again.");
-        setShowErrorModal(true);
+        showStatusModal('error', 'Load Failed', 'Unable to load mood history. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -149,6 +165,7 @@ export default function MoodHistoryScreen() {
       setAllFactors(data.factors.map((f: any) => f.factor));
     } catch (error) {
       console.error("Error loading factors:", error);
+      showStatusModal('error', 'Load Failed', 'Unable to load mood factors. Please try again.');
     }
   }, [user?.id]);
 
@@ -212,6 +229,7 @@ export default function MoodHistoryScreen() {
       month: "short",
       day: "numeric",
       year: "numeric",
+      timeZone: APP_TIME_ZONE,
     });
   };
 
@@ -243,11 +261,9 @@ export default function MoodHistoryScreen() {
     try {
       await moodApi.deleteMood(selectedMoodId);
       setMoodHistory((prev) => prev.filter((m) => m.id !== selectedMoodId));
-      setModalMessage("Mood entry deleted successfully");
-      setShowSuccessModal(true);
+      showStatusModal('success', 'Success', 'Mood entry deleted successfully.');
     } catch (error) {
-      setModalMessage("Failed to delete mood entry");
-      setShowErrorModal(true);
+      showStatusModal('error', 'Delete Failed', 'Unable to delete mood entry. Please try again.');
     }
   };
 
@@ -265,6 +281,7 @@ export default function MoodHistoryScreen() {
               year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
+              timeZone: APP_TIME_ZONE,
             })}
           </Text>
         </View>
@@ -308,6 +325,9 @@ export default function MoodHistoryScreen() {
           <AppHeader title="Mood History" showBack={true} />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
+              Loading mood history...
+            </Text>
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -405,28 +425,28 @@ export default function MoodHistoryScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="sad-outline" size={48} color="#999" />
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyText, { color: theme.colors.text }]}>
                 {activeFiltersCount > 0 
                   ? "No mood entries found for the selected filters" 
                   : "No mood entries found"
                 }
               </Text>
               {activeFiltersCount > 0 && (
-                <Text style={styles.emptySubtext}>
+                <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
                   Try adjusting your filters or clear them to see all entries
                 </Text>
               )}
               <TouchableOpacity
-                style={styles.addButton}
+                style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
                 onPress={() => router.push("/(app)/mood-tracking")}
               >
-                <Text style={styles.addButtonText}>Log Your First Mood</Text>
+                <Text style={[styles.addButtonText, { color: theme.colors.surface }]}>Log Your First Mood</Text>
               </TouchableOpacity>
             </View>
           }
           ListFooterComponent={
             loading && offset > 0 ? (
-              <ActivityIndicator size="small" color="#4CAF50" style={{ marginVertical: 20 }} />
+              <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginVertical: 20 }} />
             ) : null
           }
         />
@@ -456,8 +476,11 @@ export default function MoodHistoryScreen() {
                       key={mood.value}
                       style={[
                         styles.moodTypeChip,
-                        selectedMoodType === mood.value &&
+                        { backgroundColor: theme.colors.surface },
+                        selectedMoodType === mood.value && [
                           styles.moodTypeChipActive,
+                          { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '08' }
+                        ],
                       ]}
                       onPress={() =>
                         setSelectedMoodType(
@@ -481,16 +504,22 @@ export default function MoodHistoryScreen() {
                           key={factor}
                           style={[
                             styles.factorFilterChip,
-                            selectedFactors.includes(factor) &&
+                            { backgroundColor: theme.colors.surface },
+                            selectedFactors.includes(factor) && [
                               styles.factorFilterChipActive,
+                              { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '08' }
+                            ],
                           ]}
                           onPress={() => toggleFactor(factor)}
                         >
                           <Text
                             style={[
                               styles.factorFilterText,
-                              selectedFactors.includes(factor) &&
+                              { color: theme.colors.textSecondary },
+                              selectedFactors.includes(factor) && [
                                 styles.factorFilterTextActive,
+                                { color: theme.colors.primary }
+                              ],
                             ]}
                           >
                             {factor}
@@ -508,7 +537,7 @@ export default function MoodHistoryScreen() {
                 <View style={styles.dateInputContainer}>
                   <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>From:</Text>
                   <TouchableOpacity
-                    style={styles.dateButton}
+                    style={[styles.dateButton, { backgroundColor: theme.colors.primary + '20' }]}
                     onPress={() => setShowStartDatePicker(true)}
                   >
                     <Text style={[styles.dateButtonText, { color: theme.colors.text }]}>
@@ -528,7 +557,7 @@ export default function MoodHistoryScreen() {
                   <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>To:</Text>
                   <Text style={[styles.dateHint, { color: theme.colors.textSecondary }]}>(Leave empty for single day)</Text>
                   <TouchableOpacity
-                    style={styles.dateButton}
+                    style={[styles.dateButton, { backgroundColor: theme.colors.primary + '20' }]}
                     onPress={() => setShowEndDatePicker(true)}
                   >
                     <Text style={[styles.dateButtonText, { color: theme.colors.text }]}>
@@ -568,7 +597,7 @@ export default function MoodHistoryScreen() {
 
               <View style={[styles.modalActions, { borderTopColor: theme.colors.borderLight }]}>
                 <TouchableOpacity
-                  style={styles.clearButton}
+                  style={[styles.clearButton, { backgroundColor: theme.colors.borderLight }]}
                   onPress={clearFilters}
                 >
                   <Text style={[styles.clearButtonText, { color: theme.colors.textSecondary }]}>Clear All</Text>
@@ -577,7 +606,7 @@ export default function MoodHistoryScreen() {
                   style={[styles.applyButton, { backgroundColor: theme.colors.primary }]}
                   onPress={applyFilters}
                 >
-                  <Text style={styles.applyButtonText}>Apply Filters</Text>
+                  <Text style={[styles.applyButtonText, { color: theme.colors.surface }]}>Apply Filters</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -620,59 +649,15 @@ export default function MoodHistoryScreen() {
           </View>
         </Modal>
 
-        {/* Success Modal */}
-        <Modal
-          visible={showSuccessModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowSuccessModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
-              <View style={styles.successIcon}>
-                <Ionicons name="checkmark-circle" size={64} color={theme.colors.primary} />
-              </View>
-              <Text style={[styles.successTitle, { color: theme.colors.text }]}>Success!</Text>
-              <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>
-                {modalMessage}
-              </Text>
-              <TouchableOpacity
-                style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => setShowSuccessModal(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.successButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Error Modal */}
-        <Modal
-          visible={showErrorModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowErrorModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
-              <View style={styles.successIcon}>
-                <Ionicons name="close-circle" size={64} color="#F44336" />
-              </View>
-              <Text style={[styles.successTitle, { color: theme.colors.text }]}>Error</Text>
-              <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>
-                {modalMessage}
-              </Text>
-              <TouchableOpacity
-                style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => setShowErrorModal(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.successButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+        {/* Status Modal for error handling */}
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
 
         <BottomNavigation
           tabs={tabs}
@@ -684,7 +669,8 @@ export default function MoodHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -693,6 +679,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    fontSize: scaledFontSize(14), // Base size 14px
+    marginTop: 12,
   },
   searchBar: {
     flexDirection: "row",
@@ -711,7 +701,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 40,
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
   filterButton: {
     width: 48,
@@ -734,7 +724,7 @@ const styles = StyleSheet.create({
   },
   filterBadgeText: {
     color: "#FFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12), // Base size 12px
     fontWeight: "600",
   },
   activeFiltersContainer: {
@@ -753,7 +743,7 @@ const styles = StyleSheet.create({
   },
   activeFilterText: {
     color: "#2E7D32",
-    fontSize: 13,
+    fontSize: scaledFontSize(13), // Base size 13px
     fontWeight: "500",
   },
   listContent: {
@@ -775,18 +765,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   entryEmoji: {
-    fontSize: 32,
+    fontSize: scaledFontSize(32), // Base size 32px
     marginRight: 12,
   },
   entryDetails: {
     flex: 1,
   },
   entryMood: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
   },
   entryDate: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13), // Base size 13px
     marginTop: 2,
   },
   entryActions: {
@@ -794,7 +784,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   entryIntensity: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     fontWeight: "500",
   },
   factorsContainer: {
@@ -811,11 +801,11 @@ const styles = StyleSheet.create({
   },
   factorText: {
     color: "#2E7D32",
-    fontSize: 12,
+    fontSize: scaledFontSize(12), // Base size 12px
     fontWeight: "500",
   },
   entryNotes: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     lineHeight: 20,
   },
   emptyContainer: {
@@ -826,13 +816,13 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     marginTop: 16,
     marginBottom: 8,
     textAlign: "center",
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: 24,
     textAlign: "center",
   },
@@ -844,9 +834,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   addButtonText: {
-    color: "#FFF",
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
   modalOverlay: {
     flex: 1,
@@ -856,7 +845,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   filterModal: {
-    backgroundColor: "#FFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "80%",
@@ -867,20 +855,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
-    color: "#333",
   },
   modalContent: {
     padding: 20,
   },
   filterLabel: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
-    color: "#333",
     marginBottom: 12,
     marginTop: 12,
   },
@@ -900,15 +885,13 @@ const styles = StyleSheet.create({
   },
   moodTypeChipActive: {
     borderColor: "#4CAF50",
-    backgroundColor: "#E8F5E9",
   },
   moodTypeEmoji: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24), // Base size 24px
     marginBottom: 4,
   },
   moodTypeLabel: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: scaledFontSize(12), // Base size 12px
   },
   factorsGrid: {
     flexDirection: "row",
@@ -917,7 +900,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   factorFilterChip: {
-    backgroundColor: "#F5F5F5",
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -925,15 +907,12 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
   },
   factorFilterChipActive: {
-    backgroundColor: "#E8F5E9",
     borderColor: "#4CAF50",
   },
   factorFilterText: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: scaledFontSize(14), // Base size 14px
   },
   factorFilterTextActive: {
-    color: "#2E7D32",
     fontWeight: "500",
   },
   dateInputContainer: {
@@ -943,8 +922,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dateLabel: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: scaledFontSize(14), // Base size 14px
     width: 50,
   },
   dateButton: {
@@ -952,19 +930,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
   dateButtonText: {
-    fontSize: 14,
-    color: "#333",
+    fontSize: scaledFontSize(14), // Base size 14px
   },
   dateHint: {
-    fontSize: 12,
-    color: "#999",
+    fontSize: scaledFontSize(12), // Base size 12px
     fontStyle: 'italic',
     marginLeft: 8,
   },
@@ -973,7 +948,6 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
     borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
   },
   clearButton: {
     flex: 1,
@@ -984,21 +958,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   clearButtonText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
-    color: "#666",
   },
   applyButton: {
     flex: 1,
     padding: 16,
     borderRadius: 12,
-    backgroundColor: "#4CAF50",
     alignItems: "center",
   },
   applyButtonText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
-    color: "#FFF",
   },
   // Success/Error Modal Styles
   successModal: {
@@ -1017,13 +988,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   successTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
     marginBottom: 12,
     textAlign: "center",
   },
   successMessage: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 22,
@@ -1036,9 +1007,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   successButtonText: {
-    color: "#FFF",
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
   modalButtonRow: {
     flexDirection: "row",
@@ -1054,6 +1024,6 @@ const styles = StyleSheet.create({
   },
   modalButtonText: {
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
 });

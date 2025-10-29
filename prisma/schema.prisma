@@ -168,6 +168,8 @@ model User {
   gender                   String?
   profile_image_url        String?
   last_active_at           DateTime?
+  last_login_at            DateTime?
+  last_logout_at           DateTime?
   address                  String?
   city                     String?
   state                    String?

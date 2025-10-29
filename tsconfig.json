@@ -6,7 +6,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-        "jsx": "react-native"
-
+    "esModuleInterop": true,
+    "skipLibCheck": true
   }
 }

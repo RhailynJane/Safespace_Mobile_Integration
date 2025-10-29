@@ -10,7 +10,6 @@ import {
   Platform,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { useSignUp } from "@clerk/clerk-expo";
@@ -19,6 +18,7 @@ import PersonalInfoStep from "../../components/PersonalInfoStep";
 import PasswordStep from "../../components/PasswordStep";
 import EmailVerificationStep from "../../components/EmailVerificationStep";
 import SuccessStep from "../../components/SuccessStep";
+import StatusModal from "../../components/StatusModal";
 import { CaptchaHandler } from "../../utils/captcha-handler";
 import { apiService } from "../../utils/api";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -57,6 +57,20 @@ export default function SignupScreen() {
     verificationCode: "",
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Show modal helper
+  const showErrorModal = (title: string, message: string) => {
+    setModalConfig({ type: 'error', title, message });
+    setShowModal(true);
+  };
 
   // Wait for CAPTCHA to be ready (shorter timeout for mobile)
   useEffect(() => {
@@ -110,19 +124,12 @@ export default function SignupScreen() {
 
     // Check if user is 18 or older
     if (age < 18) {
-      Alert.alert(
+      showErrorModal(
         "Age Requirement",
-        "You must be 18 years or older to use SafeSpace. If you're under 18 and need support, please reach out to a trusted adult, school counselor, or contact Kids Help Phone at 1-800-668-6868 (available 24/7) or text CONNECT to 686868.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Reset age field
-              updateSignupData({ age: "" });
-            },
-          },
-        ]
+        "You must be 18 years or older to use SafeSpace. If you're under 18 and need support, please reach out to a trusted adult, school counselor, or contact Kids Help Phone at 1-800-668-6868 (available 24/7) or text CONNECT to 686868."
       );
+      // Reset age field
+      updateSignupData({ age: "" });
       return;
     }
 
@@ -188,14 +195,32 @@ export default function SignupScreen() {
     } catch (err: any) {
       console.error("Sign up error:", err);
 
+      // Check for specific Clerk errors
+      if (err.errors && err.errors.length > 0) {
+        const clerkError = err.errors[0];
+        console.error("Clerk error details:", err.errors);
+        
+        // Handle password pwned error
+        if (clerkError.code === "form_password_pwned") {
+          showErrorModal(
+            "Weak Password",
+            "This password has been found in an online data breach. For your account safety, please use a different, more secure password."
+          );
+          return;
+        }
+        
+        // Handle other Clerk errors
+        if (clerkError.message) {
+          setErrorMessage(clerkError.message);
+          showErrorModal("Error", clerkError.message);
+          return;
+        }
+      }
+
       // Use the improved CAPTCHA error handler
       const errorMessage = CaptchaHandler.handleCaptchaError(err);
       setErrorMessage(errorMessage);
-
-      // Log detailed error for debugging
-      if (err.errors) {
-        console.error("Clerk error details:", err.errors);
-      }
+      showErrorModal("Error", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -296,7 +321,7 @@ export default function SignupScreen() {
 
     try {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      Alert.alert(
+      showErrorModal(
         "Code Sent",
         "A new verification code has been sent to your email."
       );
@@ -472,6 +497,15 @@ export default function SignupScreen() {
           {renderCurrentStep()}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Status Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setShowModal(false)}
+      />
     </SafeAreaView>
   );
 }

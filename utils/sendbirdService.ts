@@ -1,21 +1,6 @@
 // utils/sendbirdService.ts
-import { Platform } from "react-native";
-
-const getApiBaseUrl = (): string => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:3001";
-  } else if (Platform.OS === "ios") {
-    return "http://localhost:3001";
-  } else if (Platform.OS === "web") {
-    return "http://localhost:3001";
-  }
-
-  return "http://localhost:3001";
-};
+import activityApi from "./activityApi";
+import { getApiBaseUrl } from './apiBaseUrl';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -47,6 +32,7 @@ export interface Participant {
   email: string;
   profile_image_url?: string;
   online: boolean;
+  presence?: 'online' | 'away' | 'offline';
   last_active_at: string | null;
 }
 
@@ -69,6 +55,7 @@ export interface Contact {
   role: string;
   online: boolean;
   has_existing_conversation: boolean;
+  last_active_at?: string | null;
   city?: string;
   state?: string;
 }
@@ -144,12 +131,17 @@ class SendBirdService {
     profile_url?: string;
   }): Promise<{ success: boolean; data?: any }> {
     try {
+      // Ensure profile_url is always provided to avoid 400105
+      const safeProfileUrl =
+        userData.profile_url ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.nickname || userData.user_id)}&background=666&color=fff&size=60`;
+
       const result = await this.sendbirdApiRequest("/users", {
         method: "POST",
         body: JSON.stringify({
           user_id: userData.user_id,
           nickname: userData.nickname,
-          profile_url: userData.profile_url,
+          profile_url: safeProfileUrl,
           issue_access_token: true,
         }),
       });
@@ -319,6 +311,7 @@ class MessagingService {
         await this.sendbirdService.createOrUpdateUser({
           user_id: userId,
           nickname: `User ${userId}`, // You can customize this
+          profile_url: profileUrl,
         });
       }
 
@@ -495,36 +488,9 @@ class MessagingService {
       title?: string;
     }
   ): Promise<{ success: boolean; data: any }> {
-    if (!this.sendbirdInitialized) {
-      return this.createConversationInBackend(userId, data);
-    }
-
-    try {
-      // Include current user in participants
-      const allUserIds = [userId, ...data.participantIds];
-
-      const result = await this.sendbirdService.createGroupChannel(
-        allUserIds,
-        data.title,
-        data.conversationType === "direct"
-      );
-
-      if (result.success && result.data) {
-        return {
-          success: true,
-          data: {
-            id: result.data.channel_url,
-            channel_url: result.data.channel_url,
-            title: result.data.name,
-          },
-        };
-      }
-
-      throw new Error("Failed to create conversation via SendBird");
-    } catch (error) {
-      console.log("Create conversation via SendBird failed, using backend");
-      return this.createConversationInBackend(userId, data);
-    }
+    // Always use backend for conversation creation to ensure we get a database ID
+    // that works with all our endpoints. SendBird integration is optional.
+    return this.createConversationInBackend(userId, data);
   }
 
   // Backend fallback methods
@@ -533,7 +499,7 @@ class MessagingService {
   ): Promise<{ success: boolean; data: Conversation[] }> {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${userId}`
+        `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
       );
 
       if (!response.ok) throw new Error("Backend request failed");
@@ -546,7 +512,7 @@ class MessagingService {
     }
   }
 
-private async getMessagesFromBackend(
+  private async getMessagesFromBackend(
   conversationId: string,
   userId: string,
   page = 1
@@ -635,6 +601,7 @@ private async getMessagesFromBackend(
     }
   ): Promise<{ success: boolean; data: any }> {
     try {
+      console.log("💬 [Backend] Creating conversation:", { userId, participantIds: data.participantIds, title: data.title });
       const response = await fetch(
         `${API_BASE_URL}/api/messages/conversations`,
         {
@@ -649,12 +616,19 @@ private async getMessagesFromBackend(
         }
       );
 
-      if (!response.ok) throw new Error("Backend request failed");
+      console.log("💬 [Backend] Create conversation response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("💬 [Backend] Create conversation failed:", response.status, errorText);
+        throw new Error(`Backend request failed: ${response.status} ${errorText}`);
+      }
 
       const result = await response.json();
+      console.log("💬 [Backend] Create conversation result:", result);
       return { success: true, data: result.data };
     } catch (error) {
-      console.log("Backend fallback failed for createConversation");
+      console.error("💬 [Backend] Create conversation error:", error);
       return {
         success: true,
         data: { id: `conv_${Date.now()}`, channel_url: `conv_${Date.now()}` },

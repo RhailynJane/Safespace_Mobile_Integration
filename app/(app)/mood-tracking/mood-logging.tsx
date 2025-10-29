@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { moodApi } from "../../../utils/moodApi";
 import { useTheme } from "../../../contexts/ThemeContext";
+import StatusModal from "../../../components/StatusModal";
 
 const { width } = Dimensions.get("window");
 
@@ -66,7 +67,7 @@ const tabs = [
 ];
 
 export default function MoodLoggingScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
 
@@ -82,9 +83,25 @@ export default function MoodLoggingScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("mood");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   // Handle intensity slider value change
   const handleIntensityChange = (value: number) => {
@@ -122,8 +139,7 @@ export default function MoodLoggingScreen() {
   // Handle form submission with API call
   const handleSubmit = async () => {
     if (!user?.id) {
-      setErrorMessage("User not authenticated");
-      setShowErrorModal(true);
+      showStatusModal('error', 'Authentication Error', 'Please sign in to log your mood.');
       return;
     }
 
@@ -148,8 +164,7 @@ export default function MoodLoggingScreen() {
       
       setShowSuccessModal(true);
     } catch (error: any) {
-      setErrorMessage(error.message || "Failed to log mood. Please try again.");
-      setShowErrorModal(true);
+      showStatusModal('error', 'Log Failed', error.message || "Unable to log mood. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -171,9 +186,9 @@ export default function MoodLoggingScreen() {
           <Text style={[styles.successTitle, { color: theme.colors.text }]}>Success!</Text>
           <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>{successMessage}</Text>
           {moodData.shareWithSupportWorker && (
-            <View style={styles.sharedInfo}>
+            <View style={[styles.sharedInfo, { backgroundColor: theme.colors.primary + '20' }]}>
               <Ionicons name="people" size={20} color={theme.colors.primary} />
-              <Text style={styles.sharedInfoText}>
+              <Text style={[styles.sharedInfoText, { color: theme.colors.primary }]}>
                 Your support worker has been notified
               </Text>
             </View>
@@ -183,34 +198,7 @@ export default function MoodLoggingScreen() {
             onPress={handleSuccessClose}
             activeOpacity={0.8}
           >
-            <Text style={styles.successButtonText}>View Mood History</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  // Render error modal
-  const renderErrorModal = () => (
-    <Modal
-      visible={showErrorModal}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setShowErrorModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.successModal, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.successIcon}>
-            <Ionicons name="close-circle" size={64} color="#F44336" />
-          </View>
-          <Text style={[styles.successTitle, { color: theme.colors.text }]}>Error</Text>
-          <Text style={[styles.successMessage, { color: theme.colors.textSecondary }]}>{errorMessage}</Text>
-          <TouchableOpacity
-            style={[styles.successButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => setShowErrorModal(false)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.successButtonText}>Close</Text>
+            <Text style={[styles.successButtonText, { color: theme.colors.surface }]}>View Mood History</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -367,9 +355,9 @@ export default function MoodLoggingScreen() {
               />
             </View>
             {moodData.shareWithSupportWorker && (
-              <View style={styles.shareNotice}>
+              <View style={[styles.shareNotice, { backgroundColor: theme.colors.primary + '20' }]}>
                 <Ionicons name="information-circle" size={16} color={theme.colors.primary} />
-                <Text style={styles.shareNoticeText}>
+                <Text style={[styles.shareNoticeText, { color: theme.colors.primary }]}>
                   Your support worker will be notified about this mood entry
                 </Text>
               </View>
@@ -404,9 +392,16 @@ export default function MoodLoggingScreen() {
 
         {/* Success Modal */}
         {renderSuccessModal()}
-        
-        {/* Error Modal */}
-        {renderErrorModal()}
+
+        {/* Status Modal for error handling */}
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
 
         {/* Bottom navigation bar */}
         <BottomNavigation
@@ -419,7 +414,8 @@ export default function MoodLoggingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -441,11 +437,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   moodEmoji: {
-    fontSize: 72,
+    fontSize: scaledFontSize(72), // Base size 72px
     marginBottom: 12,
   },
   moodLabel: {
-    fontSize: 22,
+    fontSize: scaledFontSize(22), // Base size 22px
     fontWeight: "600",
   },
   section: {
@@ -458,12 +454,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
     marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13), // Base size 13px
     marginBottom: 12,
   },
   sliderContainer: {
@@ -473,7 +469,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sliderLabel: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     fontWeight: "500",
   },
   slider: {
@@ -484,7 +480,7 @@ const styles = StyleSheet.create({
   intensityValue: {
     textAlign: "center",
     marginTop: 8,
-    fontSize: 15,
+    fontSize: scaledFontSize(15), // Base size 15px
     fontWeight: "600",
   },
   factorsContainer: {
@@ -498,11 +494,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
   },
-  selectedFactorButton: {
-    // Removed - using inline styles
-  },
   factorText: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13), // Base size 13px
     fontWeight: "500",
   },
   selectedFactorText: {
@@ -516,7 +509,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   charCounter: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13), // Base size 13px
     fontWeight: "500",
   },
   charCounterMax: {
@@ -529,7 +522,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     textAlignVertical: "top",
-    fontSize: 15,
+    fontSize: scaledFontSize(15), // Base size 15px
   },
   shareContainer: {
     flexDirection: "row",
@@ -541,7 +534,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   shareSubtext: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13), // Base size 13px
     marginTop: 4,
   },
   shareNotice: {
@@ -549,14 +542,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 12,
     padding: 12,
-    backgroundColor: "#E8F5E9",
     borderRadius: 8,
     gap: 8,
   },
   shareNoticeText: {
     flex: 1,
-    fontSize: 13,
-    color: "#2E7D32",
+    fontSize: scaledFontSize(13), // Base size 13px
   },
   submitButton: {
     borderRadius: 12,
@@ -580,7 +571,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: "#FFF",
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
   // Success Modal Styles
   modalOverlay: {
@@ -606,13 +597,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   successTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
     marginBottom: 12,
     textAlign: "center",
   },
   successMessage: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
     marginBottom: 16,
     lineHeight: 22,
@@ -620,15 +611,13 @@ const styles = StyleSheet.create({
   sharedInfo: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#E8F5E9",
     borderRadius: 12,
     padding: 12,
     marginBottom: 20,
     alignSelf: "stretch",
   },
   sharedInfoText: {
-    fontSize: 14,
-    color: "#2E7D32",
+    fontSize: scaledFontSize(14), // Base size 14px
     marginLeft: 8,
     flex: 1,
   },
@@ -640,8 +629,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   successButtonText: {
-    color: "#FFF",
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
 });

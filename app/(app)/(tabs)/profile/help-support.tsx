@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // app/(app)/help-support.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,6 +10,7 @@ import {
   Linking,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -22,14 +24,21 @@ import {
   HelpItem,
 } from "../../../../utils/helpService";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
 
 const HelpSupportScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [helpSections, setHelpSections] = useState<HelpSection[]>([]);
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -38,6 +47,9 @@ const HelpSupportScreen: React.FC = () => {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Load help data on component mount
   useEffect(() => {
@@ -51,9 +63,19 @@ const HelpSupportScreen: React.FC = () => {
       setHelpSections(data);
     } catch (error) {
       console.error("Failed to load help data:", error);
+      showModal('error', 'Load Failed', 'Unable to load help content. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideModal = () => {
+    setModalVisible(false);
   };
 
   const onRefresh = async () => {
@@ -72,16 +94,31 @@ const HelpSupportScreen: React.FC = () => {
   };
 
   const toggleSection = async (sectionId: string) => {
-    // Track section view when expanded
-    if (!expandedSections.includes(sectionId)) {
-      await trackHelpSectionView(sectionId);
-    }
+    try {
+      // Track section view when expanded
+      if (!expandedSections.includes(sectionId)) {
+        await trackHelpSectionView(sectionId);
+      }
 
-    setExpandedSections((prev) =>
-      prev.includes(sectionId)
-        ? prev.filter((id) => id !== sectionId)
-        : [...prev, sectionId]
-    );
+      setExpandedSections((prev) =>
+        prev.includes(sectionId)
+          ? prev.filter((id) => id !== sectionId)
+          : [...prev, sectionId]
+      );
+    } catch (error) {
+      console.error("Failed to track section view:", error);
+      showModal('error', 'Tracking Error', 'Unable to track your selection.');
+    }
+  };
+
+  const handleEmailSupport = () => {
+    try {
+      Linking.openURL("mailto:safespace.dev.app@gmail.com");
+      showModal('success', 'Email Opened', 'Your email app should open shortly. If not, please email safespace.dev.app@gmail.com');
+    } catch (error) {
+      console.error("Failed to open email:", error);
+      showModal('error', 'Email Error', 'Unable to open email app. Please try again or email us directly at safespace.dev.app@gmail.com');
+    }
   };
 
   const renderHelpItem = (item: HelpItem, index: number) => (
@@ -184,9 +221,7 @@ const HelpSupportScreen: React.FC = () => {
             </Text>
             <TouchableOpacity
               style={[styles.contactButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() =>
-                Linking.openURL("mailto:safespace.dev.app@gmail.com")
-              }
+              onPress={handleEmailSupport}
             >
               <Text style={styles.contactButtonText}>📧 Email Support</Text>
             </TouchableOpacity>
@@ -198,12 +233,22 @@ const HelpSupportScreen: React.FC = () => {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideModal}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 };
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -211,13 +256,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   screenTitle: {
-    fontSize: 22,
+    fontSize: scaledFontSize(22), // Base size 22px
     fontWeight: "700",
     marginBottom: 8,
     textAlign: "center",
   },
   screenSubtitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 24,
@@ -237,12 +282,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18), // Base size 18px
     fontWeight: "600",
     flex: 1,
   },
   expandIcon: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
     width: 24,
     textAlign: "center",
@@ -256,12 +301,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   helpItemTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
     marginBottom: 8,
   },
   helpItemContent: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     lineHeight: 20,
   },
   footerSection: {
@@ -270,7 +315,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   footerText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
     marginBottom: 16,
     lineHeight: 24,
@@ -285,7 +330,7 @@ const styles = StyleSheet.create({
   contactButtonText: {
     color: "white",
     fontWeight: "600",
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
   },
   loadingContainer: {
@@ -296,7 +341,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
   },
 });

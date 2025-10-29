@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { AppHeader } from "../../../../../components/AppHeader";
 import Svg, { Path } from 'react-native-svg';
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { useTheme } from "../../../../../contexts/ThemeContext";
+import StatusModal from "../../../../../components/StatusModal";
 
 const CATEGORIES = [
   "Self Care",
@@ -58,9 +59,17 @@ const getCategoryIcon = (category: string) => {
 };
 
 export default function SelectCategoryScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
+  
+  // Modal state
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("");
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   const handleContinue = () => {
     if (selectedCategory) {
@@ -68,7 +77,15 @@ export default function SelectCategoryScreen() {
         pathname: "/community-forum/create/content",
         params: { category: selectedCategory },
       });
+    } else {
+      showError("Selection Required", "Please select a category to continue");
     }
+  };
+
+  const showError = (title: string, message: string) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setShowErrorModal(true);
   };
 
   const tabs = [
@@ -87,7 +104,6 @@ export default function SelectCategoryScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
-
 
   return (
     <CurvedBackground>
@@ -153,17 +169,28 @@ export default function SelectCategoryScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        {/* Error Modal */}
+        <StatusModal
+          visible={showErrorModal}
+          type="error"
+          title={errorTitle}
+          message={errorMessage}
+          onClose={() => setShowErrorModal(false)}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 }
 
-const styles = StyleSheet.create({
+// Dynamic styles with text size scaling
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
   },
-   communityPostButton: {
+  communityPostButton: {
     backgroundColor: "#EDE7EC",
     paddingHorizontal: 40,
     paddingVertical: 8,
@@ -173,7 +200,7 @@ const styles = StyleSheet.create({
   },
   communityPostButtonText: {
     color: "#000",
-    fontSize: 11,
+    fontSize: scaledFontSize(11),
     fontWeight: "600",
   },
   titleSection: {
@@ -182,7 +209,7 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   mainTitle: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24),
     fontWeight: "800",
     // color moved to theme.colors.text via inline override
     justifyContent: "center",
@@ -197,7 +224,7 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "500",
     color: "#000",
   },
@@ -207,16 +234,16 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   subtitle: {
-  fontSize: 16,
-  fontWeight: "300",
-  // color moved to theme.colors.text via inline override
-  marginTop: 10,
-  marginBottom: 24,
-  textAlign: "center",
-  paddingHorizontal: 20,
-},
+    fontSize: scaledFontSize(16),
+    fontWeight: "300",
+    // color moved to theme.colors.text via inline override
+    marginTop: 10,
+    marginBottom: 24,
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
   title: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#212121",
     marginBottom: 24,
@@ -230,9 +257,9 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   iconImage: {
-  width: 87,
-  height: 87,
-  marginBottom: 8,
+    width: 87,
+    height: 87,
+    marginBottom: 8,
   },
   categoryCard: {
     width: 100,
@@ -276,7 +303,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     // color moved to theme.colors.textSecondary via inline override
     textAlign: "center",
     fontWeight: "500",
@@ -314,9 +341,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     color: "#000",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "800",
   },
 });
-
- 

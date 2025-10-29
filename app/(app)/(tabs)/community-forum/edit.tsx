@@ -37,7 +37,7 @@
  * Reference: chat.deepseek.com
  */
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -46,7 +46,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
@@ -57,6 +56,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
 
 // Available categories for post organization and filtering
 const CATEGORIES = [
@@ -78,7 +78,7 @@ const CATEGORIES = [
  * with support for draft management and publishing workflows
  */
 export default function EditPostScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // Extract post data from navigation parameters
   const {
     id,
@@ -98,7 +98,48 @@ export default function EditPostScreen() {
   const [isPublishing, setIsPublishing] = useState(false); // Publish loading state
   const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
 
+  // Modal states
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [errorTitle, setErrorTitle] = useState("Error");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
+
   const postId = parseInt(id as string); // Convert post ID to number
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  /**
+   * Show error modal with custom title and message
+   */
+  const showError = (title: string, message: string) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
+
+  /**
+   * Show success modal with custom message
+   */
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccessModal(true);
+  };
+
+  /**
+   * Show confirmation modal for destructive actions
+   */
+  const showConfirmation = (title: string, message: string, callback: () => void) => {
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmCallback(() => callback);
+    setShowConfirmModal(true);
+  };
 
   /**
    * Handle post save operation
@@ -109,13 +150,13 @@ export default function EditPostScreen() {
   const handleSave = async (publish: boolean = false) => {
     // Validate required fields
     if (!title.trim() || !content.trim()) {
-      Alert.alert("Error", "Please fill in both title and content");
+      showError("Missing Information", "Please fill in both title and content");
       return;
     }
 
     // Check user authentication
     if (!user?.id) {
-      Alert.alert("Error", "Please sign in to edit posts");
+      showError("Authentication Required", "Please sign in to edit posts");
       return;
     }
 
@@ -127,25 +168,23 @@ export default function EditPostScreen() {
         setIsSaving(true);
       }
 
-      // Update post via API
+      // Update post via API (ensure category is persisted too)
       await communityApi.updatePost(postId, {
         title: title.trim(),
         content: content.trim(),
+        category: (category || "Support").trim(),
         isDraft: !publish, // Set draft status based on publish flag
       });
 
       // Show success message based on action
       if (publish) {
-        Alert.alert("Success", "Post published successfully!");
+        showSuccess("Post published successfully! It's now visible to the community.");
       } else {
-        Alert.alert("Success", "Post updated successfully!");
+        showSuccess("Post updated successfully! Your changes have been saved.");
       }
-
-      // Navigate back to previous screen
-      router.back();
     } catch (error) {
       console.error("Error updating post:", error);
-      Alert.alert("Error", "Failed to update post");
+      showError("Update Failed", "Failed to update post. Please check your connection and try again.");
     } finally {
       // Reset loading states
       setIsSaving(false);
@@ -158,29 +197,22 @@ export default function EditPostScreen() {
    * Provides safety mechanism to prevent accidental deletion
    */
   const handleDelete = () => {
-    Alert.alert(
+    showConfirmation(
       "Delete Post",
       "Are you sure you want to delete this post? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            (async () => {
-              try {
-                await communityApi.deletePost(postId);
-                Alert.alert("Success", "Post deleted successfully!");
-                // Navigate to community forum after successful deletion
-                router.replace("/community-forum");
-              } catch (error) {
-                console.error("Error deleting post:", error);
-                Alert.alert("Error", "Failed to delete post");
-              }
-            })();
-          },
-        },
-      ]
+      async () => {
+        try {
+          await communityApi.deletePost(postId);
+          showSuccess("Post deleted successfully!");
+          // Navigate to community forum after successful deletion
+          setTimeout(() => {
+            router.replace("/community-forum");
+          }, 1500);
+        } catch (error) {
+          console.error("Error deleting post:", error);
+          showError("Delete Failed", "Failed to delete post. Please try again.");
+        }
+      }
     );
   };
 
@@ -291,7 +323,7 @@ export default function EditPostScreen() {
               style={[styles.deleteButton, { backgroundColor: theme.colors.surface }]}
               onPress={handleDelete}
             >
-              <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+              <Ionicons name="trash-outline" size={scaledFontSize(20)} color={theme.colors.error} />
               <Text style={[styles.deleteButtonText, { color: theme.colors.error }]}>Delete Post</Text>
             </TouchableOpacity>
             <Text style={[styles.deleteWarning, { color: theme.colors.error }]}>
@@ -313,7 +345,7 @@ export default function EditPostScreen() {
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
-              <Ionicons name="save-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="save-outline" size={scaledFontSize(20)} color="#FFFFFF" />
               <Text style={styles.buttonText}>Save as Draft</Text>
             </>
           )}
@@ -329,7 +361,7 @@ export default function EditPostScreen() {
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <>
-              <Ionicons name="send-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="send-outline" size={scaledFontSize(20)} color="#FFFFFF" />
               <Text style={styles.buttonText}>Publish</Text>
             </>
           )}
@@ -342,6 +374,47 @@ export default function EditPostScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
       />
+
+      {/* Success Modal */}
+      <StatusModal
+        visible={showSuccessModal}
+        type="success"
+        title="Success!"
+        message={successMessage}
+        onClose={() => {
+          setShowSuccessModal(false);
+          router.back();
+        }}
+        buttonText="Continue"
+      />
+
+      {/* Error Modal */}
+      <StatusModal
+        visible={showErrorModal}
+        type="error"
+        title={errorTitle}
+        message={errorMessage}
+        onClose={() => setShowErrorModal(false)}
+        buttonText="OK"
+      />
+
+      {/* Confirmation Modal */}
+      <StatusModal
+        visible={showConfirmModal}
+        type="info"
+        title={confirmTitle}
+        message={confirmMessage}
+        onClose={() => setShowConfirmModal(false)}
+        buttonText="Cancel"
+        secondaryButtonText="Delete"
+        onSecondaryButtonPress={() => {
+          setShowConfirmModal(false);
+          if (confirmCallback) {
+            confirmCallback();
+          }
+        }}
+        secondaryButtonType="destructive"
+      />
     </SafeAreaView>
   );
 }
@@ -351,7 +424,7 @@ export default function EditPostScreen() {
  * Organized by component sections with consistent theming
  * Uses responsive design patterns and accessibility considerations
  */
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -400,11 +473,11 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: "#C53030",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   deleteWarning: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#E53E3E",
     marginTop: 8,
     textAlign: "center",
@@ -412,7 +485,7 @@ const styles = StyleSheet.create({
   
   // Form Labels
   label: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#333",
     marginBottom: 8,
@@ -424,7 +497,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
     minHeight: 60,
@@ -441,7 +514,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     minHeight: 200,
     textAlignVertical: "top",
@@ -474,7 +547,7 @@ const styles = StyleSheet.create({
     borderColor: "#7CB9A9",
   },
   categoryText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
     fontWeight: "500",
   },
@@ -488,7 +561,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   characterCountText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#999",
   },
   
@@ -522,7 +595,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
 });

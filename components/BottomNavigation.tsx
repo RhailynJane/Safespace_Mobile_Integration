@@ -6,6 +6,7 @@
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface Tab {
   id: string;
@@ -25,9 +26,16 @@ export default function BottomNavigation({
   onTabPress,
 }: BottomNavigationProps) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   
   return (
-    <View style={[styles.bottomNav, { backgroundColor: theme.colors.surface }]}>
+    <View style={[
+      styles.bottomNav, 
+      { 
+        backgroundColor: theme.colors.surface,
+        paddingBottom: insets.bottom > 0 ? insets.bottom : 8 // Use safe area if exists, otherwise 8px
+      }
+    ]}>
       {tabs.map((tab) => (
         <TouchableOpacity
           key={tab.id}
@@ -57,19 +65,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 10,      
-    paddingBottom: 14,       // Extra bottom padding for safe area
+    paddingTop: 8,             // Reduced top padding
+    paddingVertical: 4,        // Minimal vertical padding
+    // paddingBottom removed - now dynamic based on safe area
     // backgroundColor removed - now uses theme.colors.surface
     position: "absolute",      // Fixed at bottom
     bottom: 0,
     left: 0,
     right: 0,
     borderTopLeftRadius: 40,   // Rounded top corners
-    borderTopRightRadius: 40, 
+    borderTopRightRadius: 40,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,              // Android shadow
   },
   navItem: {
     alignItems: "center",
-    padding: 14,               
+    padding: 8,                // Reduced padding from 14
   },
   navIconContainer: {
     width: 40,

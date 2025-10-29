@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../../contexts/ThemeContext";
+import StatusModal from "../../../../../components/StatusModal";
 
 /**
  * AppointmentDetail Component
@@ -35,7 +36,8 @@ import { useTheme } from "../../../../../contexts/ThemeContext";
  * Features modals for confirmation actions and elegant curved background.
  */
 export default function AppointmentList() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
+  
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,10 +47,19 @@ export default function AppointmentList() {
   const [rescheduleModalVisible, setRescheduleModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  
+  // StatusModal states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalType, setStatusModalType] = useState<'success' | 'error' | 'info'>('info');
+  const [statusModalTitle, setStatusModalTitle] = useState('');
+  const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Mock data for appointments
   const appointments = [
@@ -65,6 +76,16 @@ export default function AppointmentList() {
 
   // Find the appointment based on the ID from the URL
   const appointment = appointments.find((appt) => appt.id === Number(id));
+
+  /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
 
   /**
    * Enhanced logout function with Clerk integration
@@ -99,7 +120,7 @@ export default function AppointmentList() {
       
     } catch (error) {
       console.error("Logout error:", error);
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -136,12 +157,12 @@ export default function AppointmentList() {
             <TouchableOpacity onPress={() => router.back()}>
               <Ionicons name="arrow-back" size={28} color="#4CAF50" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Appointment Details</Text>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Appointment Details</Text>
             <View style={{ width: 28 }} />
           </View>
           <View style={styles.errorContainer}>
             <Ionicons name="warning" size={48} color="#FF6B6B" />
-            <Text style={styles.errorText}>Appointment not found</Text>
+            <Text style={[styles.errorText, { color: theme.colors.text }]}>Appointment not found</Text>
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -178,8 +199,8 @@ export default function AppointmentList() {
     setTimeout(() => {
       setLoading(false);
       setCancelModalVisible(false);
-      Alert.alert("Success", "Your appointment has been cancelled");
-      router.back();
+      showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
+      setTimeout(() => router.back(), 1500);
     }, 1500);
   };
 
@@ -189,10 +210,7 @@ export default function AppointmentList() {
    */
   const confirmReschedule = () => {
     if (!selectedTimeSlot) {
-      Alert.alert(
-        "Selection Required",
-        "Please select a time slot to reschedule your appointment."
-      );
+      showStatusModal('error', 'Selection Required', 'Please select a time slot to reschedule your appointment.');
       return;
     }
 
@@ -201,9 +219,9 @@ export default function AppointmentList() {
     setTimeout(() => {
       setLoading(false);
       setRescheduleModalVisible(false);
-      Alert.alert("Success", "Your appointment has been rescheduled");
+      showStatusModal('success', 'Appointment Rescheduled', 'Your appointment has been successfully rescheduled.');
       setSelectedTimeSlot(null);
-      router.back();
+      setTimeout(() => router.back(), 1500);
     }, 1500);
   };
 
@@ -627,6 +645,15 @@ export default function AppointmentList() {
           </View>
         </Modal>
 
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModalVisible}
+          type={statusModalType}
+          title={statusModalTitle}
+          message={statusModalMessage}
+          onClose={() => setStatusModalVisible(false)}
+        />
+
         {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
@@ -638,7 +665,7 @@ export default function AppointmentList() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -660,12 +687,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2E7D32",
   },
   title: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
@@ -692,13 +719,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#757575",
   },
   sideMenuContent: {
@@ -716,7 +743,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     marginLeft: 15,
   },
@@ -739,7 +766,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     color: "#FF6B6B",
     marginTop: 16,
   },
@@ -759,7 +786,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   supportWorkerName: {
-    fontSize: 17,
+    fontSize: scaledFontSize(17),
     fontWeight: "600",
     color: "#2c3e50",
     marginBottom: 10,
@@ -770,7 +797,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   detailText: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     color: "#666",
     marginLeft: 12,
   },
@@ -788,7 +815,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     marginLeft: 8,
   },
@@ -805,7 +832,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#4CAF50",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     marginLeft: 8,
   },
@@ -821,7 +848,7 @@ const styles = StyleSheet.create({
   },
   tertiaryButtonText: {
     color: "#F44336",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     marginLeft: 8,
   },
@@ -833,13 +860,13 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2c3e50",
     marginBottom: 12,
   },
   modalText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#666",
     marginBottom: 24,
     lineHeight: 24,
@@ -863,6 +890,7 @@ const styles = StyleSheet.create({
   },
   modalCancelButtonText: {
     color: "#666",
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
     textAlign: "center",
     justifyContent: "center",
@@ -873,6 +901,7 @@ const styles = StyleSheet.create({
   },
   modalConfirmButtonText: {
     color: "#FFFFFF",
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
     textAlign: "center",
     justifyContent: "center",
@@ -906,7 +935,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   rescheduleHint: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
     marginBottom: 12,
     textAlign: "center",
@@ -919,7 +948,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   timeSlotText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#2c3e50",
     fontWeight: "500",
   },

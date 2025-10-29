@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 // app/(app)/(tabs)/profile/edit.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   TextInput,
   Switch,
   Alert,
-  Image,
   ActivityIndicator,
   Modal,
   Platform,
@@ -25,9 +24,11 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import profileAPI, { ClientProfileData } from "../../../../utils/profileApi";
+import avatarEvents from "../../../../utils/avatarEvents";
 import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import OptimizedImage from "../../../../components/OptimizedImage";
 
 // Gender options for the form
 const GENDER_OPTIONS = [
@@ -109,7 +110,7 @@ const HEALTH_CONCERNS_OPTIONS = [
 ];
 
 export default function EditProfileScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [locationQuery, setLocationQuery] = useState("");
@@ -181,7 +182,6 @@ export default function EditProfileScreen() {
     location: "",
     // Emergency Contact
     emergencyContactName: "",
-    emergencyContactPhone: "",
     emergencyContactRelationship: "",
     emergencyContactNumber: "",
     // Settings
@@ -203,6 +203,9 @@ export default function EditProfileScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Load existing profile data when screen loads
   useEffect(() => {
@@ -355,9 +358,9 @@ export default function EditProfileScreen() {
               profileData.emergencyContactName ||
               prev.emergencyContactName ||
               "",
-            emergencyContactPhone:
+            emergencyContactNumber:
               profileData.emergencyContactPhone ||
-              prev.emergencyContactPhone ||
+              prev.emergencyContactNumber ||
               "",
             emergencyContactRelationship:
               profileData.emergencyContactRelationship ||
@@ -673,12 +676,17 @@ export default function EditProfileScreen() {
         const imageUri = result.assets[0].uri;
 
         try {
-          // Upload image to backend (now stored as base64 in database)
-          const base64ImageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
+          // Upload image to backend (returns URL, not base64)
+          const imageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
+          console.log('📸 Profile edit: Uploaded image URL:', imageUrl);
           
-          // Save to local storage for immediate display and offline access
-          await AsyncStorage.setItem("profileImage", base64ImageUrl);
-          setProfileImage(base64ImageUrl);
+          // ✅ FIX: Store URL instead of base64 to prevent memory issues
+          // Base64 images can be 66MB+ causing OOM errors
+          await AsyncStorage.setItem("profileImage", imageUrl);
+          setProfileImage(imageUrl);
+          // Notify app header and other listeners immediately
+          console.log('📸 Profile edit: Emitting avatar event with URL:', imageUrl);
+          avatarEvents.emit(imageUrl);
 
           setSuccessMessage("Profile picture updated!");
           setShowSuccessModal(true);
@@ -875,6 +883,8 @@ export default function EditProfileScreen() {
               JSON.stringify(updatedProfileData)
             );
             console.log("✅ Updated profileData in AsyncStorage");
+            // Emit again to ensure any subscribers update
+            avatarEvents.emit(profileImage);
           } catch (syncError) {
             console.error("Error syncing profileData:", syncError);
           }
@@ -1097,11 +1107,11 @@ export default function EditProfileScreen() {
       <View style={styles.suggestionsContainer}>
         <View style={styles.suggestionsList}>
           {loadingLocations ? (
-            <View style={styles.loadingSuggestions}>
-              <ActivityIndicator size="small" color="#4CAF50" />
-              <Text style={styles.loadingText}>Searching locations...</Text>
-            </View>
-          ) : (
+                <View style={styles.loadingSuggestions}>
+                  <ActivityIndicator size="small" color="#4CAF50" />
+                  <Text style={styles.loadingSuggestionsText}>Searching locations...</Text>
+                </View>
+              ) : (
             <View style={styles.suggestionsContainer}>
               {locationSuggestions.map((item) => (
                 <TouchableOpacity
@@ -1149,9 +1159,13 @@ export default function EditProfileScreen() {
           <View style={styles.profilePhotoSection}>
             <View style={styles.profilePhotoContainer}>
               {profileImage ? (
-                <Image
+                <OptimizedImage
                   source={{ uri: profileImage }}
                   style={styles.profilePhoto}
+                  cache="force-cache"
+                  loaderSize="large"
+                  loaderColor="#4CAF50"
+                  showErrorIcon={false}
                 />
               ) : (
                 <View style={styles.profilePhoto}>
@@ -1198,6 +1212,7 @@ export default function EditProfileScreen() {
                   onBlur={() => validateField("firstName", formData.firstName)}
                   placeholder="Enter your first name"
                   placeholderTextColor={theme.colors.textSecondary}
+                  numberOfLines={1}
                 />
               </View>
               {validationErrors.firstName ? (
@@ -1275,13 +1290,16 @@ export default function EditProfileScreen() {
                   style={[styles.input, { color: theme.colors.text }]}
                   value={formData.phoneNumber}
                   onChangeText={(text) => {
-                    setFormData({ ...formData, phoneNumber: text });
-                    validateField("phoneNumber", text);
+                    // Only allow digits and limit to 10
+                    const filtered = text.replace(/[^0-9]/g, '').slice(0, 10);
+                    setFormData({ ...formData, phoneNumber: filtered });
+                    validateField("phoneNumber", filtered);
                   }}
                   onBlur={() => validateField("phoneNumber", formData.phoneNumber)}
-                  placeholder="Enter your phone number"
+                  placeholder="Enter your phone number (10 digits)"
                   keyboardType="phone-pad"
                   placeholderTextColor={theme.colors.textSecondary}
+                  maxLength={10}
                 />
               </View>
               {validationErrors.phoneNumber ? (
@@ -1518,11 +1536,30 @@ export default function EditProfileScreen() {
                       key={item.id.toString()}
                       style={styles.suggestionItem}
                       onPress={() => {
+                        // Parse the full address to extract all components
+                        const addressParts = item.description.split(",");
+                        const street = addressParts[0]?.trim() || "";
+                        
+                        // Extract city and postal code from the address object if available
+                        const city = item.address?.city || item.address?.town || item.address?.village || "";
+                        const postalCode = item.address?.postcode || "";
+                        
+                        // Update form with all extracted data
                         setFormData({
                           ...formData,
-                          streetAddress: item.description.split(",")[0], // Get just the street part
+                          streetAddress: street,
+                          location: city,
+                          postalCode: postalCode,
                         });
+                        
+                        // Also update location query to show the city in the field
+                        if (city) {
+                          setLocationQuery(city);
+                        }
+                        
                         setShowStreetSuggestions(false);
+                        
+                        console.log('📍 Auto-populated address:', { street, city, postalCode });
                       }}
                     >
                       <Ionicons
@@ -1678,13 +1715,16 @@ export default function EditProfileScreen() {
                   style={[styles.input, { color: theme.colors.text }]}
                   value={formData.emergencyContactNumber}
                   onChangeText={(text) => {
-                    setFormData({ ...formData, emergencyContactNumber: text });
-                    validateField("emergencyContactNumber", text);
+                    // Only allow digits and limit to 10
+                    const filtered = text.replace(/[^0-9]/g, '').slice(0, 10);
+                    setFormData({ ...formData, emergencyContactNumber: filtered });
+                    validateField("emergencyContactNumber", filtered);
                   }}
                   onBlur={() => validateField("emergencyContactNumber", formData.emergencyContactNumber)}
-                  placeholder="Emergency contact phone number"
+                  placeholder="Emergency contact number (10 digits)"
                   keyboardType="phone-pad"
                   placeholderTextColor={theme.colors.textSecondary}
+                  maxLength={10}
                 />
               </View>
               {validationErrors.emergencyContactNumber ? (
@@ -2011,7 +2051,8 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -2019,6 +2060,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: scaledFontSize(16),
   },
   scrollContainer: {
     paddingBottom: 100,
@@ -2041,7 +2086,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   initialsText: {
-    fontSize: 36,
+    fontSize: scaledFontSize(36),
     fontWeight: "bold",
     color: "#FFFFFF",
   },
@@ -2056,7 +2101,7 @@ const styles = StyleSheet.create({
   },
   editPhotoText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "500",
   },
   uploadingOverlay: {
@@ -2071,29 +2116,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   formSection: {
-    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
-    // color removed - now uses theme.colors.text via inline override
     marginBottom: 15,
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "700",
-    // color removed - now uses theme.colors.text via inline override
     marginBottom: 8,
   },
   errorText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#FF3B30",
     marginTop: 5,
     marginLeft: 5,
@@ -2101,18 +2143,17 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    // backgroundColor removed - now uses theme via inline override
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 12,
+    overflow: "hidden",
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    // color removed - now uses theme.colors.text via inline override
+    fontSize: scaledFontSize(16),
   },
   optionsContainer: {
     flexDirection: "row",
@@ -2122,18 +2163,15 @@ const styles = StyleSheet.create({
   optionButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    // backgroundColor removed - now uses theme via inline override
     borderRadius: 20,
     borderWidth: 1,
-    // borderColor removed - now uses theme via inline override
   },
   optionButtonSelected: {
     backgroundColor: "#4CAF50",
     borderColor: "#4CAF50",
   },
   optionText: {
-    fontSize: 12,
-    // color removed - now uses theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(12),
   },
   optionTextSelected: {
     color: "#FFFFFF",
@@ -2152,11 +2190,10 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   notificationSection: {
-    // backgroundColor removed - now uses theme.colors.surface via inline override
     marginHorizontal: 20,
     borderRadius: 15,
     padding: 20,
@@ -2181,8 +2218,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   notificationText: {
-    fontSize: 14,
-    // color removed - now uses theme.colors.text via inline override
+    fontSize: scaledFontSize(14),
   },
   suggestionsContainer: {
     position: "relative",
@@ -2208,7 +2244,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   suggestionText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#333",
     marginLeft: 10,
     flex: 1,
@@ -2219,9 +2255,9 @@ const styles = StyleSheet.create({
     padding: 15,
     justifyContent: "center",
   },
-  loadingText: {
+  loadingSuggestionsText: {
     marginLeft: 10,
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
   },
   placeholderText: {
@@ -2264,12 +2300,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   datePickerTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
   },
   pickerTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
   },
@@ -2321,7 +2357,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F8F0",
   },
   optionItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     flex: 1,
   },
@@ -2336,7 +2372,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 15,
     backgroundColor: "#F8F8F8",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
   },
   // Success Modal Styles
@@ -2369,7 +2405,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1 }],
   },
   successTitle: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
     fontWeight: "700",
     color: "#1F2937",
     marginBottom: 12,
@@ -2377,7 +2413,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   errorTitle: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
     fontWeight: "700",
     color: "#1F2937",
     marginBottom: 12,
@@ -2385,7 +2421,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   successMessage: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     textAlign: "center",
     marginBottom: 28,
     color: "#6B7280",
@@ -2420,7 +2456,7 @@ const styles = StyleSheet.create({
   },
   successButtonText: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: scaledFontSize(17),
     fontWeight: "600",
     letterSpacing: 0.5,
   },

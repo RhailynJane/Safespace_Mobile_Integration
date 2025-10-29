@@ -1,14 +1,7 @@
 // lib/api.ts
-const getBaseURL = () => {
-  if (__DEV__) {
-    // Replace with YOUR actual IP address
-    return "http://10.0.165.112:3001";
-  } else {
-    return "https://your-production-api.com";
-  }
-};
+import { getApiBaseUrl } from '../utils/apiBaseUrl';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE_URL = getApiBaseUrl();
 export interface SyncUserData {
   clerkUserId: string;
   email: string;
@@ -19,7 +12,7 @@ export interface SyncUserData {
 
 export const syncUserToDatabase = async (userData: SyncUserData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/sync-user`, {
+  const response = await fetch(`${API_BASE_URL}/sync-user`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

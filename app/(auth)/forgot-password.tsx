@@ -11,12 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSignIn } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
+import StatusModal from "../../components/StatusModal";
 import { useTheme } from "../../contexts/ThemeContext";
 
 export default function ForgotPasswordScreen() {
@@ -25,6 +25,14 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'success' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
   const { isLoaded, signIn } = useSignIn();
 
@@ -57,20 +65,20 @@ export default function ForgotPasswordScreen() {
       });
 
       setSuccessMessage("Password reset email sent! Check your inbox.");
-      Alert.alert(
-        "Reset Email Sent",
-        "We've sent a password reset link to your email address.",
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              router.push({
-                pathname: "/(auth)/reset-password",
-                params: { email: email.trim() },
-              }),
-          },
-        ]
-      );
+      setModalConfig({
+        type: 'success',
+        title: 'Reset Email Sent',
+        message: "We've sent a password reset link to your email address.",
+      });
+      setShowModal(true);
+      
+      // Navigate after showing modal
+      setTimeout(() => {
+        router.push({
+          pathname: "/(auth)/reset-password",
+          params: { email: email.trim() },
+        });
+      }, 2000);
     } catch (err: any) {
       console.error("Password reset error:", err);
 
@@ -78,11 +86,29 @@ export default function ForgotPasswordScreen() {
         const clerkError = err.errors[0];
         if (clerkError.code === "form_identifier_not_found") {
           setEmailError("No account found with this email address");
+          setModalConfig({
+            type: 'error',
+            title: 'Account Not Found',
+            message: "No account found with this email address. Please check your email or sign up for a new account.",
+          });
+          setShowModal(true);
         } else {
           setEmailError(clerkError.message || "Failed to send reset email");
+          setModalConfig({
+            type: 'error',
+            title: 'Error',
+            message: clerkError.message || "Failed to send reset email. Please try again.",
+          });
+          setShowModal(true);
         }
       } else {
         setEmailError("An unexpected error occurred");
+        setModalConfig({
+          type: 'error',
+          title: 'Error',
+          message: "An unexpected error occurred. Please try again.",
+        });
+        setShowModal(true);
       }
     } finally {
       setLoading(false);
@@ -176,6 +202,15 @@ export default function ForgotPasswordScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Status Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setShowModal(false)}
+      />
     </SafeAreaView>
   );
 }

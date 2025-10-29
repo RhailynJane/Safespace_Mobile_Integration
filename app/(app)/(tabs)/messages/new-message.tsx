@@ -3,7 +3,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { messagingService, Contact } from "../../../../utils/sendbirdService";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 const { width } = Dimensions.get("window");
 
@@ -35,8 +37,9 @@ const { width } = Dimensions.get("window");
  * contact list with online status indicators, and navigation to individual chat screens.
  */
 export default function NewMessagesScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
   const { userId } = useAuth();
+  const API_BASE_URL = getApiBaseUrl();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("messages");
   const [searchQuery, setSearchQuery] = useState("");
@@ -46,6 +49,12 @@ export default function NewMessagesScreen() {
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [searching, setSearching] = useState(false);
   const [filteredConversations, setFilteredConversations] = useState<any[]>([]);
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalData, setStatusModalData] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -54,6 +63,14 @@ export default function NewMessagesScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalData({ type, title, message });
+    setStatusModalVisible(true);
+  };
 
   useEffect(() => {
     initializeMessaging();
@@ -68,13 +85,24 @@ export default function NewMessagesScreen() {
 
     try {
       setLoading(true);
-      const initialized = await messagingService.initializeSendBird(userId);
-      if (initialized) {
-        await loadConversationsAndContacts();
+      // Try to initialize SendBird (if configured); otherwise we'll use backend
+      try {
+        const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
+        const sbInitialized = await messagingService.initializeSendBird(
+          userId,
+          accessToken,
+          "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
+        );
+        console.log("💬 [NewMessages] SendBird initialized:", sbInitialized);
+      } catch (e) {
+        console.log("💬 [NewMessages] SendBird init skipped/fallback", e);
       }
+      // Load from backend (or SendBird via wrapper if available)
+      console.log("💬 [NewMessages] initializeMessaging for user:", userId);
+      await loadConversationsAndContacts();
     } catch (error) {
       console.error("Failed to initialize messaging:", error);
-      Alert.alert("Error", "Failed to load messages");
+      showStatusModal('error', 'Load Error', 'Failed to load messages');
     } finally {
       setLoading(false);
     }
@@ -85,10 +113,37 @@ export default function NewMessagesScreen() {
       console.error("User ID is null or undefined");
       return;
     }
+    console.log("💬 [NewMessages] Loading conversations for:", userId);
     const conversationsResult = await messagingService.getConversations(userId);
+    console.log("💬 [NewMessages] Conversations result:", {
+      success: conversationsResult.success,
+      count: conversationsResult.data?.length || 0,
+      sample: conversationsResult.data?.[0] ? {
+        id: conversationsResult.data[0].id,
+        participants: conversationsResult.data[0].participants?.map(p => p.clerk_user_id)
+      } : null
+    });
     if (conversationsResult.success) {
-      setConversations(conversationsResult.data);
-      setFilteredConversations(conversationsResult.data);
+      let convs = conversationsResult.data || [];
+      // Fallback: if empty, try direct backend fetch (cache-busted) just in case
+      if (convs.length === 0) {
+        try {
+          const resp = await fetch(`${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`);
+          if (resp.ok) {
+            const json = await resp.json();
+            console.log("💬 [NewMessages] Fallback fetch conversations count:", json?.data?.length || 0);
+            convs = json?.data || [];
+          } else {
+            console.log("💬 [NewMessages] Fallback fetch failed with status:", resp.status);
+          }
+        } catch (e) {
+          console.log("💬 [NewMessages] Fallback fetch error:", e);
+        }
+      }
+      setConversations(convs);
+      setFilteredConversations(convs);
+    } else {
+      console.log("💬 [NewMessages] getConversations did not succeed");
     }
 
     const contactsResult = await messagingService.getContacts(userId);
@@ -215,7 +270,16 @@ export default function NewMessagesScreen() {
     if (!userId) {
       const firstParticipant = participants[0];
       if (firstParticipant?.profile_image_url) {
-        return { type: "image", value: firstParticipant.profile_image_url };
+        const raw = firstParticipant.profile_image_url as string;
+        let normalized = raw;
+        if (raw.startsWith('http')) {
+          normalized = raw;
+        } else if (raw.startsWith('/')) {
+          normalized = `${API_BASE_URL}${raw}`;
+        } else if (raw.startsWith('data:image')) {
+          normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(firstParticipant.clerk_user_id || '')}/profile-image`;
+        }
+        return { type: "image", value: normalized };
       }
       const initials = getUserInitials(
         firstParticipant?.first_name,
@@ -235,7 +299,16 @@ export default function NewMessagesScreen() {
 
     // If profile image exists, return URL
     if (displayParticipant?.profile_image_url) {
-      return { type: "image", value: displayParticipant.profile_image_url };
+      const raw = displayParticipant.profile_image_url as string;
+      let normalized = raw;
+      if (raw.startsWith('http')) {
+        normalized = raw;
+      } else if (raw.startsWith('/')) {
+        normalized = `${API_BASE_URL}${raw}`;
+      } else if (raw.startsWith('data:image')) {
+        normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(displayParticipant.clerk_user_id || '')}/profile-image`;
+      }
+      return { type: "image", value: normalized };
     }
 
     // Otherwise return initials for text display
@@ -287,17 +360,57 @@ export default function NewMessagesScreen() {
         setSearchQuery("");
         setSearchResults([]);
         
-        // Navigate to the new chat
-        router.push(`../messages/message-chat-screen?id=${result.data.id}&title=${encodeURIComponent(contact.first_name + ' ' + contact.last_name)}`);
+        console.log("📝 Created conversation result:", result.data);
         
-        // Refresh conversations
-        initializeMessaging();
+        // Compute a safe conversation id; fallback to lookup if non-numeric
+        const fullName = `${contact.first_name} ${contact.last_name}`.trim();
+        const online = contact.online ? "1" : "0";
+        let conversationId = result.data?.id || result.data;
+
+        const isNumericId = typeof conversationId === 'string' && /^\d+$/.test(conversationId);
+        if (!isNumericId) {
+          try {
+            console.log("🔎 Fallback: resolving numeric conversation id via list…");
+            const resp = await fetch(`${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`);
+            if (resp.ok) {
+              const json = await resp.json();
+              const conv = (json?.data || []).find((c: any) =>
+                Array.isArray(c.participants) && c.participants.some((p: any) => p.clerk_user_id === contact.clerk_user_id)
+              );
+              if (conv?.id) {
+                conversationId = conv.id;
+                console.log("✅ Resolved conversation id:", conversationId);
+              }
+            }
+          } catch (e) {
+            console.log("❌ Fallback resolution failed:", e);
+          }
+        }
+
+        if (!conversationId || !(typeof conversationId === 'string') || !/^\d+$/.test(conversationId)) {
+          showStatusModal('error', 'Create Error', 'Failed to create conversation. Please try again.');
+        } else {
+          console.log("🔗 Navigating to chat with ID:", conversationId);
+          router.push({
+            pathname: `../messages/message-chat-screen`,
+            params: {
+              id: conversationId,
+              title: fullName,
+              otherClerkId: contact.clerk_user_id,
+              initialOnline: online,
+              initialLastActive: contact.last_active_at || "",
+              profileImageUrl: contact.profile_image_url || "",
+            }
+          });
+          // Refresh conversations after navigation kickoff
+          initializeMessaging();
+        }
       } else {
-        Alert.alert("Error", "Failed to start conversation");
+        showStatusModal('error', 'Create Error', 'Failed to start conversation');
       }
     } catch (error) {
       console.error("Failed to create conversation:", error);
-      Alert.alert("Error", "Failed to start conversation");
+      showStatusModal('error', 'Create Error', 'Failed to start conversation');
     } finally {
       setLoading(false);
     }
@@ -342,9 +455,10 @@ export default function NewMessagesScreen() {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: APP_TIME_ZONE,
       });
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: APP_TIME_ZONE });
     }
   };
 
@@ -395,6 +509,65 @@ export default function NewMessagesScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        {/* Status Modal */}
+        <Modal
+          visible={statusModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setStatusModalVisible(false)}
+        >
+          <View style={[
+            styles.modalOverlay,
+            { backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)' }
+          ]}>
+            <View style={[
+              styles.modalContent,
+              { backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }
+            ]}>
+              <View style={styles.iconContainer}>
+                <Ionicons 
+                  name={
+                    statusModalData.type === 'success' ? 'checkmark-circle' :
+                    statusModalData.type === 'error' ? 'close-circle' : 'information-circle'
+                  } 
+                  size={64} 
+                  color={
+                    statusModalData.type === 'success' ? '#4CAF50' :
+                    statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                  } 
+                />
+              </View>
+
+              <Text style={[
+                styles.modalTitle,
+                { color: isDarkMode ? '#F9FAFB' : '#1F2937' }
+              ]}>
+                {statusModalData.title}
+              </Text>
+              <Text style={[
+                styles.modalMessage,
+                { color: isDarkMode ? '#D1D5DB' : '#6B7280' }
+              ]}>
+                {statusModalData.message}
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton, 
+                  { 
+                    backgroundColor: 
+                      statusModalData.type === 'success' ? '#4CAF50' :
+                      statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                  }
+                ]}
+                onPress={() => setStatusModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         <AppHeader 
           title="Messages" 
           showBack={true}
@@ -469,13 +642,25 @@ export default function NewMessagesScreen() {
               const avatar = getAvatarDisplay(conversation.participants || []);
               const displayName = getDisplayName(conversation);
               const isOnline = isOtherParticipantOnline(conversation.participants || []);
+              const otherParticipant = (conversation.participants || []).find((p: any) => p.clerk_user_id !== userId);
 
               return (
                 <TouchableOpacity
                   key={conversation.id}
                   style={[styles.contactItem, { borderBottomColor: theme.colors.borderLight }]}
                   onPress={() =>
-                    router.push(`../messages/message-chat-screen?id=${conversation.id}&title=${encodeURIComponent(displayName)}`)
+                    router.push({
+                      pathname: `../messages/message-chat-screen`,
+                      params: {
+                        id: conversation.id,
+                        title: displayName,
+                        otherClerkId: otherParticipant?.clerk_user_id || "",
+                        initialOnline: isOnline ? "1" : "0",
+                        initialLastActive: otherParticipant?.last_active_at || "",
+                        profileImageUrl: otherParticipant?.profile_image_url || "",
+                        initialPresence: (otherParticipant?.presence as any) || (isOnline ? 'online' : 'offline'),
+                      }
+                    })
                   }
                 >
                   <View style={styles.avatarContainer}>
@@ -532,7 +717,7 @@ export default function NewMessagesScreen() {
               <TouchableOpacity onPress={handleCloseModal}>
                 <Ionicons name="close" size={24} color={theme.colors.icon} />
               </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>New Message</Text>
+              <Text style={[styles.newMessageModalTitle, { color: theme.colors.text }]}>New Message</Text>
               <View style={{ width: 24 }} />
             </View>
 
@@ -621,7 +806,8 @@ export default function NewMessagesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -629,12 +815,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    // backgroundColor moved to theme.colors.background via inline override
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(16),
   },
   header: {
     flexDirection: "row",
@@ -645,14 +829,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2E7D32",
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    // backgroundColor moved to theme.colors.surface via inline override
     margin: 15,
     borderRadius: 10,
     paddingHorizontal: 15,
@@ -663,8 +846,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(16),
   },
   clearButton: {
     padding: 4,
@@ -679,13 +861,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   searchResultsText: {
-    fontSize: 14,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(14),
     fontStyle: 'italic',
   },
   clearSearchText: {
-    fontSize: 14,
-    // color moved to theme.colors.primary via inline override
+    fontSize: scaledFontSize(14),
     fontWeight: '600',
   },
   contactList: {
@@ -693,9 +873,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
-    // color moved to theme via inline override
     marginBottom: 15,
     marginTop: 10,
   },
@@ -704,7 +883,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    // borderBottomColor moved to theme via inline override
   },
   avatarContainer: {
     position: "relative",
@@ -719,13 +897,12 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    // backgroundColor moved to theme via inline override
     justifyContent: "center",
     alignItems: "center",
   },
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
   },
   onlineIndicator: {
@@ -735,37 +912,30 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    // backgroundColor moved to theme via inline override
     borderWidth: 2,
-    // borderColor moved to theme via inline override
   },
   contactInfo: {
     flex: 1,
   },
   contactName: {
-    fontSize: 16,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(16),
     fontWeight: "500",
     marginBottom: 4,
   },
   contactMessage: {
-    fontSize: 14,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(14),
   },
   contactEmail: {
-    fontSize: 14,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(14),
   },
   timestampContainer: {
     alignItems: "flex-end",
   },
   timestamp: {
-    fontSize: 12,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(12),
     marginBottom: 4,
   },
   unreadBadge: {
-    // backgroundColor moved to theme via inline override
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -775,7 +945,7 @@ const styles = StyleSheet.create({
   },
   unreadCount: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
   },
   emptyState: {
@@ -784,20 +954,17 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 18,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(18),
     marginTop: 16,
     fontWeight: "600",
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(14),
     marginTop: 8,
     textAlign: "center",
   },
   modalContainer: {
     flex: 1,
-    // backgroundColor moved to theme via inline override
   },
   modalHeader: {
     flexDirection: "row",
@@ -805,12 +972,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 15,
     borderBottomWidth: 1,
-    // borderBottomColor moved to theme via inline override
   },
-  modalTitle: {
-    fontSize: 18,
+  newMessageModalTitle: {
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
-    // color moved to theme via inline override
   },
   searchResults: {
     flex: 1,
@@ -821,7 +986,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    // borderBottomColor moved to theme via inline override
   },
   centered: {
     alignItems: "center",
@@ -830,8 +994,60 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     textAlign: "center",
-    // color moved to theme via inline override
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
+  },
+  // Status Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 24,
+    padding: 32,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  iconContainer: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: scaledFontSize(28),
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  modalMessage: {
+    fontSize: scaledFontSize(16),
+    textAlign: "center",
+    marginBottom: 28,
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  modalButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modalButtonText: {
+    color: "#FFFFFF",
+    fontSize: scaledFontSize(17),
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });
 
@@ -841,7 +1057,6 @@ const bottomNavStyles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 16,
-    // backgroundColor moved to theme via inline override
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: "#000",

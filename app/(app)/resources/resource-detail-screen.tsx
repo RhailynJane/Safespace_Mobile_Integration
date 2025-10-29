@@ -33,7 +33,7 @@
  */
 
 // app/(app)/resources/resource-detail-screen.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -57,10 +57,16 @@ import { useTheme } from "../../../contexts/ThemeContext";
  * with enhanced visual presentation and user engagement features
  */
 export default function ResourceDetailScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const params = useLocalSearchParams();
   
   const [loading, setLoading] = useState(false); // Loading state for future enhancements
+
+  /**
+   * Create styles dynamically based on text size scaling
+   * Uses useMemo for performance optimization
+   */
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   /**
    * Extract and structure resource data from navigation parameters
@@ -260,8 +266,9 @@ export default function ResourceDetailScreen() {
  * Stylesheet for ResourceDetailScreen component
  * Organized by content sections with consistent visual hierarchy
  * Uses category-based theming and accessible design patterns
+ * Now includes dynamic font scaling via scaledFontSize parameter
  */
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -292,7 +299,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   categoryText: {
-    fontSize: 11,
+    fontSize: scaledFontSize(11),
     fontWeight: "700",
     color: "#FFF",
     letterSpacing: 1, // Enhanced readability for uppercase
@@ -312,19 +319,22 @@ const styles = StyleSheet.create({
     fontSize: 40, // Large emoji for visual impact
   },
   title: {
-    fontSize: 26,
+    fontSize: scaledFontSize(26),
     fontWeight: "700",
     lineHeight: 34, // Improved readability for longer titles
+    textAlign: "center",
   },
   author: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontStyle: "italic",
     marginBottom: 15,
+    textAlign: "center",
   },
   meta: {
     flexDirection: "row",
     alignItems: "center",
     gap: 15,
+    justifyContent: "center",
   },
   metaItem: {
     flexDirection: "row",
@@ -332,7 +342,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   metaText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
   },
   
   // Action Bar - User interaction controls
@@ -360,7 +370,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   actionButtonText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
   },
   
@@ -370,7 +380,7 @@ const styles = StyleSheet.create({
     paddingTop: 25,
   },
   contentTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "700",
     marginBottom: 15,
   },
@@ -385,7 +395,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
   },
   contentText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     lineHeight: 26, // Enhanced readability for longer content
     letterSpacing: 0.3, // Improved text rendering
   },
@@ -399,12 +409,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   reflectionTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "700",
     marginBottom: 10,
   },
   reflectionText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     lineHeight: 22,
   },
   
@@ -414,7 +424,7 @@ const styles = StyleSheet.create({
     paddingTop: 30,
   },
   relatedTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "700",
     marginBottom: 15,
   },
@@ -445,11 +455,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   relatedCardTitle: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     marginBottom: 3,
   },
   relatedCardText: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
   },
 });

@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import activityApi from "../../../../utils/activityApi";
+import StatusModal from "../../../../components/StatusModal";
 
 /**
  * BookAppointment Component
@@ -37,16 +39,36 @@ import { useTheme } from "../../../../contexts/ThemeContext";
  * Features an elegant curved background and intuitive interface.
  */
 export default function BookAppointment() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // StatusModal states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalType, setStatusModalType] = useState<'success' | 'error' | 'info'>('info');
+  const [statusModalTitle, setStatusModalTitle] = useState('');
+  const [statusModalMessage, setStatusModalMessage] = useState('');
+
   // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
 
   /**
    * Handles navigation to support worker details screen
@@ -111,6 +133,15 @@ export default function BookAppointment() {
       setIsSigningOut(true);
       setSideMenuVisible(false);
 
+      // Record logout activity
+      if (user?.id) {
+        try {
+          await activityApi.recordLogout(user.id);
+        } catch (_e) {
+          // Continue with logout even if tracking fails
+        }
+      }
+
       await AsyncStorage.clear();
       if (signOut) {
         await signOut();
@@ -118,7 +149,7 @@ export default function BookAppointment() {
 
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -409,6 +440,15 @@ export default function BookAppointment() {
           </View>
         </Modal>
 
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModalVisible}
+          type={statusModalType}
+          title={statusModalTitle}
+          message={statusModalMessage}
+          onClose={() => setStatusModalVisible(false)}
+        />
+
         {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
@@ -420,7 +460,7 @@ export default function BookAppointment() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -461,7 +501,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2E7D32",
   },
@@ -491,13 +531,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     // color moved to theme.colors.text via inline override
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
   },
   sideMenuContent: {
@@ -512,7 +552,7 @@ const styles = StyleSheet.create({
     // borderBottomColor moved to theme.colors.borderLight via inline override
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme.colors.text via inline override
     marginLeft: 15,
   },
@@ -531,7 +571,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   secondaryButton: {
@@ -546,15 +586,16 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#4CAF50",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   title: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
     textAlign: "center",
+    marginTop: 16,
   },
   stepsContainer: {
     alignItems: "center",
@@ -580,7 +621,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   stepNumber: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#4CAF50",
     fontWeight: "600",
   },
@@ -607,24 +648,24 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme via inline override
   },
   supportWorkerName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     // color moved to theme via inline override
     marginBottom: 4,
   },
   supportWorkerNameHeading: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#333",
     marginBottom: 24,
     textAlign: "center",
   },
   supportWorkerTitle: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme via inline override
     marginBottom: 0,
   },
@@ -640,12 +681,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
   },
   selectText: {
     // color moved to theme via inline override
     fontWeight: "600",
     textAlign: "center",
+    fontSize: scaledFontSize(14),
   },
   avatarContainer: {
     flexDirection: "row",

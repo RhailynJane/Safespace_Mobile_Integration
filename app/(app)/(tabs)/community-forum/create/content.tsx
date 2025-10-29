@@ -5,7 +5,7 @@
  * LLM Prompt: Add comprehensive comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -19,7 +19,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Animated,
-  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -29,11 +28,15 @@ import { AppHeader } from "../../../../../components/AppHeader";
 import { useUser } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../../utils/communityForumApi";
 import { useTheme } from "../../../../../contexts/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import avatarEvents from "../../../../../utils/avatarEvents";
+import { makeAbsoluteUrl } from "../../../../../utils/apiBaseUrl";
+import StatusModal from "../../../../../components/StatusModal";
 
 const { width } = Dimensions.get("window");
 
 export default function CreatePostScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const params = useLocalSearchParams();
   const { user } = useUser();
   const selectedCategory = params.category as string;
@@ -45,6 +48,7 @@ export default function CreatePostScreen() {
   const [isDraft, setIsDraft] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -53,10 +57,9 @@ export default function CreatePostScreen() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [errorTitle, setErrorTitle] = useState("Error");
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmMessage, setConfirmMessage] = useState("");
-  const [confirmTitle, setConfirmTitle] = useState("");
-  const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -65,6 +68,62 @@ export default function CreatePostScreen() {
       useNativeDriver: true,
     }).start();
   }, [fadeAnim]);
+
+  const loadProfileImage = useCallback(async () => {
+    try {
+      const storedImage = await AsyncStorage.getItem("profileImage");
+      console.log('📝 Create Post: Loaded from AsyncStorage:', storedImage);
+      if (storedImage) {
+        setProfileImage(storedImage);
+        console.log('📝 Create Post: Set profileImage to:', storedImage);
+        return;
+      }
+      if (user?.imageUrl) {
+        console.log('📝 Create Post: Using Clerk imageUrl:', user.imageUrl);
+        setProfileImage(user.imageUrl);
+      }
+    } catch (error) {
+      console.error("Error loading profile image:", error);
+    }
+  }, [user?.imageUrl]);
+
+  useEffect(() => {
+    loadProfileImage();
+    
+    const unsubscribe = avatarEvents.subscribe((newAvatarUrl) => {
+      console.log('📝 Create Post received avatar event:', newAvatarUrl);
+      setProfileImage(newAvatarUrl);
+      if (newAvatarUrl) {
+        AsyncStorage.setItem("profileImage", newAvatarUrl);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [loadProfileImage]);
+
+  const normalizeImageUri = (uri: string | null | undefined): string | null => {
+    if (!uri) {
+      console.log('📝 Create Post normalizeImageUri: uri is null/undefined');
+      return null;
+    }
+    if (uri.startsWith('data:image')) {
+      console.log('📝 Create Post normalizeImageUri: Blocking base64 image');
+      return null;
+    }
+    if (uri.startsWith('http://') || uri.startsWith('https://')) {
+      console.log('📝 Create Post normalizeImageUri: Using absolute URL:', uri);
+      return uri;
+    }
+    if (uri.startsWith('/')) {
+      const absolute = makeAbsoluteUrl(uri);
+      console.log('📝 Create Post normalizeImageUri: Converted relative to absolute:', absolute);
+      return absolute;
+    }
+    console.log('📝 Create Post normalizeImageUri: Returning as-is:', uri);
+    return uri;
+  };
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -197,13 +256,13 @@ export default function CreatePostScreen() {
           >
             {/* Header Section */}
             <View style={styles.headerSection}>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
                 Share your thoughts with the community
               </Text>
               
               {selectedCategory && (
                 <View style={styles.categoryBadge}>
-                  <Ionicons name="pricetag" size={14} color="#FFFFFF" />
+                  <Ionicons name="pricetag" size={scaledFontSize(14)} color="#FFFFFF" />
                   <Text style={styles.categoryText}>{selectedCategory}</Text>
                 </View>
               )}
@@ -216,7 +275,14 @@ export default function CreatePostScreen() {
                 <View style={styles.authorInfo}>
                   <View style={styles.avatarContainer}>
                     <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>{getInitials()}</Text>
+                      {normalizeImageUri(profileImage) ? (
+                        <Image 
+                          source={{ uri: normalizeImageUri(profileImage)! }} 
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.avatarText}>{getInitials()}</Text>
+                      )}
                     </View>
                   </View>
                   <View style={styles.authorDetails}>
@@ -224,7 +290,7 @@ export default function CreatePostScreen() {
                     <Text style={[styles.authorRole, { color: theme.colors.textSecondary }]}>Community Member</Text>
                   </View>
                 </View>
-                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <Ionicons name="checkmark-circle" size={scaledFontSize(20)} color="#4CAF50" />
               </View>
             </View>
 
@@ -277,7 +343,7 @@ export default function CreatePostScreen() {
                     maxLength={1000}
                   />
                   <View style={[styles.contentTips, { borderTopColor: theme.colors.borderLight }]}>
-                    <Ionicons name="bulb-outline" size={16} color="#7CB9A9" />
+                    <Ionicons name="bulb-outline" size={scaledFontSize(16)} color="#7CB9A9" />
                     <Text style={styles.tipsText}>
                       Be authentic and respectful in your sharing
                     </Text>
@@ -293,7 +359,7 @@ export default function CreatePostScreen() {
                 <View style={styles.privacyInfo}>
                   <Ionicons 
                     name={isPrivate ? "lock-closed" : "earth"} 
-                    size={20} 
+                    size={scaledFontSize(20)} 
                     color={isPrivate ? "#FF6B6B" : "#4CAF50"} 
                   />
                   <View style={styles.privacyTextContainer}>
@@ -333,7 +399,7 @@ export default function CreatePostScreen() {
                   <ActivityIndicator size="small" color={theme.colors.textSecondary} />
                 ) : (
                   <>
-                    <Ionicons name="save-outline" size={20} color={theme.colors.textSecondary} />
+                    <Ionicons name="save-outline" size={scaledFontSize(20)} color={theme.colors.textSecondary} />
                     <Text style={[styles.draftButtonText, { color: theme.colors.textSecondary }]}>Save Draft</Text>
                   </>
                 )}
@@ -351,7 +417,7 @@ export default function CreatePostScreen() {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Ionicons name="send" size={20} color="#FFFFFF" />
+                    <Ionicons name="send" size={scaledFontSize(20)} color="#FFFFFF" />
                     <Text style={styles.publishButtonText}>Publish to Community</Text>
                   </>
                 )}
@@ -370,65 +436,36 @@ export default function CreatePostScreen() {
         />
 
         {/* Success Modal */}
-        <Modal
+        <StatusModal
           visible={showSuccessModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowSuccessModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.successModal}>
-              <View style={styles.successIconContainer}>
-                <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
-              </View>
-              <Text style={styles.successTitle}>Success!</Text>
-              <Text style={styles.successMessage}>{successMessage}</Text>
-              <TouchableOpacity
-                style={styles.successButton}
-                onPress={() => {
-                  setShowSuccessModal(false);
-                  if (successCallback) {
-                    successCallback();
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.successButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+          type="success"
+          title="Success!"
+          message={successMessage}
+          onClose={() => {
+            setShowSuccessModal(false);
+            if (successCallback) {
+              successCallback();
+            }
+          }}
+          buttonText="Done"
+        />
 
         {/* Error Modal */}
-        <Modal
+        <StatusModal
           visible={showErrorModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowErrorModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.successModal}>
-              <View style={styles.errorIconContainer}>
-                <Ionicons name="close-circle" size={80} color="#FF3B30" />
-              </View>
-              <Text style={styles.errorTitle}>{errorTitle}</Text>
-              <Text style={styles.successMessage}>{errorMessage}</Text>
-              <TouchableOpacity
-                style={styles.errorButton}
-                onPress={() => setShowErrorModal(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.successButtonText}>OK</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+          type="error"
+          title={errorTitle}
+          message={errorMessage}
+          onClose={() => setShowErrorModal(false)}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 }
 
-const styles = StyleSheet.create({
+// Dynamic styles with text size scaling
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -460,15 +497,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   mainTitle: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
     fontWeight: "800",
     color: "#1A1A1A",
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: scaledFontSize(16),
     textAlign: "center",
     marginBottom: 16,
     lineHeight: 22,
@@ -484,7 +520,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
   },
   
@@ -493,7 +529,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionLabel: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "700",
     marginBottom: 12,
   },
@@ -529,22 +565,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 50,
+    height: 50,
   },
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "bold",
   },
   authorDetails: {
     flex: 1,
   },
   authorName: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     marginBottom: 2,
   },
   authorRole: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
   },
   
   // Content Section
@@ -561,17 +602,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   charCount: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "500",
   },
   titleInput: {
     padding: 16,
     borderRadius: 12,
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "500",
     borderWidth: 2,
     shadowColor: "#000",
@@ -593,7 +634,7 @@ const styles = StyleSheet.create({
   contentInput: {
     minHeight: 160,
     padding: 16,
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     lineHeight: 22,
     textAlignVertical: "top",
   },
@@ -606,7 +647,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tipsText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#7CB9A9",
     fontWeight: "500",
     flex: 1,
@@ -638,12 +679,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   privacyTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     marginBottom: 2,
   },
   privacyDescription: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     lineHeight: 18,
   },
   
@@ -668,7 +709,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   draftButtonText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   publishButton: {
@@ -691,7 +732,7 @@ const styles = StyleSheet.create({
     shadowColor: "#B6D5CF",
   },
   publishButtonText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "700",
     color: "#FFFFFF",
   },
@@ -701,66 +742,5 @@ const styles = StyleSheet.create({
   
   bottomSpacing: {
     height: 20,
-  },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successModal: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    width: '80%',
-    maxWidth: 400,
-  },
-  successIconContainer: {
-    marginBottom: 16,
-  },
-  errorIconContainer: {
-    marginBottom: 16,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#FF3B30',
-    marginBottom: 8,
-  },
-  successMessage: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  successButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    width: '100%',
-  },
-  errorButton: {
-    backgroundColor: '#FF3B30',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    width: '100%',
-  },
-  successButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
   },
 });

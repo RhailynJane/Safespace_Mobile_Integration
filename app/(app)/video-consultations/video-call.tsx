@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise inline comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -53,12 +53,18 @@ const appointments = [
  * - Contains selectable audio options and actions to join/cancel the meeting.
  */
 export default function VideoCallScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // Local UI state for audio selection
   const [audioOption, setAudioOption] = useState<"phone" | "none">("phone");
 
   // Active bottom navigation tab
   const [activeTab, setActiveTab] = useState<string>("home");
+
+  /**
+   * Create styles dynamically based on text size scaling
+   * Uses useMemo for performance optimization
+   */
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Use the mock data instead of auth/context
   const user = mockUser;
@@ -207,8 +213,11 @@ export default function VideoCallScreen() {
   );
 }
 
-/* Styles for the VideoCallScreen */
-const styles = StyleSheet.create({
+/**
+ * Stylesheet for VideoCallScreen component
+ * Now includes dynamic font scaling via scaledFontSize parameter
+ */
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   // container added to match usage in JSX (SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]})
   container: {
     flex: 1,
@@ -232,7 +241,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   meetingTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#2E7D32",
   },
@@ -242,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   meetingWith: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     marginBottom: 30,
     // color applied inline via theme
   },
@@ -260,13 +269,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   avatarName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     marginBottom: 5,
     // color applied inline via theme
   },
   avatarStatus: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#757575",
   },
   profileTextContainer: {
@@ -282,7 +291,7 @@ const styles = StyleSheet.create({
     marginLeft: (width - Math.min(width, 360)) / 2,
   },
   audioTitle: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
     marginBottom: 15,
     // color applied inline via theme
@@ -304,13 +313,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   audioOptionTitle: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     fontWeight: "600",
     marginBottom: 4,
     // color applied inline via theme
   },
   audioOptionDesc: {
-    fontSize: 10,
+    fontSize: scaledFontSize(10),
     // color applied inline via theme
   },
   meetingActions: {
@@ -335,7 +344,7 @@ const styles = StyleSheet.create({
     // backgroundColor and borderColor applied inline via theme
   },
   cancelButtonText: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     fontWeight: "600",
     // color applied inline via theme
   },
@@ -349,7 +358,7 @@ const styles = StyleSheet.create({
   },
   joinNowButtonText: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     fontWeight: "600",
   },
 });

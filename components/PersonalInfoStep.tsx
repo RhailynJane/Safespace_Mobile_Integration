@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import StatusModal from "./StatusModal";
+import { router } from "expo-router";
 
 // Local interface for signup data
 interface SignupData {
@@ -46,6 +48,50 @@ export default function PersonalInfoStep({
   // State to store validation errors for each form field
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Modal state for age restriction
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  /**
+   * Handles age input changes and checks for minimum age requirement
+   */
+  const handleAgeChange = (text: string) => {
+    // Only allow digits
+    const filtered = text.replace(/[^0-9]/g, '');
+    onUpdate({ age: filtered });
+
+    // Check if user entered a complete age less than 16
+    if (filtered.length >= 2) {
+      const ageNum = parseInt(filtered, 10);
+      if (!isNaN(ageNum) && ageNum < 16) {
+        // Show modal immediately
+        setModalConfig({
+          type: 'error',
+          title: 'Age Requirement',
+          message: 'You must be at least 16 years old to create an account. If you need support, please contact Kids Help Phone at 1-800-668-6868 (available 24/7).\n\nNeed Immediate Help? If you or someone you know is in crisis, please call 911 or contact a 24/7 crisis line in your area. For urgent mental health support, reach out to the Distress Centre at 403-266-HELP (4357) or visit distresscentre.com.',
+        });
+        setShowModal(true);
+      }
+    }
+  };
+
+  /**
+   * Handles modal close and redirects to login
+   */
+  const handleModalClose = () => {
+    setShowModal(false);
+    // Clear age field
+    onUpdate({ age: '' });
+    // Navigate back to login after a short delay
+    setTimeout(() => {
+      router.replace('/(auth)/login');
+    }, 300);
+  };
+
   /**
    * Validates all form fields for required data and correct formats
    * @returns boolean indicating whether all validations passed
@@ -53,32 +99,55 @@ export default function PersonalInfoStep({
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // Validate first name - required field
+    // Validate first name - required field, must contain only letters
     if (!data.firstName.trim()) {
       newErrors.firstName = "First name is required";
+    } else if (!/^[a-zA-Z\s'-]+$/.test(data.firstName.trim())) {
+      newErrors.firstName = "First name can only contain letters";
+    } else if (data.firstName.trim().length < 2) {
+      newErrors.firstName = "First name must be at least 2 characters";
     }
 
-    // Validate last name - required field
+    // Validate last name - required field, must contain only letters
     if (!data.lastName.trim()) {
       newErrors.lastName = "Last name is required";
+    } else if (!/^[a-zA-Z\s'-]+$/.test(data.lastName.trim())) {
+      newErrors.lastName = "Last name can only contain letters";
+    } else if (data.lastName.trim().length < 2) {
+      newErrors.lastName = "Last name must be at least 2 characters";
     }
 
-    // Validate email - required and must match basic email format
+    // Validate email - required and must match proper email format
     if (!data.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(data.email)) {
-      // Basic regex for email validation (name@domain.extension)
-      newErrors.email = "Please enter a valid email";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
+      newErrors.email = "Please enter a valid email address";
     }
 
-    // Validate age - required field
+    // Validate age - required field, must be a number and 16 or above
     if (!data.age.trim()) {
       newErrors.age = "Age is required";
+    } else {
+      const ageNum = parseInt(data.age.trim(), 10);
+      if (isNaN(ageNum) || !/^\d+$/.test(data.age.trim())) {
+        newErrors.age = "Age must be a valid number";
+      } else if (ageNum < 16) {
+        newErrors.age = "You must be at least 16 years old";
+      } else if (ageNum > 120) {
+        newErrors.age = "Please enter a valid age";
+      }
     }
 
-    // Validate phone number - required field
+    // Validate phone number - required field, must be exactly 10 digits
     if (!data.phoneNumber.trim()) {
       newErrors.phoneNumber = "Phone number is required";
+    } else {
+      const cleanedPhone = data.phoneNumber.replace(/\D/g, '');
+      if (cleanedPhone.length !== 10) {
+        newErrors.phoneNumber = "Phone number must be exactly 10 digits";
+      } else if (!/^\d{10}$/.test(cleanedPhone)) {
+        newErrors.phoneNumber = "Phone number must contain only digits";
+      }
     }
 
     // Update error state and return validation status
@@ -121,8 +190,13 @@ export default function PersonalInfoStep({
               placeholder="Enter your First Name"
               placeholderTextColor={theme.colors.textSecondary}
               value={data.firstName}
-              onChangeText={(text) => onUpdate({ firstName: text })}
+              onChangeText={(text) => {
+                // Only allow letters, spaces, hyphens, and apostrophes
+                const filtered = text.replace(/[^a-zA-Z\s'-]/g, '');
+                onUpdate({ firstName: filtered });
+              }}
               autoCapitalize="words" // Capitalize first letter of each word
+              maxLength={50}
             />
           </View>
           {/* Show error message if validation fails */}
@@ -149,8 +223,13 @@ export default function PersonalInfoStep({
               placeholder="Enter your Last Name"
               placeholderTextColor={theme.colors.textSecondary}
               value={data.lastName}
-              onChangeText={(text) => onUpdate({ lastName: text })}
+              onChangeText={(text) => {
+                // Only allow letters, spaces, hyphens, and apostrophes
+                const filtered = text.replace(/[^a-zA-Z\s'-]/g, '');
+                onUpdate({ lastName: filtered });
+              }}
               autoCapitalize="words"
+              maxLength={50}
             />
           </View>
           {errors.lastName && (
@@ -176,9 +255,10 @@ export default function PersonalInfoStep({
               placeholder="Enter your Email Address"
               placeholderTextColor={theme.colors.textSecondary}
               value={data.email}
-              onChangeText={(text) => onUpdate({ email: text })}
+              onChangeText={(text) => onUpdate({ email: text.trim().toLowerCase() })}
               autoCapitalize="none" // No capitalization for email addresses
               keyboardType="email-address" // Show email-optimized keyboard
+              maxLength={100}
             />
           </View>
           {errors.email && <Text style={[styles.errorText, { color: theme.colors.error }]}>{errors.email}</Text>}
@@ -199,11 +279,12 @@ export default function PersonalInfoStep({
             />
             <TextInput
               style={[styles.input, { color: theme.colors.text }]}
-              placeholder="Enter your Age"
+              placeholder="Enter your Age (16+)"
               placeholderTextColor={theme.colors.textSecondary}
               value={data.age}
-              onChangeText={(text) => onUpdate({ age: text })}
+              onChangeText={handleAgeChange}
               keyboardType="numeric" // Show numeric keyboard for age input
+              maxLength={3}
             />
           </View>
           {errors.age && <Text style={[styles.errorText, { color: theme.colors.error }]}>{errors.age}</Text>}
@@ -224,11 +305,16 @@ export default function PersonalInfoStep({
             />
             <TextInput
               style={[styles.input, { color: theme.colors.text }]}
-              placeholder="Enter your Phone Number"
+              placeholder="Enter your Phone Number (10 digits)"
               placeholderTextColor={theme.colors.textSecondary}
               value={data.phoneNumber}
-              onChangeText={(text) => onUpdate({ phoneNumber: text })}
+              onChangeText={(text) => {
+                // Only allow digits and limit to 10
+                const filtered = text.replace(/[^0-9]/g, '').slice(0, 10);
+                onUpdate({ phoneNumber: filtered });
+              }}
               keyboardType="phone-pad" // Show phone number keyboard
+              maxLength={10}
             />
           </View>
           {errors.phoneNumber && (
@@ -241,6 +327,15 @@ export default function PersonalInfoStep({
           <Text style={styles.continueButtonText}>Continue</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Age Restriction Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={handleModalClose}
+      />
     </View>
   );
 }

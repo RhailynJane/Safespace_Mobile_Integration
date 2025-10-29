@@ -1,5 +1,6 @@
 // utils/userSync.ts
 import type { UserResource as User } from '@clerk/types';
+import { getApiBaseUrl } from './apiBaseUrl';
 
 export async function syncUserWithDatabase(clerkUser: User, authToken?: string) {
   try {
@@ -21,7 +22,7 @@ export async function syncUserWithDatabase(clerkUser: User, authToken?: string) 
       throw new Error('User email is required');
     }
 
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.100:3001';
+  const API_URL = getApiBaseUrl();
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',

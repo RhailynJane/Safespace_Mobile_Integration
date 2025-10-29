@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -25,6 +24,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
 
 const { width } = Dimensions.get("window");
 
@@ -36,16 +36,36 @@ const { width } = Dimensions.get("window");
  * with clear navigation options and an elegant curved background.
  */
 export default function AppointmentsScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [activeView, setActiveView] = useState("main");
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // StatusModal states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalType, setStatusModalType] = useState<'success' | 'error' | 'info'>('info');
+  const [statusModalTitle, setStatusModalTitle] = useState('');
+  const [statusModalMessage, setStatusModalMessage] = useState('');
+
   // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -81,7 +101,7 @@ export default function AppointmentsScreen() {
 
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -240,54 +260,100 @@ export default function AppointmentsScreen() {
     router.push("../appointments/appointment-list");
   };
 
-  /**
-   * Renders the main content of the appointments screen
-   * @returns JSX element with appointment options
-   */
-  const renderContent = () => (
-    <View style={styles.content}>
-      <View style={styles.buttonContainer}>
-        {/* Primary action button - Book Appointment */}
-        <TouchableOpacity
-          style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-          onPress={handleBookAppointment}
-        >
-          <Text style={styles.buttonText}>Book Appointment</Text>
-        </TouchableOpacity>
-
-        {/* Secondary action button - View Scheduled Appointments */}
-        <TouchableOpacity
-          style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
-          onPress={handleViewScheduled}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }] }>
-            Check Scheduled Appointments
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Placeholder for scheduled appointments list */}
-      {activeView === "scheduled"}
-    </View>
-  );
-
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointments" showBack={true} />
 
-        {/* Appointment Illustration */}
-        {/* Image Reference: https://iconscout.com/free-illustration/free-task-appointment-management-illustration_3485590*/}
-        <View style={styles.imageContainer}>
-          <Image
-            source={require("../../../../assets/images/appointment.png")}
-            style={styles.appointmentImage}
-            resizeMode="contain"
-          />
-        </View>
+        <ScrollView 
+          style={styles.scrollContainer} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Welcome Section with Icons */}
+          <View style={styles.welcomeContainer}>
+            <View style={[styles.iconCircle, { backgroundColor: theme.colors.primary + '20' }]}>
+              <Ionicons name="calendar" size={40} color={theme.colors.primary} />
+            </View>
+            <Text style={[styles.welcomeTitle, { color: theme.colors.text }]}>
+              Manage Your Sessions
+            </Text>
+            <Text style={[styles.welcomeSubtitle, { color: theme.colors.textSecondary }]}>
+              Schedule new appointments or view your upcoming sessions with mental health professionals
+            </Text>
+          </View>
 
-        {/* Main Content */}
-        {renderContent()}
+          {/* Quick Stats Cards */}
+          <View style={styles.statsContainer}>
+            <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>2</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Upcoming</Text>
+            </View>
+            <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="checkmark-circle-outline" size={24} color={theme.colors.primary} />
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>5</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Completed</Text>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.buttonContainer}>
+            {/* Primary action button - Book Appointment */}
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              onPress={handleBookAppointment}
+            >
+              <Ionicons name="add-circle" size={24} color="#FFFFFF" style={styles.buttonIcon} />
+              <Text style={styles.buttonText}>Book New Appointment</Text>
+            </TouchableOpacity>
+
+            {/* Secondary action button - View Scheduled Appointments */}
+            <TouchableOpacity
+              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
+              onPress={handleViewScheduled}
+            >
+              <Ionicons name="list" size={24} color={theme.colors.primary} style={styles.buttonIcon} />
+              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
+                View Scheduled Appointments
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Upcoming Session Preview */}
+          <View style={styles.upcomingSection}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Next Session
+            </Text>
+            <View style={[styles.upcomingCard, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.upcomingHeader}>
+                <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
+                <View style={styles.upcomingInfo}>
+                  <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
+                    Dr. Sarah Johnson
+                  </Text>
+                  <Text style={[styles.upcomingSpecialty, { color: theme.colors.textSecondary }]}>
+                    Clinical Psychologist
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.upcomingDetails}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
+                  <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                    Tomorrow • 2:00 PM
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
+                  <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                    Video Session
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
 
         {/* Side Menu Modal */}
         <Modal
@@ -328,7 +394,7 @@ export default function AppointmentsScreen() {
                         styles.sideMenuItemText,
                         { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && styles.signOutText,
+                        item.title === "Sign Out" && { color: theme.colors.error },
                       ]}
                     >
                       {item.title}
@@ -341,6 +407,15 @@ export default function AppointmentsScreen() {
           </View>
         </Modal>
 
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModalVisible}
+          type={statusModalType}
+          title={statusModalTitle}
+          message={statusModalMessage}
+          onClose={() => setStatusModalVisible(false)}
+        />
+
         {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
@@ -352,58 +427,167 @@ export default function AppointmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor removed - now uses theme.colors.background
   },
-  appointmentImage: {
-    width: width * 0.9,
-    height: 350,
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 100, // Added padding to prevent overlap with bottom navigation
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "#FFFFFF",
+  welcomeContainer: {
+    alignItems: 'center',
+    padding: 24,
+    marginTop: 20,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#2E7D32",
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  imageContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 10,
-    marginTop: 10,
+  welcomeTitle: {
+    fontSize: scaledFontSize(24),
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  content: {
-    flex: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginTop: 40,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
+  welcomeSubtitle: {
+    fontSize: scaledFontSize(16),
+    textAlign: 'center',
     lineHeight: 24,
+    paddingHorizontal: 20,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginHorizontal: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statNumber: {
+    fontSize: scaledFontSize(24),
+    fontWeight: '700',
+    marginVertical: 8,
+  },
+  statLabel: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '500',
+  },
+  buttonContainer: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: "#4CAF50",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: scaledFontSize(16),
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: "transparent",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#4CAF50",
+    width: '100%',
+  },
+  secondaryButtonText: {
+    color: "#4CAF50",
+    fontSize: scaledFontSize(16),
+    fontWeight: "600",
+  },
+  upcomingSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  upcomingCard: {
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  upcomingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  upcomingInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  upcomingTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  upcomingSpecialty: {
+    fontSize: scaledFontSize(14),
+    color: '#666',
+  },
+  upcomingDetails: {
+    gap: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailText: {
+    fontSize: scaledFontSize(14),
+    marginLeft: 8,
   },
   modalContainer: {
     flex: 1,
@@ -415,30 +599,20 @@ const styles = StyleSheet.create({
   },
   sideMenu: {
     width: "75%",
-    // backgroundColor removed - now uses theme.colors.surface
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    // borderBottomColor removed - now uses theme.colors.borderLight
     alignItems: "center",
   },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
-  },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
-    // color removed - now uses theme.colors.text
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
-    // color removed - now uses theme.colors.textSecondary
+    fontSize: scaledFontSize(14),
   },
   sideMenuContent: {
     padding: 10,
@@ -449,54 +623,15 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    // borderBottomColor removed - now uses theme.colors.borderLight
   },
   sideMenuItemText: {
-    fontSize: 16,
-    // color removed - now uses theme.colors.text
+    fontSize: scaledFontSize(16),
     marginLeft: 15,
-  },
-  buttonContainer: {
-    width: "100%",
-    alignItems: "center",
-    gap: 16,
-  },
-  primaryButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    width: "100%",
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#4CAF50",
-    fontSize: 16,
-    fontWeight: "600",
   },
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
   sideMenuItemTextDisabled: {
     color: "#CCCCCC",
-  },
-  signOutText: {
-    color: "#FF6B6B",
-    fontWeight: "600",
   },
 });

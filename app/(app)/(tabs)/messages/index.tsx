@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Image,
   RefreshControl,
   Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -25,11 +26,17 @@ import {
   Conversation,
   Participant,
 } from "../../../../utils/sendbirdService";
-import { useFocusEffect } from "@react-navigation/native";
+import activityApi from "../../../../utils/activityApi";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { useRef } from "react";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 export default function MessagesScreen() {
-  const { theme } = useTheme();
+    // Access isDarkMode and fontScale from useTheme
+  const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
+  const isFocused = useIsFocused();
   const { userId } = useAuth(); // Get actual Clerk user ID
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,10 +44,15 @@ export default function MessagesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
-  const [sendbirdStatus, setSendbirdStatus] =
-    useState<string>("Initializing...");
-  const API_BASE_URL =
-    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+  const [sendbirdStatus, setSendbirdStatus] = useState<string>("Initializing...");
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalData, setStatusModalData] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+  // Removed session-based unread suppression; rely on backend read receipts instead
+  const API_BASE_URL = getApiBaseUrl();
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -50,11 +62,20 @@ export default function MessagesScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalData({ type, title, message });
+    setStatusModalVisible(true);
+  };
+
   const initializeMessaging = useCallback(async () => {
     if (!userId) {
       console.log("❌ No user ID available");
       setSendbirdStatus("User not authenticated");
       setLoading(false);
+      showStatusModal('error', 'Authentication Error', 'Please sign in to access messages');
       return;
     }
 
@@ -75,6 +96,7 @@ export default function MessagesScreen() {
     } catch (error) {
       console.log("Failed to initialize messaging");
       setSendbirdStatus("Using Backend API");
+      showStatusModal('info', 'Connection Notice', 'Using backend messaging service');
       await loadConversations();
     }
   }, [userId]);
@@ -83,10 +105,18 @@ export default function MessagesScreen() {
     initializeMessaging();
   }, [initializeMessaging]);
 
+  // Track opened conversations in current session only (no persistence)
+  // This clears unread counts when user taps a conversation during this session
+  // but allows unread counts to show again after app restart
+
   useFocusEffect(
     useCallback(() => {
       console.log("💬 MessagesScreen focused, refreshing conversations");
-      loadConversations();
+      console.log("💬 Current userId:", userId);
+      console.log("💬 Current conversations count:", conversations.length);
+      if (userId) {
+        loadConversations();
+      }
     }, [userId])
   );
 
@@ -139,42 +169,110 @@ export default function MessagesScreen() {
       setLoading(true);
       console.log(`💬 Loading conversations for user: ${userId}`);
 
+      // Add timestamp to prevent caching
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${userId}`
+        `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
       );
 
       if (response.ok) {
         const result = await response.json();
         console.log(`💬 Setting ${result.data.length} conversations`);
-        setConversations(result.data);
-        setFilteredConversations(result.data); // Initialize filtered conversations
+        console.log(`💬 Conversation data:`, JSON.stringify(result.data, null, 2));
+        let convs: Conversation[] = result.data;
 
-        // DEBUG: Check what online status is being returned
-        console.log(
-          "🔍 Online status debug:",
-          result.data.map((conv: any) => ({
-            id: conv.id,
-            participants: conv.participants.map((p: any) => ({
-              name: `${p.first_name} ${p.last_name}`,
-              online: p.online,
-              last_active_at: p.last_active_at,
-            })),
-          }))
-        );
+        // After conversations load, refresh presence using batch status for other participants
+        try {
+          const otherIds = Array.from(
+            new Set(
+              convs
+                .flatMap((c) => c.participants)
+                .filter((p) => p.clerk_user_id !== userId)
+                .map((p) => p.clerk_user_id)
+                .filter(Boolean)
+            )
+          );
+
+          if (otherIds.length > 0) {
+            const statusMap = await activityApi.statusBatch(otherIds);
+            convs = convs.map((c) => ({
+              ...c,
+              participants: c.participants.map((p) => {
+                if (p.clerk_user_id === userId) return p;
+                const s = statusMap[p.clerk_user_id];
+                return s
+                  ? { ...p, online: !!s.online, presence: s.presence as any, last_active_at: s.last_active_at }
+                  : p;
+              }),
+            }));
+          }
+        } catch (e) {
+          console.log("Presence batch update failed:", e);
+        }
+
+        setConversations(convs);
+        setFilteredConversations(convs); // Initialize filtered conversations
       } else {
         console.log("💬 Failed to load conversations from backend");
         setConversations([]);
         setFilteredConversations([]);
+        showStatusModal('error', 'Load Error', 'Failed to load conversations. Please try again.');
       }
     } catch (error) {
       console.error("💬 Error loading conversations:", error);
       setConversations([]);
       setFilteredConversations([]);
+      showStatusModal('error', 'Connection Error', 'Unable to load conversations. Please check your connection.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
+  // Removed presence polling per request
+
+  // Poll for new messages and update unread counts every 10 seconds
+  useEffect(() => {
+    if (!isFocused || !userId) return;
+    
+    const pollMessages = async () => {
+      try {
+        console.log('📬 Polling for new messages...');
+        const response = await fetch(
+          `${API_BASE_URL}/api/messages/conversations/${userId}`
+        );
+        
+        if (response.ok) {
+          const result = await response.json();
+          let freshConvs: Conversation[] = result.data;
+          
+          console.log(`📬 Polled ${freshConvs.length} conversations, unread counts:`, 
+            freshConvs.map(c => ({ id: c.id, unread: c.unread_count }))
+          );
+          
+          // Update conversations with fresh unread counts
+          setConversations(freshConvs);
+          setFilteredConversations((prev) => {
+            // Maintain search filter
+            if (!searchQuery.trim()) return freshConvs;
+            return freshConvs.filter((c) => {
+              const searchLower = searchQuery.toLowerCase().trim();
+              const participantNames = c.participants
+                .filter(p => p.clerk_user_id !== userId)
+                .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
+              return participantNames.some(name => name.includes(searchLower)) ||
+                c.title?.toLowerCase().includes(searchLower) ||
+                c.last_message?.toLowerCase().includes(searchLower);
+            });
+          });
+        }
+      } catch (e) {
+        console.log('❌ Error polling messages:', e);
+      }
+    };
+    
+    const pollInterval = setInterval(pollMessages, 10000); // Poll every 10 seconds
+    return () => clearInterval(pollInterval);
+  }, [isFocused, userId, searchQuery]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -183,11 +281,8 @@ export default function MessagesScreen() {
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
-    if (tabId === "home") {
-      router.replace("/(app)/(tabs)/home");
-    } else {
-      router.push(`/(app)/(tabs)/${tabId}`);
-    }
+    // Use replace for all tab switches to avoid stacking screens and off-tab renders
+    router.replace(`/(app)/(tabs)/${tabId}`);
   };
 
   const getDisplayName = (conversation: Conversation) => {
@@ -229,9 +324,19 @@ export default function MessagesScreen() {
     const displayParticipant =
       otherParticipants.length > 0 ? otherParticipants[0] : participants[0];
 
-    // If profile image exists, return URL
+    // If profile image exists, return a normalized absolute URL
     if (displayParticipant?.profile_image_url) {
-      return { type: "image", value: displayParticipant.profile_image_url };
+      const raw = displayParticipant.profile_image_url;
+      let normalized = raw;
+      if (raw.startsWith('http')) {
+        normalized = raw;
+      } else if (raw.startsWith('/')) {
+        normalized = `${API_BASE_URL}${raw}`;
+      } else if (raw.startsWith('data:image')) {
+        // Use lightweight server endpoint that streams the image instead of embedding base64
+        normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(displayParticipant.clerk_user_id || '')}/profile-image`;
+      }
+      return { type: "image", value: normalized };
     }
 
     // Otherwise return initials for text display
@@ -253,9 +358,10 @@ export default function MessagesScreen() {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: APP_TIME_ZONE,
       });
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: APP_TIME_ZONE });
     }
   };
 
@@ -277,13 +383,72 @@ export default function MessagesScreen() {
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
 
+        {/* Status Modal */}
+        <Modal
+          visible={statusModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setStatusModalVisible(false)}
+        >
+          <View style={[
+            styles.modalOverlay,
+            { backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)' }
+          ]}>
+            <View style={[
+              styles.modalContent,
+              { backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }
+            ]}>
+              <View style={styles.iconContainer}>
+                <Ionicons 
+                  name={
+                    statusModalData.type === 'success' ? 'checkmark-circle' :
+                    statusModalData.type === 'error' ? 'close-circle' : 'information-circle'
+                  } 
+                  size={64} 
+                  color={
+                    statusModalData.type === 'success' ? '#4CAF50' :
+                    statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                  } 
+                />
+              </View>
+
+              <Text style={[
+                styles.modalTitle,
+                { color: isDarkMode ? '#F9FAFB' : '#1F2937' }
+              ]}>
+                {statusModalData.title}
+              </Text>
+              <Text style={[
+                styles.modalMessage,
+                { color: isDarkMode ? '#D1D5DB' : '#6B7280' }
+              ]}>
+                {statusModalData.message}
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton, 
+                  { 
+                    backgroundColor: 
+                      statusModalData.type === 'success' ? '#4CAF50' :
+                      statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                  }
+                ]}
+                onPress={() => setStatusModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         {/* New Message Button */}
         <View>
           <TouchableOpacity
             style={styles.newMessageButton}
             onPress={() => {
               if (!userId) {
-                Alert.alert("Error", "Please sign in to send messages");
+                showStatusModal('error', 'Authentication Required', 'Please sign in to send messages');
                 return;
               }
               router.push("../messages/new-message");
@@ -342,7 +507,7 @@ export default function MessagesScreen() {
         {/* Connection Status removed per request */}
 
         {/* Conversation List */}
-  <View style={[styles.conversationContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
+        <View style={[styles.conversationContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
           <ScrollView
             style={styles.conversationList}
             refreshControl={
@@ -389,20 +554,46 @@ export default function MessagesScreen() {
                 )}
               </View>
             ) : (
-              filteredConversations.map((conversation) => (
+              filteredConversations.map((conversation) => {
+                return (
                 <TouchableOpacity
                   key={conversation.id}
                   style={[styles.conversationItem, { borderBottomColor: theme.colors.borderLight }]}
                   onPress={() => {
                     if (!userId) {
-                      Alert.alert("Error", "Please sign in to view messages");
+                      showStatusModal('error', 'Authentication Required', 'Please sign in to view messages');
                       return;
                     }
+                    // Persistently clear unread via backend mark-read endpoint, and optimistically update UI
+                    (async () => {
+                      try {
+                        await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}/mark-read`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ clerkUserId: userId })
+                        });
+                      } catch (_e) { /* ignore transient errors */ }
+                    })();
+                    setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+                    setFilteredConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
+
+                    // Determine other participant to pass initial presence
+                    const otherParticipants = conversation.participants.filter((p) => p.clerk_user_id !== userId);
+                    const other = otherParticipants[0];
+                    const otherAvatar = other ? getAvatarDisplay([other as any]) : { type: 'text', value: '' } as const;
+                    const initialPresence = (other?.presence as any) || (other?.online ? 'online' : 'offline');
+
                     router.push({
                       pathname: "../messages/message-chat-screen",
                       params: {
                         id: conversation.id,
                         title: getDisplayName(conversation),
+                        channelUrl: conversation.channel_url || "",
+                        initialOnline: other?.online ? "1" : "0",
+                        initialLastActive: other?.last_active_at || "",
+                        otherClerkId: other?.clerk_user_id || "",
+                        profileImageUrl: otherAvatar.type === 'image' ? otherAvatar.value : "",
+                        initialPresence: initialPresence,
                       },
                     });
                   }}
@@ -430,24 +621,26 @@ export default function MessagesScreen() {
                       }
                     })()}
 
-                    {/* Show green dot if online, gray dot if offline */}
+                    {/* Show presence dot: green online, yellow away, gray offline */}
                     {(() => {
                       const otherParticipants =
                         conversation.participants.filter(
                           (p) => p.clerk_user_id !== userId
                         );
-                      const isOnline = otherParticipants.some(
-                        (p) => p.online === true
-                      );
+                      // choose first other participant's presence
+                      const presence = otherParticipants[0]?.presence || (otherParticipants[0]?.online ? 'online' : 'offline');
+                      const color = presence === 'online'
+                        ? theme.colors.primary
+                        : presence === 'away'
+                          ? '#FFC107'
+                          : theme.colors.iconDisabled;
 
                       return (
                         <View
                           style={[
                             styles.onlineIndicator,
                             {
-                              backgroundColor: isOnline
-                                ? theme.colors.primary
-                                : theme.colors.iconDisabled,
+                              backgroundColor: color,
                               borderColor: theme.colors.surface,
                             },
                           ]}
@@ -490,7 +683,8 @@ export default function MessagesScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
-              ))
+              );
+              })
             )}
           </ScrollView>
         </View>
@@ -505,41 +699,36 @@ export default function MessagesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor removed - now uses theme.colors.background
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    // backgroundColor removed - now uses theme.colors.background
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
-    // color removed - now uses theme.colors.text
+    fontSize: scaledFontSize(16),
   },
   statusContainer: {
     alignItems: "center",
     marginTop: 5,
   },
   statusSubtitle: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: scaledFontSize(14),
     fontStyle: "italic",
   },
   statusText: {
     marginTop: 5,
-    fontSize: 14,
-    color: "#999",
+    fontSize: scaledFontSize(14),
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 30,
-    // backgroundColor removed - now uses theme.colors.surface
     marginTop: 10,
     margin: 15,
     paddingHorizontal: 15,
@@ -558,8 +747,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    // color removed - now uses theme.colors.text
+    fontSize: scaledFontSize(16),
   },
   clearButton: {
     padding: 4,
@@ -574,14 +762,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   searchResultsText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: scaledFontSize(14),
     fontStyle: 'italic',
   },
   clearSearchText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '600',
+    fontSize: scaledFontSize(14),
+    fontWeight: "600",
   },
   statusIndicator: {
     flexDirection: "row",
@@ -595,12 +781,11 @@ const styles = StyleSheet.create({
   },
   statusIndicatorText: {
     color: "#FFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
   },
   conversationContainer: {
     flex: 1,
-    // backgroundColor moved to theme.colors.surface via inline override
     borderWidth: 1,
     margin: 15,
     padding: 10,
@@ -610,7 +795,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
     borderRadius: 10,
-    // borderColor moved to theme.colors.borderLight via inline override
     marginBottom: 100,
     marginTop: 5,
   },
@@ -624,14 +808,12 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 18,
-    // color moved to theme.colors.text via inline override
+    fontSize: scaledFontSize(18),
     marginTop: 16,
     fontWeight: "600",
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    // color moved to theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(14),
     marginTop: 8,
     textAlign: "center",
     marginHorizontal: 20,
@@ -640,12 +822,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    // backgroundColor moved to theme.colors.primary via inline override
     borderRadius: 20,
   },
   retryButtonText: {
     color: "#FFF",
     fontWeight: "600",
+    fontSize: scaledFontSize(14),
   },
   conversationItem: {
     flexDirection: "row",
@@ -654,7 +836,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     paddingTop: 3,
     borderBottomWidth: 1,
-    // borderBottomColor moved to theme.colors.borderLight via inline override
     width: "100%",
   },
   avatarContainer: {
@@ -673,9 +854,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#4CAF50",
     borderWidth: 2,
-    borderColor: "#FFF",
   },
   conversationContent: {
     flex: 1,
@@ -687,30 +866,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   conversationName: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     fontWeight: "800",
-    // color moved to theme.colors.text via inline override
   },
   conversationTime: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontStyle: "italic",
-    // color moved to theme.colors.textSecondary via inline override
   },
   conversationMessage: {
-    fontSize: 14,
-    // color moved to theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(14),
     marginBottom: 2,
   },
   unreadMessage: {
-    // color moved to theme.colors.text via inline override
     fontWeight: "500",
   },
   participantsText: {
-    fontSize: 12,
-    // color moved to theme.colors.textSecondary via inline override
+    fontSize: scaledFontSize(12),
   },
   unreadBadge: {
-    // backgroundColor moved to theme.colors.primary via inline override
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -721,7 +894,7 @@ const styles = StyleSheet.create({
   },
   unreadCount: {
     color: "#FFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "bold",
   },
   newMessageButton: {
@@ -745,21 +918,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   newMessageButtonText: {
-    // color moved to inline override for better contrast on gradient
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "800",
   },
   initialsAvatar: {
     width: 60,
     height: 60,
     borderRadius: 60,
-    // backgroundColor moved to theme.colors.primary via inline override
     justifyContent: "center",
     alignItems: "center",
   },
   initialsText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
   },
   offlineIndicator: {
@@ -769,7 +940,59 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    // colors moved to inline override using theme.colors.iconDisabled and theme.colors.surface
     borderWidth: 2,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 24,
+    padding: 32,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  iconContainer: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: scaledFontSize(28),
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  modalMessage: {
+    fontSize: scaledFontSize(16),
+    textAlign: "center",
+    marginBottom: 28,
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  modalButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modalButtonText: {
+    color: "#FFFFFF",
+    fontSize: scaledFontSize(17),
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });

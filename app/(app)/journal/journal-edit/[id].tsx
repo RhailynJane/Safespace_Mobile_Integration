@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Switch,
@@ -22,6 +21,7 @@ import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../../utils/journalApi";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 
@@ -50,7 +50,7 @@ const tabs = [
 const MAX_CHARACTERS = 2000;
 
 export default function JournalEditScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { id } = useLocalSearchParams();
   const [journalData, setJournalData] = useState({
     title: "",
@@ -65,6 +65,24 @@ export default function JournalEditScreen() {
   const [characterCount, setCharacterCount] = useState(0);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   const fetchEntry = React.useCallback(async () => {
     try {
@@ -82,9 +100,7 @@ export default function JournalEditScreen() {
       setCharacterCount(entry.content.length);
     } catch (error) {
       console.error("Error fetching journal entry:", error);
-      Alert.alert("Error", "Failed to load journal entry", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      showStatusModal('error', 'Load Failed', 'Unable to load journal entry. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -137,7 +153,7 @@ export default function JournalEditScreen() {
       !journalData.content.trim() ||
       !journalData.emotion
     ) {
-      Alert.alert("Missing Fields", "Please fill all required fields");
+      showStatusModal('error', 'Missing Fields', 'Please fill all required fields before saving.');
       return;
     }
 
@@ -162,7 +178,7 @@ export default function JournalEditScreen() {
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error("Error updating journal entry:", error);
-      Alert.alert("Error", error.message || "Failed to update journal entry");
+      showStatusModal('error', 'Update Failed', error.message || "Unable to update journal entry. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -174,18 +190,11 @@ export default function JournalEditScreen() {
   };
 
   const handleCancel = () => {
-    Alert.alert(
-      "Discard Changes?",
-      "Are you sure you want to discard your changes?",
-      [
-        { text: "Keep Editing", style: "cancel" },
-        {
-          text: "Discard",
-          style: "destructive",
-          onPress: () => router.back(),
-        },
-      ]
+    showStatusModal('info', 'Discard Changes?', 
+      'Are you sure you want to discard your changes? Your edits will be lost.'
     );
+    // Note: If you need custom button handling for the cancel confirmation, 
+    // consider implementing a separate confirmation modal component
   };
 
   const renderSuccessModal = () => (
@@ -416,6 +425,15 @@ export default function JournalEditScreen() {
 
         {renderSuccessModal()}
 
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
+
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -426,7 +444,8 @@ export default function JournalEditScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -441,20 +460,22 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xl,
   },
   pageTitle: {
-    ...Typography.title,
+    fontSize: scaledFontSize(24), // Base size 24px
+    fontWeight: "700",
     textAlign: "center",
     marginBottom: Spacing.md,
   },
   pageSubtitle: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     textAlign: "center",
     marginBottom: Spacing.xxl,
+    color: "#666",
   },
   fieldContainer: {
     marginBottom: Spacing.xxl,
   },
   fieldLabel: {
-    ...Typography.subtitle,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
     marginBottom: Spacing.sm,
   },
@@ -468,7 +489,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   characterCount: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
   },
   characterCountMax: {
     fontWeight: "600",
@@ -476,21 +497,22 @@ const styles = StyleSheet.create({
   titleInput: {
     borderRadius: 12,
     padding: Spacing.lg,
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     borderWidth: 1,
   },
   contentInput: {
     borderRadius: 12,
     padding: Spacing.lg,
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     height: 150,
     borderWidth: 1,
     textAlignVertical: 'top',
   },
   // Emotion Styles
   emotionSubtext: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: Spacing.lg,
+    color: "#666",
   },
   emotionsContainer: {
     flexDirection: "row",
@@ -511,13 +533,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
   },
   emotionEmoji: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28), // Base size 28px
     marginBottom: Spacing.xs,
   },
   emotionLabel: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(12), // Base size 12px
     textAlign: "center",
-    fontSize: 12,
   },
   emotionLabelSelected: {
     fontWeight: "600",
@@ -535,36 +556,43 @@ const styles = StyleSheet.create({
     marginRight: Spacing.md,
   },
   shareSubtext: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: 4,
+    color: "#666",
   },
   actionButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: Spacing.lg,
-    marginBottom: Spacing.huge,
+    gap: Spacing.xl,
+    marginBottom: 100,
+    marginTop: Spacing.xxl,
+    paddingHorizontal: Spacing.md,
   },
   cancelButton: {
     flex: 1,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     alignItems: "center",
     borderWidth: 1,
   },
   cancelButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
   saveButton: {
     flex: 1,
     borderRadius: 12,
     paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     alignItems: "center",
   },
   disabledButton: {
     opacity: 0.6,
   },
   saveButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
   centered: {
     flex: 1,
@@ -572,8 +600,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: Spacing.md,
+    color: "#666",
   },
   // Success Modal Styles
   modalOverlay: {
@@ -594,15 +623,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   successTitle: {
-    ...Typography.title,
+    fontSize: scaledFontSize(24), // Base size 24px
+    fontWeight: "700",
     marginBottom: Spacing.md,
     textAlign: "center",
   },
   successMessage: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
     marginBottom: Spacing.lg,
     lineHeight: 22,
+    color: "#666",
   },
   sharedInfo: {
     flexDirection: "row",
@@ -613,7 +644,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
   sharedInfoText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginLeft: Spacing.sm,
     flex: 1,
   },
@@ -625,6 +656,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   successButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
 });
