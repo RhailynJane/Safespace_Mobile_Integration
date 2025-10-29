@@ -5,10 +5,10 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import StatusModal from "./StatusModal";
 
 // Local interface for signup data
 interface SignupData {
@@ -38,6 +38,14 @@ export default function PasswordStep({
   // State to toggle password visibility
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
   // Validates password against all security requirements
   const validatePassword = () => {
@@ -54,10 +62,16 @@ export default function PasswordStep({
     return failedRequirements.length === 0;
   };
 
+  // Show modal helper
+  const showErrorModal = (title: string, message: string) => {
+    setModalConfig({ type: 'error', title, message });
+    setShowModal(true);
+  };
+
   // Handles form submission
   const handleSubmit = () => {
     if (!validatePassword()) {
-      Alert.alert(
+      showErrorModal(
         "Password Requirements",
         "Please ensure your password meets all requirements"
       );
@@ -65,7 +79,7 @@ export default function PasswordStep({
     }
 
     if (!data.confirmPassword) {
-      Alert.alert(
+      showErrorModal(
         "Confirm Password",
         "Please confirm your password"
       );
@@ -73,7 +87,7 @@ export default function PasswordStep({
     }
 
     if (data.password !== data.confirmPassword) {
-      Alert.alert(
+      showErrorModal(
         "Passwords Don't Match",
         "Please make sure both passwords are identical"
       );
@@ -146,7 +160,7 @@ export default function PasswordStep({
               <View
                 style={[
                   styles.requirementDot,
-                  { backgroundColor: requirement.test ? theme.colors.primary : theme.colors.borderLight },
+                  { backgroundColor: requirement.test ? theme.colors.primary : (theme.isDark ? '#666666' : '#CCCCCC') },
                 ]}
               />
               <Text
@@ -222,6 +236,15 @@ export default function PasswordStep({
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Status Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setShowModal(false)}
+      />
     </View>
   );
 }

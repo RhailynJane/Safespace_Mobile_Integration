@@ -1,5 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,8 +6,6 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Alert,
-  Image,
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,8 +16,12 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { syncUserWithDatabase } from "../../../../utils/userSync";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import activityApi from "../../../../utils/activityApi";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
+import OptimizedImage from "../../../../components/OptimizedImage";
+import StatusModal from "../../../../components/StatusModal";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = getApiBaseUrl();
 
 interface ProfileData {
   firstName: string;
@@ -41,10 +42,19 @@ export default function ProfileScreen() {
   });
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
   const { signOut } = useAuth();
   const { user } = useUser();
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -54,8 +64,17 @@ export default function ProfileScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideModal = () => {
+    setModalVisible(false);
+  };
+
   // Use the existing sync function from userSync.ts
-  const syncUserWithBackend = async (): Promise<boolean> => {
+  const syncUserWithBackend = useCallback(async (): Promise<boolean> => {
     if (!user) {
       console.log("❌ No user available for sync");
       return false;
@@ -68,9 +87,10 @@ export default function ProfileScreen() {
       return true;
     } catch (error) {
       console.error("❌ Error syncing user via userSync.ts:", error);
+      showModal('error', 'Sync Failed', 'Unable to sync user data. Some features may not work properly.');
       return false;
     }
-  };
+  }, [user]);
 
   // Simple function to fetch client profile directly
   const fetchClientProfile = async (clerkUserId: string): Promise<any> => {
@@ -203,10 +223,11 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error("❌ Error in fetchProfileData:", error);
+      showModal('error', 'Load Failed', 'Unable to load profile data. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, syncUserWithBackend]);
 
   useEffect(() => {
     fetchProfileData();
@@ -221,50 +242,51 @@ export default function ProfileScreen() {
     }
   };
 
-    const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+  const handleLogout = async () => {
+    if (!user) {
+      router.navigate("/(auth)/login");
+      return;
+    }
 
-  const handleLogout = async (user: any) => {
     try {
+      setIsLoggingOut(true);
       console.log('Signout initiated...');
       
       // Get current user info before signing out
-      const clerkUserId = user?.id;
+      const clerkUserId = user.id;
     
-    // Update logout timestamp in database
-    if (clerkUserId) {
-      try {
-        await fetch(`${API_BASE_URL}/api/users/${clerkUserId}/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        console.log('Logout timestamp updated in database');
-      } catch (dbError) {
-        console.error('Failed to update logout timestamp:', dbError);
-        // Continue with logout even if DB update fails
+      // Record logout activity
+      if (clerkUserId) {
+        try {
+          await activityApi.recordLogout(clerkUserId);
+          console.log('Logout activity recorded');
+        } catch (dbError) {
+          console.error('Failed to record logout activity:', dbError);
+          // Continue with logout even if tracking fails
+        }
       }
+    
+      await AsyncStorage.clear();
+      console.log('AsyncStorage cleared');
+    
+      if (signOut) {
+        await signOut();
+        console.log('Clerk signout successful');
+      }
+    
+      showModal('success', 'Signed Out', 'You have been successfully signed out.');
+      
+      // Navigate after a brief delay to show success message
+      setTimeout(() => {
+        router.navigate("/(auth)/login");
+      }, 1500);
+    
+    } catch (error) {
+      console.error("Signout error:", error);
+      showModal('error', 'Sign Out Failed', 'There was a problem signing out. Please try again.');
+      setIsLoggingOut(false);
     }
-    
-    await AsyncStorage.clear();
-    console.log('AsyncStorage cleared');
-    
-    if (signOut) {
-      await signOut();
-      console.log('Clerk signout successful');
-    }
-    
-    router.navigate("/(auth)/login");
-    console.log('Navigation to login completed');
-    
-  } catch (error) {
-    console.error("Signout error:", error);
-    router.navigate("/(auth)/login");
-  }
-
-
   };
-
 
   const getFullName = () => {
     if (profileData.firstName && profileData.lastName) {
@@ -291,7 +313,7 @@ export default function ProfileScreen() {
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading profile...</Text>
           </View>
         </SafeAreaView>
@@ -306,12 +328,16 @@ export default function ProfileScreen() {
           {/* Profile Information Section */}
           <View style={[styles.profileSection, { backgroundColor: theme.colors.surface }]}>
             {profileData.profileImageUrl ? (
-              <Image
+              <OptimizedImage
                 source={{ uri: profileData.profileImageUrl }}
                 style={styles.profileImage}
+                cache="force-cache"
+                loaderSize="large"
+                loaderColor={theme.colors.primary}
+                showErrorIcon={false}
               />
             ) : (
-              <View style={styles.profileInitials}>
+              <View style={[styles.profileInitials, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.initialsText}>{getInitials()}</Text>
               </View>
             )}
@@ -356,9 +382,14 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={[styles.menuItem, styles.logoutItem]}
-              onPress={() => handleLogout(user)}
+              onPress={handleLogout}
+              disabled={isLoggingOut}
             >
-              <Text style={[styles.menuText, styles.logoutText]}>Sign Out</Text>
+              {isLoggingOut ? (
+                <ActivityIndicator size="small" color="#FF6B6B" />
+              ) : (
+                <Text style={[styles.menuText, styles.logoutText]}>Sign Out</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -368,13 +399,22 @@ export default function ProfileScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideModal}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 }
 
-// Your styles remain the same...
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -389,7 +429,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     color: "#666",
   },
   profileSection: {
@@ -421,18 +461,18 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   initialsText: {
-    fontSize: 32,
+    fontSize: scaledFontSize(32), // Base size 32px
     fontWeight: "bold",
     color: "#FFFFFF",
   },
   name: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "bold",
     color: "#333",
     marginBottom: 5,
   },
   email: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     color: "#666",
   },
   locationContainer: {
@@ -441,7 +481,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   location: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14), // Base size 14px
     color: "#666",
     marginLeft: 4,
   },
@@ -465,12 +505,13 @@ const styles = StyleSheet.create({
   },
   menuText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scaledFontSize(16), // Base size 16px
     color: "#333",
     marginLeft: 15,
   },
   logoutItem: {
     borderBottomWidth: 0,
+    justifyContent: "center",
   },
   logoutText: {
     color: "#FF6B6B",

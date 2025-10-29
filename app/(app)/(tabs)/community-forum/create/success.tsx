@@ -4,7 +4,7 @@
  * LLM Prompt: Add comprehensive comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -21,14 +21,22 @@ import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useTheme } from "../../../../../contexts/ThemeContext";
+import StatusModal from "../../../../../components/StatusModal";
 
 const { width, height } = Dimensions.get("window");
 
 export default function PostSuccessScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [activeTab, setActiveTab] = useState("community-forum");
   const [scaleAnim] = useState(new Animated.Value(0.8));
   const [fadeAnim] = useState(new Animated.Value(0));
+  
+  // Modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   useEffect(() => {
     // Success animation sequence
@@ -66,6 +74,14 @@ export default function PostSuccessScreen() {
    */
   const handleBrowseCommunity = () => {
     router.replace("/(app)/(tabs)/community-forum/main");
+  };
+
+  /**
+   * Shows success modal for additional feedback
+   */
+  const showAdditionalSuccess = () => {
+    setSuccessMessage("Your post is now live! You can track engagement and responses in your profile.");
+    setShowSuccessModal(true);
   };
 
   // Bottom navigation tabs configuration
@@ -110,7 +126,7 @@ export default function PostSuccessScreen() {
             {/* Success Icon with Celebration Effect */}
             <View style={styles.iconContainer}>
               <View style={styles.successIconBackground}>
-                <Ionicons name="checkmark" size={48} color="#FFFFFF" />
+                <Ionicons name="checkmark" size={scaledFontSize(48)} color="#FFFFFF" />
               </View>
               {/* Celebration dots */}
               <View style={styles.celebrationDot1} />
@@ -130,15 +146,15 @@ export default function PostSuccessScreen() {
             {/* Success Stats */}
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
-                <Ionicons name="eye-outline" size={20} color="#7CB9A9" />
+                <Ionicons name="eye-outline" size={scaledFontSize(20)} color="#7CB9A9" />
                 <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>Visible to community</Text>
               </View>
               <View style={styles.statItem}>
-                <Ionicons name="heart-outline" size={20} color="#7CB9A9" />
+                <Ionicons name="heart-outline" size={scaledFontSize(20)} color="#7CB9A9" />
                 <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>Ready for reactions</Text>
               </View>
               <View style={styles.statItem}>
-                <Ionicons name="chatbubble-outline" size={20} color="#7CB9A9" />
+                <Ionicons name="chatbubble-outline" size={scaledFontSize(20)} color="#7CB9A9" />
                 <Text style={[styles.statText, { color: theme.colors.textSecondary }]}>Open for support</Text>
               </View>
             </View>
@@ -148,7 +164,7 @@ export default function PostSuccessScreen() {
               style={styles.primaryButton}
               onPress={handleViewPost}
             >
-              <Ionicons name="rocket" size={20} color="#FFFFFF" />
+              <Ionicons name="rocket" size={scaledFontSize(20)} color="#FFFFFF" />
               <Text style={styles.primaryButtonText}>View My Post</Text>
             </TouchableOpacity>
 
@@ -158,16 +174,16 @@ export default function PostSuccessScreen() {
                 style={styles.secondaryButton}
                 onPress={handleCreateAnother}
               >
-                <Ionicons name="add-circle" size={18} color="#7CB9A9" />
+                <Ionicons name="add-circle" size={scaledFontSize(18)} color="#7CB9A9" />
                 <Text style={styles.secondaryButtonText}>Create Another</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.secondaryButton}
-                onPress={handleBrowseCommunity}
+                onPress={showAdditionalSuccess}
               >
-                <Ionicons name="compass" size={18} color="#7CB9A9" />
-                <Text style={styles.secondaryButtonText}>Browse Community</Text>
+                <Ionicons name="information-circle" size={scaledFontSize(18)} color="#7CB9A9" />
+                <Text style={styles.secondaryButtonText}>More Info</Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -179,12 +195,23 @@ export default function PostSuccessScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        {/* Success Modal */}
+        <StatusModal
+          visible={showSuccessModal}
+          type="success"
+          title="Post Published Successfully"
+          message={successMessage}
+          onClose={() => setShowSuccessModal(false)}
+          buttonText="Got It"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 }
 
-const styles = StyleSheet.create({
+// Dynamic styles with text size scaling
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -285,7 +312,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   title: {
-    fontSize: 28,
+    fontSize: scaledFontSize(28),
     fontWeight: "800",
     // color moved to theme.colors.text via inline override
     textAlign: "center",
@@ -293,7 +320,7 @@ const styles = StyleSheet.create({
     lineHeight: 34,
   },
   message: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     // color moved to theme.colors.textSecondary via inline override
     textAlign: "center",
     lineHeight: 24,
@@ -312,7 +339,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   statText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     // color moved to theme.colors.textSecondary via inline override
     fontWeight: "500",
   },
@@ -338,7 +365,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "700",
   },
   secondaryActions: {
@@ -361,7 +388,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#7CB9A9",
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
   },
   // Legacy styles (kept for reference)
@@ -385,7 +412,7 @@ const styles = StyleSheet.create({
   },
   communityPostButtonText: {
     color: "#000",
-    fontSize: 11,
+    fontSize: scaledFontSize(11),
     fontWeight: "600",
   },
   headerRight: {

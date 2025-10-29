@@ -5,10 +5,10 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
+import StatusModal from "./StatusModal";
 
 interface EmailVerificationStepProps {
   email: string;
@@ -35,6 +35,14 @@ export default function EmailVerificationStep({
   const [resendLoading, setResendLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState("");
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
   // Handle cooldown timer for resend button
   useEffect(() => {
@@ -70,7 +78,12 @@ export default function EmailVerificationStep({
       }
 
       setCooldown(30);
-      Alert.alert("Verification Code Sent", `A new 6-digit code has been sent to ${email}`);
+      setModalConfig({
+        type: 'info',
+        title: 'Verification Code Sent',
+        message: `A new 6-digit code has been sent to ${email}`,
+      });
+      setShowModal(true);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to resend code";
       setError(errorMessage);
@@ -163,6 +176,15 @@ export default function EmailVerificationStep({
       >
         <Text style={[styles.backButtonText, { color: theme.colors.textSecondary }]}>Back</Text>
       </TouchableOpacity>
+
+      {/* Status Modal */}
+      <StatusModal
+        visible={showModal}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onClose={() => setShowModal(false)}
+      />
     </View>
   );
 }

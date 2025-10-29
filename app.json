@@ -13,11 +13,28 @@
         "expo-router"
       ],
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow SafeSpace to access your photos",
+          "savePhotosPermission": "Allow SafeSpace to save photos to your library",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ]
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e7c636be-6f7e-403c-8731-4ec9a0ec2d48"
+      }
+    },
+    "owner": "safespacedev"
   },
   "splash": {
     "image": "./assets/splash-icon.png",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +16,9 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
+import StatusModal from "../../../components/StatusModal";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -28,11 +29,29 @@ const tabs = [
 ];
 
 export default function JournalScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journal");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideModal = () => {
+    setModalVisible(false);
+  };
 
   const fetchRecentEntries = React.useCallback(async () => {
     if (!user?.id) return;
@@ -43,7 +62,7 @@ export default function JournalScreen() {
       setJournalEntries(response.entries || []);
     } catch (error) {
       console.error("Error fetching journal entries:", error);
-      Alert.alert("Error", "Failed to load journal entries");
+      showModal('error', 'Load Failed', 'Unable to load journal entries. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -86,7 +105,7 @@ export default function JournalScreen() {
       month: "short",
       day: "numeric",
     };
-    return date.toLocaleDateString("en-US", options);
+    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
 
   return (
@@ -208,12 +227,22 @@ export default function JournalScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideModal}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -228,9 +257,10 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xxl,
   },
   subText: {
-    ...Typography.subtitle,
+    fontSize: scaledFontSize(16), // Base size 16px
     textAlign: "center",
     marginBottom: Spacing.xxl,
+    color: "#666",
   },
   createCard: {
     borderRadius: 16,
@@ -258,12 +288,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   createTitle: {
-    ...Typography.subtitle,
+    fontSize: scaledFontSize(18), // Base size 18px
     fontWeight: "600",
     marginBottom: 4,
   },
   createSubtitle: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
+    color: "#666",
   },
   createButton: {
     padding: Spacing.sm,
@@ -272,7 +303,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
-    ...Typography.subtitle,
+    fontSize: scaledFontSize(18), // Base size 18px
     fontWeight: "600",
     marginBottom: Spacing.lg,
   },
@@ -287,8 +318,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xl,
   },
   loadingText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: Spacing.md,
+    color: "#666",
   },
   entryCard: {
     borderRadius: 12,
@@ -301,23 +333,25 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   entryEmoji: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24), // Base size 24px
     marginRight: Spacing.md,
   },
   entryInfo: {
     flex: 1,
   },
   entryTitle: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
     marginBottom: 2,
   },
   entryDate: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(12), // Base size 12px
+    color: "#666",
   },
   entryPreview: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     lineHeight: 18,
+    color: "#666",
   },
   sharedBadge: {
     flexDirection: "row",
@@ -329,22 +363,22 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   sharedText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(10), // Base size 10px
     marginLeft: 4,
-    fontSize: 10,
   },
   noEntriesText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     textAlign: "center",
     marginTop: Spacing.huge,
     marginBottom: Spacing.huge,
+    color: "#666",
   },
   viewAllButton: {
     marginTop: Spacing.lg,
     alignItems: "center",
   },
   viewAllText: {
-    ...Typography.link,
+    fontSize: scaledFontSize(16), // Base size 16px
     textDecorationLine: "underline",
   },
 });

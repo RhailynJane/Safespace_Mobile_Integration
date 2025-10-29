@@ -3,7 +3,7 @@
  * Reference: chat.deepseek.com
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -45,10 +45,16 @@ const mockProfile = {
  * Features a beautiful curved background and comprehensive navigation.
  */
 export default function VideoScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("video");
+
+  /**
+   * Create styles dynamically based on text size scaling
+   * Uses useMemo for performance optimization
+   */
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Navigation tabs configuration
   const tabs = [
@@ -244,7 +250,11 @@ export default function VideoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stylesheet for VideoScreen component
+ * Now includes dynamic font scaling via scaledFontSize parameter
+ */
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -269,7 +279,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
   },
   content: {
@@ -279,13 +289,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   title: {
-    fontSize: 22,
+    fontSize: scaledFontSize(22),
     fontWeight: "600",
     marginBottom: 12,
     textAlign: "center",
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     textAlign: "center",
     lineHeight: 24,
   },
@@ -313,12 +323,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
   },
   sideMenuContent: {
     padding: 10,
@@ -331,7 +341,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     marginLeft: 15,
   },
   scrollContent: {
@@ -352,14 +362,14 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   name: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
   },
   date: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
   },
   time: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -379,7 +389,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
   },
   joinButton: {
     flexDirection: "row",
@@ -392,7 +402,7 @@ const styles = StyleSheet.create({
   },
   joinButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   profileContainer: {
@@ -408,12 +418,12 @@ const styles = StyleSheet.create({
     marginVertical: 20,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     marginBottom: 16,
   },
   subsectionTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     marginTop: 16,
     marginBottom: 12,
@@ -431,7 +441,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   requirementText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     flex: 1,
     lineHeight: 24,
   },

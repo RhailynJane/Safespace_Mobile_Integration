@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -46,12 +46,18 @@ const responseOptions = [
 ];
 
 export default function PreSurveyScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // Store responses for all questions (question id -> selected value)
   const [responses, setResponses] = useState<{ [key: number]: number }>({});
   const [activeTab, setActiveTab] = useState("assessment");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const { user } = useUser();
+
+  /**
+   * Create styles dynamically based on text size scaling
+   * Uses useMemo for performance optimization
+   */
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Bottom navigation configuration
   const tabs = [
@@ -296,7 +302,11 @@ export default function PreSurveyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stylesheet for PreSurveyScreen component
+ * Now includes dynamic font scaling via scaledFontSize parameter
+ */
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -309,13 +319,13 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     textAlign: "center",
     marginBottom: 10,
   },
   instructions: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     textAlign: "center",
     marginBottom: 30,
     lineHeight: 20,
@@ -335,14 +345,14 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   questionNumber: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   questionText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "500",
     marginBottom: 20,
     lineHeight: 22,
@@ -379,7 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   optionLabel: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     textAlign: "center",
     lineHeight: 18,
   },
@@ -404,7 +414,7 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   submitButtonText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#FFFFFF",
   },
@@ -436,13 +446,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "700",
     textAlign: "center",
     marginBottom: 15,
   },
   modalMessage: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 25,
@@ -462,7 +472,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalButtonText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#FFFFFF",
   },

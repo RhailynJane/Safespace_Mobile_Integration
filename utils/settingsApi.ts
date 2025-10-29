@@ -1,8 +1,7 @@
 // utils/settingsAPI.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth, useUser } from '@clerk/clerk-expo';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+import { getApiBaseUrl } from './apiBaseUrl';
 
 export interface SettingsAPIResponse {
   success: boolean;
@@ -15,23 +14,36 @@ export interface UserSettings {
   // Display & Accessibility
   darkMode: boolean;
   textSize: string;
-  
-  // Privacy & Security
-  autoLockTimer: string;
 
   // Notifications
   notificationsEnabled: boolean;
-  quietHoursEnabled: boolean;
-  quietStartTime: string;
-  quietEndTime: string;
+  // Granular notification categories
+  notifMoodTracking: boolean;
+  notifJournaling: boolean;
+  notifMessages: boolean;
+  notifPostReactions: boolean;
+  notifAppointments: boolean;
+  notifSelfAssessment: boolean;
   reminderFrequency: string;
+  // Per-category reminders
+  moodReminderEnabled: boolean;
+  moodReminderTime: string;
+  moodReminderFrequency: string;
+  moodReminderCustomSchedule: Record<string, string>;
+  journalReminderEnabled: boolean;
+  journalReminderTime: string;
+  journalReminderFrequency: string;
+  journalReminderCustomSchedule: Record<string, string>;
+  // Appointment reminders
+  appointmentReminderEnabled: boolean;
+  appointmentReminderAdvanceMinutes: number;
 }
 
 class SettingsAPI {
   private baseURL: string;
 
   constructor() {
-    this.baseURL = API_BASE_URL;
+    this.baseURL = getApiBaseUrl();
     console.log('🔧 Settings API initialized with base URL:', this.baseURL);
   }
 
@@ -40,38 +52,48 @@ class SettingsAPI {
       // Method 1: Check AsyncStorage first (most reliable for React Native)
       const authData = await AsyncStorage.getItem('authData');
       if (authData) {
-        const parsed = JSON.parse(authData);
-        if (parsed.clerkUserId) {
-          console.log('🔧 Found Clerk user ID from storage:', parsed.clerkUserId);
-          return parsed.clerkUserId;
+        try {
+          const parsed = JSON.parse(authData);
+          if (parsed.clerkUserId && parsed.clerkUserId !== 'undefined') {
+            console.log('🔧 Found Clerk user ID from storage:', parsed.clerkUserId);
+            return parsed.clerkUserId;
+          }
+        } catch (e) {
+          console.log('🔧 Error parsing authData:', e);
         }
       }
 
       // Method 2: Check for any user data in storage
       const userData = await AsyncStorage.getItem('userData');
       if (userData) {
-        const parsed = JSON.parse(userData);
-        if (parsed.clerkUserId || parsed.id) {
-          const userId = parsed.clerkUserId || parsed.id;
-          console.log('🔧 Found user ID from user data:', userId);
-          return userId;
+        try {
+          const parsed = JSON.parse(userData);
+          if ((parsed.clerkUserId || parsed.id) && (parsed.clerkUserId !== 'undefined' && parsed.id !== 'undefined')) {
+            const userId = parsed.clerkUserId || parsed.id;
+            console.log('🔧 Found user ID from user data:', userId);
+            return userId;
+          }
+        } catch (e) {
+          console.log('🔧 Error parsing userData:', e);
         }
       }
 
-      // Method 3: Try to get from Clerk hooks (if in React component context)
-      try {
-        // Note: This will only work if called from a React component
-        // For utils file, we'll rely on the storage methods above
-        console.log('🔧 Attempting to get user ID from Clerk context...');
-        
-        // For now, we'll use the actual user ID from your logs
-        // In a real app, you'd pass the user ID as a parameter or use a different approach
-      } catch (clerkError) {
-        console.log('🔧 Clerk context not available in utils file');
+      // Method 3: Try to get from Clerk user object stored in storage
+      const clerkUserData = await AsyncStorage.getItem('clerkUser');
+      if (clerkUserData) {
+        try {
+          const parsed = JSON.parse(clerkUserData);
+          if (parsed.id && parsed.id !== 'undefined') {
+            console.log('🔧 Found Clerk user ID from clerk user data:', parsed.id);
+            return parsed.id;
+          }
+        } catch (e) {
+          console.log('🔧 Error parsing clerkUser:', e);
+        }
       }
 
-      // If no user ID found, use the actual user ID from your logs
-      console.log('🔧 Using actual user ID from logs');
+      // Fallback: use the actual user ID from your logs
+      console.log('🔧 Using fallback user ID');
       return 'user_344imQE8qo1PA0Blw6bsT9YC1qe';
       
     } catch (error) {
@@ -81,9 +103,9 @@ class SettingsAPI {
     }
   }
 
-  async fetchSettings(): Promise<UserSettings> {
+  async fetchSettings(providedClerkUserId?: string): Promise<UserSettings> {
     try {
-      const clerkUserId = await this.getClerkUserId();
+      const clerkUserId = providedClerkUserId || await this.getClerkUserId();
       const url = `${this.baseURL}/api/settings/${clerkUserId}`;
       console.log('🔧 Fetching settings from:', url);
       
@@ -125,11 +147,23 @@ class SettingsAPI {
     }
   }
 
-  async saveSettings(settings: UserSettings): Promise<SettingsAPIResponse> {
+  async saveSettings(settings: UserSettings, providedClerkUserId?: string): Promise<SettingsAPIResponse> {
     try {
-      const clerkUserId = await this.getClerkUserId();
+      const clerkUserId = providedClerkUserId || await this.getClerkUserId();
+      
+      // Validate that we have a valid user ID
+      if (!clerkUserId || clerkUserId === 'undefined' || clerkUserId === 'null') {
+        console.error('❌ Invalid clerk user ID:', clerkUserId);
+        return {
+          success: false,
+          message: 'Invalid user ID',
+          error: 'Cannot save settings without valid user ID'
+        };
+      }
+
       const url = `${this.baseURL}/api/settings/${clerkUserId}`;
       console.log('🔧 Saving settings to:', url);
+      console.log('🔧 Clerk User ID:', clerkUserId);
       console.log('🔧 Settings to save:', settings);
       
       const mappedSettings = this.mapClientToServer(settings);
@@ -140,7 +174,9 @@ class SettingsAPI {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ settings: mappedSettings })
+        body: JSON.stringify({ 
+          settings: mappedSettings 
+        })
       });
 
       console.log('🔧 Save response status:', response.status, response.statusText);
@@ -278,16 +314,30 @@ class SettingsAPI {
       // Display & Accessibility
       darkMode: serverData.dark_mode ?? false,
       textSize: serverData.text_size ?? 'Medium',
-      
-      // Privacy & Security
-      autoLockTimer: serverData.auto_lock_timer ?? '5 minutes',
 
       // Notifications
       notificationsEnabled: serverData.notifications_enabled ?? true,
-      quietHoursEnabled: serverData.quiet_hours_enabled ?? false,
-      quietStartTime: serverData.quiet_start_time ?? '22:00',
-      quietEndTime: serverData.quiet_end_time ?? '08:00',
+      notifMoodTracking: serverData.notif_mood_tracking ?? true,
+      notifJournaling: serverData.notif_journaling ?? true,
+      notifMessages: serverData.notif_messages ?? true,
+      notifPostReactions: serverData.notif_post_reactions ?? true,
+      notifAppointments: serverData.notif_appointments ?? true,
+      notifSelfAssessment: serverData.notif_self_assessment ?? true,
       reminderFrequency: serverData.reminder_frequency ?? 'Daily',
+      moodReminderEnabled: serverData.mood_reminder_enabled ?? false,
+      moodReminderTime: serverData.mood_reminder_time ?? '09:00',
+      moodReminderFrequency: serverData.mood_reminder_frequency ?? 'Daily',
+      moodReminderCustomSchedule: typeof serverData.mood_reminder_custom_schedule === 'string' 
+        ? JSON.parse(serverData.mood_reminder_custom_schedule)
+        : (serverData.mood_reminder_custom_schedule ?? {}),
+      journalReminderEnabled: serverData.journal_reminder_enabled ?? false,
+      journalReminderTime: serverData.journal_reminder_time ?? '20:00',
+      journalReminderFrequency: serverData.journal_reminder_frequency ?? 'Daily',
+      journalReminderCustomSchedule: typeof serverData.journal_reminder_custom_schedule === 'string'
+        ? JSON.parse(serverData.journal_reminder_custom_schedule)
+        : (serverData.journal_reminder_custom_schedule ?? {}),
+      appointmentReminderEnabled: serverData.appointment_reminder_enabled ?? true,
+      appointmentReminderAdvanceMinutes: serverData.appointment_reminder_advance_minutes ?? 60,
     };
   }
 
@@ -296,16 +346,26 @@ class SettingsAPI {
       // Display & Accessibility
       darkMode: clientSettings.darkMode,
       textSize: clientSettings.textSize,
-      
-      // Privacy & Security
-      autoLockTimer: clientSettings.autoLockTimer,
 
       // Notifications
       notificationsEnabled: clientSettings.notificationsEnabled,
-      quietHoursEnabled: clientSettings.quietHoursEnabled,
-      quietStartTime: clientSettings.quietStartTime,
-      quietEndTime: clientSettings.quietEndTime,
+      notifMoodTracking: clientSettings.notifMoodTracking,
+      notifJournaling: clientSettings.notifJournaling,
+      notifMessages: clientSettings.notifMessages,
+      notifPostReactions: clientSettings.notifPostReactions,
+      notifAppointments: clientSettings.notifAppointments,
+      notifSelfAssessment: clientSettings.notifSelfAssessment,
       reminderFrequency: clientSettings.reminderFrequency,
+      moodReminderEnabled: clientSettings.moodReminderEnabled,
+      moodReminderTime: clientSettings.moodReminderTime,
+      moodReminderFrequency: clientSettings.moodReminderFrequency,
+      moodReminderCustomSchedule: clientSettings.moodReminderCustomSchedule,
+      journalReminderEnabled: clientSettings.journalReminderEnabled,
+      journalReminderTime: clientSettings.journalReminderTime,
+      journalReminderFrequency: clientSettings.journalReminderFrequency,
+      journalReminderCustomSchedule: clientSettings.journalReminderCustomSchedule,
+      appointmentReminderEnabled: clientSettings.appointmentReminderEnabled,
+      appointmentReminderAdvanceMinutes: clientSettings.appointmentReminderAdvanceMinutes,
     };
   }
 
@@ -313,14 +373,27 @@ class SettingsAPI {
     return {
       darkMode: false,
       textSize: 'Medium',
-      autoLockTimer: '5 minutes',
       notificationsEnabled: true,
-      quietHoursEnabled: false,
-      quietStartTime: '22:00',
-      quietEndTime: '08:00',
+      notifMoodTracking: true,
+      notifJournaling: true,
+      notifMessages: true,
+      notifPostReactions: true,
+      notifAppointments: true,
+      notifSelfAssessment: true,
       reminderFrequency: 'Daily',
+      moodReminderEnabled: false,
+      moodReminderTime: '09:00',
+      moodReminderFrequency: 'Daily',
+      moodReminderCustomSchedule: {},
+      journalReminderEnabled: false,
+      journalReminderTime: '20:00',
+      journalReminderFrequency: 'Daily',
+      journalReminderCustomSchedule: {},
+      appointmentReminderEnabled: true,
+      appointmentReminderAdvanceMinutes: 60,
     };
   }
 }
+
 
 export default new SettingsAPI();

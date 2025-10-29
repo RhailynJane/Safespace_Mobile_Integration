@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
-  Alert,
   TextInput,
   Modal,
   Platform,
@@ -20,8 +19,10 @@ import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from "../../../contexts/ThemeContext";
+import StatusModal from "../../../components/StatusModal";
 
 type FilterType = "all" | "week" | "month" | "custom";
 
@@ -34,7 +35,7 @@ const tabs = [
 ];
 
 export default function JournalHistoryScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
@@ -48,6 +49,24 @@ export default function JournalHistoryScreen() {
   const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
+
+  // Create styles dynamically based on text size
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  const hideStatusModal = () => {
+    setModalVisible(false);
+  };
 
   // Move getDateFilters outside of fetchEntries and use useCallback
   const getDateFilters = React.useCallback(() => {
@@ -103,7 +122,7 @@ export default function JournalHistoryScreen() {
       setFilteredEntries(response.entries || []);
     } catch (error) {
       console.error("Error fetching journal entries:", error);
-      Alert.alert("Error", "Failed to load journal history");
+      showStatusModal('error', 'Load Failed', 'Unable to load journal history. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -175,13 +194,13 @@ export default function JournalHistoryScreen() {
 
   const handleApplyCustomDate = () => {
     if (!customStartDate) {
-      Alert.alert("Error", "Please select a start date");
+      showStatusModal('error', 'Missing Date', 'Please select a start date to filter by custom date range.');
       return;
     }
     
     // Validate that end date is not before start date
     if (customEndDate && customEndDate < customStartDate) {
-      Alert.alert("Error", "End date cannot be before start date");
+      showStatusModal('error', 'Invalid Date Range', 'End date cannot be before start date. Please adjust your selection.');
       return;
     }
     
@@ -208,7 +227,7 @@ export default function JournalHistoryScreen() {
       month: "long",
       day: "numeric",
     };
-    return date.toLocaleDateString("en-US", options);
+    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
 
   const formatDateForDisplay = (date: Date | null) => {
@@ -218,7 +237,7 @@ export default function JournalHistoryScreen() {
       month: "short",
       day: "numeric",
     };
-    return date.toLocaleDateString("en-US", options);
+    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
 
   const renderFilterButton = (filter: FilterType, label: string) => (
@@ -522,6 +541,15 @@ export default function JournalHistoryScreen() {
           />
         )}
 
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideStatusModal}
+          buttonText="OK"
+        />
+
         <BottomNavigation
           tabs={tabs}
           activeTab={activeTab}
@@ -532,7 +560,8 @@ export default function JournalHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -544,8 +573,7 @@ const styles = StyleSheet.create({
     marginBottom: 60,
   },
   pageTitle: {
-    ...Typography.title,
-    fontSize: 28,
+    fontSize: scaledFontSize(28), // Base size 28px
     fontWeight: "600",
     marginTop: Spacing.xl,
     marginBottom: Spacing.lg,
@@ -568,7 +596,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
   filterContainer: {
     flexDirection: "row",
@@ -590,9 +618,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   filterText: {
-    ...Typography.body,
+    fontSize: scaledFontSize(13), // Base size 13px
     fontWeight: "500",
-    fontSize: 13,
   },
   filterTextActive: {
     fontWeight: "600",
@@ -606,11 +633,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   activeDateText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     fontWeight: "600",
   },
   resultsCount: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: Spacing.lg,
   },
   entriesContainer: {
@@ -621,7 +648,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xxl,
   },
   loadingText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: Spacing.md,
   },
   entryCard: {
@@ -644,30 +671,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   entryTitle: {
-    ...Typography.subtitle,
+    fontSize: scaledFontSize(18), // Base size 18px
     fontWeight: "600",
     marginBottom: 4,
   },
   entryDate: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
   },
   entryMeta: {
     flexDirection: "row",
     alignItems: "center",
   },
   entryEmoji: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24), // Base size 24px
     marginRight: Spacing.sm,
   },
   expandIcon: {
     marginLeft: Spacing.sm,
   },
   entryContent: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
     lineHeight: 22,
   },
   readMore: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginTop: Spacing.sm,
     fontWeight: "500",
   },
@@ -683,7 +710,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
   },
   tagText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
   },
   sharedBadge: {
     flexDirection: "row",
@@ -695,9 +722,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   sharedText: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(10), // Base size 10px
     marginLeft: 4,
-    fontSize: 10,
   },
   emptyState: {
     alignItems: "center",
@@ -705,12 +731,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   emptyStateText: {
-    ...Typography.title,
+    fontSize: scaledFontSize(20), // Base size 20px
+    fontWeight: "600",
     marginTop: Spacing.xl,
     marginBottom: Spacing.md,
   },
   emptyStateSubtext: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     textAlign: "center",
     marginBottom: Spacing.xl,
   },
@@ -720,7 +747,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   addEntryButtonText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
   floatingAddButton: {
     position: "absolute",
@@ -750,7 +778,8 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   modalTitle: {
-    ...Typography.title,
+    fontSize: scaledFontSize(20), // Base size 20px
+    fontWeight: "600",
     marginBottom: Spacing.xl,
     textAlign: "center",
   },
@@ -758,7 +787,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   dateLabel: {
-    ...Typography.subtitle,
+    fontSize: scaledFontSize(16), // Base size 16px
     fontWeight: "600",
     marginBottom: Spacing.sm,
   },
@@ -770,13 +799,13 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   dateInputText: {
-    ...Typography.body,
+    fontSize: scaledFontSize(16), // Base size 16px
   },
   dateInputPlaceholder: {
     color: Colors.textTertiary,
   },
   dateHint: {
-    ...Typography.caption,
+    fontSize: scaledFontSize(14), // Base size 14px
     marginBottom: Spacing.sm,
     fontStyle: 'italic',
   },
@@ -791,7 +820,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalCancelText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
   modalApplyButton: {
     flex: 1,
@@ -803,6 +833,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.disabled,
   },
   modalApplyText: {
-    ...Typography.button,
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
   },
 });

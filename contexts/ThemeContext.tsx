@@ -26,6 +26,10 @@ interface ThemeContextType {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   setDarkMode: (value: boolean) => void;
+  textSize: string;
+  setTextSize: (size: string) => void;
+  fontScale: number;
+  scaledFontSize: (baseSize: number) => number;
 }
 
 const lightTheme: ThemeColors = {
@@ -60,9 +64,27 @@ const darkTheme: ThemeColors = {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Helper function to get font scale based on text size
+const getScaleForTextSize = (size: string): number => {
+  switch (size) {
+    case "Extra Small":
+      return 0.85;
+    case "Small":
+      return 0.95;
+    case "Medium":
+      return 1.0;
+    case "Large":
+      return 1.15;
+    default:
+      return 1.0;
+  }
+};
+
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [textSize, setTextSizeState] = useState<string>('Medium');
+  const [fontScale, setFontScale] = useState<number>(1.0);
 
   useEffect(() => {
     loadThemePreference();
@@ -76,6 +98,15 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const isDark = JSON.parse(savedTheme);
         setIsDarkMode(isDark);
         console.log('📱 Theme loaded and applied:', isDark ? 'Dark' : 'Light');
+      }
+
+      // Load text size preference
+      const savedTextSize = await AsyncStorage.getItem('appTextSize');
+      if (savedTextSize !== null) {
+        setTextSizeState(savedTextSize);
+        const scale = getScaleForTextSize(savedTextSize);
+        setFontScale(scale);
+        console.log('📱 Text size loaded:', savedTextSize, 'Scale:', scale);
       }
     } catch (error) {
       console.log('Error loading theme preference:', error);
@@ -106,13 +137,40 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     saveThemePreference(value);
   };
 
+  const setTextSize = async (size: string) => {
+    console.log('📱 Setting text size:', size);
+    setTextSizeState(size);
+    const scale = getScaleForTextSize(size);
+    setFontScale(scale);
+    
+    try {
+      await AsyncStorage.setItem('appTextSize', size);
+      console.log('📱 Text size preference saved:', size);
+    } catch (error) {
+      console.log('Error saving text size preference:', error);
+    }
+  };
+
+  const scaledFontSize = (baseSize: number): number => {
+    return Math.round(baseSize * fontScale);
+  };
+
   const theme: Theme = {
     colors: isDarkMode ? darkTheme : lightTheme,
     isDark: isDarkMode,
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, isDarkMode, toggleDarkMode, setDarkMode }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      isDarkMode, 
+      toggleDarkMode, 
+      setDarkMode,
+      textSize,
+      setTextSize,
+      fontScale,
+      scaledFontSize
+    }}>
       {children}
     </ThemeContext.Provider>
   );

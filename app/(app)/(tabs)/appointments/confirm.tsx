@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
 
 /**
  * ConfirmAppointment Component
@@ -34,19 +35,39 @@ import { useTheme } from "../../../../contexts/ThemeContext";
  * Features a multi-step progress indicator and elegant curved background.
  */
 export default function ConfirmAppointment() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [appointmentNotes, setAppointmentNotes] = useState<string>("");
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // StatusModal states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalType, setStatusModalType] = useState<'success' | 'error' | 'info'>('info');
+  const [statusModalTitle, setStatusModalTitle] = useState('');
+  const [statusModalMessage, setStatusModalMessage] = useState('');
+
   // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
 
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
   // Get support worker ID from navigation params
   const { supportWorkerId } = useLocalSearchParams();
+
+  /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
 
   // Mock data for support workers (replaces backend data)
   const supportWorkers = [
@@ -93,7 +114,7 @@ export default function ConfirmAppointment() {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <Text style={styles.errorText}>Support worker not found</Text>
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>Support worker not found</Text>
         </SafeAreaView>
       </CurvedBackground>
     );
@@ -138,7 +159,7 @@ export default function ConfirmAppointment() {
 
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -368,7 +389,7 @@ export default function ConfirmAppointment() {
                 </View>
               </View>
             ) : (
-              <Text>No appointment data available</Text>
+              <Text style={[styles.errorText, { color: theme.colors.text }]}>No appointment data available</Text>
             )}
 
             <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
@@ -460,6 +481,15 @@ export default function ConfirmAppointment() {
           </View>
         </Modal>
 
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModalVisible}
+          type={statusModalType}
+          title={statusModalTitle}
+          message={statusModalMessage}
+          onClose={() => setStatusModalVisible(false)}
+        />
+
         {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
@@ -470,13 +500,14 @@ export default function ConfirmAppointment() {
     </CurvedBackground>
   );
 }
-const styles = StyleSheet.create({
+
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
   },
   errorText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     color: "#666",
     textAlign: "center",
     marginTop: 50,
@@ -498,12 +529,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2E7D32",
   },
   title: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
@@ -534,7 +565,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   stepNumber: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#4CAF50",
     fontWeight: "600",
   },
@@ -560,14 +591,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f5f9",
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#333",
     marginBottom: 16,
     textAlign: "center",
   },
   subSectionTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#333",
     marginBottom: 12,
@@ -581,12 +612,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   summaryLabel: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#000000",
     fontWeight: "600",
   },
   summaryValue: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#333",
   },
   divider: {
@@ -602,7 +633,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
     marginBottom: 20,
     minHeight: 100,
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     backgroundColor: "white",
   },
   buttonRow: {
@@ -621,7 +652,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: "#4CAF50",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   bookButton: {
@@ -633,7 +664,7 @@ const styles = StyleSheet.create({
   },
   bookButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   modalContainer: {
@@ -656,13 +687,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#757575",
   },
   sideMenuContent: {
@@ -677,7 +708,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     marginLeft: 15,
   },

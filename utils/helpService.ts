@@ -27,8 +27,8 @@ export interface HelpSearchResult {
   sections: HelpSection[];
   query: string;
 }
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://localhost:3000';
+import { getApiBaseUrl } from './apiBaseUrl';
+const API_BASE_URL = getApiBaseUrl();
 
 // API Functions remain the same
 export const fetchHelpSections = async (): Promise<HelpSection[]> => {

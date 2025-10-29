@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { moodApi } from "../../../utils/moodApi"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -7,17 +7,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { AppHeader } from "../../../components/AppHeader";
 import { assessmentTracker } from "../../../utils/assessmentTracker";
 import BottomNavigation from "../../../components/BottomNavigation";
@@ -25,6 +24,8 @@ import {
   Resource, 
   fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
 import { useTheme } from "../../../contexts/ThemeContext";
+import OptimizedImage from "../../../components/OptimizedImage";
+import React from "react";
 
 type MoodEntry = {
   id: string;
@@ -49,7 +50,10 @@ export default function HomeScreen() {
 const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const { user } = useUser();
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
+
+  // Create styles with scaled font sizes
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Bottom navigation configuration
   const tabs = [
@@ -153,8 +157,16 @@ const fetchProfileImage = useCallback(async () => {
     const savedImage = await AsyncStorage.getItem('profileImage');
     if (savedImage) {
       console.log('📸 Found profile image in AsyncStorage');
-      setProfileImage(savedImage);
-      return;
+      
+      // ✅ FIX: If it's base64 (starts with data:image), it's too large - remove it
+      if (savedImage.startsWith('data:image')) {
+        console.warn("⚠️ Removing large base64 image from AsyncStorage to prevent OOM");
+        await AsyncStorage.removeItem("profileImage");
+        // Fall through to use Clerk image
+      } else {
+        setProfileImage(savedImage);
+        return;
+      }
     }
 
     // Priority 2: Check profileData in AsyncStorage
@@ -208,9 +220,10 @@ const fetchProfileImage = useCallback(async () => {
    * Returns appropriate greeting based on time of day
    */
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
+    const hour = new Date().toLocaleString("en-US", { hour: "2-digit", hour12: false, timeZone: APP_TIME_ZONE });
+    const hourNum = Number.parseInt(hour, 10);
+    if (hourNum < 12) return "Good Morning";
+    if (hourNum < 17) return "Good Afternoon";
     return "Good Evening";
   };
 
@@ -300,6 +313,7 @@ const fetchProfileImage = useCallback(async () => {
       return date.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
+        timeZone: APP_TIME_ZONE,
       });
     }
   };
@@ -373,7 +387,7 @@ const fetchProfileImage = useCallback(async () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={["top"]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Use AppHeader component - handles all navigation and menu */}
         <AppHeader showBack={false} showMenu={true} showNotifications={true} />
 
@@ -477,13 +491,17 @@ const fetchProfileImage = useCallback(async () => {
                       ]}
                     >
                       {action.image ? (
-                        <Image
+                        <OptimizedImage
                           source={action.image}
                           style={[
                             styles.actionImage,
                             action.id === "crisis" && styles.crisisSupportImage,
                           ]}
                           resizeMode="contain"
+                          cache="force-cache"
+                          loaderSize="small"
+                          loaderColor="#666"
+                          showErrorIcon={false}
                         />
                       ) : (
                         <Ionicons
@@ -616,12 +634,13 @@ const fetchProfileImage = useCallback(async () => {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
-      </SafeAreaView>
+      </View>
     </CurvedBackground>
   );
 }
 
-const styles = StyleSheet.create({
+// Create dynamic styles function that accepts scaledFontSize
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -641,7 +660,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   greetingText: {
-    fontSize: 24,
+    fontSize: scaledFontSize(24),
     fontWeight: "300",
     color: "#000",
     marginBottom: 4,
@@ -651,7 +670,7 @@ const styles = StyleSheet.create({
     color: "#000",
   },
   subGreetingText: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     color: "#000",
     opacity: 0.8,
   },
@@ -660,7 +679,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   sectionTitle: {
-    fontSize: 14,
+     fontSize: scaledFontSize(14),
     fontWeight: "700",
     color: "#000",
     marginBottom: 20,
@@ -681,7 +700,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   helpButtonText: {
-    fontSize: 16,
+     fontSize: scaledFontSize(16),
     color: "#FFFFFF",
     fontWeight: "600",
     marginLeft: 8,
@@ -727,7 +746,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   actionTitle: {
-    fontSize: 14,
+     fontSize: scaledFontSize(14),
     fontWeight: "600",
     color: "#000",
     textAlign: "center",

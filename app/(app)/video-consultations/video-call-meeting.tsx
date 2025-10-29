@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise inline comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { APP_TIME_ZONE } from "../../../utils/timezone";
 
 const { width, height } = Dimensions.get("window");
 
@@ -35,7 +36,7 @@ const initialMessages = [
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
 export default function VideoCallScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -46,6 +47,12 @@ export default function VideoCallScreen() {
   const [reactions, setReactions] = useState<
     { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
   >([]);
+
+  /**
+   * Create styles dynamically based on text size scaling
+   * Uses useMemo for performance optimization
+   */
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   const handleLeaveCall = () => {
     router.replace("../(tabs)/appointments/appointment-list");
@@ -85,7 +92,7 @@ export default function VideoCallScreen() {
         id: messages.length + 1,
         text: newMessage,
         sender: "You",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })
       };
       setMessages([...messages, newMsg]);
       setNewMessage("");
@@ -96,7 +103,7 @@ export default function VideoCallScreen() {
           id: messages.length + 2,
           text: "Thank you for sharing that. Let's explore this further in our session.",
           sender: "Eric",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })
         };
         setMessages(prev => [...prev, responseMsg]);
       }, 1500);
@@ -394,7 +401,11 @@ export default function VideoCallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * Stylesheet for VideoCallScreen component
+ * Now includes dynamic font scaling via scaledFontSize parameter
+ */
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -425,7 +436,7 @@ const styles = StyleSheet.create({
   },
   participantName: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     marginRight: 8,
   },
   audioIndicator: {
@@ -465,7 +476,7 @@ const styles = StyleSheet.create({
   },
   callStatusText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   // Reaction styles
@@ -499,7 +510,7 @@ const styles = StyleSheet.create({
   },
   controlText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     marginTop: 4,
   },
   leaveButtonContainer: {
@@ -517,7 +528,7 @@ const styles = StyleSheet.create({
   },
   leaveButtonText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
   },
   // Emoji Panel styles
@@ -537,7 +548,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   emojiPanelTitle: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
     marginBottom: 12,
     textAlign: "center",
@@ -586,7 +597,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   chatTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     // color applied inline via theme
   },
@@ -607,12 +618,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   messageText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     marginBottom: 4,
     // color applied inline via theme
   },
   messageTime: {
-    fontSize: 10,
+    fontSize: scaledFontSize(10),
     alignSelf: "flex-end",
     // color applied inline via theme
   },
@@ -630,6 +641,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     maxHeight: 100,
     marginRight: 8,
+    fontSize: scaledFontSize(14),
   },
   sendButton: {
     padding: 8,

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+﻿import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 // Utility function to get file icon based on file name or extension
 const getFileIcon = (
@@ -40,13 +40,15 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
   Modal,
+  Keyboard,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -54,13 +56,21 @@ import { useAuth } from "@clerk/clerk-expo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { Audio } from 'expo-av';
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { Message, Participant } from "../../../../utils/sendbirdService";
-import { Paths, File as FSFile } from "expo-file-system";
+import OptimizedImage from "../../../../components/OptimizedImage";
+import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
+import activityApi from "../../../../utils/activityApi";
+import * as FileSystem from "expo-file-system";
+import * as FSLegacy from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import * as MediaLibrary from "expo-media-library";
+import Constants from "expo-constants";
+import { useIsFocused } from "@react-navigation/native";
+import { APP_TIME_ZONE } from "../../../../utils/timezone";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -72,20 +82,33 @@ interface ExtendedMessage extends Message {
 }
 
 export default function ChatScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
+  const isFocused = useIsFocused();
   const { userId } = useAuth();
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
-  const API_BASE_URL =
-    process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
+  const channelUrl = (params.channelUrl as string) || "";
+  const initialOnlineParam = (params.initialOnline as string) || "";
+  const initialPresenceParam = (params.initialPresence as string) || "";
+  const initialLastActiveParam = (params.initialLastActive as string) || "";
+  const otherClerkIdParam = (params.otherClerkId as string) || "";
+  const profileImageUrlParam = (params.profileImageUrl as string) || "";
+  const API_BASE_URL = getApiBaseUrl();
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [contact, setContact] = useState<Participant | null>(null);
-  const [isOnline, setIsOnline] = useState(false);
+  // Optimistic presence: default to online unless explicitly told otherwise by param
+  const [isOnline, setIsOnline] = useState(initialOnlineParam === "0" ? false : true);
+  const [presence, setPresence] = useState<'online' | 'away' | 'offline'>(
+    (initialPresenceParam as any) === 'online' || (initialPresenceParam as any) === 'away' || (initialPresenceParam as any) === 'offline'
+      ? (initialPresenceParam as any)
+      : (initialOnlineParam === '0' ? 'offline' : 'online')
+  );
   const [attachmentModalVisible, setAttachmentModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -93,9 +116,43 @@ export default function ChatScreen() {
   const [currentAttachment, setCurrentAttachment] =
     useState<ExtendedMessage | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [fileErrorModalVisible, setFileErrorModalVisible] = useState(false);
+  const [fileErrorMessage, setFileErrorMessage] = useState("");
+  const [userNearBottom, setUserNearBottom] = useState(true);
+  const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+  const didMarkReadRef = useRef(false);
+  const [manualScrolling, setManualScrolling] = useState(false);
+  const scrollIdleTimerRef = useRef<any>(null);
+  const messagesListRef = useRef<FlatList<ExtendedMessage>>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingRef = useRef<any>(null);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [pendingRecordingUri, setPendingRecordingUri] = useState<string | null>(null);
+  const [pendingRecordingDuration, setPendingRecordingDuration] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ uri: string; name: string; size?: number }>>([]);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('smileys');
+  const emojiScrollRef = useRef<ScrollView>(null);
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalData, setStatusModalData] = useState({
+    type: 'info' as 'success' | 'error' | 'info',
+    title: '',
+    message: '',
+  });
 
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  // Create styles dynamically based on text size
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalData({ type, title, message });
+    setStatusModalVisible(true);
+  };
 
   // Calculate header height based on screen size and safe area
   const getHeaderHeight = () => {
@@ -113,6 +170,23 @@ export default function ChatScreen() {
   };
 
   const headerHeight = getHeaderHeight();
+  // Use a smaller keyboard offset to avoid excessive gap between input and keyboard
+  const keyboardOffset = Platform.OS === 'ios' ? insets.top + 50 : 0;
+
+  // Track keyboard visibility to adjust bottom spacing only when keyboard is hidden
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    // Also listen to 'will' events on iOS for smoother transitions
+    const willShowSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const willHideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      willShowSub.remove();
+      willHideSub.remove();
+    };
+  }, []);
 
   // Request permissions on component mount
   useEffect(() => {
@@ -120,9 +194,10 @@ export default function ChatScreen() {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission required",
-          "Sorry, we need camera roll permissions to make this work!"
+        showStatusModal(
+          'error', 
+          'Permission Required', 
+          'Sorry, we need camera roll permissions to make this work!'
         );
       }
     })();
@@ -167,74 +242,80 @@ export default function ChatScreen() {
   // Load messages
   const loadMessages = useCallback(async () => {
     if (!conversationId || !userId) {
-      console.log("❌ Missing conversationId or userId");
+      console.log("Missing conversationId or userId");
       setLoading(false);
       return;
     }
 
     try {
-      // Update user's activity
-      await updateUserActivity();
+      console.log(`[${Date.now()}] Loading messages for conversation ${conversationId}`)
+      // Start all non-blocking operations in parallel
+      const startTime = Date.now();
+      
+      // Fire and forget: update activity in background (don't await)
+      updateUserActivity().catch(() => {});
 
-      // console.log(
-      //   `💬 Loading messages for conversation ${conversationId}, user ${userId}`
-      // );
-
-      // Use direct backend API instead of messagingService
+      // Load messages (this is the critical path) - limit to 30 to reduce memory usage
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=50`
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=30`
       );
 
       if (response.ok) {
         const result = await response.json();
-        // console.log(`💬 Loaded ${result.data.length} messages`);
+        const loadTime = Date.now() - startTime;
+        console.log(`[${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
         setMessages(result.data);
 
-        // Get conversation details to find the other participant with online status
-        const conversationsResponse = await fetch(
-          `${API_BASE_URL}/api/messages/conversations/${userId}`
-        );
-
-        if (conversationsResponse.ok) {
-          const conversationsResult = await conversationsResponse.json();
-          const currentConversation = conversationsResult.data.find(
-            (conv: any) => conv.id === conversationId
-          );
-
-          if (currentConversation) {
-            const otherParticipant = currentConversation.participants.find(
-              (p: Participant) => p.clerk_user_id !== userId
-            );
-            if (otherParticipant) {
-              setContact(otherParticipant);
-              // Set online status once and persist it
-              setIsOnline(otherParticipant.online || false);
+        // Fire and forget: mark as read in background (don't block UI)
+        Promise.all([
+          // SendBird mark as read
+          (async () => {
+            try {
+              if (!didMarkReadRef.current && channelUrl && messagingService.isSendBirdEnabled()) {
+                await messagingService.markAsRead(channelUrl);
+                didMarkReadRef.current = true;
+              }
+            } catch (_e) {
+              // ignore SB errors
             }
-          }
-        }
+          })(),
+          // Backend mark as read
+          (async () => {
+            try {
+              if (userId && conversationId) {
+                await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ clerkUserId: userId })
+                });
+              }
+            } catch (_e) {
+              // ignore transient errors
+            }
+          })()
+        ]).catch(() => {}); // Don't block on mark-read failures
 
-        // Fallback if no contact found
-        if (!contact) {
+        // Initialize contact from route params if not already set
+        if (!contact && otherClerkIdParam) {
           const fallbackContact = {
-            id: "unknown",
-            clerk_user_id: "unknown",
+            id: otherClerkIdParam,
+            clerk_user_id: otherClerkIdParam,
             first_name: conversationTitle?.split(" ")[0] || "User",
             last_name: conversationTitle?.split(" ").slice(1).join(" ") || "",
             email: "",
-            profile_image_url: undefined,
-            online: false,
-            last_active_at: null,
+            profile_image_url: profileImageUrlParam || undefined,
+            online: initialOnlineParam === "0" ? false : true,
+            last_active_at: initialLastActiveParam || null,
           };
           setContact(fallbackContact);
-          setIsOnline(false);
         }
       } else {
-        console.error("💬 Failed to load messages:", response.status);
-        Alert.alert("Error", "Failed to load messages");
+        console.error("Failed to load messages:", response.status);
+        showStatusModal('error', 'Load Error', 'Failed to load messages. Please try again.');
       }
     } catch (error) {
-      console.error("💬 Error loading messages:", error);
-      Alert.alert("Error", "Failed to load messages");
+      console.error("Error loading messages:", error);
+      showStatusModal('error', 'Connection Error', 'Failed to load messages. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -243,13 +324,18 @@ export default function ChatScreen() {
     userId,
     conversationTitle,
     API_BASE_URL,
+    channelUrl,
+    initialOnlineParam,
+    initialLastActiveParam,
+    otherClerkIdParam,
+    profileImageUrlParam,
     contact,
     updateUserActivity,
   ]);
 
   // Load messages with 60-second polling
   useEffect(() => {
-    if (!conversationId || !userId) return;
+    if (!isFocused || !conversationId || !userId) return;
 
     loadMessages(); // Load immediately
 
@@ -259,41 +345,47 @@ export default function ChatScreen() {
     }, 60000); // 60 seconds
 
     return () => clearInterval(pollInterval);
-  }, [conversationId, userId, loadMessages]);
+  }, [isFocused, conversationId, userId, loadMessages]);
 
-  // Update online status based on last activity (every 10 seconds)
+  // One-time status refresh after mount (no polling)
   useEffect(() => {
-    if (!contact) return;
+    if (!isFocused || !contact || !contact.clerk_user_id || contact.clerk_user_id === "unknown") return;
 
-    const updateOnlineStatus = () => {
-      if (contact.last_active_at) {
-        const lastActive = new Date(contact.last_active_at);
-        const now = new Date();
-        const diffMinutes =
-          (now.getTime() - lastActive.getTime()) / (1000 * 60);
-
-        // Consider online if active in last 3 minutes
-        const shouldBeOnline = diffMinutes <= 3;
-        if (isOnline !== shouldBeOnline) {
-          setIsOnline(shouldBeOnline);
+    const updateOnlineStatus = async () => {
+      try {
+        const status = await activityApi.status(contact.clerk_user_id);
+        if (status) {
+          const newOnline = !!status.online;
+          const newPresence = (status as any).presence as 'online' | 'away' | 'offline' | undefined;
+          setIsOnline(newOnline);
+          
+          if (newPresence) {
+            setPresence(newPresence);
+          } else {
+            setPresence(newOnline ? 'online' : 'offline');
+          }
+          setContact((prev) => prev ? { ...prev, online: newOnline, last_active_at: status.last_active_at } : prev);
         }
+      } catch (_e) {
+        // ignore
       }
     };
 
-    updateOnlineStatus();
-    const statusInterval = setInterval(updateOnlineStatus, 10000); // Check every 10 seconds
-
-    return () => clearInterval(statusInterval);
-  }, [contact, isOnline]);
+    const initialTimeout = setTimeout(updateOnlineStatus, 1500);
+    return () => clearTimeout(initialTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, contact?.clerk_user_id]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
-    setTimeout(() => {
-      if (scrollViewRef.current) {
-        scrollViewRef.current.scrollToEnd({ animated: true });
-      }
-    }, 100);
-  }, [messages]);
+    // Only auto-scroll if user is near bottom or last message is mine
+    const last = messages[messages.length - 1];
+    const lastIsMine = last ? last.sender.clerk_user_id === userId : false;
+    if (!manualScrolling && (userNearBottom || lastIsMine)) {
+      setTimeout(() => {
+        messagesListRef.current?.scrollToEnd?.({ animated: true });
+      }, 100);
+    }
+  }, [messages, userNearBottom, userId, manualScrolling]);
 
   // Handle image selection from gallery
   const pickImage = async () => {
@@ -304,7 +396,7 @@ export default function ChatScreen() {
         mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7, // slightly lower quality to reduce file size and improve performance
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -312,7 +404,7 @@ export default function ChatScreen() {
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to pick image");
+      showStatusModal('error', 'Upload Error', 'Failed to pick image');
     }
   };
 
@@ -326,13 +418,22 @@ export default function ChatScreen() {
         copyToCacheDirectory: true,
       });
 
-      if (result.assets?.[0]) {
-        const asset = result.assets[0];
-        await uploadAttachment(asset.uri, "file", asset.name);
+      const assets = result.assets || (result as any).assets || [];
+      if (assets.length > 0) {
+        const toAdd: Array<{ uri: string; name: string; size?: number }> = [];
+        for (const asset of assets) {
+          try {
+            const info = await getFileInfo(asset.uri);
+            toAdd.push({ uri: asset.uri, name: asset.name || `file_${Date.now()}`, size: info.size });
+          } catch {
+            toAdd.push({ uri: asset.uri, name: asset.name || `file_${Date.now()}` });
+          }
+        }
+        setPendingFiles((prev) => [...prev, ...toAdd]);
       }
     } catch (error) {
       console.error("Error picking document:", error);
-      Alert.alert("Error", "Failed to pick document");
+      showStatusModal('error', 'Upload Error', 'Failed to pick document');
     }
   };
 
@@ -343,9 +444,10 @@ export default function ChatScreen() {
 
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission required",
-          "Sorry, we need camera permissions to take photos!"
+        showStatusModal(
+          'error',
+          'Permission Required',
+          'Sorry, we need camera permissions to take photos!'
         );
         return;
       }
@@ -353,7 +455,7 @@ export default function ChatScreen() {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7, // slightly lower quality to reduce file size
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -361,7 +463,7 @@ export default function ChatScreen() {
       }
     } catch (error) {
       console.error("Error taking photo:", error);
-      Alert.alert("Error", "Failed to take photo");
+      showStatusModal('error', 'Camera Error', 'Failed to take photo');
     }
   };
 
@@ -403,7 +505,7 @@ export default function ChatScreen() {
     }
   };
 
-  // Upload attachment to server
+  // Upload attachment to server (multipart) and create a proper attachment message
   const uploadAttachment = async (
     fileUri: string,
     fileType: "image" | "file",
@@ -414,51 +516,91 @@ export default function ChatScreen() {
     try {
       setUploading(true);
 
-      // Generate a descriptive filename if not provided
-      const actualFileName =
-        fileName ||
-        (fileType === "image"
-          ? `photo_${Date.now()}.jpg`
-          : `document_${Date.now()}.file`);
+      // Derive filename and extension
+      const defaultName = fileType === "image" ? `photo_${Date.now()}.jpg` : `document_${Date.now()}.bin`;
+      const originalName = fileName || (fileUri.split("/").pop() || defaultName);
+      const nameParts = originalName.split(".");
+      const originalExt = (nameParts.length > 1 ? nameParts.pop() : "bin") as string;
+      let finalExt = originalExt;
+      let finalMime = getMimeType(originalExt) || (fileType === "image" ? "image/jpeg" : "application/octet-stream");
+      let finalNameBase = nameParts.join(".") || (fileType === "image" ? `photo_${Date.now()}` : `document_${Date.now()}`);
+      let uploadUri = fileUri;
 
-      // Choose appropriate emoji and description
-      const emoji = fileType === "image" ? "🖼️" : "📄";
-      const description = fileType === "image" ? "Image" : "File";
-
-      // console.log(`📤 Sharing ${description}: ${actualFileName}`);
-
-      // Send message using your working messages API
-      const messageResponse = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clerkUserId: userId,
-            messageText: `${emoji} Shared ${description}: ${actualFileName}`,
-            messageType: "text",
-          }),
+      // If image, compress/resize before upload using expo-image-manipulator (if available)
+      if (fileType === 'image') {
+        try {
+          // @ts-ignore - optional dependency; will be resolved at runtime if installed
+          const ImageManipulator: any = await import('expo-image-manipulator');
+          const manipulated = await ImageManipulator.manipulateAsync(
+            fileUri,
+            [{ resize: { width: 1280 } }],
+            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          if (manipulated?.uri) {
+            uploadUri = manipulated.uri;
+            finalExt = 'jpg';
+            finalMime = 'image/jpeg';
+          }
+        } catch (_e) {
+          // If the module isn't installed or manipulation fails, proceed with original file
         }
+      }
+
+      // Validate size against backend 10MB cap
+      try {
+        const info = await getFileInfo(fileUri);
+        if (info.size && info.size > 10 * 1024 * 1024) {
+          showStatusModal(
+            'error',
+            'File Too Large',
+            'Please select a file under 10 MB. For images, try choosing a lower-quality version or cropping.'
+          );
+          return;
+        }
+      } catch (_e) {
+        // Ignore size check failures; we'll let the server enforce limits
+      }
+
+      // Build multipart form data
+      const form = new FormData();
+      form.append("conversationId", String(conversationId));
+      form.append("clerkUserId", String(userId));
+      form.append("messageType", fileType);
+      const finalFileName = `${finalNameBase}.${finalExt}`;
+      form.append(
+        "file",
+        {
+          uri: uploadUri,
+          name: finalFileName,
+          type: finalMime,
+        } as any
       );
 
-      if (messageResponse.ok) {
-        const result = await messageResponse.json();
+      const res = await fetch(`${API_BASE_URL}/api/messages/upload-attachment`, {
+        method: "POST",
+        // Let React Native set the Content-Type with boundary
+        body: form as any,
+      });
 
-        // Update UI immediately
-        setMessages((prev) => [...prev, result.data]);
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("ðŸ“ Upload failed:", errText);
+        setFileErrorMessage("Failed to upload attachment. Please try again.");
+        setFileErrorModalVisible(true);
+        return;
+      }
 
-        // Refresh messages after a short delay
-        setTimeout(() => loadMessages(), 1000);
-
-        Alert.alert("Success", `${description} shared successfully!`);
-      } else {
-        const errorText = await messageResponse.text();
-        console.error("Server error:", errorText);
-        Alert.alert("Error", "Failed to share file. Please try again.");
+      const json = await res.json();
+      if (json?.data) {
+        // Optimistically add the new message returned by server
+        setMessages((prev) => [...prev, json.data]);
+        // Optionally refresh to sync ordering/unread states
+        setTimeout(() => loadMessages(), 800);
       }
     } catch (error) {
-      console.error("Network error:", error);
-      Alert.alert("Error", "Network error. Please check your connection.");
+      console.error("ðŸ“ Upload error:", error);
+      setFileErrorMessage("Network error. Please check your connection.");
+      setFileErrorModalVisible(true);
     } finally {
       setUploading(false);
     }
@@ -471,7 +613,7 @@ export default function ChatScreen() {
 
     try {
       setSending(true);
-      // console.log(`💬 Sending message: "${newMessage}"`);
+      // console.log(`Sending message: "${newMessage}"`);
 
       // Update activity when sending message
       await updateUserActivity();
@@ -492,21 +634,168 @@ export default function ChatScreen() {
 
       if (response.ok) {
         const result = await response.json();
-        // console.log("💬 Message sent successfully");
+        // console.log("Message sent successfully");
         setMessages((prev) => [...prev, result.data]);
         setNewMessage("");
+        setIsTyping(false); // Reset typing state after sending
 
         // Reload messages to ensure both parties see the same
         setTimeout(() => loadMessages(), 500);
       } else {
-        console.error("💬 Failed to send message:", response.status);
-        Alert.alert("Error", "Failed to send message");
+        console.error("Failed to send message:", response.status);
+        showStatusModal('error', 'Send Error', 'Failed to send message');
       }
     } catch (error) {
-      console.error("💬 Error sending message:", error);
-      Alert.alert("Error", "Failed to send message");
+      console.error("Error sending message:", error);
+      showStatusModal('error', 'Send Error', 'Failed to send message');
     } finally {
       setSending(false);
+    }
+  };
+
+  // Handle emoji picker
+  const handleEmojiPress = () => {
+    setEmojiPickerVisible(true);
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setNewMessage(prev => prev + emoji);
+    setEmojiPickerVisible(false);
+  };
+
+  // Handle voice recording (start/stop)
+  const handleMicPress = async () => {
+    if (isRecording) {
+      // Stop recording
+      try {
+        if (recordingRef.current) {
+          await recordingRef.current.stopAndUnloadAsync();
+          const uri = recordingRef.current.getURI();
+          recordingRef.current = null;
+          setIsRecording(false);
+          if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+          // Move to pending state so user can preview/cancel/send from UI
+          if (uri) {
+            setPendingRecordingUri(uri);
+            setPendingRecordingDuration(Math.max(1, Math.floor(recordingDuration)));
+          }
+          setRecordingDuration(0);
+        }
+      } catch (error) {
+        console.error('Error stopping recording:', error);
+        showStatusModal('error', 'Error', 'Failed to stop recording');
+        setIsRecording(false);
+        recordingRef.current = null;
+      }
+    } else {
+      // Start recording
+      try {
+        const permission = await Audio.requestPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permission Required', 'Please allow microphone access to record voice messages.');
+          return;
+        }
+
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+
+        const { recording } = await Audio.Recording.createAsync(
+          Audio.RecordingOptionsPresets.HIGH_QUALITY
+        );
+        
+        recordingRef.current = recording;
+        setIsRecording(true);
+        
+        // Track duration
+        const durationInterval = setInterval(() => {
+          if (recordingRef.current) {
+            recordingRef.current.getStatusAsync().then((status: any) => {
+              if (status.isRecording) {
+                setRecordingDuration(status.durationMillis / 1000);
+              }
+            });
+          }
+        }, 100);
+        recordingTimerRef.current = durationInterval as unknown as NodeJS.Timeout;
+        
+        // Auto-stop after 2 minutes
+        setTimeout(async () => {
+          if (recordingRef.current && isRecording) {
+            clearInterval(durationInterval);
+            await handleMicPress(); // This will stop the recording
+          }
+        }, 120000);
+        
+      } catch (error) {
+        console.error('Error starting recording:', error);
+        showStatusModal('error', 'Error', 'Failed to start recording. Please check your microphone permissions.');
+        setIsRecording(false);
+      }
+    }
+  };
+
+  // Cancel/remove pending recording (or abort active recording)
+  const cancelPendingRecording = async () => {
+    try {
+      if (isRecording && recordingRef.current) {
+        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current = null;
+        setIsRecording(false);
+      }
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+      if (pendingRecordingUri) {
+        await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }).catch(() => {});
+      }
+    } finally {
+      setPendingRecordingUri(null);
+      setPendingRecordingDuration(0);
+      setRecordingDuration(0);
+    }
+  };
+
+  // Send the prepared recording
+  const sendPendingRecording = async () => {
+    if (!pendingRecordingUri) return;
+    try {
+      setUploading(true);
+      const fileName = `voice_${Date.now()}.m4a`;
+      await uploadAttachment(pendingRecordingUri, 'file', fileName);
+      showStatusModal('success', 'Sent', 'Voice message sent successfully');
+    } catch (error) {
+      console.error('Error sending voice message:', error);
+      showStatusModal('error', 'Error', 'Failed to send voice message');
+    } finally {
+      setUploading(false);
+      try { await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }); } catch { /* noop */ }
+      setPendingRecordingUri(null);
+      setPendingRecordingDuration(0);
+    }
+  };
+
+  // Send pending files and/or message
+  const handleMainSend = async () => {
+    if (sending || uploading) return;
+    try {
+      // Send files first
+      if (pendingFiles.length > 0) {
+        setUploading(true);
+        for (const f of pendingFiles) {
+          await uploadAttachment(f.uri, 'file', f.name);
+        }
+        setPendingFiles([]);
+        setUploading(false);
+      }
+      // Then send text if any
+      if (newMessage.trim().length > 0) {
+        await handleSendMessage();
+      }
+    } catch (e) {
+      console.error('Send error:', e);
+      showStatusModal('error', 'Error', 'Failed to send');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -526,9 +815,10 @@ export default function ChatScreen() {
       return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: APP_TIME_ZONE,
       });
     } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric" });
+      return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: APP_TIME_ZONE });
     }
   };
 
@@ -547,62 +837,39 @@ export default function ChatScreen() {
   // Download file to local storage and share
   const downloadAndShareFile = async (remoteUri: string, fileName: string) => {
     try {
+      console.log("ðŸ“¥ Starting download:", { remoteUri, fileName });
       setDownloading(true);
-
-      // console.log("Downloading file:", { remoteUri, fileName });
-
-      // Extract file extension
-      const urlWithoutParams = remoteUri.split("?")[0];
-      const fileExtension =
-        (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
+      const resolvedUri = resolveRemoteUri(remoteUri);
+      const urlWithoutParams = resolvedUri.split("?")[0];
+      const fileExtension = (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
       const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
-      
-      // Create file in cache directory
-      const file = new FSFile(Paths.cache, `${safeFileName}.${fileExtension}`);
-      const localUri = file.uri;
+      const baseName = safeFileName.replace(/\.[^/.]+$/, ""); // remove existing extension if present
 
-      // console.log("Download details:", { localUri, fileExtension });
+      // Use legacy API shim to avoid runtime deprecation errors (SDK 54): download into cache directory
+      const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
+      const fileUri = `${cacheDir}${baseName}.${fileExtension}`;
+      console.log("ðŸ“¥ Downloading to:", fileUri);
+      await FSLegacy.downloadAsync(resolvedUri, fileUri);
 
-      // Download file using fetch and write to file
-      const response = await fetch(remoteUri);
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      await file.write(new Uint8Array(arrayBuffer));
+      console.log("âœ… Download complete, opening share sheet");
 
-      // console.log("Download complete:", { localUri, fileExtension });
-
-      // Check if sharing is available
       const canShare = await Sharing.isAvailableAsync();
-
       if (canShare) {
-        await Sharing.shareAsync(localUri, {
+        await Sharing.shareAsync(fileUri, {
           mimeType: getMimeType(fileExtension),
-          dialogTitle: `Download ${fileName}`,
-          UTI: getUTI(fileExtension), // For iOS
+          dialogTitle: `Share ${fileName}`,
+          UTI: getUTI(fileExtension),
         });
-
-        Alert.alert("Success", "File downloaded and shared successfully!");
+        console.log("âœ… Share sheet closed");
       } else {
-        Alert.alert("Success", "File downloaded successfully!");
-        // If sharing not available, open the file directly
+        console.log("âš ï¸ Sharing not available, opening in browser");
+        // Fallback: open in browser quietly
         await WebBrowser.openBrowserAsync(remoteUri);
       }
     } catch (error) {
-      console.error("Download error:", error);
-
-      let errorMessage = "Unable to download the file.";
-
-      if (error instanceof Error) {
-        if (error.message.includes("Network request failed")) {
-          errorMessage = "Network error. Please check your connection.";
-        } else if (error.message.includes("Invalid file URL")) {
-          errorMessage = "The file link is invalid or broken.";
-        } else if (error.message.includes("404")) {
-          errorMessage = "File not found on server.";
-        }
-      }
-
-      Alert.alert("Download Failed", errorMessage);
+      console.error("âŒ Download error:", error);
+      setFileErrorMessage("Unable to download or share the file. Please try again.");
+      setFileErrorModalVisible(true);
     } finally {
       setDownloading(false);
     }
@@ -628,46 +895,109 @@ export default function ChatScreen() {
     return mimeTypes[extension.toLowerCase()] || "application/octet-stream";
   };
 
+  // Ensure we share a local file: download remote HTTP(S) URIs to cache first
+  const shareUriEnsuringLocal = async (uri: string, fallbackName = `share_${Date.now()}`) => {
+    console.log("ðŸ“¤ shareUriEnsuringLocal called with:", uri);
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      console.log("âš ï¸ Sharing not available on this device");
+      return false;
+    }
+    try {
+      let localUri = uri;
+      let ext = 'file';
+      if (uri.startsWith('http')) {
+        console.log("ðŸ“¥ Remote URI detected, downloading first...");
+        const resolved = resolveRemoteUri(uri);
+        const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
+        ext = (withoutParams.split('.').pop() || 'file').toLowerCase();
+        const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
+        const destUri = `${cacheDir}${fallbackName}.${ext}`;
+        console.log("ðŸ“¥ Downloading to:", destUri);
+        await FSLegacy.downloadAsync(resolved, destUri);
+        localUri = destUri;
+        console.log("âœ… Download complete:", localUri);
+      }
+      console.log("ðŸ“¤ Opening share sheet for:", localUri);
+      await Sharing.shareAsync(localUri, { mimeType: getMimeType(ext) });
+      console.log("âœ… Share sheet closed");
+      return true;
+    } catch (e) {
+      console.error('âŒ Share error:', e);
+      return false;
+    }
+  };
+
   // Save image to gallery
   const saveImageToGallery = async (imageUri: string) => {
+    console.log("ðŸ’¾ saveImageToGallery called with:", imageUri);
     try {
       setDownloading(true);
-
-      // Request permissions
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "We need access to your media library to save images."
-        );
+      // Expo Go limitation: cannot grant full media access; fallback to share
+      if (Constants?.appOwnership === 'expo') {
+        console.log("â„¹ï¸ Running in Expo Go, using share fallback for gallery save");
+        const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+        if (!shared) {
+          setFileErrorMessage("Saving to gallery isn't supported in Expo Go. Shared instead.");
+          setFileErrorModalVisible(true);
+        }
+        return;
+      }
+      // Request permissions; if not available or rejected, fallback to share sheet
+      try {
+        console.log("ðŸ” Requesting media library permissions...");
+        // Request only photo permission to avoid AUDIO manifest requirement on Android 13+
+        const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
+        console.log("ðŸ” Permission status:", status);
+        if (status !== "granted") {
+          console.log("âš ï¸ Permission denied, falling back to share");
+          const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+          if (shared) return;
+          setFileErrorMessage("Cannot save without media permissions.");
+          setFileErrorModalVisible(true);
+          return;
+        }
+      } catch (_permErr) {
+        console.error("âš ï¸ Permission request error:", _permErr);
+        // Some Android setups (Expo Go) will reject if manifest lacks permissions.
+        // Gracefully fallback to share sheet.
+        const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+        if (shared) return;
+        setFileErrorMessage("Unable to request media permissions.");
+        setFileErrorModalVisible(true);
         return;
       }
 
       let finalUri = imageUri;
-
-      // If it's a remote URL, download it first
+      // If remote, download to a writable cache path
       if (imageUri.startsWith("http")) {
-        const fileName = `image_${Date.now()}.jpg`;
-        const imageFile = new FSFile(Paths.cache, fileName);
-        
-        // Download using fetch
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        await imageFile.write(new Uint8Array(arrayBuffer));
-        
-        finalUri = imageFile.uri;
+        console.log("ðŸ“¥ Remote image, downloading first...");
+        const resolved = resolveRemoteUri(imageUri);
+        const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
+        const ext = (withoutParams.split('.').pop() || 'jpg').toLowerCase();
+        const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
+        const destUri = `${cacheDir}image_${Date.now()}.${ext}`;
+        await FSLegacy.downloadAsync(resolved, destUri);
+        finalUri = destUri;
+        console.log("âœ… Downloaded to:", finalUri);
       }
 
-      // Save to gallery
+      console.log("ðŸ’¾ Creating media library asset...");
       const asset = await MediaLibrary.createAssetAsync(finalUri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-
-      Alert.alert("Success", "Image saved to your gallery!");
+      console.log("âœ… Image saved to gallery!");
     } catch (error) {
-      console.error("Save image error:", error);
-      Alert.alert("Error", "Failed to save image to gallery");
+      console.error("âŒ Save image error:", error);
+      // Final fallback: try share if gallery save failed
+      try {
+        console.log("âš ï¸ Gallery save failed, trying share fallback...");
+        const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
+        if (shared) return;
+      } catch (_e2) {
+        // ignore share fallback errors here; will show modal below
+      }
+      setFileErrorMessage("Failed to save image to gallery.");
+      setFileErrorModalVisible(true);
     } finally {
       setDownloading(false);
     }
@@ -675,6 +1005,84 @@ export default function ChatScreen() {
 
   // Enhanced renderMessageContent function
   const renderMessageContent = (message: ExtendedMessage) => {
+    // Helper: detect audio files by extension/name
+    const isAudioFile = (name?: string, url?: string) => {
+      const target = (name || url || '').toLowerCase();
+      return ['.m4a', '.mp3', '.wav', '.ogg', '.aac'].some(ext => target.includes(ext))
+        || (url || '').startsWith('data:audio')
+        || (url || '').includes('/audio/');
+    };
+
+    // Inline component for playing audio messages
+    const AudioBubble = ({ uri }: { uri: string }) => {
+      const [playing, setPlaying] = useState(false);
+      const [barAnim] = useState([new Animated.Value(2), new Animated.Value(8), new Animated.Value(4)]);
+      const soundRef = useRef<Audio.Sound | null>(null);
+
+      const startWave = () => {
+        const loops = barAnim.map((v, i) => Animated.loop(
+          Animated.sequence([
+            Animated.timing(v, { toValue: 14 - i * 2, duration: 250, useNativeDriver: false }),
+            Animated.timing(v, { toValue: 2 + i * 2, duration: 250, useNativeDriver: false }),
+          ])
+        ));
+        Animated.parallel(loops).start();
+      };
+
+      const stopWave = () => {
+        barAnim.forEach(v => v.stopAnimation());
+      };
+
+      const toggle = async () => {
+        try {
+          if (!soundRef.current) {
+            const { sound } = await Audio.Sound.createAsync({ uri: resolveRemoteUri(uri) });
+            soundRef.current = sound;
+            await sound.playAsync();
+            setPlaying(true);
+            startWave();
+            sound.setOnPlaybackStatusUpdate((st: any) => {
+              if (st.didJustFinish) {
+                setPlaying(false);
+                stopWave();
+              }
+            });
+          } else {
+            const status: any = await soundRef.current.getStatusAsync();
+            if (status.isPlaying) {
+              await soundRef.current.pauseAsync();
+              setPlaying(false);
+              stopWave();
+            } else {
+              await soundRef.current.playAsync();
+              setPlaying(true);
+              startWave();
+            }
+          }
+        } catch (_e) {
+          // ignore
+        }
+      };
+
+      useEffect(() => {
+        return () => { try { soundRef.current?.unloadAsync(); } catch { /* noop */ } };
+      }, []);
+
+      return (
+        <View style={styles.audioBubble}>
+          <TouchableOpacity style={styles.audioPlayButton} onPress={toggle}>
+            <Ionicons name={playing ? 'pause' : 'play'} size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.audioBars}>
+            {barAnim.map((v, idx) => (
+              <Animated.View key={idx} style={[styles.audioBar, { height: v }]} />
+            ))}
+          </View>
+          <Text style={styles.audioDurationText}>Voice</Text>
+        </View>
+      );
+    };
+
     // Handle image attachments
     if (message.message_type === "image" && message.attachment_url) {
       return (
@@ -696,66 +1104,57 @@ export default function ChatScreen() {
             ]);
           }}
         >
-          <Image
-            source={{ uri: message.attachment_url }}
+          <OptimizedImage
+            source={{ uri: resolveRemoteUri(message.attachment_url) }}
             style={styles.attachmentImage}
             resizeMode="cover"
+            cache="force-cache"
+            loaderColor={theme.colors.primary}
           />
           <View style={styles.imageOverlay}>
             <Ionicons name="expand" size={20} color="#FFFFFF" />
-            <Text style={styles.imageText}>📷 Photo • Tap to view</Text>
+            <Text style={styles.imageText}>ðŸ“· Photo â€¢ Tap to view</Text>
           </View>
         </TouchableOpacity>
       );
     }
 
-    // Handle file attachments
+    // Handle audio attachments (voice notes)
+    if (message.message_type === 'file' && message.attachment_url && isAudioFile(message.file_name, message.attachment_url)) {
+      return <AudioBubble uri={message.attachment_url} />;
+    }
+
+    // Handle other file attachments - dark bubble with icon, name and size
     if (message.message_type === "file" && message.attachment_url) {
       return (
         <TouchableOpacity
-          style={styles.fileAttachment}
           onPress={() => handleDownloadFile(message)}
           onLongPress={() => {
             Alert.alert(
               "File Options",
               `File: ${message.file_name || "Unknown file"}`,
               [
-                {
-                  text: "Download & Share",
-                  onPress: () => { handleDownloadFile(message); },
-                },
-                {
-                  text: "Open in Browser",
-                  onPress: () => {
-                    WebBrowser.openBrowserAsync(message.attachment_url!);
-                  },
-                },
+                { text: "Download & Share", onPress: () => { handleDownloadFile(message); } },
+                { text: "Open in Browser", onPress: () => { WebBrowser.openBrowserAsync(message.attachment_url!); } },
                 { text: "Cancel", style: "cancel" },
               ]
             );
           }}
+          activeOpacity={0.8}
         >
-          <View style={styles.fileIconContainer}>
-            <Ionicons
-              name={getFileIcon(message.file_name)}
-              size={24}
-              color="#4CAF50"
-            />
-          </View>
-          <View style={styles.fileInfo}>
-            <Text style={styles.fileName} numberOfLines={1}>
-              {message.file_name || "Download file"}
-            </Text>
-            {message.file_size && (
-              <Text style={styles.fileSize}>
-                {formatFileSize(message.file_size)}
+          <View style={styles.fileBubbleRow}>
+            <View style={styles.fileIconCircle}>
+              <Ionicons name={getFileIcon(message.file_name)} size={18} color="#FFFFFF" />
+            </View>
+            <View style={styles.fileTexts}>
+              <Text style={styles.fileNameDark} numberOfLines={1}>
+                {message.file_name || "Document"}
               </Text>
-            )}
-            <Text style={styles.fileHint}>
-              {getFileTypeText(message.file_name)} • Tap to download
-            </Text>
+              <Text style={styles.fileSizeDark}>
+                {message.file_size ? formatFileSize(message.file_size) : getFileTypeText(message.file_name)}
+              </Text>
+            </View>
           </View>
-          <Ionicons name="download-outline" size={20} color="#666" />
         </TouchableOpacity>
       );
     }
@@ -804,40 +1203,53 @@ export default function ChatScreen() {
   const handleDownloadFile = async (message: ExtendedMessage) => {
     if (!message.attachment_url) return;
 
-    try {
-      setDownloading(true);
+    const fileUri = message.attachment_url;
+    const fileName = message.file_name || `file_${Date.now()}`;
 
-      const fileUri = message.attachment_url;
-      const fileName = message.file_name || `file_${Date.now()}`;
-
-      // console.log("Starting download:", { fileUri, fileName });
-
-      // Show download confirmation
-      Alert.alert(
-        "Download File",
-        `Download "${message.file_name || "this file"}"?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Download",
-            onPress: () => {
-              (async () => {
-                try {
-                  await downloadAndShareFile(fileUri, fileName);
-                } catch (error) {
-                  console.error("Download error:", error);
-                  Alert.alert("Error", "Failed to download file");
-                }
-              })();
-            },
+    // Show download confirmation
+    Alert.alert(
+      "Download File",
+      `Download "${message.file_name || "this file"}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Download",
+          onPress: async () => {
+            try {
+              setDownloading(true);
+              await downloadAndShareFile(fileUri, fileName);
+            } catch (error) {
+              console.error("Download error:", error);
+              setFileErrorMessage("Failed to download file. Please try again.");
+              setFileErrorModalVisible(true);
+            } finally {
+              setDownloading(false);
+            }
           },
-        ]
-      );
-    } catch (error) {
-      console.error("Error handling file:", error);
-      Alert.alert("Error", "Failed to download file");
-    } finally {
-      setDownloading(false);
+        },
+      ]
+    );
+  };
+
+  // Normalize any local LAN or localhost URLs to the public API base (e.g., ngrok)
+  const resolveRemoteUri = (uri: string) => {
+    try {
+      if (!uri) return uri;
+      // If relative path
+      if (uri.startsWith('/')) {
+        return `${API_BASE_URL}${uri}`;
+      }
+      const src = new URL(uri);
+      const api = new URL(API_BASE_URL);
+      // If host differs and the path is under uploads, rebuild with public base
+      if (src.host !== api.host && src.pathname.startsWith('/uploads')) {
+        return `${api.origin}${src.pathname}`;
+      }
+      return uri;
+    } catch {
+      // Fallback: if it's not parsable but looks like an uploads path, prefix API base
+      if (uri?.startsWith('/uploads')) return `${API_BASE_URL}${uri}`;
+      return uri;
     }
   };
 
@@ -845,7 +1257,7 @@ export default function ChatScreen() {
   // Handle viewing attachments
   const handleViewAttachment = async (message: ExtendedMessage) => {
     if (!message.attachment_url) {
-      Alert.alert("Error", "No attachment URL found.");
+      showStatusModal('error', 'View Error', 'No attachment URL found.');
       return;
     }
 
@@ -873,7 +1285,7 @@ export default function ChatScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Loading messages...</Text>
+          <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading messages...</Text>
         </View>
       </SafeAreaView>
     );
@@ -881,12 +1293,71 @@ export default function ChatScreen() {
 
   return (
     <CurvedBackground>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={[styles.container, { backgroundColor: theme.colors.background }]}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <KeyboardAvoidingView
+          behavior={Platform.select({ ios: "padding", android: "height" })}
+          style={styles.container}
+          keyboardVerticalOffset={keyboardOffset}
+        >
+          {/* Status Modal */}
+          <Modal
+            visible={statusModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setStatusModalVisible(false)}
+          >
+            <View style={[
+              styles.modalOverlay,
+              { backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)' }
+            ]}>
+              <View style={[
+                styles.modalContent,
+                { backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }
+              ]}>
+                <View style={styles.iconContainer}>
+                  <Ionicons 
+                    name={
+                      statusModalData.type === 'success' ? 'checkmark-circle' :
+                      statusModalData.type === 'error' ? 'close-circle' : 'information-circle'
+                    } 
+                    size={64} 
+                    color={
+                      statusModalData.type === 'success' ? '#4CAF50' :
+                      statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                    } 
+                  />
+                </View>
+
+                <Text style={[
+                  styles.modalTitle,
+                  { color: isDarkMode ? '#F9FAFB' : '#1F2937' }
+                ]}>
+                  {statusModalData.title}
+                </Text>
+                <Text style={[
+                  styles.modalMessage,
+                  { color: isDarkMode ? '#D1D5DB' : '#6B7280' }
+                ]}>
+                  {statusModalData.message}
+                </Text>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton, 
+                    { 
+                      backgroundColor: 
+                        statusModalData.type === 'success' ? '#4CAF50' :
+                        statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                    }
+                  ]}
+                  onPress={() => setStatusModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
           {/* Fixed Header with dynamic height based on screen size */}
           <View style={[styles.headerWrapper, { height: headerHeight }]}>
             <View style={styles.header}>
@@ -895,31 +1366,48 @@ export default function ChatScreen() {
               </TouchableOpacity>
 
               <View style={styles.contactInfo}>
-                <View style={styles.headerAvatar}>
-                  <Text style={styles.headerAvatarText}>
-                    {getUserInitials(contact?.first_name, contact?.last_name)}
-                  </Text>
-                  {/* Online/Offline indicator in header */}
+                <View style={styles.headerAvatarWrapper}>
+                  {contact?.profile_image_url ? (
+                    <OptimizedImage
+                      source={{ uri: resolveRemoteUri(contact.profile_image_url) }}
+                      style={styles.headerAvatar}
+                      resizeMode="cover"
+                      cache="force-cache"
+                      loaderSize="small"
+                      showErrorIcon={false}
+                    />
+                  ) : (
+                    <View style={styles.headerAvatar}>
+                      <Text style={styles.headerAvatarText}>
+                        {getUserInitials(contact?.first_name, contact?.last_name)}
+                      </Text>
+                    </View>
+                  )}
+                  {/* Presence indicator in header: green online, yellow away, gray offline */}
                   <View
                     style={[
                       styles.headerStatusIndicator,
-                      isOnline
-                        ? styles.onlineIndicator
-                        : styles.offlineIndicator,
+                      {
+                        backgroundColor:
+                          presence === 'online' ? '#4CAF50' : presence === 'away' ? '#FFC107' : theme.colors.iconDisabled,
+                        borderColor: theme.colors.surface,
+                      },
                     ]}
                   />
                 </View>
-                <View>
-                  <Text style={styles.contactName}>{conversationTitle}</Text>
+                <View style={styles.headerTextBlock}>
+                  <Text style={[styles.contactName, { color: theme.colors.text }]}>{conversationTitle}</Text>
                   <Text
                     style={[
                       styles.contactStatus,
-                      isOnline ? styles.onlineStatus : styles.offlineStatus,
+                      presence === 'online' ? styles.onlineStatus : styles.offlineStatus,
                     ]}
                   >
-                    {contact
-                      ? getLastSeenText(contact.last_active_at, isOnline)
-                      : "Offline"}
+                    {presence === 'online'
+                      ? 'Online now'
+                      : presence === 'away'
+                        ? 'Away'
+                        : (contact ? getLastSeenText(contact.last_active_at, false) : 'Offline')}
                   </Text>
                 </View>
               </View>
@@ -932,138 +1420,279 @@ export default function ChatScreen() {
             </View>
           </View>
 
-          {/* Chat Messages */}
-          <ScrollView
-            style={styles.messagesContainer}
-            ref={scrollViewRef}
-            contentContainerStyle={styles.messagesContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {messages.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="chatbubble-outline" size={64} color={theme.colors.iconDisabled} />
-                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No messages yet</Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                  Start the conversation by sending a message
-                </Text>
-              </View>
-            ) : (
-              messages.map((message) => {
-                const myMessage = isMyMessage(message);
-
-                return (
-                  <View
-                    key={message.id}
-                    style={[
-                      styles.messageContainer,
-                      myMessage
-                        ? styles.myMessageContainer
-                        : styles.theirMessageContainer,
-                    ]}
-                  >
-                    {/* Other user's avatar */}
-                    {!myMessage && (
-                      <View style={styles.avatarContainer}>
+          {/* Chat Messages (FlatList for virtualization) */}
+          <FlatList
+            ref={messagesListRef}
+            data={messages}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => {
+              const myMessage = isMyMessage(item);
+              // Decide bubble style: for non-audio files use a dark file bubble like the mock
+              const looksLikeAudio = (
+                item.message_type === 'file' && item.attachment_url && (
+                  (item.file_name || '').toLowerCase().match(/\.(m4a|mp3|wav|ogg|aac)$/) ||
+                  (item.attachment_url || '').toLowerCase().match(/\.(m4a|mp3|wav|ogg|aac)$/)
+                )
+              );
+              const isFileButNotAudio = item.message_type === 'file' && item.attachment_url && !looksLikeAudio;
+              const bubbleStyle = isFileButNotAudio
+                ? (myMessage ? styles.myFileMessage : styles.theirFileMessage)
+                : (myMessage ? styles.myMessage : styles.theirMessage);
+              return (
+                <View
+                  style={[
+                    styles.messageContainer,
+                    myMessage ? styles.myMessageContainer : styles.theirMessageContainer,
+                  ]}
+                >
+                  {!myMessage && (
+                    <View style={styles.avatarContainer}>
+                      {item.sender.profile_image_url ? (
+                        <OptimizedImage
+                          source={{ uri: resolveRemoteUri(item.sender.profile_image_url) }}
+                          style={styles.avatar}
+                          resizeMode="cover"
+                          cache="force-cache"
+                          loaderSize="small"
+                          showErrorIcon={false}
+                        />
+                      ) : (
                         <View style={styles.avatar}>
                           <Text style={styles.avatarText}>
-                            {getUserInitials(
-                              message.sender.first_name,
-                              message.sender.last_name
-                            )}
+                            {getUserInitials(item.sender.first_name, item.sender.last_name)}
                           </Text>
                         </View>
-                      </View>
-                    )}
+                      )}
+                    </View>
+                  )}
 
-                    {/* Message bubble with file attachment */}
-                    <View
+                  <View style={[styles.messageBubble, bubbleStyle]}>
+                    {renderMessageContent(item)}
+                    <Text
                       style={[
-                        styles.messageBubble,
-                        myMessage ? styles.myMessage : styles.theirMessage,
+                        styles.messageTime,
+                        myMessage ? styles.myMessageTime : styles.theirMessageTime,
                       ]}
                     >
-                      {renderMessageContent(message)}
-                      <Text
-                        style={[
-                          styles.messageTime,
-                          myMessage
-                            ? styles.myMessageTime
-                            : styles.theirMessageTime,
-                        ]}
-                      >
-                        {formatTime(message.created_at)}
-                      </Text>
-                    </View>
+                      {formatTime(item.created_at)}
+                    </Text>
+                  </View>
 
-                    {/* My avatar */}
-                    {myMessage && (
-                      <View style={styles.avatarContainer}>
+                  {myMessage && (
+                    <View style={styles.avatarContainer}>
+                      {item.sender.profile_image_url ? (
+                        <OptimizedImage
+                          source={{ uri: resolveRemoteUri(item.sender.profile_image_url) }}
+                          style={[styles.avatar, styles.myAvatar]}
+                          resizeMode="cover"
+                          cache="force-cache"
+                          loaderSize="small"
+                          showErrorIcon={false}
+                        />
+                      ) : (
                         <View style={[styles.avatar, styles.myAvatar]}>
                           <Text style={styles.avatarText}>
-                            {getUserInitials(
-                              message.sender.first_name,
-                              message.sender.last_name
-                            )}
+                            {getUserInitials(item.sender.first_name, item.sender.last_name)}
                           </Text>
                         </View>
-                      </View>
-                    )}
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            }}
+            contentContainerStyle={styles.messagesContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={(e) => {
+              const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+              const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+              const near = distanceFromBottom < 300;
+              if (near !== userNearBottom) setUserNearBottom(near);
+              setShowScrollToLatest(!near && messages.length > 0);
+              if (!near) setManualScrolling(true);
+            }}
+            scrollEventThrottle={100}
+            onContentSizeChange={() => {
+              if (!manualScrolling && userNearBottom) {
+                messagesListRef.current?.scrollToEnd?.({ animated: true });
+              }
+            }}
+            onScrollBeginDrag={() => {
+              setManualScrolling(true);
+              if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+            }}
+            onScrollEndDrag={() => {
+              if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+              scrollIdleTimerRef.current = setTimeout(() => setManualScrolling(false), 1200);
+            }}
+            onMomentumScrollEnd={() => {
+              if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+              scrollIdleTimerRef.current = setTimeout(() => setManualScrolling(false), 800);
+            }}
+            initialNumToRender={12}
+            windowSize={7}
+            removeClippedSubviews
+          />
 
-          {/* Message Input */}
-          <View style={[styles.inputContainer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.borderLight }] }>
-            <View style={[styles.inputWrapper, { backgroundColor: theme.colors.background }] }>
+          {showScrollToLatest && (
+            <TouchableOpacity
+              onPress={() => {
+                messagesListRef.current?.scrollToEnd?.({ animated: true });
+                setShowScrollToLatest(false);
+                setUserNearBottom(true);
+              }}
+            >
+            </TouchableOpacity>
+          )}
+
+          {/* Message Input - Single row with icons and text input */}
+          <View style={[
+            styles.bottomInputSection, 
+            { 
+              backgroundColor: 'transparent',
+              // When keyboard hidden, keep input 10px above safe-area bottom; when shown, keep it tight
+              paddingBottom: keyboardVisible ? Math.max(insets.bottom, 4) : insets.bottom + 10,
+            }
+          ]}>
+            {/* Show expand button when icons are hidden */}
+            {isTyping && (
               <TouchableOpacity
-                style={styles.attachmentButton}
-                onPress={() => setAttachmentModalVisible(true)}
-                disabled={uploading}
+                style={styles.iconButton}
+                onPress={() => setIsTyping(false)}
               >
-                {uploading ? (
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                ) : (
-                  <Ionicons name="attach" size={24} color={theme.colors.primary} />
-                )}
+                <Ionicons name="chevron-forward" size={28} color={theme.colors.primary} />
               </TouchableOpacity>
+            )}
 
-              <TextInput
-                style={[styles.textInput, { color: theme.colors.text }]}
-                placeholder="Type a message..."
-                value={newMessage}
-                onChangeText={setNewMessage}
-                multiline
-                maxLength={500}
-                editable={!sending && !uploading}
-                onSubmitEditing={handleSendMessage}
-                returnKeyType="send"
-                placeholderTextColor={theme.colors.textDisabled}
-              />
+            {/* Left icons - hide when typing */}
+            {!isTyping && (
+              <>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={takePhoto}
+                >
+                  <Ionicons name="camera" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
 
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={pickImage}
+                >
+                  <Ionicons name="image" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={pickDocument}
+                >
+                  <Ionicons name="document-text" size={28} color={theme.colors.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={handleMicPress}
+                >
+                  <Ionicons 
+                    name={isRecording ? "stop-circle" : "mic"} 
+                    size={28} 
+                    color={isRecording ? "#FF0000" : theme.colors.primary} 
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+
+            <View style={[
+              styles.inputWrapper,
+              { 
+                backgroundColor: theme.colors.background,
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.15)'
+              }
+            ]}>
+              {/* Pending document chips */}
+              {pendingFiles.length > 0 && !isRecording && !pendingRecordingUri && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pendingFilesScroll} contentContainerStyle={styles.pendingFilesRow}>
+                  {pendingFiles.map((f, idx) => (
+                    <View key={`${f.uri}-${idx}`} style={styles.pendingChip}>
+                      <Ionicons name="document-text" size={16} color="#FFFFFF" style={styles.pendingChipIcon} />
+                      <Text numberOfLines={1} style={styles.pendingChipText}>{f.name}</Text>
+                      <TouchableOpacity style={styles.pendingChipClose} onPress={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}>
+                        <Ionicons name="close" size={14} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+
+              {(isRecording || pendingRecordingUri) ? (
+                <View style={styles.recordingBar}>
+                  {/* Cancel */}
+                  <TouchableOpacity style={styles.recCircleButton} onPress={cancelPendingRecording}>
+                    <Ionicons name="close" size={18} color="#0B6E8B" />
+                  </TouchableOpacity>
+
+                  {/* Middle pill */}
+                  <View style={styles.recordingPill}>
+                    <View style={styles.pillMeter} />
+                    <Text style={styles.pillTime}>
+                      {isRecording ? `${Math.floor(recordingDuration)}s` : `${Math.max(1, pendingRecordingDuration)}s`}
+                    </Text>
+                  </View>
+
+                  {/* Send */}
+                  <TouchableOpacity style={[styles.recCircleButton, !pendingRecordingUri && { opacity: 0.5 }]} onPress={sendPendingRecording} disabled={!pendingRecordingUri}>
+                    <Ionicons name="send" size={18} color="#0B6E8B" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TextInput
+                  style={[styles.textInput, { color: theme.colors.text }]}
+                  placeholder="Message"
+                  value={newMessage}
+                  onChangeText={(text) => {
+                    setNewMessage(text);
+                    setIsTyping(text.length > 0);
+                  }}
+                  onFocus={() => {
+                    if (newMessage.length > 0) {
+                      setIsTyping(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (newMessage.length === 0) {
+                      setIsTyping(false);
+                    }
+                  }}
+                  multiline={true}
+                  maxLength={500}
+                  editable={!sending && !uploading}
+                  placeholderTextColor={theme.colors.textDisabled}
+                  returnKeyType="send"
+                  blurOnSubmit={true}
+                  onSubmitEditing={handleSendMessage}
+                />
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={handleEmojiPress}
+            >
+              <Ionicons name="happy-outline" size={28} color={theme.colors.primary} />
+            </TouchableOpacity>
+
+            {(newMessage.trim() !== "" || pendingFiles.length > 0) && (
               <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  { backgroundColor: theme.colors.primary },
-                  (newMessage.trim() === "" || sending || uploading) && { backgroundColor: theme.colors.borderLight },
-                ]}
-                onPress={handleSendMessage}
-                disabled={
-                  newMessage.trim() === "" || sending || uploading || !userId
-                }
+                style={styles.iconButton}
+                onPress={handleMainSend}
+                disabled={sending || uploading}
               >
                 {sending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={theme.colors.primary} />
                 ) : (
-                  <Ionicons
-                    name="send"
-                    size={24}
-                    color={newMessage.trim() === "" ? theme.colors.iconDisabled : "#FFFFFF"}
-                  />
+                  <Ionicons name="send" size={28} color={theme.colors.primary} />
                 )}
               </TouchableOpacity>
-            </View>
+            )}
           </View>
 
           {/* Enhanced Attachment Viewer Modal */}
@@ -1117,18 +1746,45 @@ export default function ChatScreen() {
                 contentContainerStyle={styles.viewerScrollContent}
               >
                 {currentAttachment?.attachment_url && (
-                  <Image
-                    source={{ uri: currentAttachment.attachment_url }}
+                  <OptimizedImage
+                    source={{ uri: resolveRemoteUri(currentAttachment.attachment_url) }}
                     style={styles.fullSizeImage}
                     resizeMode="contain"
+                    cache="force-cache"
+                    loaderColor="#FFFFFF"
+                    loaderSize="large"
                   />
                 )}
               </ScrollView>
 
               <View style={styles.viewerFooter}>
                 <Text style={styles.viewerFooterText}>
-                  Pinch to zoom • Tap download to save
+                  Pinch to zoom â€¢ Tap download to save
                 </Text>
+              </View>
+            </View>
+          </Modal>
+
+          {/* File Error Modal */}
+          <Modal
+            visible={fileErrorModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setFileErrorModalVisible(false)}
+          >
+            <View style={styles.centeredOverlay}>
+              <View style={[styles.simpleModal, { backgroundColor: theme.colors.surface }]}>
+                <Ionicons name="alert-circle" size={28} color={theme.colors.error} style={{ marginBottom: 8 }} />
+                <Text style={[styles.simpleModalTitle, { color: theme.colors.text }]}>Something went wrong</Text>
+                <Text style={[styles.simpleModalMessage, { color: theme.colors.textSecondary }]}>
+                  {fileErrorMessage || "An unexpected error occurred."}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.simpleModalButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => setFileErrorModalVisible(false)}
+                >
+                  <Text style={styles.simpleModalButtonText}>OK</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </Modal>
@@ -1140,14 +1796,14 @@ export default function ChatScreen() {
             onRequestClose={() => setAttachmentModalVisible(false)}
           >
             <View style={styles.modalOverlay}>
-              <View style={styles.modalContent}>
+              <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Choose Attachment</Text>
+                  <Text style={[styles.attachmentModalTitle, { color: theme.colors.text }]}>Choose Attachment</Text>
                   <TouchableOpacity
                     onPress={() => setAttachmentModalVisible(false)}
                     style={styles.closeButton}
                   >
-                    <Ionicons name="close" size={24} color="#666" />
+                    <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
 
@@ -1164,7 +1820,7 @@ export default function ChatScreen() {
                     >
                       <Ionicons name="camera" size={24} color="#FFFFFF" />
                     </View>
-                    <Text style={styles.optionText}>Camera</Text>
+                    <Text style={[styles.optionText, { color: theme.colors.text }]}>Camera</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1179,7 +1835,7 @@ export default function ChatScreen() {
                     >
                       <Ionicons name="image" size={24} color="#FFFFFF" />
                     </View>
-                    <Text style={styles.optionText}>Gallery</Text>
+                    <Text style={[styles.optionText, { color: theme.colors.text }]}>Gallery</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1194,19 +1850,317 @@ export default function ChatScreen() {
                     >
                       <Ionicons name="document" size={24} color="#FFFFFF" />
                     </View>
-                    <Text style={styles.optionText}>Document</Text>
+                    <Text style={[styles.optionText, { color: theme.colors.text }]}>Document</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
           </Modal>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+
+          {/* Emoji Picker Modal */}
+          <Modal
+            visible={emojiPickerVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setEmojiPickerVisible(false)}
+          >
+            <TouchableOpacity 
+              style={styles.emojiModalOverlay}
+              activeOpacity={1}
+              onPress={() => setEmojiPickerVisible(false)}
+            >
+              <TouchableOpacity 
+                activeOpacity={1}
+                style={[styles.emojiModalContent, { backgroundColor: theme.colors.surface }]}
+                onPress={(e) => e.stopPropagation()}
+              >
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.attachmentModalTitle, { color: theme.colors.text }]}>Select Emoji</Text>
+                  <TouchableOpacity
+                    onPress={() => setEmojiPickerVisible(false)}
+                    style={styles.closeButton}
+                  >
+                    <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Category Tabs */}
+                <View style={styles.emojiCategoryTabs}>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'recent' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('recent')}
+                  >
+                    <Ionicons name="time-outline" size={24} color={selectedEmojiCategory === 'recent' ? theme.colors.primary : theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'smileys' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('smileys')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'smileys' ? theme.colors.primary : theme.colors.textSecondary }]}>😊</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'gestures' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('gestures')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'gestures' ? theme.colors.primary : theme.colors.textSecondary }]}>👋</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'animals' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('animals')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'animals' ? theme.colors.primary : theme.colors.textSecondary }]}>🐶</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'food' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('food')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'food' ? theme.colors.primary : theme.colors.textSecondary }]}>🍕</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'activities' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('activities')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'activities' ? theme.colors.primary : theme.colors.textSecondary }]}>⚽</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'travel' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('travel')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'travel' ? theme.colors.primary : theme.colors.textSecondary }]}>🚗</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'objects' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('objects')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'objects' ? theme.colors.primary : theme.colors.textSecondary }]}>💡</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'symbols' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('symbols')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'symbols' ? theme.colors.primary : theme.colors.textSecondary }]}>❤️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.emojiCategoryTab, selectedEmojiCategory === 'flags' && styles.emojiCategoryTabActive]}
+                    onPress={() => setSelectedEmojiCategory('flags')}
+                  >
+                    <Text style={[styles.emojiCategoryIcon, { color: selectedEmojiCategory === 'flags' ? theme.colors.primary : theme.colors.textSecondary }]}>🏁</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView 
+                  ref={emojiScrollRef}
+                  style={styles.emojiScroll} 
+                  contentContainerStyle={styles.emojiScrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* Recent */}
+                  {selectedEmojiCategory === 'recent' && (
+                    <View style={styles.emojiGrid}>
+                      {['😊', '❤️', '😂', '👍', '🙏', '😭', '🎉', '🔥', '💯', '✨', '😍', '🤔', '😢', '🥰', '😅', '😎', '💪', '👏', '🙌', '💕'].map((emoji, index) => (
+                        <TouchableOpacity key={`recent-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Smileys */}
+                  {selectedEmojiCategory === 'smileys' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃',
+                        '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙',
+                        '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔',
+                        '🤐', '🤨', '😐', '😑', '😶', '🙄', '😬', '🤥', '😌', '😔',
+                        '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵',
+                        '🥶', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐', '😕', '😟',
+                        '🙁', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰',
+                        '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫',
+                        '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩',
+                        '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', '😺', '😸', '😹',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`smiley-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Gestures */}
+                  {selectedEmojiCategory === 'gestures' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
+                        '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+                        '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
+                        '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂',
+                        '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅',
+                        '👄', '💋', '🩸', '👶', '👧', '🧒', '👦', '👩', '🧑', '👨',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`gesture-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Animals */}
+                  {selectedEmojiCategory === 'animals' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
+                        '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒',
+                        '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇',
+                        '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐜',
+                        '🦟', '🦗', '🕷️', '🕸️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕',
+                        '🐙', '🦑', '🦐', '🦀', '🐠', '🐟', '🐡', '🐬', '🐳', '🐋',
+                        '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦏', '🦛',
+                        '🐪', '🐫', '🦒', '🦘', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏',
+                        '🐑', '🐐', '🐕', '🐩', '🐈', '🐓', '🦃', '🦚', '🦜', '🦢',
+                        '🦩', '🕊', '🐇', '🦌', '🐀', '🐁', '🐿️', '🦔', '🦎', '🦇',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`animal-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Food */}
+                  {selectedEmojiCategory === 'food' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐',
+                        '🍈', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦',
+                        '🥬', '🥒', '🌶️', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠',
+                        '🥐', '🥖', '🥨', '🥯', '🍞', '🥚', '🍳', '🧀', '🥓', '🥩',
+                        '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🫓', '🥪', '🥙', '🧆',
+                        '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '🥫', '🍝', '🍜', '🍲',
+                        '🍛', '🍣', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥',
+                        '🥠', '🥮', '🍢', '🍡', '🍧', '🍨', '🍦', '🥧', '🧁', '🍰',
+                        '🎂', '🍮', '🍭', '🍬', '🍫', '🍿', '🍩', '🍪', '🌰', '🥜',
+                        '🍯', '☕', '🍵', '🧃', '🥤', '🧋', '🍶', '🍺', '🍻', '🥂',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`food-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Activities */}
+                  {selectedEmojiCategory === 'activities' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱',
+                        '🪀', '🏓', '🏸', '🏑', '🏒', '🥍', '🏏', '🥅', '⛳', '🪁',
+                        '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️',
+                        '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '🤺', '⛹️',
+                        '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽', '🚣', '🧗', '🚵',
+                        '🚴', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎫',
+                        '🎟️', '🎪', '🤹', '🎭', '🩰', '🎨', '🎬', '🎤', '🎧', '🎼',
+                        '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '♟️', '🎯',
+                        '🎳', '🎮', '🎰', '🧩', '🎉', '🎊', '🎈', '🎁', '🎀', '🎂',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`activity-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Travel */}
+                  {selectedEmojiCategory === 'travel' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐',
+                        '🛻', '🚚', '🚛', '🚜', '🦯', '🦽', '🦼', '🩼', '🛴', '🚲',
+                        '🛵', '🏍️', '🛺', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠',
+                        '🚟', '🚃', '🚋', '🚞', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆',
+                        '🚇', '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🛰️', '🚀',
+                        '🛸', '🚁', '🛶', '⛵', '🚤', '🛥️', '🛳️', '⛴️', '🚢', '⚓',
+                        '⛽', '🚧', '🚦', '🚥', '🚏', '🗺️', '🗿', '🗽', '🗼', '🏰',
+                        '🏯', '🏟️', '🎡', '🎢', '🎠', '⛲', '⛱️', '🏖️', '🏝️', '🏜️',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`travel-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Objects */}
+                  {selectedEmojiCategory === 'objects' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '⌚', '📱', '📲', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '🕹️',
+                        '🗜️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥',
+                        '📽️', '🎞️', '📞', '☎️', '📟', '📠', '📺', '📻', '🎙️', '🎚️',
+                        '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋',
+                        '🔌', '💡', '🔦', '🕯️', '🧯', '🛢️', '💸', '💵', '💴', '💶',
+                        '💷', '🪙', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🪛', '🔧',
+                        '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '⛓️', '🧲', '🔫',
+                        '💣', '🧨', '🪃', '🏹', '🔪', '⚔️', '🛡️', '🚬', '⚰️', '⚱️',
+                        '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩻',
+                        '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠', '🧫', '🧪', '🌡️',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`object-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Symbols */}
+                  {selectedEmojiCategory === 'symbols' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+                        '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️',
+                        '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎',
+                        '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑',
+                        '♒', '♓', '⚛️', '☢️', '☣️', '🔴', '🟠', '🟡', '🟢', '🔵',
+                        '🟣', '⚫', '⚪', '🟤', '⭐', '🌟', '✨', '💫', '⚡', '🔥',
+                        '💧', '💦', '⛄', '☃️', '☄️', '💥', '✅', '❌', '➕', '➖',
+                        '✖️', '➗', '©️', '®️', '™️', '#️⃣', '*️⃣', '0️⃣', '1️⃣', '2️⃣',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`symbol-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Flags */}
+                  {selectedEmojiCategory === 'flags' && (
+                    <View style={styles.emojiGrid}>
+                      {[
+                        '🏳️', '🏴', '🏁', '🚩', '🏳️‍🌈', '🏴‍☠️', '🇺🇸', '🇬🇧', '🇨🇦', '🇫🇷',
+                        '🇩🇪', '🇮🇹', '🇪🇸', '🇵🇹', '🇷🇺', '🇨🇳', '🇯🇵', '🇰🇷', '🇮🇳', '🇦🇺',
+                        '🇧🇷', '🇲🇽', '🇦🇷', '🇨🇱', '🇨🇴', '🇵🇪', '🇻🇪', '🇪🇨', '🇧🇴', '🇺🇾',
+                        '🇵🇾', '🇬🇾', '🇸🇷', '🇫🇷', '🇬🇫', '🇵🇫', '🇲🇶', '🇬🇵', '🇷🇪', '🇾🇹',
+                        '🇵🇲', '🇧🇱', '🇲🇫', '🇼🇫', '🇳🇨', '🇵🇳', '🇹🇰', '🇨🇽', '🇨🇨', '🇳🇺',
+                        '🇳🇿', '🇹🇴', '🇼🇸', '🇫🇯', '🇻🇺', '🇰🇮', '🇹🇻', '🇳🇷', '🇵🇬', '🇸🇧',
+                        '🇳🇫', '🇦🇺', '🇨🇰', '🇵🇫', '🇵🇳', '🇳🇿', '🇫🇯', '🇵🇬', '🇻🇺', '🇹🇴',
+                      ].map((emoji, index) => (
+                        <TouchableOpacity key={`flag-${index}`} style={styles.emojiButton} onPress={() => handleEmojiSelect(emoji)}>
+                          <Text style={styles.emojiText}>{emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </CurvedBackground>
   );
 }
-
-const styles = StyleSheet.create({
+// Styles function that accepts scaledFontSize for dynamic text sizing
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -1215,12 +2169,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    // backgroundColor moved to theme via inline override
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
-    // color moved to theme via inline override
+    fontSize: scaledFontSize(16),
   },
   // Dynamic header wrapper
   headerWrapper: {
@@ -1241,6 +2193,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 15,
   },
+  headerAvatarWrapper: {
+    position: 'relative',
+    marginRight: 16, // extra space so the status dot never overlaps text
+  },
   headerAvatar: {
     width: 40,
     height: 40,
@@ -1248,23 +2204,26 @@ const styles = StyleSheet.create({
     backgroundColor: "#2196F3",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
     position: "relative",
   },
   headerAvatarText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   headerStatusIndicator: {
     position: "absolute",
-    bottom: -2,
-    right: -2,
+    bottom: -1,
+    right: -1,
     width: 12,
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: "#FFF",
+  },
+  headerTextBlock: {
+    flexShrink: 1,
+    minWidth: 0,
   },
   onlineIndicator: {
     backgroundColor: "#4CAF50",
@@ -1273,12 +2232,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#9E9E9E",
   },
   contactName: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
-    color: "#2E7D32",
   },
   contactStatus: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
   },
   onlineStatus: {
     color: "#4CAF50",
@@ -1300,13 +2258,13 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     color: "#666",
     marginTop: 16,
     fontWeight: "600",
   },
   emptyStateSubtext: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#999",
     marginTop: 8,
     textAlign: "center",
@@ -1339,7 +2297,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
   },
   messageBubble: {
@@ -1362,7 +2320,7 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
   },
   messageText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     marginBottom: 4,
   },
   myMessageText: {
@@ -1372,7 +2330,7 @@ const styles = StyleSheet.create({
     color: "#000000",
   },
   messageTime: {
-    fontSize: 11,
+    fontSize: scaledFontSize(11),
     alignSelf: "flex-end",
   },
   myMessageTime: {
@@ -1381,42 +2339,51 @@ const styles = StyleSheet.create({
   theirMessageTime: {
     color: "#999",
   },
-  inputContainer: {
-    padding: 15,
-    // backgroundColor moved to theme via inline override
+  // Dark file message bubble styles (match desired mock)
+  myFileMessage: {
+    backgroundColor: '#2C2F33',
+    borderTopRightRadius: 4,
+    minWidth: 220,
+  },
+  theirFileMessage: {
+    backgroundColor: '#2C2F33',
+    borderTopLeftRadius: 4,
+    elevation: 0,
+    shadowOpacity: 0,
+    minWidth: 220,
+  },
+  // Bottom input section - all items in one row
+  bottomInputSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 4,
     borderTopWidth: 1,
-    // borderTopColor moved to theme via inline override
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  iconButton: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputWrapper: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    // backgroundColor moved to theme via inline override
-    borderRadius: 25,
-    paddingHorizontal: 15,
+    borderRadius: 24,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-  },
-  attachmentButton: {
-    padding: 4,
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.15)',
+    backgroundColor: 'transparent',
   },
   textInput: {
     flex: 1,
+    fontSize: scaledFontSize(16),
     paddingVertical: 8,
-    paddingHorizontal: 12,
     maxHeight: 100,
-    fontSize: 16,
-    // color moved to theme via inline override
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    // backgroundColor moved to theme via inline override
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
-  },
-  sendButtonDisabled: {
-    // backgroundColor moved to theme via inline override
   },
   // Attachment styles
   imageAttachment: {
@@ -1440,7 +2407,7 @@ const styles = StyleSheet.create({
   },
   imageText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     marginLeft: 4,
   },
   fileAttachment: {
@@ -1453,6 +2420,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E9ECEF",
   },
+  // Inner layout for file content inside dark bubble
+  fileBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fileIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  fileTexts: {
+    flex: 1,
+  },
+  fileNameDark: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+  },
+  fileSizeDark: {
+    color: '#BFC7D1',
+    fontSize: scaledFontSize(12),
+    marginTop: 2,
+  },
   fileIconContainer: {
     marginRight: 12,
   },
@@ -1460,22 +2454,74 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fileName: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     fontWeight: "500",
     color: "#333",
     marginBottom: 2,
   },
   fileSize: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#666",
   },
   // Modal styles
   modalOverlay: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 24,
+    padding: 32,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  iconContainer: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: scaledFontSize(28),
+    fontWeight: "700",
+    marginBottom: 12,
+    textAlign: "center",
+    letterSpacing: 0.3,
+  },
+  modalMessage: {
+    fontSize: scaledFontSize(16),
+    textAlign: "center",
+    marginBottom: 28,
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  modalButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    minWidth: 140,
+    alignItems: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modalButtonText: {
+    color: "#FFFFFF",
+    fontSize: scaledFontSize(17),
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  attachmentModalOverlay: {
+    flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
-  modalContent: {
+  attachmentModalContent: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -1488,10 +2534,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  modalTitle: {
-    fontSize: 18,
+  attachmentModalTitle: {
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
-    color: "#333",
   },
   closeButton: {
     padding: 4,
@@ -1513,12 +2558,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   optionText: {
-    fontSize: 14,
-    color: "#333",
+    fontSize: scaledFontSize(14),
     fontWeight: "500",
   },
   fileHint: {
-    fontSize: 10,
+    fontSize: scaledFontSize(10),
     color: "#888",
     marginTop: 2,
   },
@@ -1547,13 +2591,13 @@ const styles = StyleSheet.create({
   },
   viewerFileName: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     textAlign: "center",
   },
   viewerFileSize: {
     color: "#CCCCCC",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     marginTop: 2,
   },
   viewerActionButton: {
@@ -1578,7 +2622,234 @@ const styles = StyleSheet.create({
   },
   viewerFooterText: {
     color: "#CCCCCC",
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
+  },
+  centeredOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Simple Modal styles
+  simpleModal: {
+    width: '80%',
+    maxWidth: 400,
+    alignSelf: 'center',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+  },
+  simpleModalTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  simpleModalMessage: {
+    fontSize: scaledFontSize(14),
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  simpleModalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  simpleModalButtonText: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+  },
+  // Emoji Picker styles
+  emojiModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  emojiModalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    height: '75%',
+  },
+  emojiCategoryTabs: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+    marginBottom: 12,
+  },
+  emojiCategoryTab: {
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  emojiCategoryTabActive: {
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  emojiCategoryIcon: {
+    fontSize: 22,
+  },
+  emojiScroll: {
+    flex: 1,
+  },
+  emojiScrollContent: {
+    paddingBottom: 20,
+  },
+  emojiSection: {
+    marginBottom: 24,
+  },
+  emojiSectionTitle: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+    marginBottom: 12,
+    paddingLeft: 5,
+  },
+  emojiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: 8,
+  },
+  emojiButton: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  emojiText: {
+    fontSize: 32,
+  },
+  // Recording indicator styles
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingVertical: 8,
+  },
+  recordingDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FF0000',
+    marginRight: 10,
+  },
+  recordingText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '500',
+  },
+  // New recording toolbar styles
+  recordingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  recCircleButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#B9F5FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordingPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#00CFE8',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  pillControl: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E0FBFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillMeter: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 3,
+    marginHorizontal: 10,
+  },
+  pillTime: {
+    color: '#0B6E8B',
+    fontWeight: '600',
+  },
+  // Audio message bubble (for sent/received audio files)
+  audioBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  audioPlayButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#2196F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 18,
+    gap: 4,
+  },
+  audioBar: {
+    width: 4,
+    backgroundColor: '#2196F3',
+    borderRadius: 2,
+  },
+  audioDurationText: {
+    fontSize: scaledFontSize(12),
+    color: '#555',
+  },
+  // Pending file chips
+  pendingFilesScroll: {
+    maxHeight: 60,
+    marginBottom: 6,
+  },
+  pendingFilesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pendingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2C2F33',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  pendingChipIcon: {
+    marginRight: 6,
+  },
+  pendingChipText: {
+    color: '#FFFFFF',
+    maxWidth: 140,
+  },
+  pendingChipClose: {
+    marginLeft: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

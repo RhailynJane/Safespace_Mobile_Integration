@@ -27,15 +27,20 @@ function UserSyncHandler() {
         try {
           const token = await getToken();
           if (token) {
-            await syncUserWithDatabase(user, token);
+            console.log('🔄 Starting user sync...');
+            // Sync in background - don't block UI
+            syncUserWithDatabase(user, token).then(() => {
+              console.log("✅ User synced successfully");
+            }).catch((error) => {
+              console.error("❌ Failed to sync user (non-blocking):", error);
+            });
           } else {
             console.warn("⚠️ Token is null, skipping user sync.");
           }
-          // Mark onboarding as completed when user is created
+          // Mark onboarding as completed
           await AsyncStorage.setItem("hasCompletedOnboarding", "true");
-          console.log("✅ User synced successfully");
         } catch (error) {
-          console.error("❌ Failed to sync user:", error);
+          console.error("❌ Failed to handle user sync:", error);
           // Don't block the app if sync fails - user might already exist
           await AsyncStorage.setItem("hasCompletedOnboarding", "true");
         }

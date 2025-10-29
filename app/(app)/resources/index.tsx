@@ -38,7 +38,7 @@
  */
 
 // app/(app)/resources/index.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -49,13 +49,13 @@ import {
   ActivityIndicator,
   TextInput,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import StatusModal from "../../../components/StatusModal";
 import { 
   Resource, 
   fetchAllResourcesWithExternal,
@@ -127,7 +127,8 @@ const CATEGORIES: Category[] = [
  * with advanced filtering, search, and quick access features
  */
 export default function ResourcesScreen() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
+  
   // State management for UI and data
   const [loading, setLoading] = useState(true); // Initial loading state
   const [refreshing, setRefreshing] = useState(false); // Pull-to-refresh state
@@ -136,6 +137,18 @@ export default function ResourcesScreen() {
   const [selectedCategory, setSelectedCategory] = useState(""); // Currently selected category filter
   const [resources, setResources] = useState<Resource[]>([]); // Resource data array
   const [featuredResource, setFeaturedResource] = useState<Resource | null>(null); // Highlighted resource
+  const [modalVisible, setModalVisible] = useState(false); // Status modal visibility
+  const [modalConfig, setModalConfig] = useState({
+    type: 'error' as 'success' | 'error' | 'info',
+    title: '',
+    message: ''
+  }); // Modal configuration
+
+  /**
+   * Create styles dynamically based on text size scaling
+   * Uses useMemo for performance optimization
+   */
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   /**
    * Bottom navigation tabs configuration
@@ -148,6 +161,23 @@ export default function ResourcesScreen() {
     { id: "messages", name: "Messages", icon: "chatbubbles" },
     { id: "profile", name: "Profile", icon: "person" },
   ];
+
+  /**
+   * Show modal with specified configuration
+   * Replaces Alert.alert with consistent modal UI
+   */
+  const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+
+  /**
+   * Hide modal and reset configuration
+   */
+  const hideModal = () => {
+    setModalVisible(false);
+    setModalConfig({ type: 'error', title: '', message: '' });
+  };
 
   /**
    * Load resources on component mount
@@ -172,10 +202,10 @@ export default function ResourcesScreen() {
       setFeaturedResource(featured || null);
     } catch (error) {
       console.error("Error loading resources:", error);
-      Alert.alert(
-        "Error",
-        "Could not load resources.",
-        [{ text: "OK" }]
+      showModal(
+        'error',
+        'Load Error',
+        'Could not load resources. Please check your connection and try again.'
       );
     } finally {
       setLoading(false);
@@ -207,7 +237,14 @@ export default function ResourcesScreen() {
       setLoading(true);
       fetchResourcesByCategory(newCategory)
         .then(setResources)
-        .catch(console.error)
+        .catch(error => {
+          console.error("Error fetching category resources:", error);
+          showModal(
+            'error',
+            'Filter Error',
+            'Could not load resources for this category. Please try again.'
+          );
+        })
         .finally(() => setLoading(false));
     } else {
       // Reset to show all resources
@@ -230,6 +267,11 @@ export default function ResourcesScreen() {
           setResources(searchResults);
         } catch (error) {
           console.error("Error searching resources:", error);
+          showModal(
+            'error',
+            'Search Error',
+            'Could not complete search. Please check your connection and try again.'
+          );
         } finally {
           setLoading(false);
         }
@@ -291,6 +333,11 @@ export default function ResourcesScreen() {
       handleResourcePress(affirmation);
     } catch (error) {
       console.error("Error getting daily affirmation:", error);
+      showModal(
+        'error',
+        'Affirmation Error',
+        'Could not load daily affirmation. Please check your connection and try again.'
+      );
     }
   };
 
@@ -304,6 +351,11 @@ export default function ResourcesScreen() {
       handleResourcePress(quote);
     } catch (error) {
       console.error("Error getting random quote:", error);
+      showModal(
+        'error',
+        'Quote Error',
+        'Could not load random quote. Please check your connection and try again.'
+      );
     }
   };
 
@@ -507,6 +559,16 @@ export default function ResourcesScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
+
+        {/* Status Modal for Error/Success Messages */}
+        <StatusModal
+          visible={modalVisible}
+          type={modalConfig.type}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          onClose={hideModal}
+          buttonText="OK"
+        />
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -516,8 +578,9 @@ export default function ResourcesScreen() {
  * Stylesheet for ResourcesScreen component
  * Organized by component sections with consistent theming
  * Uses responsive design patterns and accessibility considerations
+ * Now includes dynamic font scaling via scaledFontSize parameter
  */
-const styles = StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -531,7 +594,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
   },
   
@@ -554,7 +617,7 @@ const styles = StyleSheet.create({
     borderLeftColor: "#4CAF50", // Accent border for visual emphasis
   },
   featuredLabel: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: "600",
     color: "#4CAF50",
     marginBottom: 8,
@@ -562,14 +625,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   featuredText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontStyle: "italic",
     color: "#333",
     lineHeight: 24,
     marginBottom: 8,
   },
   featuredAuthor: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
     textAlign: "right",
   },
@@ -607,7 +670,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   actionText: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
@@ -636,7 +699,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
   },
   
@@ -652,12 +715,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
   },
   seeAllButton: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#4CAF50",
     fontWeight: "600",
   },
@@ -681,7 +744,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   categoryName: {
-    fontSize: 11,
+    fontSize: scaledFontSize(11),
     fontWeight: "600",
     color: "#333",
     textAlign: "center",
@@ -694,7 +757,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100, // Extra padding for bottom navigation
   },
   resourcesSectionTitle: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
     marginBottom: 15,
@@ -730,7 +793,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   resourceTitle: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 4,
@@ -741,7 +804,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   resourceType: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     color: "#666",
   },
   resourceDot: {
@@ -752,11 +815,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   resourceDuration: {
-    fontSize: 13,
+    fontSize: scaledFontSize(13),
     color: "#666",
   },
   resourceAuthor: {
-    fontSize: 12,
+    fontSize: scaledFontSize(12),
     color: "#999",
     fontStyle: "italic",
   },
@@ -774,13 +837,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
     textAlign: "center",
   },

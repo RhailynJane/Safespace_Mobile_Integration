@@ -20,6 +20,21 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Lightweight request timing/logger to inspect slow endpoints and payload sizes
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const end = process.hrtime.bigint();
+    const ms = Number(end - start) / 1_000_000;
+    const len = res.getHeader('Content-Length');
+    // Only log API calls
+    if (req.path.startsWith('/api/')) {
+      console.log(`➡️  ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms.toFixed(1)}ms` + (len ? ` ${len}b` : ''));
+    }
+  });
+  next();
+});
+
 // PostgreSQL connection
 const pool = new Pool({
   user: "postgres",
@@ -28,6 +43,119 @@ const pool = new Pool({
   password: "password",
   port: 5432,
 });
+
+// Ensure database schema is up to date for user_settings notification columns
+async function ensureUserSettingsSchema() {
+  try {
+    const alterSqls = [
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_mood_tracking BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_journaling BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_messages BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_post_reactions BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_appointments BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS notif_self_assessment BOOLEAN DEFAULT TRUE",
+      // Reminder controls per category
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_enabled BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_time VARCHAR(5) DEFAULT '09:00'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_frequency VARCHAR(20) DEFAULT 'Daily'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS mood_reminder_custom_schedule JSONB DEFAULT '{}'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_enabled BOOLEAN DEFAULT FALSE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_time VARCHAR(5) DEFAULT '20:00'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_frequency VARCHAR(20) DEFAULT 'Daily'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS journal_reminder_custom_schedule JSONB DEFAULT '{}'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_mood_reminder_at TIMESTAMP NULL",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_journal_reminder_at TIMESTAMP NULL",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS self_assessment_reminder_time VARCHAR(5) DEFAULT '09:00'",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS last_self_assessment_reminder_at TIMESTAMP NULL",
+      // Appointment reminder settings
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS appointment_reminder_enabled BOOLEAN DEFAULT TRUE",
+      "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS appointment_reminder_advance_minutes INTEGER DEFAULT 60"
+    ];
+    for (const sql of alterSqls) {
+      await pool.query(sql);
+    }
+    console.log('✅ Ensured user_settings notification columns exist');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure user_settings schema:', e.message);
+  }
+}
+
+// Ensure database schema for notifications table
+async function ensureNotificationsSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(30) NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_notifications_user_id_created_at ON notifications(user_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+    `);
+    console.log('✅ Ensured notifications table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure notifications schema:', e.message);
+  }
+}
+
+// Ensure database schema for push tokens
+async function ensurePushTokensSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(20),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        revoked BOOLEAN NOT NULL DEFAULT FALSE
+      );
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_revoked ON push_tokens(revoked);
+    `);
+    console.log('✅ Ensured push_tokens table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure push_tokens schema:', e.message);
+  }
+}
+
+// Ensure database schema for appointments
+async function ensureAppointmentsSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS appointments (
+        id SERIAL PRIMARY KEY,
+        client_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        worker_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        appointment_date DATE NOT NULL,
+        appointment_time TIME NOT NULL,
+        duration_minutes INTEGER DEFAULT 60,
+        appointment_type VARCHAR(50) DEFAULT 'consultation',
+        status VARCHAR(20) DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'confirmed', 'cancelled', 'completed', 'no-show')),
+        notes TEXT,
+        location VARCHAR(255),
+        is_virtual BOOLEAN DEFAULT FALSE,
+        meeting_link TEXT,
+        reminder_sent BOOLEAN DEFAULT FALSE,
+        reminder_sent_at TIMESTAMP NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_appointments_client_id ON appointments(client_id);
+      CREATE INDEX IF NOT EXISTS idx_appointments_worker_id ON appointments(worker_id);
+      CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+      CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+      CREATE INDEX IF NOT EXISTS idx_appointments_reminder ON appointments(reminder_sent, appointment_date, appointment_time);
+    `);
+    console.log('✅ Ensured appointments table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure appointments schema:', e.message);
+  }
+}
 
 // Interface definitions
 interface SyncUserRequest {
@@ -85,6 +213,350 @@ pool.connect((err, client, release) => {
   }
 });
 
+// Kick off lightweight auto-migration for user_settings
+ensureUserSettingsSchema();
+ensureNotificationsSchema();
+ensurePushTokensSchema();
+ensureAppointmentsSchema();
+
+// Send Expo push notification to all active tokens for a user
+async function sendPushToUser(userId: number, title: string, body: string, data?: Record<string, any>) {
+  try {
+    const tokensRes = await pool.query(`SELECT token FROM push_tokens WHERE user_id = $1 AND revoked = FALSE`, [userId]);
+    if (tokensRes.rows.length === 0) {
+      try { console.log(`🔕 No active push tokens for userId=${userId}; push skipped.`); } catch { /* no-op */ }
+      return;
+    }
+
+    const messages = tokensRes.rows.map((r) => ({
+      to: r.token,
+      title,
+      body,
+      sound: 'default',
+      data: data || {},
+      priority: 'high',
+    }));
+
+    // Send to Expo push API
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(messages),
+    } as any);
+
+    if (!response.ok) {
+      const txt = await response.text();
+      console.warn('⚠️ Expo push send failed:', response.status, txt);
+    } else {
+      // Inspect ticket results to surface per-token errors (DeviceNotRegistered, MessageTooBig, etc.)
+      try {
+        const result = await response.json();
+        const tickets = (result && (result.data || result.tickets)) || [];
+        const failures = tickets.filter((t: any) => t && t.status !== 'ok');
+        if (failures.length > 0) {
+          console.warn('⚠️ Expo push ticket failures:', JSON.stringify(failures));
+        } else {
+          try { console.log(`✅ Expo push enqueued ${tickets.length || messages.length} message(s)`); } catch (_ignore) { /* no-op */ }
+        }
+      } catch (_e) {
+        // ignore JSON parse issues; not critical
+      }
+    }
+  } catch (e: any) {
+    console.warn('⚠️ sendPushToUser error:', e.message);
+  }
+}
+
+// Reminder scheduler: check every minute for mood/journaling reminders
+function frequencyMatches(freq: string, now: Date, lastSent: Date | null, customSchedule?: any): boolean {
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const isWeekday = day >= 1 && day <= 5;
+  const isWeekend = day === 0 || day === 6;
+  const f = (freq || 'Daily').toLowerCase();
+  
+  if (f === 'never' || f === 'off') return false;
+  if (f === 'hourly') return true; // will check every hour
+  if (f === 'daily') return true;
+  if (f === 'weekdays') return isWeekday;
+  if (f === 'weekends') return isWeekend;
+  if (f === 'weekly') {
+    if (!lastSent) return true;
+    const diffMs = now.getTime() - lastSent.getTime();
+    return diffMs >= 6.5 * 24 * 60 * 60 * 1000; // ~weekly
+  }
+  if (f === 'custom' && customSchedule) {
+    const todayKey = dayNames[day];
+    return !!customSchedule[todayKey]; // enabled if key exists
+  }
+  return true;
+}
+
+function shouldSendAtTime(freq: string, now: Date, configTime: string, lastSent: Date | null, customSchedule?: any): boolean {
+  const day = now.getDay();
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const nowHHMM = hhmm(now);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const withinOneMinute = (target: string) => {
+    const [th, tm] = target.split(':').map((n: string) => parseInt(n, 10));
+    const targetMin = th * 60 + tm;
+    let diff = Math.abs(nowMin - targetMin);
+    // wrap around midnight
+    if (diff > 720) diff = 1440 - diff;
+    return diff <= 1; // allow 1-minute tolerance
+  };
+  
+  if (freq === 'Hourly') {
+    // send at top of every hour if at least 55 minutes since last
+    if (now.getMinutes() === 0) {
+      if (!lastSent) return true;
+      const diffMs = now.getTime() - lastSent.getTime();
+      return diffMs >= 55 * 60 * 1000;
+    }
+    return false;
+  }
+  
+  if (freq === 'Custom' && customSchedule) {
+    const todayKey = dayNames[day];
+    const todayTime = customSchedule[todayKey];
+    if (!todayTime) return false; // not scheduled today
+    return nowHHMM === todayTime || withinOneMinute(todayTime);
+  }
+  
+  // Daily, Weekdays, Weekends, Weekly: use configTime
+  return nowHHMM === configTime || withinOneMinute(configTime);
+}
+
+function hhmm(now: Date): string {
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+async function runRemindersTick() {
+  try {
+    // Get current time in Mountain Standard Time (UTC-7)
+    const nowUTC = new Date();
+    const now = new Date(nowUTC.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+    const currentTime = hhmm(now);
+    const day = now.getDay();
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    
+    console.log(`⏰ Reminder tick: ${currentTime} MST (${dayNames[day]})`);
+    
+    const res = await pool.query(`
+      SELECT 
+        us.*, u.id as uid, u.clerk_user_id
+      FROM user_settings us
+      JOIN users u ON u.id = us.user_id
+    `);
+    
+    console.log(`⏰ Checking reminders for ${res.rows.length} users`);
+    
+    for (const row of res.rows) {
+      const lastMoodSent = row.last_mood_reminder_at ? new Date(row.last_mood_reminder_at) : null;
+      const lastJournalSent = row.last_journal_reminder_at ? new Date(row.last_journal_reminder_at) : null;
+      
+      // Mood reminders
+      if (row.mood_reminder_enabled) {
+        const freq = row.mood_reminder_frequency || 'Daily';
+        const customSched = row.mood_reminder_custom_schedule || {};
+        const configTime = row.mood_reminder_time || '09:00';
+        
+        console.log(`  📊 User ${row.clerk_user_id}: Mood reminder enabled, freq=${freq}, time=${configTime}, currentTime=${currentTime}`);
+        
+        if (frequencyMatches(freq, now, lastMoodSent, customSched) && shouldSendAtTime(freq, now, configTime, lastMoodSent, customSched)) {
+          console.log(`  ✅ SENDING mood reminder to userId=${row.uid}`);
+          await createAndPushNotification(row.uid, 'mood', 'Mood check-in', 'How are you feeling right now? Take a quick mood check.');
+          await pool.query(`UPDATE user_settings SET last_mood_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
+        }
+      }
+      
+      // Journaling reminders
+      if (row.journal_reminder_enabled) {
+        const freq = row.journal_reminder_frequency || 'Daily';
+        const customSched = row.journal_reminder_custom_schedule || {};
+        const configTime = row.journal_reminder_time || '20:00';
+        
+        console.log(`  📝 User ${row.clerk_user_id}: Journal reminder enabled, freq=${freq}, time=${configTime}, currentTime=${currentTime}`);
+        
+        if (freq === 'Custom') {
+          const todayKey = dayNames[day];
+          const todayTime = customSched[todayKey];
+          console.log(`    Custom schedule for ${todayKey}: ${todayTime || 'not scheduled'}`);
+        }
+        
+        if (frequencyMatches(freq, now, lastJournalSent, customSched) && shouldSendAtTime(freq, now, configTime, lastJournalSent, customSched)) {
+          console.log(`  ✅ SENDING journal reminder to userId=${row.uid}`);
+          await createAndPushNotification(row.uid, 'journaling', 'Journal reminder', 'Write a quick entry to reflect on your day.');
+          await pool.query(`UPDATE user_settings SET last_journal_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
+        }
+      }
+
+      // Self-assessment reminders (6-month cadence)
+      try {
+        const selfAssessEnabled = row.notif_self_assessment !== false;
+        if (selfAssessEnabled) {
+          const lastSelfSent = row.last_self_assessment_reminder_at ? new Date(row.last_self_assessment_reminder_at) : null;
+          const dueRes = await pool.query("SELECT is_assessment_due($1) as is_due", [row.uid]);
+          const isDue = !!(dueRes.rows && dueRes.rows[0] && dueRes.rows[0].is_due);
+          if (isDue) {
+            const time = row.self_assessment_reminder_time || '09:00';
+            // Only send at configured time, and at most once per day
+            const atTime = shouldSendAtTime('Daily', now, time, lastSelfSent);
+            const minGap = !lastSelfSent || (now.getTime() - lastSelfSent.getTime()) >= (24 * 60 * 60 * 1000);
+            if (atTime && minGap) {
+              await createAndPushNotification(
+                row.uid,
+                'self_assessment',
+                "It's time for your 6‑month check‑in",
+                'Take a quick self‑assessment to track your progress.'
+              );
+              await pool.query(`UPDATE user_settings SET last_self_assessment_reminder_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [row.uid]);
+            }
+          }
+        }
+      } catch (se: any) {
+        console.warn('⚠️ Self-assessment reminder check failed:', se.message);
+      }
+
+      // Appointment reminders
+      try {
+        const appointmentReminderEnabled = row.appointment_reminder_enabled !== false;
+        if (appointmentReminderEnabled) {
+          const advanceMinutes = row.appointment_reminder_advance_minutes || 60;
+          
+          // Query upcoming appointments that need reminders
+          const appointmentsRes = await pool.query(`
+            SELECT id, appointment_date, appointment_time, appointment_type, location, is_virtual, meeting_link
+            FROM appointments
+            WHERE (client_id = $1 OR worker_id = $1)
+            AND status IN ('scheduled', 'confirmed')
+            AND reminder_sent = FALSE
+            AND appointment_date >= CURRENT_DATE
+            ORDER BY appointment_date, appointment_time
+            LIMIT 10
+          `, [row.uid]);
+
+          for (const apt of appointmentsRes.rows) {
+            // Combine date and time to create appointment datetime in MST
+            const aptDateStr = apt.appointment_date.toISOString().split('T')[0]; // YYYY-MM-DD
+            const aptTimeStr = apt.appointment_time; // HH:MM:SS
+            const aptDatetimeStr = `${aptDateStr}T${aptTimeStr}`;
+            const aptDatetimeUTC = new Date(aptDatetimeStr + 'Z'); // Parse as UTC first
+            const aptDatetimeMST = new Date(aptDatetimeUTC.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+            
+            // Calculate reminder time (appointment time minus advance minutes)
+            const reminderTime = new Date(aptDatetimeMST.getTime() - (advanceMinutes * 60 * 1000));
+            const reminderTimeMST = new Date(reminderTime.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+            
+            // Check if it's time to send the reminder (within 1 minute tolerance)
+            const timeDiff = Math.abs(now.getTime() - reminderTimeMST.getTime());
+            if (timeDiff <= 60 * 1000) {
+              const aptType = apt.appointment_type || 'appointment';
+              const aptLocation = apt.is_virtual ? 'Virtual meeting' : (apt.location || 'Office');
+              const title = `Appointment Reminder`;
+              const message = `Your ${aptType} is in ${advanceMinutes} minutes at ${aptLocation}`;
+              
+              console.log(`  📅 SENDING appointment reminder to userId=${row.uid} for appointment #${apt.id}`);
+              
+              await createAndPushNotification(
+                row.uid,
+                'appointment',
+                title,
+                message,
+                { appointmentId: apt.id, meetingLink: apt.meeting_link }
+              );
+              
+              // Mark reminder as sent
+              await pool.query(`
+                UPDATE appointments 
+                SET reminder_sent = TRUE, reminder_sent_at = CURRENT_TIMESTAMP 
+                WHERE id = $1
+              `, [apt.id]);
+            }
+          }
+        }
+      } catch (ae: any) {
+        console.warn('⚠️ Appointment reminder check failed:', ae.message);
+      }
+    }
+  } catch (e: any) {
+    console.warn('⚠️ Reminder tick failed:', e.message);
+  }
+}
+
+// Start scheduler (tick at the top of each minute)
+setInterval(runRemindersTick, 60 * 1000);
+
+// Centralized helper to create a notification row and send push if allowed by settings
+async function createAndPushNotification(
+  userId: number,
+  category: 'message' | 'appointment' | 'system' | 'reminder' | 'journaling' | 'mood' | 'post_reactions' | 'self_assessment',
+  title: string,
+  message: string,
+  data?: Record<string, any>
+) {
+  try {
+    // Get current time in Mountain Standard Time for logging
+    const nowUTC = new Date();
+    const nowMST = new Date(nowUTC.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+    
+    try {
+      console.log(`🔔 createAndPushNotification: userId=${userId} category=${category} title=${title} time=${hhmm(nowMST)} MST`);
+    } catch { /* no-op */ }
+    // Read settings (no quiet hours check anymore)
+    const sRes = await pool.query(
+      `SELECT 
+         COALESCE(notifications_enabled, TRUE) as notifications_enabled,
+         COALESCE(notif_messages, TRUE) as notif_messages,
+         COALESCE(notif_journaling, TRUE) as notif_journaling,
+         COALESCE(notif_mood_tracking, TRUE) as notif_mood_tracking,
+         COALESCE(notif_post_reactions, TRUE) as notif_post_reactions,
+         COALESCE(notif_appointments, TRUE) as notif_appointments,
+         COALESCE(notif_self_assessment, TRUE) as notif_self_assessment
+       FROM user_settings WHERE user_id = $1`,
+      [userId]
+    );
+
+  const s = sRes.rows[0] || {};
+  // Global gate: notifications_enabled must be true for any notifications to be sent
+  const globalEnabled = s.notifications_enabled !== false;
+    const byCategory: Record<string, boolean> = {
+      message: s.notif_messages !== false,
+      journaling: s.notif_journaling !== false,
+      mood: s.notif_mood_tracking !== false,
+      post_reactions: s.notif_post_reactions !== false,
+      appointment: s.notif_appointments !== false,
+      self_assessment: s.notif_self_assessment !== false,
+      system: true,
+      reminder: true,
+    };
+
+    // Always insert a notification row (in-app feed), but push only if allowed
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, $2, $3, $4)`,
+      [userId, category, title, message]
+    );
+
+    const categoryAllowed = byCategory[category] !== false;
+    let canPush = globalEnabled && categoryAllowed;
+    if (!globalEnabled) {
+      try { console.log(`🔕 Push suppressed (notifications_enabled=false): userId=${userId} category=${category}`); } catch { /* no-op */ }
+    }
+    if (!categoryAllowed) {
+      try { console.log(`🔕 Push suppressed (category disabled): userId=${userId} category=${category}`); } catch { /* no-op */ }
+    }
+
+    if (canPush) {
+      try { console.log(`📤 Sending push -> userId=${userId} category=${category}`); } catch { /* no-op */ }
+      await sendPushToUser(userId, title, message, { type: category, ...(data || {}) });
+    }
+  } catch (e: any) {
+    console.warn('⚠️ createAndPushNotification failed:', e.message);
+  }
+}
+
 // Test endpoint
 app.get("/", (req: Request, res: Response) => {
   res.json({
@@ -94,11 +566,189 @@ app.get("/", (req: Request, res: Response) => {
   });
 });
 
+// Simple health endpoint for uptime checks/ngrok
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).send('ok');
+});
+
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+
+// Lightweight test endpoint for settings API
+app.get('/api/test-settings', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Settings API reachable' });
+});
+
+// Settings: GET current settings for a user
+app.get('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+    const userId = userRes.rows[0].id;
+
+    const sRes = await pool.query(
+      `SELECT 
+        dark_mode, text_size, notifications_enabled,
+        notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+        reminder_frequency,
+        mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+        journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
+        self_assessment_reminder_time, last_self_assessment_reminder_at,
+        appointment_reminder_enabled, appointment_reminder_advance_minutes
+       FROM user_settings WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (sRes.rows.length === 0) {
+      // Return defaults
+      return res.json({ success: true, settings: {
+        dark_mode: false,
+        text_size: 'Medium',
+        notifications_enabled: true,
+        notif_mood_tracking: true,
+        notif_journaling: true,
+        notif_messages: true,
+        notif_post_reactions: true,
+        notif_appointments: true,
+        notif_self_assessment: true,
+        reminder_frequency: 'Daily',
+        mood_reminder_enabled: false,
+        mood_reminder_time: '09:00',
+        mood_reminder_frequency: 'Daily',
+        mood_reminder_custom_schedule: {},
+        journal_reminder_enabled: false,
+        journal_reminder_time: '20:00',
+        journal_reminder_frequency: 'Daily',
+        journal_reminder_custom_schedule: {},
+        self_assessment_reminder_time: '09:00',
+        appointment_reminder_enabled: true,
+        appointment_reminder_advance_minutes: 60,
+      }});
+    }
+
+    return res.json({ success: true, settings: sRes.rows[0] });
+  } catch (e: any) {
+    console.error('❌ Settings GET failed:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch settings', error: e.message });
+  }
+});
+
+// Settings: PUT update/insert
+app.put('/api/settings/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { settings } = req.body as { settings?: any };
+    if (!settings) return res.status(400).json({ success: false, message: 'settings payload required' });
+
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+    const userId = userRes.rows[0].id;
+
+    const query = `INSERT INTO user_settings (
+      user_id,
+      clerk_user_id,
+      dark_mode, text_size, notifications_enabled,
+      notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+      reminder_frequency,
+      mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+      journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
+      self_assessment_reminder_time,
+      appointment_reminder_enabled, appointment_reminder_advance_minutes,
+      updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+      $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (user_id)
+    DO UPDATE SET 
+      dark_mode = EXCLUDED.dark_mode,
+      text_size = EXCLUDED.text_size,
+      notifications_enabled = EXCLUDED.notifications_enabled,
+      notif_mood_tracking = EXCLUDED.notif_mood_tracking,
+      notif_journaling = EXCLUDED.notif_journaling,
+      notif_messages = EXCLUDED.notif_messages,
+      notif_post_reactions = EXCLUDED.notif_post_reactions,
+      notif_appointments = EXCLUDED.notif_appointments,
+      notif_self_assessment = EXCLUDED.notif_self_assessment,
+      reminder_frequency = EXCLUDED.reminder_frequency,
+      mood_reminder_enabled = EXCLUDED.mood_reminder_enabled,
+      mood_reminder_time = EXCLUDED.mood_reminder_time,
+      mood_reminder_frequency = EXCLUDED.mood_reminder_frequency,
+      mood_reminder_custom_schedule = EXCLUDED.mood_reminder_custom_schedule,
+      journal_reminder_enabled = EXCLUDED.journal_reminder_enabled,
+      journal_reminder_time = EXCLUDED.journal_reminder_time,
+      journal_reminder_frequency = EXCLUDED.journal_reminder_frequency,
+      journal_reminder_custom_schedule = EXCLUDED.journal_reminder_custom_schedule,
+      self_assessment_reminder_time = EXCLUDED.self_assessment_reminder_time,
+      appointment_reminder_enabled = EXCLUDED.appointment_reminder_enabled,
+      appointment_reminder_advance_minutes = EXCLUDED.appointment_reminder_advance_minutes,
+      updated_at = CURRENT_TIMESTAMP
+    `;
+
+    const params = [
+      userId,
+      clerkUserId,
+      settings.darkMode ?? false,
+      settings.textSize ?? 'Medium',
+      settings.notificationsEnabled ?? true,
+      settings.notifMoodTracking ?? true,
+      settings.notifJournaling ?? true,
+      settings.notifMessages ?? true,
+      settings.notifPostReactions ?? true,
+      settings.notifAppointments ?? true,
+      settings.notifSelfAssessment ?? true,
+      settings.reminderFrequency ?? 'Daily',
+      settings.moodReminderEnabled ?? false,
+      settings.moodReminderTime ?? '09:00',
+      settings.moodReminderFrequency ?? 'Daily',
+      JSON.stringify(settings.moodReminderCustomSchedule ?? {}),
+      settings.journalReminderEnabled ?? false,
+      settings.journalReminderTime ?? '20:00',
+      settings.journalReminderFrequency ?? 'Daily',
+      JSON.stringify(settings.journalReminderCustomSchedule ?? {}),
+      settings.selfAssessmentReminderTime ?? '09:00',
+      settings.appointmentReminderEnabled ?? true,
+      settings.appointmentReminderAdvanceMinutes ?? 60,
+    ];
+
+    await pool.query(query, params);
+    res.json({ success: true, message: 'Settings saved' });
+  } catch (e: any) {
+    console.error('❌ Settings PUT failed:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to save settings', error: e.message });
+  }
+});
+
+// Debug: trigger a test notification for a category (bypasses scheduler)
+app.post('/api/debug/notify', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, category, title, message, data } = req.body as { clerkUserId?: string; category?: string; title?: string; message?: string; data?: any };
+    if (!clerkUserId || !category) {
+      return res.status(400).json({ success: false, message: 'clerkUserId and category are required' });
+    }
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+    const userId = userRes.rows[0].id as number;
+
+    const cat = String(category) as any;
+    const t = title || `Test: ${cat}`;
+    const m = message || `This is a test ${cat} notification.`;
+    await createAndPushNotification(userId, cat, t, m, data || {});
+    res.json({ success: true, message: 'Notification triggered' });
+  } catch (e: any) {
+    console.error('❌ Debug notify failed:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to trigger notification', error: e.message });
+  }
+});
+
 // Get all users endpoint
 app.get("/api/users", async (req: Request, res: Response) => {
   try {
+    // Do not return profile_image_url raw to avoid sending base64 blobs
     const result = await pool.query(
-      "SELECT * FROM users ORDER BY created_at DESC"
+      "SELECT id, clerk_user_id, first_name, last_name, email, role, status, created_at, updated_at FROM users ORDER BY created_at DESC"
     );
     res.json(result.rows);
   } catch (error: any) {
@@ -173,6 +823,106 @@ app.post(
           updated_at: new Date(), // Explicitly set for create too
         },
       });
+
+      // ✅ Also create/update client_profiles record
+      try {
+        const displayName = `${firstName} ${lastName}`.trim();
+        await pool.query(
+          `INSERT INTO client_profiles (
+            clerk_user_id, 
+            display_name,
+            email,
+            phone_number,
+            created_at,
+            updated_at
+          ) 
+          VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT (clerk_user_id) 
+          DO UPDATE SET
+            display_name = COALESCE(EXCLUDED.display_name, client_profiles.display_name),
+            email = COALESCE(EXCLUDED.email, client_profiles.email),
+            phone_number = COALESCE(EXCLUDED.phone_number, client_profiles.phone_number),
+            updated_at = CURRENT_TIMESTAMP`,
+          [clerkUserId, displayName, email, phoneNumber]
+        );
+        console.log('✅ Client profile created/updated for new user');
+      } catch (profileError: any) {
+        console.error('⚠️ Failed to create client_profiles record:', profileError.message);
+        // Don't fail the whole sync if client_profiles fails
+      }
+
+      // ✅ Create default user settings
+      try {
+        await pool.query(
+          `INSERT INTO user_settings (
+            user_id,
+            clerk_user_id,
+            dark_mode,
+            text_size,
+            auto_lock_timer,
+            notifications_enabled,
+            notif_mood_tracking,
+            notif_journaling,
+            notif_messages,
+            notif_post_reactions,
+            notif_appointments,
+            notif_self_assessment,
+            quiet_hours_enabled,
+            quiet_start_time,
+            quiet_end_time,
+            reminder_frequency,
+            mood_reminder_enabled,
+            mood_reminder_time,
+            mood_reminder_frequency,
+            mood_reminder_custom_schedule,
+            journal_reminder_enabled,
+            journal_reminder_time,
+            journal_reminder_frequency,
+            journal_reminder_custom_schedule,
+            self_assessment_reminder_time,
+            last_self_assessment_reminder_at,
+            created_at,
+            updated_at
+          )
+          SELECT 
+            id,
+            clerk_user_id,
+            false,
+            'Medium',
+            '5 minutes',
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            false,
+            '22:00',
+            '08:00',
+            'Daily',
+            false,
+            '09:00',
+            'Daily',
+            '{}'::jsonb,
+            false,
+            '20:00',
+            'Daily',
+            '{}'::jsonb,
+            '09:00',
+            NULL,
+            CURRENT_TIMESTAMP,
+            CURRENT_TIMESTAMP
+          FROM users
+          WHERE clerk_user_id = $1
+          ON CONFLICT (clerk_user_id) DO NOTHING`,
+          [clerkUserId]
+        );
+        console.log('✅ Default user settings created for new user');
+      } catch (settingsError: any) {
+        console.error('⚠️ Failed to create user_settings record:', settingsError.message);
+        // Don't fail the whole sync if settings creation fails
+      }
 
       res.json({
         success: true,
@@ -261,6 +1011,191 @@ app.post("/api/users/sync", async (req: Request, res: Response) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+});
+
+// =============================================
+// USER ACTIVITY ENDPOINTS (login/logout/heartbeat/status)
+// =============================================
+
+// Record successful login (and set active)
+app.post("/api/users/login-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+     SET last_login_at = CURRENT_TIMESTAMP,
+       last_login = CURRENT_TIMESTAMP,
+       last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating login activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Record logout
+app.post("/api/users/logout-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_logout_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating logout activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Heartbeat to update last_active_at (legacy - will be unused by client)
+app.post("/api/users/heartbeat", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating heartbeat:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Get single user's presence and timestamps
+app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const result = await pool.query(
+      `SELECT last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
+    const now = new Date();
+    const activeAt = last_active_at ? new Date(last_active_at) : null;
+    const loginAt = last_login_at ? new Date(last_login_at) : null;
+    const logoutAt = last_logout_at ? new Date(last_logout_at) : null;
+
+    // Logged-in means last_login_at exists and is after last_logout_at (or no logout yet)
+    const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+
+    // Away if logged in but no activity for >= 30 minutes
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+
+    let presence: 'online' | 'away' | 'offline' = 'offline';
+    if (loggedIn) {
+      presence = activeRecently ? 'online' : 'away';
+    } else {
+      presence = 'offline';
+    }
+
+    const online = presence === 'online';
+
+    res.json({
+      success: true,
+      data: { online, presence, last_active_at, last_login_at, last_logout_at }
+    });
+  } catch (error: any) {
+    console.error("Error fetching user status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Batch presence for multiple users
+app.post("/api/users/status-batch", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserIds } = req.body as { clerkUserIds?: string[] };
+    if (!clerkUserIds || clerkUserIds.length === 0) {
+      return res.status(400).json({ success: false, message: "clerkUserIds[] is required" });
+    }
+
+    const params = clerkUserIds.map((_, i) => `$${i + 1}`).join(",");
+    const result = await pool.query(
+      `SELECT clerk_user_id, last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id IN (${params})`,
+      clerkUserIds
+    );
+
+    const now = new Date();
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const statusMap: Record<string, { online: boolean; presence: 'online' | 'away' | 'offline'; last_active_at: string | null; last_login_at: string | null; last_logout_at: string | null; }> = {};
+
+    for (const row of result.rows) {
+      const activeAt = row.last_active_at ? new Date(row.last_active_at) : null;
+      const loginAt = row.last_login_at ? new Date(row.last_login_at) : null;
+      const logoutAt = row.last_logout_at ? new Date(row.last_logout_at) : null;
+
+      const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+      const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+
+      let presence: 'online' | 'away' | 'offline' = 'offline';
+      if (loggedIn) {
+        presence = activeRecently ? 'online' : 'away';
+      }
+      const online = presence === 'online';
+
+      statusMap[row.clerk_user_id] = {
+        online,
+        presence,
+        last_active_at: row.last_active_at || null,
+        last_login_at: row.last_login_at || null,
+        last_logout_at: row.last_logout_at || null,
+      };
+    }
+
+    res.json({ success: true, data: statusMap });
+  } catch (error: any) {
+    console.error("Error fetching batch status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
   }
 });
 
@@ -434,6 +1369,18 @@ app.post(
 
       console.log("Assessment submitted successfully:", result.rows[0]);
 
+      // Fire a self-assessment notification to the same user (respects settings/quiet hours)
+      try {
+        await createAndPushNotification(
+          userId,
+          'self_assessment',
+          'Assessment Submitted',
+          'Thanks for completing your self-assessment.'
+        );
+      } catch (e: any) {
+        console.warn('⚠️ Failed to notify assessment submission:', e.message);
+      }
+
       res.json({
         success: true,
         message: "Assessment submitted successfully",
@@ -586,6 +1533,7 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
         cp.*,
         cc.name as category_name,
         cp.author_name,
+        u.profile_image_url AS author_image_url,
         COUNT(DISTINCT pr.id) as reaction_count,
         COUNT(DISTINCT pb.id) as bookmark_count,
         COALESCE(
@@ -597,6 +1545,7 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
         ) as reactions
       FROM community_posts cp
       LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      LEFT JOIN users u ON u.clerk_user_id = cp.author_id
       LEFT JOIN post_reactions pr ON cp.id = pr.post_id
       LEFT JOIN post_bookmarks pb ON cp.id = pb.post_id
       LEFT JOIN (
@@ -622,7 +1571,7 @@ app.get("/api/community/posts", async (req: Request, res: Response) => {
       paramIndex++;
     }
 
-    query += ` GROUP BY cp.id, cc.name
+  query += ` GROUP BY cp.id, cc.name, u.profile_image_url
                ORDER BY cp.reaction_count DESC, cp.created_at DESC 
                LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
 
@@ -657,6 +1606,7 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
         cp.*,
         cc.name as category_name,
         cp.author_name,
+        u.profile_image_url AS author_image_url,
         COALESCE(
           json_object_agg(
             pr.emoji, 
@@ -666,6 +1616,7 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
         ) as reactions
       FROM community_posts cp
       LEFT JOIN community_categories cc ON cp.category_id = cc.id
+      LEFT JOIN users u ON u.clerk_user_id = cp.author_id
       LEFT JOIN post_reactions pr ON cp.id = pr.post_id
       LEFT JOIN (
         SELECT post_id, emoji, COUNT(*) as count
@@ -673,7 +1624,7 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
         GROUP BY post_id, emoji
       ) reaction_counts ON cp.id = reaction_counts.post_id AND pr.emoji = reaction_counts.emoji
       WHERE cp.id = $1
-      GROUP BY cp.id, cc.name`,
+      GROUP BY cp.id, cc.name, u.profile_image_url`,
       [id]
     );
 
@@ -857,6 +1808,58 @@ app.post(
 
       await client.query("COMMIT");
 
+      // Notify post author on new reaction (do not notify on removal)
+      try {
+        if (reactionChange > 0) {
+          // Get post author (stored as clerk_user_id on community_posts.author_id)
+          const postRes = await pool.query(
+            `SELECT cp.title, cp.author_id AS author_clerk_id
+             FROM community_posts cp
+             WHERE cp.id = $1`,
+            [Number.parseInt(id)]
+          );
+          if (postRes.rows.length > 0) {
+            const authorClerkId = postRes.rows[0].author_clerk_id as string;
+            const postTitle = postRes.rows[0].title as string;
+
+            // Don't notify if reactor is the author
+            if (authorClerkId && authorClerkId !== clerkUserId) {
+              const authorUserRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [authorClerkId]);
+              if (authorUserRes.rows.length > 0) {
+                const authorUserId = authorUserRes.rows[0].id;
+                const emojiLabel = emoji;
+                const title = 'New reaction on your post';
+                // Look up reactor's display name (prefer client_profiles.display_name, fallback to users table)
+                let reactorName = 'Someone';
+                try {
+                  const nameRes = await pool.query(
+                    `SELECT COALESCE(cp.display_name, NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), 'Someone') AS name
+                     FROM users u
+                     LEFT JOIN client_profiles cp ON cp.clerk_user_id = u.clerk_user_id
+                     WHERE u.clerk_user_id = $1
+                     LIMIT 1`,
+                    [clerkUserId]
+                  );
+                  if (nameRes.rows.length > 0 && nameRes.rows[0].name) {
+                    reactorName = nameRes.rows[0].name as string;
+                  }
+                } catch (_e) { /* no-op, keep default */ }
+                const message = `${reactorName} reacted ${emojiLabel} to: ${postTitle || 'your post'}`;
+                await createAndPushNotification(
+                  authorUserId,
+                  'post_reactions',
+                  title,
+                  message,
+                  { postId: Number.parseInt(id), emoji: emojiLabel, reactorName }
+                );
+              }
+            }
+          }
+        }
+      } catch (notifyErr: any) {
+        console.warn('⚠️ Failed to notify post reaction:', notifyErr.message);
+      }
+
       res.json({
         success: true,
         message: reactionChange > 0 ? "Reaction added" : "Reaction removed",
@@ -916,6 +1919,22 @@ process.on("SIGINT", async () => {
   console.log("\nShutting down server...");
   await pool.end();
   process.exit(0);
+});
+
+// Extra diagnostics: do not silently exit on unexpected errors
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught exception:', err);
+  // Do not exit; let nodemon restart only if necessary
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled rejection at:', promise, 'reason:', reason);
+});
+process.on('SIGTERM', () => {
+  console.warn('⚠️ Received SIGTERM');
+});
+// Nodemon sends SIGUSR2 on restart
+process.once('SIGUSR2', () => {
+  console.warn('♻️  Received SIGUSR2 (nodemon restart)');
 });
 
 //Mood Tracking Interfaces and Endpoints
@@ -1455,6 +2474,168 @@ app.get(
     }
   }
 );
+
+// =============================================
+// NOTIFICATIONS ENDPOINTS
+// =============================================
+
+// Get notifications for a user
+app.get("/api/notifications/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userResult.rows[0].id;
+
+    const result = await pool.query(
+      `SELECT id, type, title, message, is_read, created_at
+       FROM notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [userId]
+    );
+
+    res.json({ success: true, data: result.rows });
+  } catch (error: any) {
+    console.error('❌ Error fetching notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch notifications', error: error.message });
+  }
+});
+
+// Mark one notification as read
+app.post("/api/notifications/:id/read", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE id = $1`, [Number(id)]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error marking notification as read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark as read', error: error.message });
+  }
+});
+
+// Mark all notifications as read for a user
+app.post("/api/notifications/:clerkUserId/read-all", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userResult.rows[0].id;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error marking all notifications as read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark all as read', error: error.message });
+  }
+});
+
+// Clear (delete) all notifications for a user
+app.delete("/api/notifications/:clerkUserId/clear-all", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userResult = await pool.query(
+      `SELECT id FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userResult.rows[0].id;
+    await pool.query(`DELETE FROM notifications WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error clearing notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clear notifications', error: error.message });
+  }
+});
+
+// Fire an appointment notification immediately (no DB schema required)
+app.post("/api/appointments/notify", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, title, message, data } = req.body as {
+      clerkUserId?: string;
+      title?: string;
+      message?: string;
+      data?: Record<string, any>;
+    };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+
+    await createAndPushNotification(userId, 'appointment', title, message, data || {});
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error sending appointment notification:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send appointment notification', error: error.message });
+  }
+});
+
+// Force-create a reminder notification for testing (mood or journaling)
+app.post("/api/test-reminder/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { type } = req.body as { type?: 'mood' | 'journaling' };
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+
+    const category = type === 'journaling' ? 'journaling' : 'mood';
+    const title = category === 'mood' ? 'Mood check-in' : 'Journal reminder';
+    const message = category === 'mood' 
+      ? 'How are you feeling right now? Take a quick mood check.'
+      : 'Write a quick entry to reflect on your day.';
+
+    await createAndPushNotification(userId, category as any, title, message, { source: 'api/test-reminder' });
+    res.json({ success: true, message: `Test ${category} reminder created` });
+  } catch (error: any) {
+    console.error('❌ Error sending test reminder:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send test reminder', error: error.message });
+  }
+});
+
+// Manual test: send a sample push notification and create a feed row
+app.post("/api/test-push/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id;
+
+    await createAndPushNotification(
+      userId,
+      'system',
+      'Test notification',
+      'If you see this, your push pipeline works!',
+      { source: 'api/test-push' }
+    );
+    res.json({ success: true, message: 'Test notification triggered' });
+  } catch (error: any) {
+    console.error('❌ Error sending test push:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send test push', error: error.message });
+  }
+});
 
 // Update a mood entry
 app.put("/api/moods/:moodId", async (req: Request, res: Response) => {
@@ -2410,40 +3591,73 @@ app.get(
       });
 
       // Get online status for all participants
-      const conversationsWithOnlineStatus = await Promise.all(
-        conversations.map(async (conversation) => {
-          const lastMessage = conversation.messages[0];
-          
-          // Get participants with real online status
-          const participantsWithStatus = await Promise.all(
-            conversation.participants.map(async (p) => {
-              const online = await getUserOnlineStatus(p.user.clerk_user_id);
-              return {
-                id: p.user.id,
-                clerk_user_id: p.user.clerk_user_id,
-                first_name: p.user.first_name,
-                last_name: p.user.last_name,
-                email: p.user.email,
-                profile_image_url: p.user.profile_image_url,
-                online,
-                last_active_at: p.user.last_active_at
-              };
-            })
-          );
-
-          return {
-            id: conversation.id.toString(),
-            title: conversation.title,
-            conversation_type: conversation.conversation_type,
-            updated_at: conversation.updated_at.toISOString(),
-            created_at: conversation.created_at.toISOString(),
-            last_message: lastMessage?.message_text || '',
-            last_message_time: lastMessage?.created_at.toISOString(),
-            unread_count: conversation._count.messages,
-            participants: participantsWithStatus
-          };
-        })
+      // Build a unique set of participant Clerk IDs to fetch status in batch
+      const allClerkIds = Array.from(
+        new Set(
+          conversations
+            .flatMap((c) => c.participants.map((p) => p.user.clerk_user_id))
+            .filter(Boolean)
+        )
       );
+
+      const usersStatus = await prisma.user.findMany({
+        where: { clerk_user_id: { in: allClerkIds } },
+        select: { clerk_user_id: true, last_active_at: true, last_login_at: true, last_logout_at: true },
+      });
+      const statusMap = new Map<string, { online: boolean; presence: 'online' | 'away' | 'offline'; last_active_at: Date | null }>();
+      const now = new Date();
+      const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+      usersStatus.forEach((u) => {
+        const activeAt = u.last_active_at ? new Date(u.last_active_at) : null;
+        const loginAt = u.last_login_at ? new Date(u.last_login_at) : null;
+        const logoutAt = u.last_logout_at ? new Date(u.last_logout_at) : null;
+        const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+        const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+        let presence: 'online' | 'away' | 'offline' = 'offline';
+        if (loggedIn) {
+          presence = activeRecently ? 'online' : 'away';
+        }
+        statusMap.set(u.clerk_user_id, { online: presence === 'online', presence, last_active_at: u.last_active_at });
+      });
+
+      const conversationsWithOnlineStatus = conversations.map((conversation) => {
+        const lastMessage = conversation.messages[0];
+
+        const participantsWithStatus = conversation.participants.map((p) => {
+          const s = statusMap.get(p.user.clerk_user_id);
+          return {
+            id: p.user.id,
+            clerk_user_id: p.user.clerk_user_id,
+            first_name: p.user.first_name,
+            last_name: p.user.last_name,
+            email: p.user.email,
+            // Avoid sending base64 blobs in JSON, provide an endpoint URL instead
+            profile_image_url: sanitizeProfileImageRef(p.user.profile_image_url, p.user.clerk_user_id),
+            online: s ? s.online : false,
+            presence: s ? s.presence : 'offline',
+            last_active_at: s ? s.last_active_at : p.user.last_active_at,
+          };
+        });
+
+        return {
+          id: conversation.id.toString(),
+          title: conversation.title,
+          conversation_type: conversation.conversation_type,
+          updated_at: conversation.updated_at.toISOString(),
+          created_at: conversation.created_at.toISOString(),
+          last_message: lastMessage?.message_text || '',
+          last_message_time: lastMessage?.created_at.toISOString(),
+          unread_count: conversation._count.messages,
+          participants: participantsWithStatus,
+        };
+      });
+
+      console.log(`💬 Returning ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
+      conversationsWithOnlineStatus.forEach(c => {
+        if (c.unread_count > 0) {
+          console.log(`  📬 Conversation ${c.id}: ${c.unread_count} unread messages`);
+        }
+      });
 
       // console.log(`💬 Found ${conversationsWithOnlineStatus.length} conversations for user ${clerkUserId}`);
 
@@ -2477,7 +3691,17 @@ app.get(
       const page = typeof pageStr === "string" ? pageStr : "1";
       const limit = typeof limitStr === "string" ? limitStr : "50";
 
-      // console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
+      console.log(`💬 Loading messages for conversation ${conversationId}, user ${clerkUserId}`);
+
+      // Validate conversationId is a valid number
+      const conversationIdNum = Number.parseInt(conversationId);
+      if (Number.isNaN(conversationIdNum)) {
+        console.error(`💬 Invalid conversation ID: "${conversationId}"`);
+        return res.status(400).json({
+          success: false,
+          message: "Invalid conversation ID",
+        });
+      }
 
       const pageNum = Number.parseInt(page) || 1;
       const limitNum = Number.parseInt(limit) || 50;
@@ -2486,7 +3710,7 @@ app.get(
       // Verify user is participant
       const participant = await prisma.conversationParticipant.findFirst({
         where: {
-          conversation_id: Number.parseInt(conversationId),
+          conversation_id: conversationIdNum,
           user: {
             clerk_user_id: clerkUserId as string
           }
@@ -2504,7 +3728,7 @@ app.get(
       // Get messages
       const messages = await prisma.message.findMany({
         where: {
-          conversation_id: Number.parseInt(conversationId)
+          conversation_id: conversationIdNum
         },
         include: {
           sender: {
@@ -2538,7 +3762,8 @@ app.get(
           clerk_user_id: message.sender.clerk_user_id,
           first_name: message.sender.first_name,
           last_name: message.sender.last_name,
-          profile_image_url: message.sender.profile_image_url,
+          // Avoid sending base64 blobs in JSON, provide an endpoint URL instead
+          profile_image_url: sanitizeProfileImageRef(message.sender.profile_image_url, message.sender.clerk_user_id),
           online: false
         }
       }));
@@ -2552,11 +3777,14 @@ app.get(
           hasMore: messages.length === limitNum,
         },
       });
-  } catch (error) {
-    console.error("Get messages error:", error);
+  } catch (error: any) {
+    console.error("💬 Get messages error:", error);
+    console.error("💬 Error stack:", error.stack);
+    console.error("💬 Error message:", error.message);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch messages"
+      message: "Failed to fetch messages",
+      error: error.message
     });
   }
 });
@@ -2647,6 +3875,37 @@ app.post(
         }
       };
 
+      // Create notifications for other participants in this conversation
+      try {
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversation_id: Number.parseInt(conversationId) },
+          include: { user: { select: { id: true, clerk_user_id: true, first_name: true, last_name: true } } }
+        });
+
+        const senderClerkId = result.sender.clerk_user_id;
+        const senderName = `${result.sender.first_name || ''} ${result.sender.last_name || ''}`.trim() || 'Someone';
+        const previewText = (result.message_text || '').slice(0, 140);
+
+        // Notify all except sender
+        const recipients = participants.filter(p => p.user.clerk_user_id !== senderClerkId);
+
+        for (const p of recipients) {
+          try {
+            await createAndPushNotification(
+              p.user.id,
+              'message',
+              'New Message',
+              `${senderName ? senderName + ': ' : ''}${previewText}`,
+              { conversationId: Number.parseInt(conversationId) }
+            );
+          } catch (notifyErr: any) {
+            console.warn('⚠️ Failed to create notification for user', p.user.id, notifyErr.message);
+          }
+        }
+      } catch (notifyBlockErr: any) {
+        console.warn('⚠️ Notification creation block failed:', notifyBlockErr.message);
+      }
+
       res.json({
         success: true,
         message: "Message sent successfully",
@@ -2659,6 +3918,69 @@ app.post(
         message: "Failed to send message",
         error: error.message,
       });
+    }
+  }
+);
+
+// Mark all messages in a conversation as read for the current user
+app.post(
+  "/api/messages/conversations/:conversationId/mark-read",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId } = req.body as { clerkUserId?: string };
+
+      if (!clerkUserId) {
+        return res.status(400).json({ success: false, message: "clerkUserId is required" });
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        // Find user
+        const user = await tx.user.findUnique({ where: { clerk_user_id: clerkUserId } });
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        // Verify user is a participant in this conversation
+        const participant = await tx.conversationParticipant.findFirst({
+          where: {
+            conversation_id: Number.parseInt(conversationId),
+            user_id: user.id,
+          },
+        });
+        if (!participant) {
+          throw new Error("Access denied to this conversation");
+        }
+
+        // Get IDs of messages in this conversation that were sent by others and are not yet marked as read by this user
+        const messagesToMark = await tx.message.findMany({
+          where: {
+            conversation_id: Number.parseInt(conversationId),
+            sender_id: { not: user.id },
+            read_status: { none: { user_id: user.id } },
+          },
+          select: { id: true },
+        });
+
+        if (messagesToMark.length === 0) {
+          return { created: 0 };
+        }
+
+        // Create read status entries, skipping duplicates just in case
+        const createRes = await tx.messageReadStatus.createMany({
+          data: messagesToMark.map((m) => ({ message_id: m.id, user_id: user.id })),
+          skipDuplicates: true,
+        });
+
+        return { created: createRes.count };
+      });
+
+      res.json({ success: true, message: "Messages marked as read", data: result });
+    } catch (error: any) {
+      console.error("💬 Mark-read error:", error.message || error);
+      const msg = error instanceof Error ? error.message : "Failed to mark messages as read";
+      const status = msg.includes("Access denied") ? 403 : msg.includes("User not found") ? 404 : 500;
+      res.status(status).json({ success: false, message: msg });
     }
   }
 );
@@ -2682,6 +4004,8 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       });
     }
 
+    let isExistingConversation = false;
+
     const result = await prisma.$transaction(async (tx) => {
       // Get creator user
       const creator = await tx.user.findUnique({
@@ -2703,6 +4027,41 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
 
       if (participants.length < 2) {
         throw new Error("At least one other valid participant is required");
+      }
+
+      // Check if a direct conversation already exists between these users
+      if (conversationType === "direct" && participants.length === 2) {
+        const participantUserIds = participants.map(p => p.id);
+        
+        // Find existing conversation with exactly these participants
+        // Query all conversations with these participants and filter in memory
+        const existingConversations = await tx.conversation.findMany({
+          where: {
+            AND: participantUserIds.map(userId => ({
+              participants: {
+                some: {
+                  user_id: userId
+                }
+              }
+            }))
+          },
+          include: {
+            participants: true
+          }
+        });
+
+        // Filter to find exact match: direct type with exactly 2 participants
+        const existingConversation = existingConversations.find(conv => 
+          conv.conversation_type === 'direct' && 
+          conv.participants.length === 2 &&
+          conv.participants.every(p => participantUserIds.includes(p.user_id))
+        );
+
+        if (existingConversation) {
+          console.log(`💬 Found existing conversation ${existingConversation.id}, returning it`);
+          isExistingConversation = true;
+          return existingConversation;
+        }
       }
 
       // Generate conversation title if not provided
@@ -2734,13 +4093,14 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      message: "Conversation created successfully",
+      message: isExistingConversation ? "Existing conversation found" : "Conversation created successfully",
       data: {
         id: result.id.toString(),
         title: result.title,
         conversation_type: result.conversation_type,
         created_at: result.created_at.toISOString(),
-        updated_at: result.updated_at.toISOString()
+        updated_at: result.updated_at.toISOString(),
+        isExisting: isExistingConversation
       },
     });
   } catch (error: any) {
@@ -2787,7 +4147,8 @@ app.get(
       // Check for existing conversations
       const contactsWithConversations = await Promise.all(
         contacts.map(async (contact) => {
-          const existingConversation = await prisma.conversation.findFirst({
+          // Query conversations with both users and filter in memory
+          const conversations = await prisma.conversation.findMany({
             where: {
               AND: [
                 {
@@ -2807,13 +4168,13 @@ app.get(
                       }
                     }
                   }
-                },
-                {
-                  conversation_type: 'direct'
                 }
               ]
             }
           });
+
+          // Filter to direct conversations only
+          const existingConversation = conversations.find(c => c.conversation_type === 'direct');
 
           return {
             ...contact,
@@ -2845,8 +4206,8 @@ app.get(
   "/api/messages/search-users/:clerkUserId",
   async (req: Request, res: Response) => {
     try {
-      const { clerkUserId } = req.params;
-      const { q: searchQuery } = req.query;
+  const { clerkUserId } = req.params;
+  const { q: searchQuery } = req.query;
 
       console.log(`🔍 Searching users for ${clerkUserId}, query: "${searchQuery}"`);
 
@@ -2857,20 +4218,27 @@ app.get(
         });
       }
 
-      const searchTerm = `%${searchQuery.trim()}%`;
+      const q = searchQuery.trim();
+      const isEmailQuery = q.includes("@") && !q.includes(" ");
+
+      // Exact match by email when the query looks like an email
+      const whereClause: any = {
+        clerk_user_id: { not: clerkUserId },
+        status: 'active',
+      };
+
+      if (isEmailQuery) {
+        whereClause.email = { equals: q, mode: 'insensitive' };
+      } else {
+        whereClause.OR = [
+          { first_name: { contains: q, mode: 'insensitive' } },
+          { last_name: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } }
+        ];
+      }
 
       const users = await prisma.user.findMany({
-        where: {
-          clerk_user_id: {
-            not: clerkUserId
-          },
-          status: 'active',
-          OR: [
-            { first_name: { contains: searchTerm, mode: 'insensitive' } },
-            { last_name: { contains: searchTerm, mode: 'insensitive' } },
-            { email: { contains: searchTerm, mode: 'insensitive' } }
-          ]
-        },
+        where: whereClause,
         select: {
           id: true,
           clerk_user_id: true,
@@ -2888,7 +4256,14 @@ app.get(
       });
 
       const formattedUsers = users.map(user => ({
-        ...user,
+        id: user.id,
+        clerk_user_id: user.clerk_user_id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        role: user.role,
+        // Avoid sending base64 blobs in JSON, provide an endpoint URL instead
+        profile_image_url: sanitizeProfileImageRef(user.profile_image_url, user.clerk_user_id),
         online: false,
         has_existing_conversation: false
       }));
@@ -2986,7 +4361,9 @@ app.get(
                   last_name: true,
                   email: true,
                   profile_image_url: true,
-                  last_active_at: true, // Include last_active_at
+                  last_active_at: true,
+                  last_login_at: true,
+                  last_logout_at: true,
                   updated_at: true
                 }
               }
@@ -3031,17 +4408,29 @@ app.get(
       const formattedConversations = conversations.map(conversation => {
         const lastMessage = conversation.messages[0];
         
-        // Get ALL participants with online status
-        const allParticipants = conversation.participants.map(p => ({
-          id: p.user.id,
-          clerk_user_id: p.user.clerk_user_id,
-          first_name: p.user.first_name,
-          last_name: p.user.last_name,
-          email: p.user.email,
-          profile_image_url: p.user.profile_image_url,
-          online: isUserOnline(p.user.last_active_at),
-          last_active_at: p.user.last_active_at
-        }));
+        // Get ALL participants with presence
+        const allParticipants = conversation.participants.map(p => {
+          const now = new Date();
+          const activeAt = p.user.last_active_at ? new Date(p.user.last_active_at) : null;
+          const loginAt = (p.user as any).last_login_at ? new Date((p.user as any).last_login_at) : null;
+          const logoutAt = (p.user as any).last_logout_at ? new Date((p.user as any).last_logout_at) : null;
+          const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+          const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+          const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+          const presence: 'online' | 'away' | 'offline' = loggedIn ? (activeRecently ? 'online' : 'away') : 'offline';
+
+          return {
+            id: p.user.id,
+            clerk_user_id: p.user.clerk_user_id,
+            first_name: p.user.first_name,
+            last_name: p.user.last_name,
+            email: p.user.email,
+            profile_image_url: p.user.profile_image_url,
+            online: presence === 'online',
+            presence,
+            last_active_at: p.user.last_active_at
+          };
+        });
 
         // console.log(`💬 Conversation ${conversation.id} has ${allParticipants.length} participants:`, allParticipants);
 
@@ -3080,20 +4469,18 @@ async function getUserOnlineStatus(clerkUserId: string): Promise<boolean> {
     // First try to get from your database
     const user = await prisma.user.findUnique({
       where: { clerk_user_id: clerkUserId },
-      select: { last_active_at: true }
+      select: { last_active_at: true, last_login_at: true, last_logout_at: true }
     });
 
-    if (user?.last_active_at) {
-      const now = new Date();
-      const lastActive = new Date(user.last_active_at);
-      const minutesSinceLastActive = (now.getTime() - lastActive.getTime()) / (1000 * 60);
-      
-      // Consider user online if active in last 3 minutes (more aggressive)
-      return minutesSinceLastActive <= 3;
-    }
+    const now = new Date();
+    const activeAt = user?.last_active_at ? new Date(user.last_active_at) : null;
+    const loginAt = user?.last_login_at ? new Date(user.last_login_at) : null;
+    const logoutAt = user?.last_logout_at ? new Date(user.last_logout_at) : null;
+    const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
 
-    // If no activity data, return false
-    return false;
+    return loggedIn && activeRecently;
   } catch (error) {
     console.error("Error checking user online status:", error);
     return false; // Ensure a value is returned in case of an error
@@ -3128,6 +4515,54 @@ const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
+  }
+});
+
+// Helper: sanitize profile image reference to avoid sending base64 blobs in JSON
+function sanitizeProfileImageRef(profileImageUrl: string | null | undefined, clerkUserId: string): string | null {
+  if (!profileImageUrl) return null;
+  // If it's a base64 data URI, return a lightweight API URL instead
+  if (profileImageUrl.startsWith('data:image')) {
+    return `/api/users/${encodeURIComponent(clerkUserId)}/profile-image`;
+  }
+  return profileImageUrl;
+}
+
+// Serve profile image (stored as base64 in DB) as a binary response to reduce JSON payload size
+app.get('/api/users/:clerkUserId/profile-image', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const result = await pool.query(
+      'SELECT profile_image_url FROM users WHERE clerk_user_id = $1 LIMIT 1',
+      [clerkUserId]
+    );
+
+    if (result.rows.length === 0 || !result.rows[0].profile_image_url) {
+      return res.status(404).send('Not found');
+    }
+
+    const dataUri: string = result.rows[0].profile_image_url as string;
+    if (!dataUri.startsWith('data:image')) {
+      // Not a base64 data URI; redirect to the URL (could be remote URL)
+      return res.redirect(dataUri);
+    }
+
+    // data:[<mediatype>][;base64],<data>
+    const match = dataUri.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/);
+    if (!match) {
+      return res.status(400).send('Invalid image data');
+    }
+    const mime = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    res.setHeader('Content-Type', mime);
+    // Simple caching to avoid repeated large transfers
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error('❌ Error serving profile image:', err.message);
+    return res.status(500).send('Server error');
   }
 });
 
@@ -3231,29 +4666,24 @@ app.post('/api/messages/upload-attachment', upload.single('file'), async (req, r
       }
     };
 
-    // Optional: Save to file_uploads table using manual SQL
+    // Save to file_uploads table using Prisma (best-effort; non-blocking if it fails)
     try {
-      const db = require('../services/db'); // Your database connection
-      await db.query(`
-        INSERT INTO file_uploads 
-          (message_id, original_name, stored_name, file_path, file_size, mime_type, uploaded_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [
-        message.id,
-        req.file.originalname,
-        req.file.filename,
-        req.file.path,
-        req.file.size,
-        req.file.mimetype,
-        user.id
-      ]);
-      console.log('📁 File upload record created successfully');
+      await prisma.fileUpload.create({
+        data: {
+          message_id: message.id,
+          original_name: req.file.originalname,
+          stored_name: req.file.filename,
+          file_path: req.file.path,
+          file_size: req.file.size,
+          mime_type: req.file.mimetype,
+          uploaded_by: user.id,
+        },
+      });
+      console.log('📁 File upload record created successfully (Prisma)');
     } catch (uploadError) {
-      console.error('📁 Failed to create file_uploads record:', uploadError);
+      console.error('📁 Failed to create file_uploads record (Prisma):', uploadError);
       // Don't fail the entire request if this fails
     }
-
-    console.log(`📁 File uploaded successfully: ${req.file.originalname}`);
 
     res.json({
       success: true,
@@ -3295,7 +4725,6 @@ app.post('/api/upload/profile-image/:clerkUserId', upload.single('profileImage')
       });
     }
 
-    console.log('📸 Uploading profile image for user:', clerkUserId);
 
     // Verify user exists
     const user = await prisma.user.findUnique({
@@ -3323,7 +4752,6 @@ app.post('/api/upload/profile-image/:clerkUserId', upload.single('profileImage')
       }
     });
 
-    console.log('✅ Profile image updated successfully:', imageUrl);
 
     res.json({
       success: true,
@@ -3732,10 +5160,26 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           text_size: "Medium",
           auto_lock_timer: "5 minutes",
           notifications_enabled: true,
+          notif_mood_tracking: true,
+          notif_journaling: true,
+          notif_messages: true,
+          notif_post_reactions: true,
+          notif_appointments: true,
+          notif_self_assessment: true,
           quiet_hours_enabled: false,
           quiet_start_time: "22:00",
           quiet_end_time: "08:00",
           reminder_frequency: "Daily",
+          // Include per-category reminder defaults
+          mood_reminder_enabled: false,
+          mood_reminder_time: '09:00',
+          mood_reminder_frequency: 'Daily',
+          mood_reminder_custom_schedule: {},
+          journal_reminder_enabled: false,
+          journal_reminder_time: '20:00',
+          journal_reminder_frequency: 'Daily',
+          journal_reminder_custom_schedule: {},
+          self_assessment_reminder_time: "09:00",
         },
       });
     }
@@ -3807,22 +5251,50 @@ app.put(
              text_size = COALESCE($2, text_size),
              auto_lock_timer = COALESCE($3, auto_lock_timer),
              notifications_enabled = COALESCE($4, notifications_enabled),
-             quiet_hours_enabled = COALESCE($5, quiet_hours_enabled),
-             quiet_start_time = COALESCE($6, quiet_start_time),
-             quiet_end_time = COALESCE($7, quiet_end_time),
-             reminder_frequency = COALESCE($8, reminder_frequency),
+             notif_mood_tracking = COALESCE($5, notif_mood_tracking),
+             notif_journaling = COALESCE($6, notif_journaling),
+             notif_messages = COALESCE($7, notif_messages),
+             notif_post_reactions = COALESCE($8, notif_post_reactions),
+             notif_appointments = COALESCE($9, notif_appointments),
+             notif_self_assessment = COALESCE($10, notif_self_assessment),
+             quiet_hours_enabled = COALESCE($11, quiet_hours_enabled),
+             quiet_start_time = COALESCE($12, quiet_start_time),
+             quiet_end_time = COALESCE($13, quiet_end_time),
+             reminder_frequency = COALESCE($14, reminder_frequency),
+             mood_reminder_enabled = COALESCE($15, mood_reminder_enabled),
+             mood_reminder_time = COALESCE($16, mood_reminder_time),
+             mood_reminder_frequency = COALESCE($17, mood_reminder_frequency),
+             mood_reminder_custom_schedule = COALESCE($18, mood_reminder_custom_schedule),
+             journal_reminder_enabled = COALESCE($19, journal_reminder_enabled),
+             journal_reminder_time = COALESCE($20, journal_reminder_time),
+             journal_reminder_frequency = COALESCE($21, journal_reminder_frequency),
+             journal_reminder_custom_schedule = COALESCE($22, journal_reminder_custom_schedule),
              updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $9
+           WHERE user_id = $23
            RETURNING *`,
           [
             settings.darkMode,
             settings.textSize,
             settings.autoLockTimer,
             settings.notificationsEnabled,
+            (settings as any).notifMoodTracking,
+            (settings as any).notifJournaling,
+            (settings as any).notifMessages,
+            (settings as any).notifPostReactions,
+            (settings as any).notifAppointments,
+            (settings as any).notifSelfAssessment,
             settings.quietHoursEnabled,
             settings.quietStartTime,
             settings.quietEndTime,
             settings.reminderFrequency,
+            (settings as any).moodReminderEnabled,
+            (settings as any).moodReminderTime,
+            (settings as any).moodReminderFrequency,
+            (settings as any).moodReminderCustomSchedule,
+            (settings as any).journalReminderEnabled,
+            (settings as any).journalReminderTime,
+            (settings as any).journalReminderFrequency,
+            (settings as any).journalReminderCustomSchedule,
             userId
           ]
         );
@@ -3832,8 +5304,20 @@ app.put(
           `INSERT INTO user_settings (
             user_id, clerk_user_id, 
             dark_mode, text_size, auto_lock_timer,
-            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            notifications_enabled,
+            notif_mood_tracking,
+            notif_journaling,
+            notif_messages,
+            notif_post_reactions,
+            notif_appointments,
+            notif_self_assessment,
+            quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+            mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+            journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule
+          ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+          $17, $18, $19, $20, $21, $22, $23, $24
+          )
           RETURNING *`,
           [
             userId,
@@ -3842,10 +5326,24 @@ app.put(
             settings.textSize ?? 'Medium',
             settings.autoLockTimer ?? '5 minutes',
             settings.notificationsEnabled ?? true,
+            (settings as any).notifMoodTracking ?? true,
+            (settings as any).notifJournaling ?? true,
+            (settings as any).notifMessages ?? true,
+            (settings as any).notifPostReactions ?? true,
+            (settings as any).notifAppointments ?? true,
+            (settings as any).notifSelfAssessment ?? true,
             settings.quietHoursEnabled ?? false,
             settings.quietStartTime ?? '22:00',
             settings.quietEndTime ?? '08:00',
-            settings.reminderFrequency ?? 'Daily'
+            settings.reminderFrequency ?? 'Daily',
+            (settings as any).moodReminderEnabled ?? false,
+            (settings as any).moodReminderTime ?? '09:00',
+            (settings as any).moodReminderFrequency ?? 'Daily',
+            (settings as any).moodReminderCustomSchedule ?? {},
+            (settings as any).journalReminderEnabled ?? false,
+            (settings as any).journalReminderTime ?? '20:00',
+            (settings as any).journalReminderFrequency ?? 'Daily',
+            (settings as any).journalReminderCustomSchedule ?? {}
           ]
         );
       }
@@ -4115,7 +5613,6 @@ app.get('/api/help-sections/:sectionId/items', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 app.get('/api/help/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -4161,7 +5658,10 @@ app.get('/api/help/search', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to search help content',
       details: error instanceof Error ? error.message : 'Unknown error'
-=======
+    });
+  }
+});
+
 // =============================================
 // APPOINTMENTS ENDPOINTS
 // =============================================
@@ -4242,12 +5742,10 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
     res.status(500).json({
       error: "Failed to fetch appointments",
       details: error.message,
->>>>>>> backend/appointments
     });
   }
 });
 
-<<<<<<< HEAD
 app.post('/api/help-sections/:sectionId/view', async (req, res) => {
   try {
     const { sectionId } = req.params;
@@ -4293,7 +5791,6 @@ app.post('/api/users/:clerkUserId/logout', async (req, res) => {
       const updateQuery = `
         UPDATE users 
         SET last_logout_at = CURRENT_TIMESTAMP,
-            last_active_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
         WHERE clerk_user_id = $1
         RETURNING id, clerk_user_id, last_logout_at
@@ -4318,147 +5815,10 @@ app.post('/api/users/:clerkUserId/logout', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to update logout timestamp',
       details: error instanceof Error ? error.message : 'Unknown error'
-=======
-// Create a new appointment
-app.post("/api/appointments", async (req: Request, res: Response) => {
-  try {
-    const {
-      clerkUserId,
-      supportWorkerId,
-      appointmentDate,
-      appointmentTime,
-      sessionType,
-      notes,
-      duration = 60
-    } = req.body;
-
-    // Validate required fields
-    if (!clerkUserId || !supportWorkerId || !appointmentDate || !appointmentTime || !sessionType) {
-      return res.status(400).json({ 
-        error: "Missing required fields",
-        required: ["clerkUserId", "supportWorkerId", "appointmentDate", "appointmentTime", "sessionType"]
-      });
-    }
-
-    // Validate session type
-    const validSessionTypes = ['video', 'phone', 'in_person'];
-    if (!validSessionTypes.includes(sessionType.toLowerCase().replace(' ', '_'))) {
-      return res.status(400).json({ 
-        error: "Invalid session type. Must be one of: video, phone, in_person" 
-      });
-    }
-
-    // Get user's internal ID
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const userId = userResult.rows[0].id;
-
-    // Check if support worker exists
-    const supportWorkerCheck = await pool.query(
-      "SELECT id FROM support_workers WHERE id = $1",
-      [supportWorkerId]
-    );
-
-    if (supportWorkerCheck.rows.length === 0) {
-      return res.status(404).json({ error: "Support worker not found" });
-    }
-
-    // Check for time slot conflicts
-    const conflictCheck = await pool.query(
-      `SELECT id FROM appointments 
-       WHERE support_worker_id = $1 
-       AND appointment_date = $2 
-       AND appointment_time = $3 
-       AND status IN ('scheduled', 'confirmed')`,
-      [supportWorkerId, appointmentDate, appointmentTime]
-    );
-
-    if (conflictCheck.rows.length > 0) {
-      return res.status(409).json({ 
-        error: "Time slot already booked",
-        message: "This time slot is not available. Please select another time."
-      });
-    }
-
-    // Generate meeting link for video sessions
-    let meetingLink = null;
-    if (sessionType.toLowerCase() === 'video' || sessionType.toLowerCase() === 'video call') {
-      const randomId = Math.random().toString(36).substring(2, 15);
-      meetingLink = `https://meet.safespace.com/${randomId}`;
-    }
-
-    // Create the appointment
-    const insertQuery = `
-      INSERT INTO appointments (
-        user_id, 
-        support_worker_id, 
-        appointment_date, 
-        appointment_time,
-        duration_minutes,
-        session_type, 
-        status,
-        meeting_link,
-        notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *
-    `;
-
-    const formattedSessionType = sessionType.toLowerCase().replace(' ', '_');
-
-    const result = await pool.query(insertQuery, [
-      userId,
-      supportWorkerId,
-      appointmentDate,
-      appointmentTime,
-      duration,
-      formattedSessionType,
-      'scheduled',
-      meetingLink,
-      notes
-    ]);
-
-    // Get support worker details for response
-    const swResult = await pool.query(
-      "SELECT first_name, last_name, specialization, avatar_url FROM support_workers WHERE id = $1",
-      [supportWorkerId]
-    );
-
-    const appointment = result.rows[0];
-    const supportWorker = swResult.rows[0];
-
-    res.status(201).json({
-      success: true,
-      message: "Appointment booked successfully",
-      appointment: {
-        id: appointment.id,
-        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
-        type: appointment.session_type,
-        status: appointment.status,
-        meetingLink: appointment.meeting_link,
-        notes: appointment.notes
-      }
-    });
-
-  } catch (error: any) {
-    console.error("Error creating appointment:", error.message);
-    res.status(500).json({
-      error: "Failed to create appointment",
-      details: error.message,
->>>>>>> backend/appointments
     });
   }
 });
 
-<<<<<<< HEAD
 app.post('/api/users/:clerkUserId/login', async (req, res) => {
   try {
     const { clerkUserId } = req.params;
@@ -4497,7 +5857,7 @@ app.post('/api/users/:clerkUserId/login', async (req, res) => {
     });
   }
 });
-=======
+
 // Reschedule an appointment
 app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) => {
   try {
@@ -4666,13 +6026,3 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
   }
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`SafeSpace API server running on http://localhost:${PORT}`);
-  console.log(`API documentation: http://localhost:${PORT}/`);
-  console.log('Press Ctrl+C to stop the server');
-});
-
-
-
->>>>>>> backend/appointments

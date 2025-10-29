@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
+import StatusModal from "../../../../components/StatusModal";
+
 /**
  * BookAppointment Component
  *
@@ -36,7 +38,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
  * Features a multi-step process with visual indicators and elegant curved background.
  */
 export default function BookAppointment() {
-  const { theme } = useTheme();
+  const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,29 +47,32 @@ export default function BookAppointment() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // StatusModal states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [statusModalType, setStatusModalType] = useState<'success' | 'error' | 'info'>('info');
+  const [statusModalTitle, setStatusModalTitle] = useState('');
+  const [statusModalMessage, setStatusModalMessage] = useState('');
+
   // Clerk authentication hooks
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
 
-  const getDisplayName = () => {
-    if (user?.firstName) return user.firstName;
-    if (user?.fullName) return user.fullName.split(" ")[0];
-    if (user?.primaryEmailAddress?.emailAddress) {
-      return user.primaryEmailAddress.emailAddress.split("@")[0];
-    }
-    return "User";
-  };
-
-  const getUserEmail = () => {
-    return (
-      user?.primaryEmailAddress?.emailAddress ||
-      user?.emailAddresses?.[0]?.emailAddress ||
-      "No email available"
-    );
-  };
+  // Create dynamic styles with text size scaling
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Get support worker ID from navigation params
   const { supportWorkerId } = useLocalSearchParams();
+
+  /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
 
   // Mock data for support workers (replaces backend data)
   const supportWorkers = [
@@ -92,12 +97,29 @@ export default function BookAppointment() {
     (sw) => sw.id === Number(supportWorkerId)
   );
 
+  const getDisplayName = () => {
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    if (user?.primaryEmailAddress?.emailAddress) {
+      return user.primaryEmailAddress.emailAddress.split("@")[0];
+    }
+    return "User";
+  };
+
+  const getUserEmail = () => {
+    return (
+      user?.primaryEmailAddress?.emailAddress ||
+      user?.emailAddresses?.[0]?.emailAddress ||
+      "No email available"
+    );
+  };
+
   // Show error if support worker not found
   if (!supportWorker) {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <Text style={styles.errorText}>Support worker not found</Text>
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>Support worker not found</Text>
         </SafeAreaView>
       </CurvedBackground>
     );
@@ -142,7 +164,7 @@ export default function BookAppointment() {
 
       router.replace("/(auth)/login");
     } catch (error) {
-      Alert.alert("Logout Failed", "Unable to sign out. Please try again.");
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -560,6 +582,15 @@ export default function BookAppointment() {
           </View>
         </Modal>
 
+        {/* Status Modal */}
+        <StatusModal
+          visible={statusModalVisible}
+          type={statusModalType}
+          title={statusModalTitle}
+          message={statusModalMessage}
+          onClose={() => setStatusModalVisible(false)}
+        />
+
         {/* Bottom Navigation */}
         <BottomNavigation
           tabs={tabs}
@@ -570,13 +601,14 @@ export default function BookAppointment() {
     </CurvedBackground>
   );
 }
-const styles = StyleSheet.create({
+
+const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
   },
   errorText: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     color: "#666",
     textAlign: "center",
     marginTop: 50,
@@ -611,7 +643,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#2E7D32",
   },
@@ -641,13 +673,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   profileName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#757575",
   },
   sideMenuContent: {
@@ -662,7 +694,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   sideMenuItemText: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#333",
     marginLeft: 15,
   },
@@ -681,7 +713,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   secondaryButton: {
@@ -696,11 +728,11 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#4CAF50",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   title: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 5,
@@ -730,7 +762,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   stepNumber: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     color: "#4CAF50",
     fontWeight: "600",
   },
@@ -744,7 +776,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   supportWorkerNameHeading: {
-    fontSize: 20,
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
     color: "#333",
     marginBottom: 24,
@@ -764,17 +796,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   supportWorkerName: {
-    fontSize: 18,
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
     color: "#333",
     marginBottom: 4,
   },
   supportWorkerTitle: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#666",
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
     color: "#333",
     marginBottom: 10,
@@ -782,7 +814,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   subSectionTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#333",
     marginBottom: 12,
@@ -815,7 +847,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sessionTypeText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#495057",
     textAlign: "center",
   },
@@ -836,7 +868,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
     color: "#333",
     marginBottom: 16,
@@ -861,7 +893,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   dateText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#495057",
     flex: 1,
   },
@@ -894,7 +926,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   timeText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#495057",
   },
   timeTextSelected: {
@@ -902,7 +934,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   placeholderText: {
-    fontSize: 14,
+    fontSize: scaledFontSize(14),
     color: "#6C757D",
     fontStyle: "italic",
     textAlign: "center",
@@ -924,7 +956,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
   sideMenuItemDisabled: {
