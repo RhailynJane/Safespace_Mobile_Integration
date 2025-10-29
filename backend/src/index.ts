@@ -5613,7 +5613,6 @@ app.get('/api/help-sections/:sectionId/items', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 app.get('/api/help/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -5659,7 +5658,10 @@ app.get('/api/help/search', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to search help content',
       details: error instanceof Error ? error.message : 'Unknown error'
-=======
+    });
+  }
+});
+
 // =============================================
 // APPOINTMENTS ENDPOINTS
 // =============================================
@@ -5740,12 +5742,10 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
     res.status(500).json({
       error: "Failed to fetch appointments",
       details: error.message,
->>>>>>> backend/appointments
     });
   }
 });
 
-<<<<<<< HEAD
 app.post('/api/help-sections/:sectionId/view', async (req, res) => {
   try {
     const { sectionId } = req.params;
@@ -5815,147 +5815,10 @@ app.post('/api/users/:clerkUserId/logout', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to update logout timestamp',
       details: error instanceof Error ? error.message : 'Unknown error'
-=======
-// Create a new appointment
-app.post("/api/appointments", async (req: Request, res: Response) => {
-  try {
-    const {
-      clerkUserId,
-      supportWorkerId,
-      appointmentDate,
-      appointmentTime,
-      sessionType,
-      notes,
-      duration = 60
-    } = req.body;
-
-    // Validate required fields
-    if (!clerkUserId || !supportWorkerId || !appointmentDate || !appointmentTime || !sessionType) {
-      return res.status(400).json({ 
-        error: "Missing required fields",
-        required: ["clerkUserId", "supportWorkerId", "appointmentDate", "appointmentTime", "sessionType"]
-      });
-    }
-
-    // Validate session type
-    const validSessionTypes = ['video', 'phone', 'in_person'];
-    if (!validSessionTypes.includes(sessionType.toLowerCase().replace(' ', '_'))) {
-      return res.status(400).json({ 
-        error: "Invalid session type. Must be one of: video, phone, in_person" 
-      });
-    }
-
-    // Get user's internal ID
-    const userResult = await pool.query(
-      "SELECT id FROM users WHERE clerk_user_id = $1",
-      [clerkUserId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const userId = userResult.rows[0].id;
-
-    // Check if support worker exists
-    const supportWorkerCheck = await pool.query(
-      "SELECT id FROM support_workers WHERE id = $1",
-      [supportWorkerId]
-    );
-
-    if (supportWorkerCheck.rows.length === 0) {
-      return res.status(404).json({ error: "Support worker not found" });
-    }
-
-    // Check for time slot conflicts
-    const conflictCheck = await pool.query(
-      `SELECT id FROM appointments 
-       WHERE support_worker_id = $1 
-       AND appointment_date = $2 
-       AND appointment_time = $3 
-       AND status IN ('scheduled', 'confirmed')`,
-      [supportWorkerId, appointmentDate, appointmentTime]
-    );
-
-    if (conflictCheck.rows.length > 0) {
-      return res.status(409).json({ 
-        error: "Time slot already booked",
-        message: "This time slot is not available. Please select another time."
-      });
-    }
-
-    // Generate meeting link for video sessions
-    let meetingLink = null;
-    if (sessionType.toLowerCase() === 'video' || sessionType.toLowerCase() === 'video call') {
-      const randomId = Math.random().toString(36).substring(2, 15);
-      meetingLink = `https://meet.safespace.com/${randomId}`;
-    }
-
-    // Create the appointment
-    const insertQuery = `
-      INSERT INTO appointments (
-        user_id, 
-        support_worker_id, 
-        appointment_date, 
-        appointment_time,
-        duration_minutes,
-        session_type, 
-        status,
-        meeting_link,
-        notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *
-    `;
-
-    const formattedSessionType = sessionType.toLowerCase().replace(' ', '_');
-
-    const result = await pool.query(insertQuery, [
-      userId,
-      supportWorkerId,
-      appointmentDate,
-      appointmentTime,
-      duration,
-      formattedSessionType,
-      'scheduled',
-      meetingLink,
-      notes
-    ]);
-
-    // Get support worker details for response
-    const swResult = await pool.query(
-      "SELECT first_name, last_name, specialization, avatar_url FROM support_workers WHERE id = $1",
-      [supportWorkerId]
-    );
-
-    const appointment = result.rows[0];
-    const supportWorker = swResult.rows[0];
-
-    res.status(201).json({
-      success: true,
-      message: "Appointment booked successfully",
-      appointment: {
-        id: appointment.id,
-        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
-        type: appointment.session_type,
-        status: appointment.status,
-        meetingLink: appointment.meeting_link,
-        notes: appointment.notes
-      }
-    });
-
-  } catch (error: any) {
-    console.error("Error creating appointment:", error.message);
-    res.status(500).json({
-      error: "Failed to create appointment",
-      details: error.message,
->>>>>>> backend/appointments
     });
   }
 });
 
-<<<<<<< HEAD
 app.post('/api/users/:clerkUserId/login', async (req, res) => {
   try {
     const { clerkUserId } = req.params;
@@ -5994,7 +5857,7 @@ app.post('/api/users/:clerkUserId/login', async (req, res) => {
     });
   }
 });
-=======
+
 // Reschedule an appointment
 app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) => {
   try {
@@ -6163,13 +6026,3 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
   }
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`SafeSpace API server running on http://localhost:${PORT}`);
-  console.log(`API documentation: http://localhost:${PORT}/`);
-  console.log('Press Ctrl+C to stop the server');
-});
-
-
-
->>>>>>> backend/appointments

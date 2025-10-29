@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-=======
-
->>>>>>> backend/appointments
 -- =============================================
 -- CONVERSATIONS TABLE
 -- =============================================
@@ -40,12 +36,9 @@ CREATE TABLE messages (
     sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     message_text TEXT NOT NULL,
     message_type VARCHAR(20) DEFAULT 'text',
-<<<<<<< HEAD
     attachment_url TEXT,
     file_name VARCHAR(255),
     file_size INTEGER,
-=======
->>>>>>> backend/appointments
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -66,7 +59,6 @@ CREATE TABLE message_read_status (
     UNIQUE(message_id, user_id)
 );
 
-<<<<<<< HEAD
 -- =============================================
 -- FILE_UPLOADS TABLE
 -- =============================================
@@ -85,9 +77,6 @@ CREATE TABLE file_uploads (
     
     CONSTRAINT chk_upload_status CHECK (upload_status IN ('pending', 'completed', 'failed'))
 );
-
-=======
->>>>>>> backend/appointments
 -- Indexes for performance
 CREATE INDEX idx_conversations_updated_at ON conversations(updated_at);
 CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
@@ -96,11 +85,8 @@ CREATE INDEX idx_messages_sender_id ON messages(sender_id);
 CREATE INDEX idx_conversation_participants_user_id ON conversation_participants(user_id);
 CREATE INDEX idx_conversation_participants_conv_id ON conversation_participants(conversation_id);
 CREATE INDEX idx_message_read_status_user_id ON message_read_status(user_id);
-<<<<<<< HEAD
 CREATE INDEX idx_file_uploads_message_id ON file_uploads(message_id);
 CREATE INDEX idx_file_uploads_uploaded_by ON file_uploads(uploaded_by);
-=======
->>>>>>> backend/appointments
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
