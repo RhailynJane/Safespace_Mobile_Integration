@@ -81,7 +81,15 @@ export default function VideoCallScreen() {
   // Handler: start meeting - navigates to the meeting route
   const handleStartMeeting = () => {
     // Replace navigation with your meeting screen path as needed
-    router.replace("../video-consultations/video-call-meeting");
+     router.push({
+      pathname: "/(app)/video-consultations/video-call-meeting",
+      params: {
+        supportWorkerId: currentAppointment?.id || "1",
+        supportWorkerName: currentAppointment?.supportWorker || "Support Worker",
+        appointmentId: currentAppointment?.id || "1",
+        audioOption: audioOption, // Pass the selected audio option
+      }
+  });
   };
 
   const currentAppointment = appointments[0];

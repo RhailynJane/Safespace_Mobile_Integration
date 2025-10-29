@@ -1,6 +1,5 @@
 import express, { Request, Response } from "express";
 
-
 // Extend the Request interface to include the `file` property
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -12,12 +11,6 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3001";
 const app = express();
 const PORT = 3001;
 const axios = require("axios");
-const twilio = require('twilio');
-
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_API_KEY = process.env.TWILIO_API_KEY;
-const TWILIO_API_SECRET = process.env.TWILIO_API_SECRET;
-
 import { PrismaClient } from "@prisma/client";
 
 
@@ -4122,6 +4115,53 @@ app.get('/api/help-sections/:sectionId/items', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
+app.get('/api/help/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ error: 'Query parameter "q" is required' });
+    }
+
+    const client = await pool.connect();
+
+    try {
+      const searchQuery = `
+        SELECT hi.id, hi.title, hi.content, hi.type, hi.section_id, hs.title as section_title
+        FROM help_items hi
+        JOIN help_sections hs ON hi.section_id = hs.id
+        WHERE hi.title ILIKE $1 OR hi.content ILIKE $1
+        ORDER BY 
+          CASE 
+            WHEN hi.title ILIKE $1 THEN 1
+            ELSE 2
+          END,
+          hi.sort_order ASC
+      `;
+      
+      const searchResult = await client.query(searchQuery, [`%${q}%`]);
+
+      const items: HelpItem[] = searchResult.rows.map(item => ({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        type: item.type,
+        related_features: [],
+        estimated_read_time: Math.ceil(item.content.length / 200),
+        last_updated: item.updated_at
+      }));
+
+      res.json(items);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error searching help content:', error);
+    res.status(500).json({ 
+      error: 'Failed to search help content',
+      details: error instanceof Error ? error.message : 'Unknown error'
+=======
 // =============================================
 // APPOINTMENTS ENDPOINTS
 // =============================================
@@ -4174,7 +4214,7 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
     const result = await pool.query(query, [userId]);
 
     // Format appointments for frontend
-    const appointments = result.rows.map((row: any) => ({
+    const appointments = result.rows.map(row => ({
       id: row.id,
       supportWorker: `${row.support_worker_first_name} ${row.support_worker_last_name}`,
       supportWorkerId: row.support_worker_id,
@@ -4202,10 +4242,83 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
     res.status(500).json({
       error: "Failed to fetch appointments",
       details: error.message,
+>>>>>>> backend/appointments
     });
   }
 });
 
+<<<<<<< HEAD
+app.post('/api/help-sections/:sectionId/view', async (req, res) => {
+  try {
+    const { sectionId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      // Verify section exists
+      const sectionCheck = await client.query(
+        'SELECT id FROM help_sections WHERE id = $1',
+        [sectionId]
+      );
+
+      if (sectionCheck.rows.length === 0) {
+        return res.status(404).json({ error: 'Help section not found' });
+      }
+
+      // In a real app, you might want to:
+      // 1. Track user ID if authenticated
+      // 2. Store view timestamps
+      // 3. Update analytics
+      
+      console.log(`Help section viewed: ${sectionId}`);
+      
+      res.json({ success: true, message: 'View tracked' });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error tracking help section view:', error);
+    res.status(500).json({ 
+      error: 'Failed to track view',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+app.post('/api/users/:clerkUserId/logout', async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      const updateQuery = `
+        UPDATE users 
+        SET last_logout_at = CURRENT_TIMESTAMP,
+            last_active_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE clerk_user_id = $1
+        RETURNING id, clerk_user_id, last_logout_at
+      `;
+      
+      const result = await client.query(updateQuery, [clerkUserId]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Logout timestamp updated',
+        user: result.rows[0]
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating logout timestamp:', error);
+    res.status(500).json({ 
+      error: 'Failed to update logout timestamp',
+      details: error instanceof Error ? error.message : 'Unknown error'
+=======
 // Create a new appointment
 app.post("/api/appointments", async (req: Request, res: Response) => {
   try {
@@ -4340,10 +4453,51 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
     res.status(500).json({
       error: "Failed to create appointment",
       details: error.message,
+>>>>>>> backend/appointments
     });
   }
 });
 
+<<<<<<< HEAD
+app.post('/api/users/:clerkUserId/login', async (req, res) => {
+  try {
+    const { clerkUserId } = req.params;
+    const client = await pool.connect();
+
+    try {
+      const updateQuery = `
+        UPDATE users 
+        SET last_login_at = CURRENT_TIMESTAMP,
+            last_login = CURRENT_TIMESTAMP,
+            last_active_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE clerk_user_id = $1
+        RETURNING id, clerk_user_id, last_login_at
+      `;
+      
+      const result = await client.query(updateQuery, [clerkUserId]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Login timestamp updated',
+        user: result.rows[0]
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating login timestamp:', error);
+    res.status(500).json({ 
+      error: 'Failed to update login timestamp',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+=======
 // Reschedule an appointment
 app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) => {
   try {
@@ -4449,7 +4603,7 @@ app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) 
   }
 });
 
-// Cancel an appointment (from backend/appointments)
+// Cancel an appointment
 app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -4512,53 +4666,6 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
   }
 });
 
-// =============================================
-// TWILIO VIDEO ENDPOINTS
-// =============================================
-
-// Generate Twilio access token
-app.post("/api/twilio/token", async (req: Request, res: Response) => {
-  try {
-    const { identity, room } = req.body;
-
-    if (!identity || !room) {
-      return res.status(400).json({ error: "identity and room are required" });
-    }
-
-    const AccessToken = twilio.jwt.AccessToken;
-    const VideoGrant = AccessToken.VideoGrant;
-
-    // Create access token
-    const token = new AccessToken(
-      TWILIO_ACCOUNT_SID,
-      TWILIO_API_KEY,
-      TWILIO_API_SECRET,
-      { identity }
-    );
-
-    // Create video grant
-    const videoGrant = new VideoGrant({
-      room: room,
-    });
-
-    token.addGrant(videoGrant);
-
-    console.log(`✅ Generated Twilio token for ${identity} in room ${room}`);
-
-    res.json({
-      token: token.toJwt(),
-      room: room,
-      identity: identity,
-    });
-  } catch (error: any) {
-    console.error("Error generating Twilio token:", error.message);
-    res.status(500).json({
-      error: "Failed to generate token",
-      details: error.message,
-    });
-  }
-});
-
 // Start the server
 app.listen(PORT, () => {
   console.log(`SafeSpace API server running on http://localhost:${PORT}`);
@@ -4568,3 +4675,4 @@ app.listen(PORT, () => {
 
 
 
+>>>>>>> backend/appointments

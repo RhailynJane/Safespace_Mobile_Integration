@@ -16,7 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import TwilioVideoService from "../../../lib/twilio-service";
+import SendBirdCallService from "../../../lib/sendbird-service";
 
 const { width, height } = Dimensions.get("window");
 
@@ -30,23 +30,21 @@ const initialMessages = [
 // Emoji options
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
-export default function VideoCallMeetingScreen() {
+export default function VideoCallScreen() {
   const { user } = useUser();
   const params = useLocalSearchParams();
   const supportWorkerId = params.supportWorkerId as string;
   const supportWorkerName = params.supportWorkerName as string || "Support Worker";
-  const appointmentId = params.appointmentId as string;
-  const audioOption = params.audioOption as string;
 
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(audioOption !== "none");
+  const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRaiseHand, setIsRaiseHand] = useState(false);
   const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState("");
-  const [reactions, setReactions] = useState< 
-  { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
+  const [reactions, setReactions] = useState<
+    { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
   >([]);
   const [callStatus, setCallStatus] = useState("Connecting...");
   const [callDuration, setCallDuration] = useState(0);
@@ -55,11 +53,6 @@ export default function VideoCallMeetingScreen() {
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    console.log("🎥 Initializing video call...");
-    console.log("Support Worker:", supportWorkerName);
-    console.log("Appointment ID:", appointmentId);
-    console.log("Audio Option:", audioOption);
-    
     initializeCall();
 
     return () => {
@@ -70,39 +63,63 @@ export default function VideoCallMeetingScreen() {
     };
   }, []);
 
-  // Initialize Twilio and start call
+  // Initialize SendBird and start call
   const initializeCall = async () => {
     try {
-      // Initialize Twilio
-      await TwilioVideoService.initialize();
+      // Initialize SendBird
+      await SendBirdCallService.initialize();
 
-      // Get user ID from Clerk
+      // Authenticate with user's Clerk ID
       const userId = user?.id || `user_${Date.now()}`;
-      
-      // Create room name
-      const roomName = `appointment_${appointmentId}`;
+      await SendBirdCallService.authenticate(userId);
 
-      console.log("🔑 Authenticating with Twilio...");
-      // Get access token from your backend
-      const accessToken = await TwilioVideoService.authenticate(userId, roomName);
+      // Create call to support worker
+      const call = await SendBirdCallService.createCall(
+        `support_worker_${supportWorkerId}`,
+        true
+      );
 
-      console.log("📞 Connecting to room:", roomName);
-      // Connect to room
-      await TwilioVideoService.connectToRoom(accessToken, roomName);
+      // Set up call event listeners
+      setupCallListeners(call);
 
-      setCallStatus("Connected");
-      setIsCallConnected(true);
-      startCallTimer();
-      
-      console.log("✅ Video call connected successfully");
+      setCallStatus("Ringing...");
     } catch (error) {
-      console.error("❌ Failed to initialize call:", error);
+      console.error("Failed to initialize call:", error);
       Alert.alert(
         "Call Failed",
         "Unable to start video call. Please try again.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     }
+  };
+
+  // Set up call event listeners
+  const setupCallListeners = (call: any) => {
+    call.onEstablished = () => {
+      setCallStatus("Connected");
+      setIsCallConnected(true);
+      startCallTimer();
+    };
+
+    call.onConnected = () => {
+      console.log("Call connected");
+    };
+
+    call.onEnded = () => {
+      setCallStatus("Call Ended");
+      setIsCallConnected(false);
+      setTimeout(() => {
+        router.back();
+      }, 2000);
+    };
+
+    call.onRemoteAudioSettingsChanged = () => {
+      console.log("Remote audio settings changed");
+    };
+
+    call.onRemoteVideoSettingsChanged = () => {
+      console.log("Remote video settings changed");
+    };
   };
 
   // Start call duration timer
@@ -136,11 +153,10 @@ export default function VideoCallMeetingScreen() {
 
   const endCall = async () => {
     try {
-      await TwilioVideoService.disconnect();
+      await SendBirdCallService.endCall();
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      console.log("📴 Call ended");
       router.back();
     } catch (error) {
       console.error("Error ending call:", error);
@@ -151,13 +167,13 @@ export default function VideoCallMeetingScreen() {
   const handleToggleCamera = () => {
     const newState = !isCameraOn;
     setIsCameraOn(newState);
-    TwilioVideoService.toggleVideo(newState);
+    SendBirdCallService.toggleVideo(newState);
   };
 
   const handleToggleMic = () => {
     const newState = !isMicOn;
     setIsMicOn(newState);
-    TwilioVideoService.toggleAudio(newState);
+    SendBirdCallService.toggleAudio(newState);
   };
 
   const handleToggleChat = () => {
@@ -228,7 +244,7 @@ export default function VideoCallMeetingScreen() {
     <SafeAreaView style={styles.container}>
       {/* Main Video Content */}
       <View style={styles.videoContainer}>
-        {/* Video Placeholder - Replace with actual Twilio native video views */}
+        {/* Video Placeholder - Replace with actual SendBird native video views */}
         <View style={styles.participantVideo}>
           <View style={styles.videoPlaceholder}>
             <Ionicons name="person-circle" size={100} color="#FFFFFF" />
@@ -269,7 +285,7 @@ export default function VideoCallMeetingScreen() {
           <View style={styles.connectionBanner}>
             <Ionicons name="information-circle" size={20} color="#FFF" />
             <Text style={styles.connectionText}>
-              Connecting to Twilio Video...
+              Video calling with SendBird requires native setup. This is a demo mode.
             </Text>
           </View>
         )}
