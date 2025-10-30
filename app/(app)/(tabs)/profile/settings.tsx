@@ -282,7 +282,7 @@ export default function SettingsScreen() {
       let fontScale = 1.0;
       switch (size) {
         case "Extra Small":
-          fontScale = 0.85;
+          fontScale = 0.85;                                                                       
           break;
         case "Small":
           fontScale = 0.95;
