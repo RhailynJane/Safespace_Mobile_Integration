@@ -34,7 +34,10 @@
         "projectId": "e7c636be-6f7e-403c-8731-4ec9a0ec2d48"
       }
     },
-    "owner": "safespacedev"
+    "owner": "safespacedev",
+    "android": {
+      "package": "com.safespacedev.SafeSpace"
+    }
   },
   "splash": {
     "image": "./assets/splash-icon.png",
