@@ -11,17 +11,19 @@ describe('ChangePasswordScreen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // Mock user with updatePassword method
-    const mockUser = {
-      id: 'user_123',
-      firstName: 'Test',
-      lastName: 'User',
-      emailAddresses: [{ emailAddress: 'test@example.com' }],
-      imageUrl: 'https://example.com/avatar.jpg',
-      updatePassword: mockUpdatePassword,
-    };
-    
-    require('@clerk/clerk-expo').useUser.mockReturnValue({ user: mockUser });
+    mockUpdatePassword.mockReset();
+    // User is already mocked in jest.setup.cjs with id: 'test-user-id'
+    // We need to add updatePassword to the mocked user
+    const { useUser } = require('@clerk/clerk-expo');
+    useUser.mockReturnValue({
+      user: {
+        id: 'test-user-id',
+        firstName: 'Test',
+        lastName: 'User',
+        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        updatePassword: mockUpdatePassword,
+      },
+    });
   });
 
   it('renders change password screen correctly', () => {

@@ -1,6 +1,9 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '../test-utils';
+import { render, screen, fireEvent, waitFor, act } from '../test-utils';
 import NotificationsScreen from '../../app/(app)/notifications/index';
+
+// Mock environment
+process.env.NODE_ENV = 'test';
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -10,15 +13,19 @@ describe('NotificationsScreen', () => {
     jest.clearAllMocks();
   });
 
-  it('renders notifications screen correctly', () => {
+  it('renders notifications screen correctly', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ success: true, data: [] }),
     });
 
-    render(<NotificationsScreen />);
+    await act(async () => {
+      render(<NotificationsScreen />);
+    });
     
-    expect(screen.getByText('Notifications')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Notifications')).toBeTruthy();
+    });
   });
 
   it('displays empty state when no notifications', async () => {
@@ -138,8 +145,12 @@ describe('NotificationsScreen', () => {
       expect(screen.getByText('Unread Message')).toBeTruthy();
     });
 
-    const notification = screen.getByText('Unread Message');
-    fireEvent.press(notification);
+    // Find the TouchableOpacity parent of the notification text
+    const notificationTitle = screen.getByText('Unread Message');
+    const touchable = notificationTitle.parent?.parent?.parent;
+    if (touchable) {
+      fireEvent.press(touchable);
+    }
     
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(

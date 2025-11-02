@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   TextInput,
   TouchableOpacity,
@@ -12,6 +11,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSignIn, useUser } from "@clerk/clerk-expo";

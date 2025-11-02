@@ -82,23 +82,53 @@ jest.mock('expo-linear-gradient', () => {
 });
 
 // Mock Clerk authentication
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: () => ({
-    isSignedIn: true,
-    userId: 'test-user-id',
-    sessionId: 'test-session-id',
-    signOut: jest.fn()
-  }),
-  useUser: () => ({
-    user: {
-      id: 'test-user-id',
-      emailAddresses: [{ emailAddress: 'test@example.com' }],
-      firstName: 'Test',
-      lastName: 'User'
-    }
-  }),
-  ClerkProvider: ({ children }) => children
-}));
+jest.mock('@clerk/clerk-expo', () => {
+  // Create shared mock fns so tests can inspect/override behavior
+  const signUpMock = {
+    create: jest.fn(async () => ({ id: 'signup_mock_id' })),
+    prepareEmailAddressVerification: jest.fn(async () => ({ status: 'needs_verification' })),
+    attemptEmailAddressVerification: jest.fn(async () => ({ status: 'complete', createdSessionId: 'sess_mock', createdUserId: 'user_mock' })),
+  };
+  const setActiveMock = jest.fn(async () => undefined);
+  const signInMock = {
+    create: jest.fn(async () => ({ status: 'complete', createdSessionId: 'sess_mock', createdUserId: 'user_mock' })),
+    attemptFirstFactor: jest.fn(async () => ({ status: 'complete', createdSessionId: 'sess_mock', createdUserId: 'user_mock' })),
+  };
+
+  const module = {
+    useAuth: () => ({
+      isSignedIn: true,
+      userId: 'test-user-id',
+      sessionId: 'test-session-id',
+      signOut: jest.fn()
+    }),
+    useUser: () => ({
+      user: {
+        id: 'test-user-id',
+        emailAddresses: [{ emailAddress: 'test@example.com' }],
+        firstName: 'Test',
+        lastName: 'User'
+      }
+    }),
+    useSignIn: () => ({
+      isLoaded: true,
+      signIn: signInMock,
+      setActive: setActiveMock,
+    }),
+    useSignUp: () => ({
+      isLoaded: true,
+      signUp: signUpMock,
+      setActive: setActiveMock,
+    }),
+    ClerkProvider: ({ children }) => children,
+    // Expose helpers for tests to tweak behavior
+    __signUpMock: signUpMock,
+    __signInMock: signInMock,
+    __setActiveMock: setActiveMock,
+  };
+
+  return module;
+});
 
 // Mock fetch for API calls (alternative to MSW)
 global.fetch = jest.fn(() =>

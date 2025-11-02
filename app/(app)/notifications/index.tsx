@@ -10,9 +10,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";

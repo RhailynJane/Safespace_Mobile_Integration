@@ -3,17 +3,10 @@ import { render, screen, fireEvent, waitFor } from '../test-utils';
 import CrisisScreen from '../../app/(app)/crisis-support/index';
 import { Linking } from 'react-native';
 
-// Mock Linking
-jest.mock('react-native/Libraries/Linking/Linking', () => ({
-  canOpenURL: jest.fn(),
-  openURL: jest.fn(),
-}));
-
 describe('CrisisScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (Linking.canOpenURL as jest.Mock).mockResolvedValue(true);
-    (Linking.openURL as jest.Mock).mockResolvedValue(true);
+    // Linking is already mocked globally in jest.setup.cjs
   });
 
   it('renders crisis support screen correctly', () => {
@@ -151,7 +144,8 @@ describe('CrisisScreen', () => {
     fireEvent.press(call911Button);
     
     await waitFor(() => {
-      expect(screen.getByText('Call Failed')).toBeTruthy();
+      // The modal shows "Call Not Supported" for device capability errors
+      expect(screen.getByText('Call Not Supported')).toBeTruthy();
     });
   });
 
