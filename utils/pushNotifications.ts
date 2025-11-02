@@ -88,6 +88,12 @@ export async function registerForPushNotifications(clerkUserId: string): Promise
         console.log('   For now, push notifications will be disabled.');
         return null;
       }
+      if (tokenError.message?.match(/FirebaseApp|DEFAULT|Firebase/i)) {
+        console.log('⚠️ Android push setup incomplete: Firebase app not initialized.');
+        console.log('   Make sure you have google-services.json and FCM configured in your dev build.');
+        console.log('   See: https://docs.expo.dev/push-notifications/fcm/');
+        return null;
+      }
       throw tokenError;
     }
     

@@ -92,6 +92,55 @@ pool.connect((err, client, release) => {
   }
 });
 
+// Ensure database schema for push tokens
+async function ensurePushTokensSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(20),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        revoked BOOLEAN NOT NULL DEFAULT FALSE
+      );
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_revoked ON push_tokens(revoked);
+    `);
+    console.log('✅ Ensured push_tokens table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure push_tokens schema:', e.message);
+  }
+}
+
+// Kick off lightweight auto-migration for push-related schema
+ensurePushTokensSchema();
+
+// Ensure database schema for notifications
+async function ensureNotificationsSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(40) NOT NULL DEFAULT 'system',
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
+      CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+    `);
+    console.log('✅ Ensured notifications table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure notifications schema:', e.message);
+  }
+}
+
+ensureNotificationsSchema();
+
 // Test endpoint
 app.get("/", (req: Request, res: Response) => {
   res.json({
@@ -695,6 +744,291 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
       error: "Failed to fetch post",
       details: error.message,
     });
+  }
+});
+
+// =============================================
+// USER ACTIVITY ENDPOINTS (login/logout/heartbeat/status)
+// =============================================
+
+// Record successful login (and set active)
+app.post("/api/users/login-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_login_at = CURRENT_TIMESTAMP,
+           last_login = CURRENT_TIMESTAMP,
+           last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating login activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Record logout
+app.post("/api/users/logout-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_logout_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating logout activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Heartbeat to update last_active_at
+app.post("/api/users/heartbeat", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating heartbeat:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Get single user's presence and timestamps
+app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const result = await pool.query(
+      `SELECT last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
+    const now = new Date();
+    const activeAt = last_active_at ? new Date(last_active_at) : null;
+    const loginAt = last_login_at ? new Date(last_login_at) : null;
+    const logoutAt = last_logout_at ? new Date(last_logout_at) : null;
+
+    const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+
+    let presence: 'online' | 'away' | 'offline' = 'offline';
+    if (loggedIn) presence = activeRecently ? 'online' : 'away';
+
+    const online = presence === 'online';
+    res.json({ success: true, data: { online, presence, last_active_at, last_login_at, last_logout_at } });
+  } catch (error: any) {
+    console.error("Error fetching user status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Batch presence for multiple users
+app.post("/api/users/status-batch", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserIds } = req.body as { clerkUserIds?: string[] };
+    if (!clerkUserIds || clerkUserIds.length === 0) {
+      return res.status(400).json({ success: false, message: "clerkUserIds[] is required" });
+    }
+
+    const params = clerkUserIds.map((_, i) => `$${i + 1}`).join(",");
+    const result = await pool.query(
+      `SELECT clerk_user_id, last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id IN (${params})`,
+      clerkUserIds
+    );
+
+    const now = new Date();
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const statusMap: Record<string, { online: boolean; presence: 'online' | 'away' | 'offline'; last_active_at: string | null; last_login_at: string | null; last_logout_at: string | null; }> = {};
+
+    for (const row of result.rows) {
+      const activeAt = row.last_active_at ? new Date(row.last_active_at) : null;
+      const loginAt = row.last_login_at ? new Date(row.last_login_at) : null;
+      const logoutAt = row.last_logout_at ? new Date(row.last_logout_at) : null;
+      const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+      const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+      let presence: 'online' | 'away' | 'offline' = 'offline';
+      if (loggedIn) presence = activeRecently ? 'online' : 'away';
+      statusMap[row.clerk_user_id] = {
+        online: presence === 'online',
+        presence,
+        last_active_at: row.last_active_at || null,
+        last_login_at: row.last_login_at || null,
+        last_logout_at: row.last_logout_at || null,
+      };
+    }
+
+    res.json({ success: true, data: statusMap });
+  } catch (error: any) {
+    console.error("Error fetching batch status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// =============================================
+// PUSH TOKEN REGISTRATION ENDPOINTS
+// =============================================
+
+// Register or update an Expo push token for a user
+app.post('/api/push/register', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, token, platform } = req.body as { clerkUserId?: string; token?: string; platform?: string };
+    if (!clerkUserId || !token) {
+      return res.status(400).json({ success: false, message: 'clerkUserId and token are required' });
+    }
+
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id as number;
+
+    // Upsert by unique token
+    await pool.query(
+      `INSERT INTO push_tokens (user_id, token, platform, revoked)
+       VALUES ($1, $2, $3, FALSE)
+       ON CONFLICT (token)
+       DO UPDATE SET user_id = EXCLUDED.user_id, platform = EXCLUDED.platform, revoked = FALSE`,
+      [userId, token, (platform || '').toString().slice(0, 20)]
+    );
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error registering push token:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to register push token', error: error.message });
+  }
+});
+
+// Revoke a token (e.g., on logout or uninstall)
+app.post('/api/push/revoke', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body as { token?: string };
+    if (!token) return res.status(400).json({ success: false, message: 'token is required' });
+    await pool.query(`UPDATE push_tokens SET revoked = TRUE WHERE token = $1`, [token]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error revoking push token:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to revoke push token', error: error.message });
+  }
+});
+
+// =============================================
+// NOTIFICATIONS ENDPOINTS
+// =============================================
+
+// Get notifications for a user by Clerk ID
+app.get('/api/notifications/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    const userId = userRes.rows[0].id as number;
+    const rows = await pool.query(
+      `SELECT id, type, title, message, is_read, created_at
+       FROM notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [userId]
+    );
+    res.json({ success: true, data: rows.rows });
+  } catch (error: any) {
+    console.error('Error fetching notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch notifications', error: error.message });
+  }
+});
+
+// Mark a single notification as read
+app.post('/api/notifications/:id/read', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE id = $1`, [id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error marking notification read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark notification as read', error: error.message });
+  }
+});
+
+// Mark all notifications for a user as read
+app.post('/api/notifications/:clerkUserId/read-all', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.json({ success: true });
+    const userId = userRes.rows[0].id as number;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error marking all notifications read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark all read', error: error.message });
+  }
+});
+
+// Clear all notifications for a user
+app.delete('/api/notifications/:clerkUserId/clear-all', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.json({ success: true });
+    const userId = userRes.rows[0].id as number;
+    await pool.query(`DELETE FROM notifications WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error clearing notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clear notifications', error: error.message });
   }
 });
 

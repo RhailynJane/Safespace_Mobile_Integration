@@ -86,7 +86,7 @@ export default function TimePickerModal({
       animationType="fade"
       onRequestClose={onCancel}
     >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
+      <View testID="time-picker-modal" style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
         <View
           style={{
             width: 280,
@@ -126,6 +126,7 @@ export default function TimePickerModal({
                   decelerationRate="fast"
                   onMomentumScrollEnd={handleHourScroll}
                   nestedScrollEnabled={true}
+                  testID="hour-picker"
                 >
                   <View style={{ height: 88 }} />
                   {hours.map((h) => (
@@ -165,6 +166,7 @@ export default function TimePickerModal({
                   decelerationRate="fast"
                   onMomentumScrollEnd={handleMinuteScroll}
                   nestedScrollEnabled={true}
+                  testID="minute-picker"
                 >
                   <View style={{ height: 88 }} />
                   {minutes.map((m) => (
@@ -205,6 +207,7 @@ export default function TimePickerModal({
                 backgroundColor: pressed ? theme.colors.background : theme.colors.background,
                 opacity: pressed ? 0.7 : 1,
               })}
+              testID="cancel-time-button"
             >
               <Text style={{ color: theme.colors.textSecondary, fontSize: 16, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
@@ -218,6 +221,7 @@ export default function TimePickerModal({
                 backgroundColor: pressed ? theme.colors.primary : theme.colors.primary,
                 opacity: pressed ? 0.8 : 1,
               })}
+              testID="confirm-time-button"
             >
               <Text style={{ color: theme.colors.surface, fontSize: 16, fontWeight: '700' }}>Confirm</Text>
             </Pressable>

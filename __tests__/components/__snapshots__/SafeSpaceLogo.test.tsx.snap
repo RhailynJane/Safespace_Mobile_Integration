@@ -1,0 +1,34 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`SafeSpaceLogo Component should match snapshot 1`] = `
+<View
+  style={
+    [
+      {
+        "alignItems": "center",
+        "height": 300,
+        "justifyContent": "center",
+        "width": 300,
+      },
+      undefined,
+    ]
+  }
+>
+  <Image
+    accessibilityLabel="SafeSpace logo"
+    source={
+      {
+        "testUri": "../../../assets/images/safespace-logo.png",
+      }
+    }
+    style={
+      {
+        "height": "100%",
+        "resizeMode": "contain",
+        "tintColor": undefined,
+        "width": "100%",
+      }
+    }
+  />
+</View>
+`;

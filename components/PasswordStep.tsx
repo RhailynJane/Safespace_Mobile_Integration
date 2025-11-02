@@ -139,10 +139,12 @@ export default function PasswordStep({
               value={data.password}
               onChangeText={(text) => onUpdate({ password: text })}
               secureTextEntry={!showPassword}
+              testID="input-password"
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeIcon}
+              testID="toggle-password-visibility"
             >
               <Ionicons
                 name={showPassword ? "eye-off-outline" : "eye-outline"}
@@ -197,6 +199,7 @@ export default function PasswordStep({
               value={data.confirmPassword}
               onChangeText={(text) => onUpdate({ confirmPassword: text })}
               secureTextEntry={!showConfirmPassword}
+              testID="input-confirm-password"
             />
             <TouchableOpacity
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
