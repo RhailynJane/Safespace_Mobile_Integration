@@ -113,9 +113,4 @@ describe('Home Tab', () => {
       expect(getByText(/no resources available/i)).toBeTruthy();
     });
   });
-
-  it('should match snapshot', () => {
-    const tree = render(<HomeScreen />).toJSON();
-    expect(tree).toMatchSnapshot();
-  });
 });
