@@ -8,6 +8,11 @@ require('@testing-library/react-native');
 global.__ExpoImportMetaRegistry = new Map();
 global.structuredClone = global.structuredClone || ((val) => JSON.parse(JSON.stringify(val)));
 
+// Add Alert to global for testing
+global.Alert = {
+  alert: jest.fn(),
+};
+
 // NOTE: MSW (Mock Service Worker) is available but commented out due to compatibility issues
 // To use MSW, uncomment the lines below and ensure msw is configured properly
 // const { server } = require('./testing/mocks/server');

@@ -1,29 +1,45 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '../test-utils';
-import ChangePasswordScreen from '../../app/(app)/change-password';
 import { Alert } from 'react-native';
+import { render, screen, fireEvent, waitFor } from '../test-utils';
 
-// Mock Alert
+// Mock Alert - just spy, don't mock implementation
 jest.spyOn(Alert, 'alert');
 
-describe('ChangePasswordScreen', () => {
-  const mockUpdatePassword = jest.fn();
+// Mock Clerk with specific implementations
+const mockUpdatePassword = jest.fn();
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: jest.fn(() => ({
+    isSignedIn: true,
+    userId: 'test-user-id',
+    sessionId: 'test-session-id',
+    signOut: jest.fn()
+  })),
+  useUser: jest.fn(() => ({
+    user: {
+      id: 'test-user-id',
+      firstName: 'Test',
+      lastName: 'User',
+      emailAddresses: [{ emailAddress: 'test@example.com' }],
+      updatePassword: mockUpdatePassword,
+    },
+  })),
+  useSignIn: jest.fn(() => ({
+    isLoaded: true,
+    signIn: {
+      create: jest.fn(),
+      attemptFirstFactor: jest.fn(),
+    },
+    setActive: jest.fn(),
+  })),
+}));
 
+// NOW import the component
+import ChangePasswordScreen from '../../app/(app)/change-password';
+
+describe('ChangePasswordScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUpdatePassword.mockReset();
-    // User is already mocked in jest.setup.cjs with id: 'test-user-id'
-    // We need to add updatePassword to the mocked user
-    const { useUser } = require('@clerk/clerk-expo');
-    useUser.mockReturnValue({
-      user: {
-        id: 'test-user-id',
-        firstName: 'Test',
-        lastName: 'User',
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
-        updatePassword: mockUpdatePassword,
-      },
-    });
   });
 
   it('renders change password screen correctly', () => {
@@ -70,7 +86,9 @@ describe('ChangePasswordScreen', () => {
   it('shows error when fields are empty', async () => {
     render(<ChangePasswordScreen />);
     
-    const submitButton = screen.getByText('Change Password');
+    // Get button by finding all "Change Password" texts and selecting the button one (not the header)
+    const submitButtons = screen.getAllByText('Change Password');
+    const submitButton = submitButtons[submitButtons.length - 1]; // Button is likely the last one
     fireEvent.press(submitButton);
     
     await waitFor(() => {
@@ -89,7 +107,8 @@ describe('ChangePasswordScreen', () => {
     fireEvent.changeText(newPasswordInput, 'NewPassword123');
     fireEvent.changeText(confirmPasswordInput, 'DifferentPassword123');
     
-    const submitButton = screen.getByText('Change Password');
+    const submitButtons = screen.getAllByText('Change Password');
+    const submitButton = submitButtons[submitButtons.length - 1];
     fireEvent.press(submitButton);
     
     await waitFor(() => {
@@ -108,7 +127,8 @@ describe('ChangePasswordScreen', () => {
     fireEvent.changeText(newPasswordInput, 'Short1');
     fireEvent.changeText(confirmPasswordInput, 'Short1');
     
-    const submitButton = screen.getByText('Change Password');
+    const submitButtons = screen.getAllByText('Change Password');
+    const submitButton = submitButtons[submitButtons.length - 1];
     fireEvent.press(submitButton);
     
     await waitFor(() => {
@@ -129,7 +149,8 @@ describe('ChangePasswordScreen', () => {
     fireEvent.changeText(newPasswordInput, 'NewPassword123');
     fireEvent.changeText(confirmPasswordInput, 'NewPassword123');
     
-    const submitButton = screen.getByText('Change Password');
+    const submitButtons = screen.getAllByText('Change Password');
+    const submitButton = submitButtons[submitButtons.length - 1];
     fireEvent.press(submitButton);
     
     await waitFor(() => {
@@ -161,7 +182,8 @@ describe('ChangePasswordScreen', () => {
     fireEvent.changeText(newPasswordInput, 'NewPassword123');
     fireEvent.changeText(confirmPasswordInput, 'NewPassword123');
     
-    const submitButton = screen.getByText('Change Password');
+    const submitButtons = screen.getAllByText('Change Password');
+    const submitButton = submitButtons[submitButtons.length - 1];
     fireEvent.press(submitButton);
     
     await waitFor(() => {
@@ -184,13 +206,15 @@ describe('ChangePasswordScreen', () => {
     fireEvent.changeText(newPasswordInput, 'NewPassword123');
     fireEvent.changeText(confirmPasswordInput, 'NewPassword123');
     
-    const submitButton = screen.getByText('Change Password');
+    const submitButtons = screen.getAllByText('Change Password');
+    const submitButton = submitButtons[submitButtons.length - 1];
     fireEvent.press(submitButton);
     
     // Button should show ActivityIndicator during loading
     await waitFor(() => {
-      const loadingButton = screen.queryByText('Change Password');
-      expect(loadingButton).toBeFalsy(); // Text should be replaced by ActivityIndicator
+      const loadingButtons = screen.queryAllByText('Change Password');
+      // Header still shows "Change Password", but button text should be gone
+      expect(loadingButtons.length).toBe(1); // Only the header should remain
     });
   });
 
@@ -209,11 +233,12 @@ describe('ChangePasswordScreen', () => {
     fireEvent.changeText(newPasswordInput, 'NewPassword123');
     fireEvent.changeText(confirmPasswordInput, 'NewPassword123');
     
-    const submitButton = screen.getByText('Change Password').parent;
+    const submitButtons = screen.getAllByText('Change Password');
+    const submitButton = submitButtons[submitButtons.length - 1].parent;
     fireEvent.press(submitButton!);
     
     // Button should be disabled
-    expect(submitButton?.props.disabled).toBe(true);
+    expect(submitButton?.props.accessibilityState?.disabled).toBe(true);
   });
 
   it('matches snapshot', () => {

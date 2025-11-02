@@ -235,7 +235,6 @@ export default function PreSurveyScreen() {
                 ],
               ]}
               onPress={handleSubmit}
-              disabled={!isComplete()}
             >
               <Text style={styles.submitButtonText}>
                 {isComplete()
