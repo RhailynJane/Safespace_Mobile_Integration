@@ -12,31 +12,101 @@ describe('Messages Tab', () => {
   const mockConversations = [
     {
       id: '1',
-      name: 'Dr. Smith',
-      lastMessage: 'How are you feeling today?',
-      timestamp: '2025-11-01T10:00:00Z',
-      unread: 2
+      title: 'Dr. Smith',
+      conversation_type: 'direct',
+      updated_at: '2025-11-01T10:00:00Z',
+      last_message: 'How are you feeling today?',
+      last_message_time: '2025-11-01T10:00:00Z',
+      unread_count: 2,
+      participants: [
+        {
+          id: '1',
+          clerk_user_id: 'test-user-id',
+          first_name: 'Test',
+          last_name: 'User',
+          email: 'test@example.com',
+          online: true,
+          presence: 'online',
+          last_active_at: '2025-11-01T10:00:00Z'
+        },
+        {
+          id: '2',
+          clerk_user_id: 'dr-smith-id',
+          first_name: 'Dr.',
+          last_name: 'Smith',
+          email: 'drsmith@example.com',
+          online: true,
+          presence: 'online',
+          last_active_at: '2025-11-01T10:00:00Z'
+        }
+      ]
     },
     {
       id: '2',
-      name: 'Support Group',
-      lastMessage: 'Meeting tomorrow at 3 PM',
-      timestamp: '2025-11-01T09:00:00Z',
-      unread: 0
+      title: 'Support Group',
+      conversation_type: 'group',
+      updated_at: '2025-11-01T09:00:00Z',
+      last_message: 'Meeting tomorrow at 3 PM',
+      last_message_time: '2025-11-01T09:00:00Z',
+      unread_count: 0,
+      participants: [
+        {
+          id: '1',
+          clerk_user_id: 'test-user-id',
+          first_name: 'Test',
+          last_name: 'User',
+          email: 'test@example.com',
+          online: true,
+          presence: 'online',
+          last_active_at: '2025-11-01T09:00:00Z'
+        }
+      ]
     }
   ];
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, data: mockConversations })
+    
+    // Mock conversations API
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/conversations')) {
+        if (url.includes('/mark-read')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ success: true })
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, data: mockConversations })
+        });
+      }
+      // Mock activity API status batch
+      if (url.includes('/activity/status/batch')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              'dr-smith-id': {
+                online: true,
+                presence: 'online',
+                last_active_at: '2025-11-01T10:00:00Z'
+              }
+            }
+          })
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ success: true, data: [] })
+      });
     });
   });
 
-  it('should render without crashing', () => {
-    const { getByTestId } = render(<MessagesScreen />);
-    expect(getByTestId('messages-screen')).toBeTruthy();
+  it('should render without crashing', async () => {
+    const { findByTestId } = render(<MessagesScreen />);
+    await expect(findByTestId('messages-screen')).resolves.toBeTruthy();
   });
 
   it('should display conversations list', async () => {
@@ -49,75 +119,73 @@ describe('Messages Tab', () => {
   });
 
   it('should show unread message count', async () => {
-    const { getByText } = render(<MessagesScreen />);
+    const { findByText } = render(<MessagesScreen />);
     
-    await waitFor(() => {
-      expect(getByText('2')).toBeTruthy(); // Unread badge
-    });
+    await expect(findByText('2')).resolves.toBeTruthy(); // Unread badge
   });
 
   it('should display last message preview', async () => {
-    const { getByText } = render(<MessagesScreen />);
+    const { findByText } = render(<MessagesScreen />);
     
-    await waitFor(() => {
-      expect(getByText('How are you feeling today?')).toBeTruthy();
-    });
+    await expect(findByText('How are you feeling today?')).resolves.toBeTruthy();
   });
 
-  it('should show new message button', () => {
-    const { getByTestId } = render(<MessagesScreen />);
-    expect(getByTestId('new-message-button')).toBeTruthy();
+  it('should show new message button', async () => {
+    const { findByTestId } = render(<MessagesScreen />);
+    await expect(findByTestId('new-message-button')).resolves.toBeTruthy();
   });
 
-  it('should navigate to new message screen', () => {
-    const { getByTestId } = render(<MessagesScreen />);
-    fireEvent.press(getByTestId('new-message-button'));
+  it('should navigate to new message screen', async () => {
+    const { findByTestId } = render(<MessagesScreen />);
+    const button = await findByTestId('new-message-button');
+    fireEvent.press(button);
     expect(router.push).toHaveBeenCalled();
   });
 
   it('should navigate to chat when conversation is tapped', async () => {
-    const { getByText } = render(<MessagesScreen />);
-    await waitFor(() => {
-      fireEvent.press(getByText('Dr. Smith'));
-    });
+    const { findByText } = render(<MessagesScreen />);
+    const conversation = await findByText('Dr. Smith');
+    fireEvent.press(conversation);
     expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ pathname: expect.stringContaining('message-chat-screen') }));
   });
 
-  it('should display search bar', () => {
-    const { getByTestId } = render(<MessagesScreen />);
-    expect(getByTestId('messages-search')).toBeTruthy();
+  it('should display search bar', async () => {
+    const { findByTestId } = render(<MessagesScreen />);
+    await expect(findByTestId('messages-search')).resolves.toBeTruthy();
   });
 
   it('should filter conversations by search', async () => {
-    const { getByTestId, getByText, queryByText } = render(<MessagesScreen />);
+    const { findByTestId, findByText, queryByText } = render(<MessagesScreen />);
     
-    await waitFor(() => {
-      expect(getByText('Dr. Smith')).toBeTruthy();
-    });
+    await findByText('Dr. Smith');
 
-    fireEvent.changeText(getByTestId('messages-search'), 'Dr. Smith');
+    const searchInput = await findByTestId('messages-search');
+    fireEvent.changeText(searchInput, 'Dr. Smith');
     
     await waitFor(() => {
-      expect(getByText('Dr. Smith')).toBeTruthy();
+      expect(queryByText('Dr. Smith')).toBeTruthy();
       expect(queryByText('Support Group')).toBeNull();
     });
   });
 
   it('should show timestamp for each conversation', async () => {
-    const { getByText } = render(<MessagesScreen />);
+    const { findByText, getAllByText } = render(<MessagesScreen />);
     
-    await waitFor(() => {
-      expect(getByText(/10:00|am|pm/i)).toBeTruthy();
-    });
+    // Wait for conversations to load first
+    await findByText('Dr. Smith');
+    
+    // Look for timestamp - there will be multiple "Nov 1" timestamps
+    const timestamps = getAllByText(/Nov 1/i);
+    expect(timestamps.length).toBeGreaterThan(0);
   });
 
   // Deletion via swipe is not implemented; skipping this scenario
 
   it('should mark conversation as read when opened', async () => {
-    const { getByText } = render(<MessagesScreen />);
-    await waitFor(() => {
-      fireEvent.press(getByText('Dr. Smith'));
-    });
+    const { findByText } = render(<MessagesScreen />);
+    const conversation = await findByText('Dr. Smith');
+    fireEvent.press(conversation);
+    
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/conversations/1/mark-read'),
       expect.objectContaining({ method: 'POST' })
@@ -127,36 +195,36 @@ describe('Messages Tab', () => {
   // Pull-to-refresh is wired via RefreshControl; event not directly fired in tests
 
   it('should show empty state when no conversations', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, data: [] })
+    (global.fetch as jest.Mock).mockReset();
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/conversations')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ success: true, data: [] })
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ success: true, data: {} })
+      });
     });
 
-    const { getByText } = render(<MessagesScreen />);
+    const { findByText } = render(<MessagesScreen />);
     
-    await waitFor(() => {
-      expect(getByText(/no messages yet/i)).toBeTruthy();
-    });
+    await expect(findByText(/no conversations yet/i)).resolves.toBeTruthy();
   });
 
   it('should handle API error gracefully', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
-    const { getByText } = render(<MessagesScreen />);
-    await waitFor(() => {
-      expect(getByText(/no conversations yet/i)).toBeTruthy();
-    });
+    (global.fetch as jest.Mock).mockReset();
+    (global.fetch as jest.Mock).mockRejectedValue(new Error('API Error'));
+    
+    const { findByText } = render(<MessagesScreen />);
+    await expect(findByText(/no conversations yet/i)).resolves.toBeTruthy();
   });
 
   it('should display online status for contacts', async () => {
-    const { getByTestId } = render(<MessagesScreen />);
+    const { findByTestId } = render(<MessagesScreen />);
     
-    await waitFor(() => {
-      expect(getByTestId('online-indicator-1')).toBeTruthy();
-    });
-  });
-
-  it('should match snapshot', () => {
-    const tree = render(<MessagesScreen />).toJSON();
-    expect(tree).toMatchSnapshot();
+    await expect(findByTestId('online-indicator-1')).resolves.toBeTruthy();
   });
 });

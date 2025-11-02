@@ -383,7 +383,7 @@ export default function MessagesScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView testID="messages-screen" style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
 
@@ -449,6 +449,7 @@ export default function MessagesScreen() {
         {/* New Message Button */}
         <View>
           <TouchableOpacity
+            testID="new-message-button"
             style={styles.newMessageButton}
             onPress={() => {
               if (!userId) {
@@ -476,6 +477,7 @@ export default function MessagesScreen() {
             style={styles.searchIcon}
           />
           <TextInput
+            testID="messages-search"
             style={[styles.searchInput, { color: theme.colors.text }]}
             placeholder="Search conversations..."
             value={searchQuery}
@@ -641,6 +643,7 @@ export default function MessagesScreen() {
 
                       return (
                         <View
+                          testID={`online-indicator-${conversation.id}`}
                           style={[
                             styles.onlineIndicator,
                             {
