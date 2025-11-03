@@ -7,8 +7,10 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "plugins": [
+      "@twilio/voice-react-native-sdk",
+      "expo-dev-client",
       [
         "expo-router"
       ],
@@ -35,7 +37,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.safespacedev.SafeSpace",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "SafeSpace needs access to your microphone for voice calls.",  //Added for Twilio
+        "UIBackgroundModes": ["audio", "voip"]  // Added for Twilio background calls
+      }
     },
     "android": {
       "package": "com.safespacedev.SafeSpace",
@@ -43,7 +51,15 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"  // Added for Twilio
+
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
