@@ -29,7 +29,6 @@
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/native": "^7.1.6",
     "@supabase/supabase-js": "^2.54.0",
-    "@twilio/voice-react-native-sdk": "^1.7.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
