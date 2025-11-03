@@ -9,7 +9,6 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "plugins": [
-      "@twilio/voice-react-native-sdk",
       "expo-dev-client",
       [
         "expo-router"
