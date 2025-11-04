@@ -3004,6 +3004,59 @@ app.post(
   }
 );
 
+// Delete a single message (sender only)
+app.delete(
+  "/api/messages/conversations/:conversationId/messages/:messageId",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId, messageId } = req.params;
+      const clerkUserId = (req.query.clerkUserId as string) || '';
+
+      if (!clerkUserId) {
+        return res.status(400).json({ success: false, message: 'clerkUserId is required' });
+      }
+
+      // Verify user exists and is sender of the message
+      const user = await prisma.user.findUnique({ where: { clerk_user_id: clerkUserId } });
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const message = await prisma.message.findUnique({ where: { id: Number.parseInt(messageId) } });
+      if (!message || message.conversation_id !== Number.parseInt(conversationId)) {
+        return res.status(404).json({ success: false, message: 'Message not found' });
+      }
+
+      if (message.sender_id !== user.id) {
+        return res.status(403).json({ success: false, message: 'Only the sender can delete this message' });
+      }
+
+      // If attachment exists and is stored locally, attempt to delete the file
+      try {
+        if (message.attachment_url && message.attachment_url.includes('/uploads/')) {
+          const url = new URL(message.attachment_url);
+          const fileName = url.pathname.split('/').pop();
+          if (fileName) {
+            const filePath = path.join(__dirname, '../uploads', fileName);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+      } catch (e) {
+        // Non-fatal if file cleanup fails
+        console.warn('⚠️ Attachment cleanup failed:', e);
+      }
+
+      await prisma.message.delete({ where: { id: Number.parseInt(messageId) } });
+      return res.json({ success: true, message: 'Message deleted' });
+    } catch (error: any) {
+      console.error('💬 Delete message error:', error.message);
+      return res.status(500).json({ success: false, message: 'Failed to delete message', error: error.message });
+    }
+  }
+);
+
 // Create new conversation
 app.post("/api/messages/conversations", async (req: Request, res: Response) => {
   try {
@@ -3180,6 +3233,48 @@ app.get(
     }
   }
 );
+
+// Delete/leave a conversation for current user
+app.delete("/api/messages/conversations/:conversationId", async (req: Request, res: Response) => {
+  try {
+    const { conversationId } = req.params;
+    const clerkUserId = (req.query.clerkUserId as string) || '';
+
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: 'clerkUserId is required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { clerk_user_id: clerkUserId } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const participant = await prisma.conversationParticipant.findFirst({
+      where: { conversation_id: Number.parseInt(conversationId), user_id: user.id }
+    });
+
+    if (!participant) {
+      return res.status(403).json({ success: false, message: 'Not a participant of this conversation' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Remove the participant (delete for this user)
+      await tx.conversationParticipant.delete({ where: { id: participant.id } });
+
+      // If no participants remain, delete conversation and its messages
+      const remaining = await tx.conversationParticipant.count({ where: { conversation_id: Number.parseInt(conversationId) } });
+      if (remaining === 0) {
+        await tx.message.deleteMany({ where: { conversation_id: Number.parseInt(conversationId) } });
+        await tx.conversation.delete({ where: { id: Number.parseInt(conversationId) } });
+      }
+    });
+
+    return res.json({ success: true, message: 'Conversation removed' });
+  } catch (error: any) {
+    console.error('💬 Delete conversation error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to delete conversation', error: error.message });
+  }
+});
 
 // Search users by name or email
 app.get(

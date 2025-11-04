@@ -55,6 +55,9 @@ export default function MessagesScreen() {
     title: '',
     message: '',
   });
+  // Track conversations marked read in this session to avoid poll flicker
+  // Key: conversationId, Value: timestamp when marked read
+  const recentlyReadRef = useRef<Record<string, number>>({});
   // Removed session-based unread suppression; rely on backend read receipts instead
   const API_BASE_URL = getApiBaseUrl();
 
@@ -213,8 +216,18 @@ export default function MessagesScreen() {
           console.log("Presence batch update failed:", e);
         }
 
-        setConversations(convs);
-        setFilteredConversations(convs); // Initialize filtered conversations
+        // Apply session read suppression (2 minutes) to avoid unread flicker right after opening
+        const now = Date.now();
+        const suppressed = convs.map((c) => {
+          const t = recentlyReadRef.current[c.id];
+          if (t && now - t < 2 * 60 * 1000) {
+            return { ...c, unread_count: 0 };
+          }
+          return c;
+        });
+
+        setConversations(suppressed);
+        setFilteredConversations(suppressed); // Initialize filtered conversations
       } else {
         console.log("💬 Failed to load conversations from backend");
         setConversations([]);
@@ -242,12 +255,21 @@ export default function MessagesScreen() {
       try {
         console.log('📬 Polling for new messages...');
         const response = await fetch(
-          `${API_BASE_URL}/api/messages/conversations/${userId}`
+          `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
         );
         
         if (response.ok) {
           const result = await response.json();
           let freshConvs: Conversation[] = result.data;
+          // Honor session-level suppression window to prevent unread reappearing immediately after open
+          const now = Date.now();
+          freshConvs = freshConvs.map((c) => {
+            const t = recentlyReadRef.current[c.id];
+            if (t && now - t < 2 * 60 * 1000) {
+              return { ...c, unread_count: 0 };
+            }
+            return c;
+          });
           
           console.log(`📬 Polled ${freshConvs.length} conversations, unread counts:`, 
             freshConvs.map(c => ({ id: c.id, unread: c.unread_count }))
@@ -580,6 +602,8 @@ export default function MessagesScreen() {
                         });
                       } catch (_e) { /* ignore transient errors */ }
                     })();
+                    // Record as recently read to suppress unread flicker for a short window
+                    recentlyReadRef.current[conversation.id] = Date.now();
                     setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
                     setFilteredConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
 
@@ -602,6 +626,34 @@ export default function MessagesScreen() {
                         initialPresence: initialPresence,
                       },
                     });
+                  }}
+                  onLongPress={() => {
+                    if (!userId) return;
+                    Alert.alert(
+                      'Delete conversation',
+                      'This will remove the conversation from your inbox. Continue?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                              if (res.ok) {
+                                setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+                                setFilteredConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+                                showStatusModal('success', 'Deleted', 'Conversation removed');
+                              } else {
+                                showStatusModal('error', 'Delete failed', 'Unable to delete this conversation');
+                              }
+                            } catch (_e) {
+                              showStatusModal('error', 'Network error', 'Please try again.');
+                            }
+                          }
+                        }
+                      ]
+                    );
                   }}
                 >
                   <View style={styles.avatarContainer}>

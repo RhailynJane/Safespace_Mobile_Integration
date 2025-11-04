@@ -101,6 +101,8 @@ export default function ChatScreen() {
   const API_BASE_URL = getApiBaseUrl();
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
+  const lastMessageIdRef = useRef<string | null>(null);
+  const lastMarkedAtRef = useRef<number>(0);
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -261,7 +263,7 @@ export default function ChatScreen() {
 
       // Load messages (this is the critical path) - limit to 30 to reduce memory usage
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=30`
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=30&t=${Date.now()}`
       );
 
       if (response.ok) {
@@ -269,6 +271,38 @@ export default function ChatScreen() {
         const loadTime = Date.now() - startTime;
         console.log(`[${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
         setMessages(result.data);
+
+        // Detect new last message and mark as read when appropriate
+        const latest = result.data[result.data.length - 1];
+        const latestId = latest ? String(latest.id) : null;
+        const prevId = lastMessageIdRef.current;
+        const nowTs = Date.now();
+        const shouldMark =
+          latestId && latestId !== prevId &&
+          // Do not mark if the latest is mine
+          !(latest && latest.sender && latest.sender.clerk_user_id === userId) &&
+          // Throttle mark-as-read to avoid spamming
+          nowTs - lastMarkedAtRef.current > 2000;
+
+        if (shouldMark) {
+          lastMessageIdRef.current = latestId;
+          lastMarkedAtRef.current = nowTs;
+          // Fire-and-forget: mark as read both in SendBird (if enabled) and backend
+          (async () => {
+            try {
+              if (channelUrl && messagingService.isSendBirdEnabled()) {
+                await messagingService.markAsRead(channelUrl);
+              }
+            } catch (_e) { /* ignore SendBird mark-as-read errors */ }
+            try {
+              await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clerkUserId: userId })
+              });
+            } catch (_e) { /* ignore backend mark-read errors */ }
+          })();
+        }
 
         // Fire and forget: mark as read in background (don't block UI)
         Promise.all([
@@ -337,19 +371,20 @@ export default function ChatScreen() {
     updateUserActivity,
   ]);
 
-  // Load messages with 60-second polling
+  // Load messages with fast polling while in the chat screen
   useEffect(() => {
     if (!isFocused || !conversationId || !userId) return;
 
     loadMessages(); // Load immediately
 
-    // Use a longer interval for polling
+    // Poll faster when the user is near the bottom (actively viewing latest)
+    const intervalMs = userNearBottom ? 4000 : 8000; // 4s vs 8s
     const pollInterval = setInterval(() => {
       loadMessages();
-    }, 60000); // 60 seconds
+    }, intervalMs);
 
     return () => clearInterval(pollInterval);
-  }, [isFocused, conversationId, userId, loadMessages]);
+  }, [isFocused, conversationId, userId, loadMessages, userNearBottom]);
 
   // One-time status refresh after mount (no polling)
   useEffect(() => {
@@ -1416,11 +1451,42 @@ export default function ChatScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                onPress={() => router.push("../appointments/book")}
-              >
-                <Ionicons name="call-outline" size={24} color={theme.colors.primary} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <TouchableOpacity onPress={() => router.push("../appointments/book")}>
+                  <Ionicons name="call-outline" size={24} color={theme.colors.primary} />
+                </TouchableOpacity>
+                {/* Delete conversation */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!conversationId || !userId) return;
+                    Alert.alert(
+                      'Delete conversation',
+                      'This will remove the conversation from your inbox. Continue?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                              if (res.ok) {
+                                router.back();
+                              } else {
+                                showStatusModal('error', 'Delete failed', 'Unable to delete this conversation.');
+                              }
+                            } catch (_e) {
+                              showStatusModal('error', 'Network error', 'Please check your connection and try again.');
+                            }
+                          }
+                        }
+                      ]
+                    );
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={22} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -1470,7 +1536,37 @@ export default function ChatScreen() {
                     </View>
                   )}
 
-                  <View style={[styles.messageBubble, bubbleStyle]}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onLongPress={() => {
+                      // Allow deleting only own messages
+                      if (!myMessage) return;
+                      Alert.alert(
+                        'Delete message',
+                        'Are you sure you want to delete this message?',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${encodeURIComponent(String(conversationId))}/messages/${encodeURIComponent(String(item.id))}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                                if (res.ok) {
+                                  setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
+                                } else {
+                                  showStatusModal('error', 'Delete failed', 'Could not delete this message.');
+                                }
+                              } catch (_e) {
+                                showStatusModal('error', 'Network error', 'Please try again.');
+                              }
+                            }
+                          }
+                        ]
+                      );
+                    }}
+                  >
+                    <View style={[styles.messageBubble, bubbleStyle]}>
                     {renderMessageContent(item)}
                     <Text
                       style={[
@@ -1480,7 +1576,8 @@ export default function ChatScreen() {
                     >
                       {formatTime(item.created_at)}
                     </Text>
-                  </View>
+                    </View>
+                  </TouchableOpacity>
 
                   {myMessage && (
                     <View style={styles.avatarContainer}>
@@ -1554,8 +1651,8 @@ export default function ChatScreen() {
             styles.bottomInputSection, 
             { 
               backgroundColor: 'transparent',
-              // When keyboard hidden, keep input 10px above safe-area bottom; when shown, keep it tight
-              paddingBottom: keyboardVisible ? Math.max(insets.bottom, 4) : insets.bottom + 10,
+              // Keep a tight bottom spacing on both platforms to avoid a floating bar
+              paddingBottom: 6,
             }
           ]}>
             {/* Show expand button when icons are hidden */}
