@@ -145,6 +145,7 @@ export default function ChatScreen() {
     type: 'info' as 'success' | 'error' | 'info',
     title: '',
     message: '',
+    confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
   });
 
   // Get safe area insets for proper spacing
@@ -156,7 +157,22 @@ export default function ChatScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalData({ type, title, message });
+    setStatusModalData({ type, title, message, confirm: undefined });
+    setStatusModalVisible(true);
+  };
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    opts?: { confirmText?: string; cancelText?: string }
+  ) => {
+    setStatusModalData({
+      type: 'info',
+      title,
+      message,
+      confirm: { onConfirm, confirmText: opts?.confirmText, cancelText: opts?.cancelText },
+    });
     setStatusModalVisible(true);
   };
 
@@ -1044,6 +1060,15 @@ export default function ChatScreen() {
 
   // Enhanced renderMessageContent function
   const renderMessageContent = (message: ExtendedMessage) => {
+    // Normalize message text to avoid odd line breaks (Android sometimes inserts newlines)
+    const sanitizeText = (txt?: string) => {
+      if (!txt) return '';
+      // Remove zero-width spaces and collapse newlines into single spaces
+      return txt
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\r?\n+/g, ' ')
+        .trim();
+    };
     // Helper: detect audio files by extension/name
     const isAudioFile = (name?: string, url?: string) => {
       const target = (name || url || '').toLowerCase();
@@ -1206,7 +1231,7 @@ export default function ChatScreen() {
           isMyMessage(message) ? styles.myMessageText : styles.theirMessageText,
         ]}
       >
-        {message.message_text}
+        {sanitizeText(message.message_text)}
       </Text>
     );
   };
@@ -1338,7 +1363,7 @@ export default function ChatScreen() {
           style={styles.container}
           keyboardVerticalOffset={keyboardOffset}
         >
-          {/* Status Modal */}
+          {/* Status Modal (also used for confirmations) */}
           <Modal
             visible={statusModalVisible}
             transparent
@@ -1380,19 +1405,39 @@ export default function ChatScreen() {
                   {statusModalData.message}
                 </Text>
 
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton, 
-                    { 
-                      backgroundColor: 
-                        statusModalData.type === 'success' ? '#4CAF50' :
-                        statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
-                    }
-                  ]}
-                  onPress={() => setStatusModalVisible(false)}
-                >
-                  <Text style={styles.modalButtonText}>OK</Text>
-                </TouchableOpacity>
+                {statusModalData.confirm ? (
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: '#6B7280' }]}
+                      onPress={() => setStatusModalVisible(false)}
+                    >
+                      <Text style={styles.modalButtonText}>{statusModalData.confirm.cancelText || 'Cancel'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: '#FF3B30' }]}
+                      onPress={() => {
+                        setStatusModalVisible(false);
+                        setTimeout(() => { try { statusModalData.confirm?.onConfirm(); } catch { /* noop */ } }, 120);
+                      }}
+                    >
+                      <Text style={styles.modalButtonText}>{statusModalData.confirm.confirmText || 'Delete'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.modalButton, 
+                      { 
+                        backgroundColor: 
+                          statusModalData.type === 'success' ? '#4CAF50' :
+                          statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                      }
+                    ]}
+                    onPress={() => setStatusModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>OK</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </Modal>
@@ -1459,28 +1504,22 @@ export default function ChatScreen() {
                 <TouchableOpacity
                   onPress={() => {
                     if (!conversationId || !userId) return;
-                    Alert.alert(
+                    showConfirm(
                       'Delete conversation',
                       'This will remove the conversation from your inbox. Continue?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Delete',
-                          style: 'destructive',
-                          onPress: async () => {
-                            try {
-                              const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                              if (res.ok) {
-                                router.back();
-                              } else {
-                                showStatusModal('error', 'Delete failed', 'Unable to delete this conversation.');
-                              }
-                            } catch (_e) {
-                              showStatusModal('error', 'Network error', 'Please check your connection and try again.');
-                            }
+                      async () => {
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            router.back();
+                          } else {
+                            showStatusModal('error', 'Delete failed', 'Unable to delete this conversation.');
                           }
+                        } catch (_e) {
+                          showStatusModal('error', 'Network error', 'Please check your connection and try again.');
                         }
-                      ]
+                      },
+                      { confirmText: 'Delete', cancelText: 'Cancel' }
                     );
                   }}
                 >
@@ -1541,28 +1580,22 @@ export default function ChatScreen() {
                     onLongPress={() => {
                       // Allow deleting only own messages
                       if (!myMessage) return;
-                      Alert.alert(
+                      showConfirm(
                         'Delete message',
                         'Are you sure you want to delete this message?',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          {
-                            text: 'Delete',
-                            style: 'destructive',
-                            onPress: async () => {
-                              try {
-                                const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${encodeURIComponent(String(conversationId))}/messages/${encodeURIComponent(String(item.id))}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                                if (res.ok) {
-                                  setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
-                                } else {
-                                  showStatusModal('error', 'Delete failed', 'Could not delete this message.');
-                                }
-                              } catch (_e) {
-                                showStatusModal('error', 'Network error', 'Please try again.');
-                              }
+                        async () => {
+                          try {
+                            const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${encodeURIComponent(String(conversationId))}/messages/${encodeURIComponent(String(item.id))}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                            if (res.ok) {
+                              setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
+                            } else {
+                              showStatusModal('error', 'Delete failed', 'Could not delete this message.');
                             }
+                          } catch (_e) {
+                            showStatusModal('error', 'Network error', 'Please try again.');
                           }
-                        ]
+                        },
+                        { confirmText: 'Delete', cancelText: 'Cancel' }
                       );
                     }}
                   >
@@ -2402,7 +2435,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
   },
   messageBubble: {
-    maxWidth: "70%",
+    maxWidth: "100%",
+    minWidth: 80,
+    flexShrink: 1,
     padding: 12,
     borderRadius: 18,
     marginBottom: 4,
@@ -2422,6 +2457,12 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   messageText: {
     fontSize: scaledFontSize(16),
+    textAlign: 'left',
+    writingDirection: 'ltr',
+    flexShrink: 1,
+    includeFontPadding: false,
+    // @ts-ignore Android-only prop to improve word wrapping
+    textBreakStrategy: 'highQuality',
     marginBottom: 4,
   },
   myMessageText: {

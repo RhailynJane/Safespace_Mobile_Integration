@@ -54,6 +54,7 @@ export default function MessagesScreen() {
     type: 'info' as 'success' | 'error' | 'info',
     title: '',
     message: '',
+    confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
   });
   // Track conversations marked read in this session to avoid poll flicker
   // Key: conversationId, Value: timestamp when marked read
@@ -73,7 +74,22 @@ export default function MessagesScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalData({ type, title, message });
+    setStatusModalData({ type, title, message, confirm: undefined });
+    setStatusModalVisible(true);
+  };
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    opts?: { confirmText?: string; cancelText?: string }
+  ) => {
+    setStatusModalData({
+      type: 'info',
+      title,
+      message,
+      confirm: { onConfirm, confirmText: opts?.confirmText, cancelText: opts?.cancelText },
+    });
     setStatusModalVisible(true);
   };
 
@@ -409,7 +425,7 @@ export default function MessagesScreen() {
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
 
-        {/* Status Modal */}
+        {/* Status Modal (also supports confirmations) */}
         <Modal
           visible={statusModalVisible}
           transparent
@@ -451,19 +467,39 @@ export default function MessagesScreen() {
                 {statusModalData.message}
               </Text>
 
-              <TouchableOpacity
-                style={[
-                  styles.modalButton, 
-                  { 
-                    backgroundColor: 
-                      statusModalData.type === 'success' ? '#4CAF50' :
-                      statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
-                  }
-                ]}
-                onPress={() => setStatusModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>OK</Text>
-              </TouchableOpacity>
+              {statusModalData.confirm ? (
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#6B7280' }]}
+                    onPress={() => setStatusModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>{statusModalData.confirm.cancelText || 'Cancel'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#FF3B30' }]}
+                    onPress={() => {
+                      setStatusModalVisible(false);
+                      setTimeout(() => { try { statusModalData.confirm?.onConfirm(); } catch { /* noop */ } }, 120);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>{statusModalData.confirm.confirmText || 'Delete'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton, 
+                    { 
+                      backgroundColor: 
+                        statusModalData.type === 'success' ? '#4CAF50' :
+                        statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                    }
+                  ]}
+                  onPress={() => setStatusModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </Modal>
@@ -629,30 +665,24 @@ export default function MessagesScreen() {
                   }}
                   onLongPress={() => {
                     if (!userId) return;
-                    Alert.alert(
+                    showConfirm(
                       'Delete conversation',
                       'This will remove the conversation from your inbox. Continue?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Delete',
-                          style: 'destructive',
-                          onPress: async () => {
-                            try {
-                              const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                              if (res.ok) {
-                                setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
-                                setFilteredConversations((prev) => prev.filter((c) => c.id !== conversation.id));
-                                showStatusModal('success', 'Deleted', 'Conversation removed');
-                              } else {
-                                showStatusModal('error', 'Delete failed', 'Unable to delete this conversation');
-                              }
-                            } catch (_e) {
-                              showStatusModal('error', 'Network error', 'Please try again.');
-                            }
+                      async () => {
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+                            setFilteredConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+                            showStatusModal('success', 'Deleted', 'Conversation removed');
+                          } else {
+                            showStatusModal('error', 'Delete failed', 'Unable to delete this conversation');
                           }
+                        } catch (_e) {
+                          showStatusModal('error', 'Network error', 'Please try again.');
                         }
-                      ]
+                      },
+                      { confirmText: 'Delete', cancelText: 'Cancel' }
                     );
                   }}
                 >
