@@ -17,13 +17,11 @@ class SendBirdCallService {
   async initialize() {
     try {
       if (!this.appId) {
-        console.warn('⚠️ SendBird App ID not found - skipping initialization');
-        return;
+        throw new Error('SendBird App ID not found in app.json. Please add it to extra.sendbirdAppId');
       }
       
-      // Correct method for v1.1.11
       SendbirdCalls.init(this.appId);
-      console.log('✅ SendBird initialized');
+      console.log('✅ SendBird initialized with App ID:', this.appId);
     } catch (error) {
       console.error('❌ SendBird init failed:', error);
       throw error;
@@ -32,7 +30,6 @@ class SendBirdCallService {
 
   async authenticate(userId: string, accessToken?: string) {
     try {
-      // Correct authentication for v1.1.11
       const authOption: any = { userId };
       if (accessToken) {
         authOption.accessToken = accessToken;
@@ -58,10 +55,9 @@ class SendBirdCallService {
         },
       };
 
-      // Correct dial method for v1.1.11
       const call = await SendbirdCalls.dial(dialParams);
       this.currentCall = call;
-      console.log('✅ Call created');
+      console.log('✅ Call created to:', calleeId);
       return this.currentCall;
     } catch (error) {
       console.error('❌ Call failed:', error);

@@ -24,7 +24,8 @@
     "express": "^5.1.0",
     "multer": "^2.0.2",
     "pg": "^8.16.3",
-    "prisma": "^6.18.0"
+    "prisma": "^6.18.0",
+    "twilio": "^5.10.4"
   },
   "devDependencies": {
     "@types/axios": "^0.14.4",
