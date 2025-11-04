@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import SendBirdCallService from "../../../lib/sendbird-service";
 
 const { width, height } = Dimensions.get("window");
 
+
+
 // Mock chat messages
 const initialMessages = [
   { id: 1, text: "Hello! How are you feeling today?", sender: "Support Worker", time: "10:25 AM" },
@@ -31,6 +33,7 @@ const initialMessages = [
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
 export default function VideoCallScreen() {
+  const [isDemoMode] = useState(true); 
   const { user } = useUser();
   const params = useLocalSearchParams();
   const supportWorkerId = params.supportWorkerId as string;
@@ -65,23 +68,30 @@ export default function VideoCallScreen() {
 
   // Initialize SendBird and start call
   const initializeCall = async () => {
-    try {
-      // Initialize SendBird
-      await SendBirdCallService.initialize();
+    // Demo mode - simulate successful connection
+    if (isDemoMode) {
+      setCallStatus("Connecting...");
+      
+      // Simulate connection delay
+      setTimeout(() => {
+        setCallStatus("Connected (Demo)");
+        setIsCallConnected(true);
+        startCallTimer();
+      }, 2000); // 2 second delay to simulate real connection
+      
+      return;
+    }
 
-      // Authenticate with user's Clerk ID
+    // Real SendBird code (only runs if isDemoMode is false)
+    try {
+      await SendBirdCallService.initialize();
       const userId = user?.id || `user_${Date.now()}`;
       await SendBirdCallService.authenticate(userId);
-
-      // Create call to support worker
       const call = await SendBirdCallService.createCall(
         `support_worker_${supportWorkerId}`,
         true
       );
-
-      // Set up call event listeners
       setupCallListeners(call);
-
       setCallStatus("Ringing...");
     } catch (error) {
       console.error("Failed to initialize call:", error);
@@ -152,6 +162,16 @@ export default function VideoCallScreen() {
   };
 
   const endCall = async () => {
+    // Demo mode - just go back
+    if (isDemoMode) {
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+      router.back();
+      return;
+    }
+
+    // Real SendBird code
     try {
       await SendBirdCallService.endCall();
       if (callDurationInterval.current) {
@@ -167,13 +187,19 @@ export default function VideoCallScreen() {
   const handleToggleCamera = () => {
     const newState = !isCameraOn;
     setIsCameraOn(newState);
-    SendBirdCallService.toggleVideo(newState);
+    
+    if (!isDemoMode) {
+      SendBirdCallService.toggleVideo(newState);
+    }
   };
 
   const handleToggleMic = () => {
     const newState = !isMicOn;
     setIsMicOn(newState);
-    SendBirdCallService.toggleAudio(newState);
+    
+    if (!isDemoMode) {
+      SendBirdCallService.toggleAudio(newState);
+    }
   };
 
   const handleToggleChat = () => {
