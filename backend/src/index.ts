@@ -4513,6 +4513,73 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
 });
 
 // =============================================
+// SUPPORT WORKERS ENDPOINTS
+// =============================================
+
+// Get all support workers
+app.get("/api/support-workers", async (req: Request, res: Response) => {
+  try {
+    console.log("📋 Fetching all support workers");
+
+    const supportWorkers = await prisma.supportWorker.findMany({
+      where: {
+        status: "active",
+      },
+      orderBy: {
+        first_name: "asc",
+      },
+    });
+
+    console.log(`✅ Found ${supportWorkers.length} support workers`);
+
+    res.json({
+      success: true,
+      data: supportWorkers,
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching support workers:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch support workers",
+      details: error.message,
+    });
+  }
+});
+
+// Get single support worker by ID
+app.get("/api/support-workers/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    console.log(`📋 Fetching support worker ${id}`);
+
+    const supportWorker = await prisma.supportWorker.findUnique({
+      where: {
+        id: parseInt(id),
+      },
+    });
+
+    if (!supportWorker) {
+      return res.status(404).json({
+        success: false,
+        error: "Support worker not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: supportWorker,
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching support worker:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch support worker",
+      details: error.message,
+    });
+  }
+});
+
+// =============================================
 // TWILIO VIDEO ENDPOINTS
 // =============================================
 

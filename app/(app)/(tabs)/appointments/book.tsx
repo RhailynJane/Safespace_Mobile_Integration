@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -38,6 +38,19 @@ import StatusModal from "../../../../components/StatusModal";
  * - Select a support worker to proceed with booking
  * Features an elegant curved background and intuitive interface.
  */
+
+interface SupportWorker {
+  id: number;
+  name: string;
+  title: string;
+  avatar: string;
+  specialties: string[];
+  bio?: string;
+  yearsOfExperience?: number;
+  hourlyRate?: number;
+  languagesSpoken?: string[];
+}
+
 export default function BookAppointment() {
   const { theme, scaledFontSize } = useTheme();
   // State management
@@ -46,6 +59,8 @@ export default function BookAppointment() {
   const [activeTab, setActiveTab] = useState("appointments");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
+  // State for support workers
+  const [supportWorkers, setSupportWorkers] = useState<any[]>([]);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -78,23 +93,49 @@ export default function BookAppointment() {
     router.push(`/appointments/details?supportWorkerId=${supportWorkerId}`);
   };
 
-  // Mock data for support workers
-  const supportWorkers = [
-    {
-      id: 1,
-      name: "Eric Young",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-  ];
+  // Fetch support workers on mount
+useEffect(() => {
+  fetchSupportWorkers();
+}, []);
+
+/**
+ * Fetch support workers from the API
+ */
+const fetchSupportWorkers = async () => {
+  try {
+    setLoading(true);
+    
+    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${API_URL}/api/support-workers`);
+    const result = await response.json();
+
+    if (result.success) {
+      // Transform the data to match the component's expected format
+      const transformedData = result.data.map((worker: any) => ({
+        id: worker.id,
+        name: `${worker.first_name} ${worker.last_name}`,
+        title: "Support Worker",
+        avatar: worker.avatar_url || "https://via.placeholder.com/150",
+        specialties: worker.specialization 
+          ? worker.specialization.split(',').map((s: string) => s.trim())
+          : [],
+        bio: worker.bio,
+        yearsOfExperience: worker.years_of_experience,
+        hourlyRate: worker.hourly_rate,
+        languagesSpoken: worker.languages_spoken,
+      }));
+
+      setSupportWorkers(transformedData);
+    } else {
+      showStatusModal('error', 'Error', 'Failed to load support workers');
+    }
+  } catch (error) {
+    console.error('Error fetching support workers:', error);
+    showStatusModal('error', 'Error', 'Unable to fetch support workers. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Filter support workers based on search query
   const filteredSupportWorkers = supportWorkers.filter((sw) =>
@@ -375,11 +416,11 @@ export default function BookAppointment() {
 
               {/* Support Worker Specialties */}
               <View style={styles.specialtiesContainer}>
-                {supportWorker.specialties.map((specialty) => (
-                  <Text key={specialty} style={styles.specialtyText}>
-                    {specialty}
-                  </Text>
-                ))}
+              {supportWorker.specialties.map((specialty: string) => (
+                <Text key={specialty} style={styles.specialtyText}>
+                  {specialty}
+                </Text>
+              ))}
               </View>
 
               {/* Selection Prompt */}
