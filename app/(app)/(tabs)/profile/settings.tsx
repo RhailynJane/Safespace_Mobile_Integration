@@ -84,8 +84,8 @@ export default function SettingsScreen() {
   // Track which reminder frequency options to show (only Daily and Custom for reminders)
   const reminderFrequencyOptionsLimited = ["Daily", "Custom"];
 
-  // Text size slider mapping
-  const textSizeLabels = ["Extra Small", "Small", "Medium", "Large"] as const;
+  // Text size slider mapping (includes Extra Large)
+  const textSizeLabels = ["Extra Small", "Small", "Medium", "Large", "Extra Large"] as const;
   type TextSizeLabel = typeof textSizeLabels[number];
   const textSizeToSlider = (size: string): number => Math.max(0, textSizeLabels.indexOf((size as TextSizeLabel)));
   const sliderToTextSize = (val: number): TextSizeLabel => textSizeLabels[Math.min(textSizeLabels.length-1, Math.max(0, Math.round(val)))] as TextSizeLabel;
@@ -293,6 +293,9 @@ export default function SettingsScreen() {
         case "Large":
           fontScale = 1.15;
           break;
+        case "Extra Large":
+          fontScale = 1.3;
+          break;
       }
       
       await AsyncStorage.setItem('appFontScale', JSON.stringify(fontScale));
@@ -338,7 +341,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const textSizeOptions = ["Extra Small", "Small", "Medium", "Large"];
+  const textSizeOptions = ["Extra Small", "Small", "Medium", "Large", "Extra Large"];
   const reminderFrequencyOptions = ["Never", "Hourly", "Daily", "Weekdays", "Weekends", "Weekly", "Custom"];
   const daysOfWeek = [
     { key: 'mon', label: 'Monday' },
@@ -517,7 +520,7 @@ export default function SettingsScreen() {
               <Slider
                 style={styles.slider}
                 minimumValue={0}
-                maximumValue={3}
+                maximumValue={4}
                 step={1}
                 value={textSizeSlider}
                 minimumTrackTintColor={theme.colors.primary}
