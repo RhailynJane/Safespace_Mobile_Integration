@@ -23,10 +23,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
+import { scheduleFromSettings } from "../../../../utils/reminderScheduler";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 import { useUser } from '@clerk/clerk-expo';
 import TimePickerModal from "../../../../components/TimePickerModal";
+// (Optional) expo-notifications was used for debug "Test" buttons; removed to avoid accidental fires on Save
 
 /**
  * SettingsScreen Component
@@ -142,7 +144,9 @@ export default function SettingsScreen() {
           appointmentReminderAdvanceMinutes,
         };
         console.log('🔔 Auto-saving notification settings:', settings);
-        await settingsAPI.saveSettings(settings, user?.id);
+  await settingsAPI.saveSettings(settings, user?.id);
+  // Schedule local notifications based on updated settings
+  try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
       } catch (error) {
         console.log('Auto-save notification settings failed:', error);
       }
@@ -194,6 +198,8 @@ export default function SettingsScreen() {
     }
   };
 
+  // (Removed) testReminderNow helper used for debug notifications to avoid accidental triggers on Save
+
   /**
    * Saves settings to backend API
    */
@@ -222,7 +228,9 @@ export default function SettingsScreen() {
         appointmentReminderAdvanceMinutes,
       };
 
-      const result = await settingsAPI.saveSettings(settings, user?.id);
+  const result = await settingsAPI.saveSettings(settings, user?.id);
+  // Always schedule locally regardless of server result
+  try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
       if (!result.success) {
         setStatusModal({visible:true, type:'error', title:'Save Failed', message: result.message || 'Failed to save settings'});
       } else {

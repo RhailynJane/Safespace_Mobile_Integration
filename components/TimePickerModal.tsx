@@ -34,24 +34,32 @@ export default function TimePickerModal({
     setSelectedMinute(isNaN(mm) ? 0 : mm);
   }, [visible, hh, mm]);
 
-  // Scroll to selected position ONLY when modal opens
+  // Constants for item height and top/bottom spacer height
+  const ITEM_HEIGHT = 44;
+  const SPACER_HEIGHT = ITEM_HEIGHT * 2; // 88
+  const HIGHLIGHT_TOP = 100; // must match the styled highlight top
+  const HIGHLIGHT_CENTER = HIGHLIGHT_TOP + ITEM_HEIGHT / 2; // 122
+
+  // Scroll to selected position ONLY when modal opens (align row center with highlight center)
   useEffect(() => {
     if (visible && hourScrollRef.current) {
       setTimeout(() => {
-        const offsetY = hh * 44;
+        const h = isNaN(hh) ? 0 : hh;
+        const offsetY = Math.max(0, SPACER_HEIGHT + h * ITEM_HEIGHT + ITEM_HEIGHT / 2 - HIGHLIGHT_CENTER);
         hourScrollRef.current?.scrollTo({ y: offsetY, animated: false });
       }, 50);
     }
-  }, [visible, hh]);
+  }, [visible, hh, SPACER_HEIGHT, ITEM_HEIGHT, HIGHLIGHT_CENTER]);
 
   useEffect(() => {
     if (visible && minuteScrollRef.current) {
       setTimeout(() => {
-        const offsetY = (isNaN(mm) ? 0 : mm) * 44;
+        const m = isNaN(mm) ? 0 : mm;
+        const offsetY = Math.max(0, SPACER_HEIGHT + m * ITEM_HEIGHT + ITEM_HEIGHT / 2 - HIGHLIGHT_CENTER);
         minuteScrollRef.current?.scrollTo({ y: offsetY, animated: false });
       }, 50);
     }
-  }, [visible, mm]);
+  }, [visible, mm, SPACER_HEIGHT, ITEM_HEIGHT, HIGHLIGHT_CENTER]);
 
   const handleConfirm = useCallback(() => {
     console.log('Confirm called - hours:', selectedHour, 'minutes:', selectedMinute);
@@ -69,13 +77,17 @@ export default function TimePickerModal({
 
   const handleHourScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = event.nativeEvent.contentOffset.y;
-    const index = Math.round(y / 44);
+    // Align to highlight center: add center offset and subtract top spacer + half item
+    const adjusted = y + HIGHLIGHT_CENTER - SPACER_HEIGHT - ITEM_HEIGHT / 2; // effectively y + 12
+    const index = Math.round(adjusted / ITEM_HEIGHT);
     setSelectedHour(Math.max(0, Math.min(23, index)));
   };
 
   const handleMinuteScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = event.nativeEvent.contentOffset.y;
-    const index = Math.round(y / 44);
+    // Align to highlight center like hours
+    const adjusted = y + HIGHLIGHT_CENTER - SPACER_HEIGHT - ITEM_HEIGHT / 2;
+    const index = Math.round(adjusted / ITEM_HEIGHT);
     setSelectedMinute(Math.max(0, Math.min(59, index)));
   };
 
@@ -128,7 +140,7 @@ export default function TimePickerModal({
                   nestedScrollEnabled={true}
                   testID="hour-picker"
                 >
-                  <View style={{ height: 88 }} />
+                  <View style={{ height: SPACER_HEIGHT }} />
                   {hours.map((h) => (
                     <View
                       key={`hour-${h}`}
@@ -149,7 +161,7 @@ export default function TimePickerModal({
                       </Text>
                     </View>
                   ))}
-                  <View style={{ height: 88 }} />
+                  <View style={{ height: SPACER_HEIGHT }} />
                 </ScrollView>
               </View>
 
@@ -168,7 +180,7 @@ export default function TimePickerModal({
                   nestedScrollEnabled={true}
                   testID="minute-picker"
                 >
-                  <View style={{ height: 88 }} />
+                  <View style={{ height: SPACER_HEIGHT }} />
                   {minutes.map((m) => (
                     <View
                       key={`minute-${m}`}
@@ -189,7 +201,7 @@ export default function TimePickerModal({
                       </Text>
                     </View>
                   ))}
-                  <View style={{ height: 88 }} />
+                  <View style={{ height: SPACER_HEIGHT }} />
                 </ScrollView>
               </View>
             </View>

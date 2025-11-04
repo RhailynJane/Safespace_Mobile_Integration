@@ -141,6 +141,55 @@ async function ensureNotificationsSchema() {
 
 ensureNotificationsSchema();
 
+// ==============================
+// Helper: create DB notification and send Expo push
+// ==============================
+async function notifyUserByIds(userId: number, title: string, message: string, data?: any) {
+  try {
+    // Insert into notifications table
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, $2, $3, $4)`,
+      [userId, 'system', title, message]
+    );
+
+    // Fetch active Expo push tokens
+    const toks = await pool.query(
+      `SELECT token FROM push_tokens WHERE user_id = $1 AND revoked = FALSE`,
+      [userId]
+    );
+    if (toks.rows.length === 0) return;
+
+    // Send batched push via Expo endpoint
+    const messages = toks.rows.map((r: any) => ({
+      to: r.token,
+      title,
+      sound: 'default',
+      body: message,
+      data: data || {},
+    }));
+    try {
+      await axios.post('https://exp.host/--/api/v2/push/send', messages, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (e: any) {
+      console.error('⚠️ Expo push send failed:', e?.response?.data || e.message);
+    }
+  } catch (e: any) {
+    console.error('⚠️ notifyUserByIds failed:', e.message);
+  }
+}
+
+async function notifyUserByClerkId(clerkUserId: string, title: string, message: string, data?: any) {
+  try {
+    const u = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (u.rows.length === 0) return;
+    const userId = u.rows[0].id as number;
+    await notifyUserByIds(userId, title, message, data);
+  } catch (e: any) {
+    console.error('⚠️ notifyUserByClerkId failed:', e.message);
+  }
+}
+
 // Test endpoint
 app.get("/", (req: Request, res: Response) => {
   res.json({
@@ -962,6 +1011,36 @@ app.post('/api/push/revoke', async (req: Request, res: Response) => {
   }
 });
 
+// Backward-compatible appointment notify endpoint
+app.post('/api/appointments/notify', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, title, message, data } = req.body as { clerkUserId?: string; title?: string; message?: string; data?: any };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+    await notifyUserByClerkId(clerkUserId, title, message, data || {});
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error in /api/appointments/notify:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to notify', error: e.message });
+  }
+});
+
+// Send an immediate notification to a user (debug/utility)
+app.post('/api/notifications/send', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, title, message, data } = req.body as { clerkUserId?: string; title?: string; message?: string; data?: any };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+    await notifyUserByClerkId(clerkUserId, title, message, data || {});
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error sending notification:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to send notification', error: e.message });
+  }
+});
+
 // =============================================
 // NOTIFICATIONS ENDPOINTS
 // =============================================
@@ -1197,6 +1276,29 @@ app.post(
           : null;
 
       await client.query("COMMIT");
+
+      // Notify post owner on new reaction (do not notify on removal)
+      try {
+        if (reactionChange > 0) {
+          const postRes = await pool.query(
+            `SELECT author_id, title FROM community_posts WHERE id = $1`,
+            [Number.parseInt(id)]
+          );
+          if (postRes.rows.length > 0) {
+            const ownerClerkId = postRes.rows[0].author_id as string;
+            if (ownerClerkId && ownerClerkId !== clerkUserId) {
+              await notifyUserByClerkId(
+                ownerClerkId,
+                'New reaction on your post',
+                `${emoji} Someone reacted to your post`,
+                { postId: Number.parseInt(id), emoji }
+              );
+            }
+          }
+        }
+      } catch (e: any) {
+        console.error('⚠️ Post reaction notify failed:', e.message);
+      }
 
       res.json({
         success: true,
