@@ -48,7 +48,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   Dimensions,
   Modal,
   Keyboard,
@@ -146,6 +145,7 @@ export default function ChatScreen() {
     title: '',
     message: '',
     confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
+    actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
 
   // Get safe area insets for proper spacing
@@ -157,7 +157,7 @@ export default function ChatScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalData({ type, title, message, confirm: undefined });
+    setStatusModalData({ type, title, message, confirm: undefined, actions: undefined });
     setStatusModalVisible(true);
   };
 
@@ -172,7 +172,17 @@ export default function ChatScreen() {
       title,
       message,
       confirm: { onConfirm, confirmText: opts?.confirmText, cancelText: opts?.cancelText },
+      actions: undefined,
     });
+    setStatusModalVisible(true);
+  };
+
+  const showActions = (
+    title: string,
+    message: string,
+    actions: Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>
+  ) => {
+    setStatusModalData({ type: 'info', title, message, confirm: undefined, actions });
     setStatusModalVisible(true);
   };
 
@@ -747,7 +757,7 @@ export default function ChatScreen() {
       try {
         const permission = await Audio.requestPermissionsAsync();
         if (!permission.granted) {
-          Alert.alert('Permission Required', 'Please allow microphone access to record voice messages.');
+          showStatusModal('error', 'Permission Required', 'Please allow microphone access to record voice messages.');
           return;
         }
 
@@ -1154,18 +1164,16 @@ export default function ChatScreen() {
           style={styles.imageAttachment}
           onPress={() => handleViewAttachment(message)}
           onLongPress={() => {
-            Alert.alert("Image Options", "What would you like to do?", [
-              { text: "View", onPress: () => { handleViewAttachment(message); } },
-              {
-                text: "Save to Gallery",
-                onPress: () => { saveImageToGallery(message.attachment_url!); },
-              },
-              {
-                text: "Download",
-                onPress: () => { handleDownloadFile(message); },
-              },
-              { text: "Cancel", style: "cancel" },
-            ]);
+            showActions(
+              'Image options',
+              message.file_name || 'Choose an action for this image',
+              [
+                { label: 'View', onPress: () => handleViewAttachment(message), variant: 'primary' },
+                { label: 'Save to Gallery', onPress: () => saveImageToGallery(message.attachment_url!), variant: 'default' },
+                { label: 'Download', onPress: () => handleDownloadFile(message), variant: 'default' },
+                { label: 'Cancel', onPress: () => {}, variant: 'default' },
+              ]
+            );
           }}
         >
           <OptimizedImage
@@ -1194,13 +1202,13 @@ export default function ChatScreen() {
         <TouchableOpacity
           onPress={() => handleDownloadFile(message)}
           onLongPress={() => {
-            Alert.alert(
-              "File Options",
-              `File: ${message.file_name || "Unknown file"}`,
+            showActions(
+              'File options',
+              message.file_name || 'Choose an action',
               [
-                { text: "Download & Share", onPress: () => { handleDownloadFile(message); } },
-                { text: "Open in Browser", onPress: () => { WebBrowser.openBrowserAsync(message.attachment_url!); } },
-                { text: "Cancel", style: "cancel" },
+                { label: 'Download & Share', onPress: () => handleDownloadFile(message), variant: 'primary' },
+                { label: 'Open in Browser', onPress: () => { if (message.attachment_url) WebBrowser.openBrowserAsync(message.attachment_url); }, variant: 'default' },
+                { label: 'Cancel', onPress: () => {}, variant: 'default' },
               ]
             );
           }}
@@ -1270,28 +1278,23 @@ export default function ChatScreen() {
     const fileUri = message.attachment_url;
     const fileName = message.file_name || `file_${Date.now()}`;
 
-    // Show download confirmation
-    Alert.alert(
-      "Download File",
-      `Download "${message.file_name || "this file"}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Download",
-          onPress: async () => {
-            try {
-              setDownloading(true);
-              await downloadAndShareFile(fileUri, fileName);
-            } catch (error) {
-              console.error("Download error:", error);
-              setFileErrorMessage("Failed to download file. Please try again.");
-              setFileErrorModalVisible(true);
-            } finally {
-              setDownloading(false);
-            }
-          },
-        },
-      ]
+    // Show download confirmation via status modal
+    showConfirm(
+      'Download File',
+      `Download "${message.file_name || 'this file'}"?`,
+      async () => {
+        try {
+          setDownloading(true);
+          await downloadAndShareFile(fileUri, fileName);
+        } catch (error) {
+          console.error('Download error:', error);
+          setFileErrorMessage('Failed to download file. Please try again.');
+          setFileErrorModalVisible(true);
+        } finally {
+          setDownloading(false);
+        }
+      },
+      { confirmText: 'Download', cancelText: 'Cancel' }
     );
   };
 
@@ -1359,7 +1362,7 @@ export default function ChatScreen() {
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          behavior={Platform.select({ ios: "padding", android: "height" })}
+          behavior={Platform.select({ ios: 'padding', android: 'height' })}
           style={styles.container}
           keyboardVerticalOffset={keyboardOffset}
         >
@@ -1405,7 +1408,25 @@ export default function ChatScreen() {
                   {statusModalData.message}
                 </Text>
 
-                {statusModalData.confirm ? (
+                {statusModalData.actions && statusModalData.actions.length > 0 ? (
+                  <View style={{ alignSelf: 'stretch', gap: 12 }}>
+                    {statusModalData.actions.map((a, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[
+                          styles.modalButton,
+                          { backgroundColor: a.variant === 'danger' ? '#FF3B30' : a.variant === 'primary' ? '#007AFF' : '#6B7280' }
+                        ]}
+                        onPress={() => {
+                          setStatusModalVisible(false);
+                          setTimeout(() => { try { a.onPress(); } catch { /* noop */ } }, 120);
+                        }}
+                      >
+                        <Text style={styles.modalButtonText}>{a.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : statusModalData.confirm ? (
                   <View style={{ flexDirection: 'row', gap: 12 }}>
                     <TouchableOpacity
                       style={[styles.modalButton, { backgroundColor: '#6B7280' }]}
@@ -1636,6 +1657,7 @@ export default function ChatScreen() {
               );
             }}
             contentContainerStyle={styles.messagesContent}
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
               const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -1684,8 +1706,8 @@ export default function ChatScreen() {
             styles.bottomInputSection, 
             { 
               backgroundColor: 'transparent',
-              // Keep a tight bottom spacing on both platforms to avoid a floating bar
-              paddingBottom: 6,
+              // Add safe-area bottom padding so the input doesn't touch system navigation
+              paddingBottom: Math.max(insets.bottom || 0, 8),
             }
           ]}>
             {/* Show expand button when icons are hidden */}
@@ -1893,7 +1915,7 @@ export default function ChatScreen() {
 
               <View style={styles.viewerFooter}>
                 <Text style={styles.viewerFooterText}>
-                  Pinch to zoom â€¢ Tap download to save
+                  Pinch to zoom. Tap download to save
                 </Text>
               </View>
             </View>
