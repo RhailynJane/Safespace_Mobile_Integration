@@ -453,12 +453,13 @@ export const AppHeader = ({
   }
 
   return (
-    <View style={[styles.safeArea, { backgroundColor: "transparent", paddingTop: insets.top }]}>
+    <View style={[styles.safeArea, { backgroundColor: "transparent", paddingTop: insets.top }]} testID="app-header"> 
       <View style={[styles.header, { backgroundColor: "transparent" }]}>
         {showBack ? (
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
+            testID="back-button"
           >
             <Ionicons name="arrow-undo-sharp" size={24} color={theme.colors.icon} />
           </TouchableOpacity>

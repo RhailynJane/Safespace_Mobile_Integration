@@ -1,8 +1,4 @@
-/**
- * LLM Prompt: Add concise inline comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,65 +6,162 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Dimensions,
-  Image,
   TextInput,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
   Animated,
-  Easing,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useTheme } from "../../../contexts/ThemeContext";
-import { APP_TIME_ZONE } from "../../../utils/timezone";
+import { router, useLocalSearchParams } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
+import TwilioVideoService from "../../../lib/twilio-service";
 
 const { width, height } = Dimensions.get("window");
 
 // Mock chat messages
 const initialMessages = [
-  { id: 1, text: "Hello! How are you feeling today?", sender: "Eric", time: "10:25 AM" },
+  { id: 1, text: "Hello! How are you feeling today?", sender: "Support Worker", time: "10:25 AM" },
   { id: 2, text: "I'm doing well, thank you for asking.", sender: "You", time: "10:26 AM" },
-  { id: 3, text: "That's great to hear. Let's begin our session.", sender: "Eric", time: "10:28 AM" },
+  { id: 3, text: "That's great to hear. Let's begin our session.", sender: "Support Worker", time: "10:28 AM" },
 ];
 
 // Emoji options
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
-export default function VideoCallScreen() {
-  const { theme, scaledFontSize } = useTheme();
+export default function VideoCallMeetingScreen() {
+  const { user } = useUser();
+  const params = useLocalSearchParams();
+  const supportWorkerId = params.supportWorkerId as string;
+  const supportWorkerName = params.supportWorkerName as string || "Support Worker";
+  const appointmentId = params.appointmentId as string;
+  const audioOption = params.audioOption as string;
+
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(true);
+  const [isMicOn, setIsMicOn] = useState(audioOption !== "none");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRaiseHand, setIsRaiseHand] = useState(false);
   const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState("");
-  const [reactions, setReactions] = useState<
-    { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
+  const [reactions, setReactions] = useState< 
+  { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
   >([]);
+  const [callStatus, setCallStatus] = useState("Connecting...");
+  const [callDuration, setCallDuration] = useState(0);
+  const [isCallConnected, setIsCallConnected] = useState(false);
 
-  /**
-   * Create styles dynamically based on text size scaling
-   * Uses useMemo for performance optimization
-   */
-  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+  const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    console.log("🎥 Initializing video call...");
+    console.log("Support Worker:", supportWorkerName);
+    console.log("Appointment ID:", appointmentId);
+    console.log("Audio Option:", audioOption);
+    
+    initializeCall();
+
+    return () => {
+      endCall();
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+    };
+  }, []);
+
+  // Initialize Twilio and start call
+  const initializeCall = async () => {
+    try {
+      // Initialize Twilio
+      await TwilioVideoService.initialize();
+
+      // Get user ID from Clerk
+      const userId = user?.id || `user_${Date.now()}`;
+      
+      // Create room name
+      const roomName = `appointment_${appointmentId}`;
+
+      console.log("🔑 Authenticating with Twilio...");
+      // Get access token from your backend
+      const accessToken = await TwilioVideoService.authenticate(userId, roomName);
+
+      console.log("📞 Connecting to room:", roomName);
+      // Connect to room
+      await TwilioVideoService.connectToRoom(accessToken, roomName);
+
+      setCallStatus("Connected");
+      setIsCallConnected(true);
+      startCallTimer();
+      
+      console.log("✅ Video call connected successfully");
+    } catch (error) {
+      console.error("❌ Failed to initialize call:", error);
+      Alert.alert(
+        "Call Failed",
+        "Unable to start video call. Please try again.",
+        [{ text: "OK", onPress: () => router.back() }]
+      );
+    }
+  };
+
+  // Start call duration timer
+  const startCallTimer = () => {
+    callDurationInterval.current = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
+  };
+
+  // Format call duration
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const handleLeaveCall = () => {
-    router.replace("../(tabs)/appointments/appointment-list");
+    Alert.alert(
+      "End Call",
+      "Are you sure you want to end this call?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "End Call",
+          style: "destructive",
+          onPress: () => endCall(),
+        },
+      ]
+    );
+  };
+
+  const endCall = async () => {
+    try {
+      await TwilioVideoService.disconnect();
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+      console.log("📴 Call ended");
+      router.back();
+    } catch (error) {
+      console.error("Error ending call:", error);
+      router.back();
+    }
   };
 
   const handleToggleCamera = () => {
-    setIsCameraOn(!isCameraOn);
+    const newState = !isCameraOn;
+    setIsCameraOn(newState);
+    TwilioVideoService.toggleVideo(newState);
   };
 
   const handleToggleMic = () => {
-    setIsMicOn(!isMicOn);
+    const newState = !isMicOn;
+    setIsMicOn(newState);
+    TwilioVideoService.toggleAudio(newState);
   };
 
   const handleToggleChat = () => {
     setIsChatOpen(!isChatOpen);
-    // Close emoji panel if chat is opened
     if (!isChatOpen) {
       setIsEmojiPanelOpen(false);
     }
@@ -80,7 +173,6 @@ export default function VideoCallScreen() {
 
   const handleToggleEmojiPanel = () => {
     setIsEmojiPanelOpen(!isEmojiPanelOpen);
-    // Close chat if emoji panel is opened
     if (!isEmojiPanelOpen && isChatOpen) {
       setIsChatOpen(false);
     }
@@ -92,39 +184,26 @@ export default function VideoCallScreen() {
         id: messages.length + 1,
         text: newMessage,
         sender: "You",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages([...messages, newMsg]);
       setNewMessage("");
-      
-      // Simulate a response after a short delay
-      setTimeout(() => {
-        const responseMsg = {
-          id: messages.length + 2,
-          text: "Thank you for sharing that. Let's explore this further in our session.",
-          sender: "Eric",
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })
-        };
-        setMessages(prev => [...prev, responseMsg]);
-      }, 1500);
     }
   };
 
   const handleAddReaction = (emoji: string) => {
-    // Add the reaction to the screen with a random position
     const newReaction = {
       id: Date.now(),
       emoji,
       position: {
-        x: Math.random() * (width - 100) + 50, // Random x position
-        y: Math.random() * (height - 200) + 100, // Random y position
+        x: Math.random() * (width - 100) + 50,
+        y: Math.random() * (height - 200) + 100,
       },
       opacity: new Animated.Value(1),
     };
     
     setReactions([...reactions, newReaction]);
     
-    // Animate the reaction (fade out and move up)
     Animated.sequence([
       Animated.timing(newReaction.opacity, {
         toValue: 1,
@@ -138,52 +217,62 @@ export default function VideoCallScreen() {
       }),
     ]).start();
     
-    // Remove the reaction after animation completes
     setTimeout(() => {
       setReactions(prev => prev.filter(r => r.id !== newReaction.id));
     }, 2300);
     
-    // Close the emoji panel after selection
     setIsEmojiPanelOpen(false);
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={styles.container}>
       {/* Main Video Content */}
       <View style={styles.videoContainer}>
-        {/* Participant Video */}
+        {/* Video Placeholder - Replace with actual Twilio native video views */}
         <View style={styles.participantVideo}>
-          <Image
-            source={{ uri: "https://randomuser.me/api/portraits/men/1.jpg" }}
-            style={styles.videoImage}
-            resizeMode="cover"
-          />
-          <View style={[styles.participantInfo, { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)' }]}>
-            <Text style={styles.participantName}>Eric Young</Text>
-            <View style={[styles.audioIndicator, { backgroundColor: theme.colors.primary }]}>
+          <View style={styles.videoPlaceholder}>
+            <Ionicons name="person-circle" size={100} color="#FFFFFF" />
+            <Text style={styles.placeholderText}>Remote Video</Text>
+            <Text style={styles.placeholderSubtext}>{supportWorkerName}</Text>
+          </View>
+          <View style={styles.participantInfo}>
+            <Text style={styles.participantName}>{supportWorkerName}</Text>
+            <View style={styles.audioIndicator}>
               <Ionicons name="mic" size={12} color="#FFFFFF" />
             </View>
           </View>
         </View>
 
-        {/* Self Video Preview */}
-        <View style={[styles.selfVideoPreview, { borderColor: theme.colors.surface }]}>
-          <Image
-            source={{ uri: "https://randomuser.me/api/portraits/women/17.jpg" }}
-            style={styles.selfVideoImage}
-            resizeMode="cover"
-          />
-          {!isCameraOn && (
-            <View style={[styles.cameraOffOverlay, { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.9)' : 'rgba(0, 0, 0, 0.7)' }]}>
+        {/* Local Video Preview */}
+        <View style={styles.selfVideoPreview}>
+          {isCameraOn ? (
+            <View style={styles.videoPlaceholderSmall}>
+              <Ionicons name="person-circle" size={40} color="#FFFFFF" />
+              <Text style={styles.placeholderTextSmall}>You</Text>
+            </View>
+          ) : (
+            <View style={styles.cameraOffOverlay}>
               <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
             </View>
           )}
         </View>
 
         {/* Call Status */}
-        <View style={[styles.callStatus, { backgroundColor: theme.isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.6)' }]}>
-          <Text style={styles.callStatusText}>00:01</Text>
+        <View style={styles.callStatus}>
+          <Text style={styles.callStatusText}>
+            {isCallConnected ? formatDuration(callDuration) : callStatus}
+          </Text>
         </View>
+
+        {/* Connection Info Banner */}
+        {!isCallConnected && (
+          <View style={styles.connectionBanner}>
+            <Ionicons name="information-circle" size={20} color="#FFF" />
+            <Text style={styles.connectionText}>
+              Connecting to Twilio Video...
+            </Text>
+          </View>
+        )}
 
         {/* Reactions displayed on screen */}
         {reactions.map((reaction) => (
@@ -212,29 +301,18 @@ export default function VideoCallScreen() {
       </View>
 
       {/* Bottom Controls */}
-      <View style={[styles.controlsContainer, { backgroundColor: theme.isDark ? '#2D2D2D' : '#424242' }]}>
-        {/* First Row - All controls in one line */}
+      <View style={styles.controlsContainer}>
         <View style={styles.controlsRow}>
-          {/* Chat Button */}
           <TouchableOpacity 
-            style={[
-              styles.controlButton, 
-              { backgroundColor: theme.isDark ? '#404040' : '#616161' },
-              isChatOpen && [styles.controlButtonActive, { backgroundColor: theme.colors.primary }]
-            ]}
+            style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
             onPress={handleToggleChat}
           >
             <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
             <Text style={styles.controlText}>Chat</Text>
           </TouchableOpacity>
 
-          {/* Raise Hand Button */}
           <TouchableOpacity 
-            style={[
-              styles.controlButton, 
-              { backgroundColor: theme.isDark ? '#404040' : '#616161' },
-              isRaiseHand && [styles.controlButtonActive, { backgroundColor: theme.colors.primary }]
-            ]}
+            style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
             onPress={handleToggleRaiseHand}
           >
             <Ionicons 
@@ -245,26 +323,16 @@ export default function VideoCallScreen() {
             <Text style={styles.controlText}>Raise</Text>
           </TouchableOpacity>
 
-          {/* React Button */}
           <TouchableOpacity 
-            style={[
-              styles.controlButton, 
-              { backgroundColor: theme.isDark ? '#404040' : '#616161' },
-              isEmojiPanelOpen && [styles.controlButtonActive, { backgroundColor: theme.colors.primary }]
-            ]}
+            style={[styles.controlButton, isEmojiPanelOpen && styles.controlButtonActive]}
             onPress={handleToggleEmojiPanel}
           >
             <Ionicons name="happy" size={24} color="#FFFFFF" />
             <Text style={styles.controlText}>React</Text>
           </TouchableOpacity>
 
-          {/* Camera Toggle */}
           <TouchableOpacity 
-            style={[
-              styles.controlButton, 
-              { backgroundColor: theme.isDark ? '#404040' : '#616161' },
-              !isCameraOn && [styles.controlButtonMuted, { backgroundColor: theme.colors.error }]
-            ]}
+            style={[styles.controlButton, !isCameraOn && styles.controlButtonMuted]}
             onPress={handleToggleCamera}
           >
             <Ionicons 
@@ -275,13 +343,8 @@ export default function VideoCallScreen() {
             <Text style={styles.controlText}>Camera</Text>
           </TouchableOpacity>
 
-          {/* Mic Toggle */}
           <TouchableOpacity 
-            style={[
-              styles.controlButton, 
-              { backgroundColor: theme.isDark ? '#404040' : '#616161' },
-              !isMicOn && [styles.controlButtonMuted, { backgroundColor: theme.colors.error }]
-            ]}
+            style={[styles.controlButton, !isMicOn && styles.controlButtonMuted]}
             onPress={handleToggleMic}
           >
             <Ionicons 
@@ -293,10 +356,9 @@ export default function VideoCallScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Second Row - Only Leave button */}
         <View style={styles.leaveButtonContainer}>
           <TouchableOpacity 
-            style={[styles.leaveButton, { backgroundColor: theme.colors.error }]}
+            style={styles.leaveButton}
             onPress={handleLeaveCall}
           >
             <Ionicons name="call" size={16} color="#FFFFFF" />
@@ -307,13 +369,13 @@ export default function VideoCallScreen() {
 
       {/* Emoji Panel */}
       {isEmojiPanelOpen && (
-        <View style={[styles.emojiPanel, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.emojiPanelTitle, { color: theme.colors.text }]}>React</Text>
+        <View style={styles.emojiPanel}>
+          <Text style={styles.emojiPanelTitle}>React</Text>
           <View style={styles.emojiGrid}>
             {emojiOptions.map((emoji, index) => (
               <TouchableOpacity
                 key={index}
-                style={[styles.emojiButton, { backgroundColor: theme.colors.borderLight }]}
+                style={styles.emojiButton}
                 onPress={() => handleAddReaction(emoji)}
               >
                 <Text style={styles.emoji}>{emoji}</Text>
@@ -325,58 +387,40 @@ export default function VideoCallScreen() {
 
       {/* Chat Panel */}
       {isChatOpen && (
-        <KeyboardAvoidingView 
-          style={styles.chatPanelContainer}
+        <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={100}
+          style={styles.chatPanelContainer}
         >
-          <View style={[styles.chatPanel, { backgroundColor: theme.colors.surface }]}>
-            <View style={[styles.chatHeader, { 
-              backgroundColor: theme.colors.borderLight,
-              borderBottomColor: theme.colors.border 
-            }]}>
-              <Text style={[styles.chatTitle, { color: theme.colors.text }]}>Chat</Text>
-              <TouchableOpacity onPress={() => setIsChatOpen(false)}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
+          <View style={styles.chatPanel}>
+            <View style={styles.chatHeader}>
+              <Text style={styles.chatTitle}>Chat</Text>
+              <TouchableOpacity onPress={handleToggleChat}>
+                <Ionicons name="close" size={24} color="#333333" />
               </TouchableOpacity>
             </View>
             
             <ScrollView 
               style={styles.messagesContainer}
-              ref={ref => ref?.scrollToEnd({ animated: true })}
+              contentContainerStyle={{ paddingBottom: 16 }}
             >
               {messages.map((message) => (
-                <View 
-                  key={message.id} 
+                <View
+                  key={message.id}
                   style={[
                     styles.messageBubble,
-                    message.sender === "You" 
-                      ? [styles.myMessage, { backgroundColor: theme.isDark ? '#2E7D32' : '#DCF8C6' }]
-                      : [styles.theirMessage, { backgroundColor: theme.isDark ? '#424242' : '#F1F0F0' }]
+                    message.sender === "You" ? styles.myMessage : styles.theirMessage,
                   ]}
                 >
-                  <Text style={[styles.messageText, { color: theme.isDark ? '#FFFFFF' : '#333333' }]}>
-                    {message.text}
-                  </Text>
-                  <Text style={[styles.messageTime, { color: theme.isDark ? '#BDBDBD' : '#666666' }]}>
-                    {message.time}
-                  </Text>
+                  <Text style={styles.messageText}>{message.text}</Text>
+                  <Text style={styles.messageTime}>{message.time}</Text>
                 </View>
               ))}
             </ScrollView>
             
-            <View style={[styles.messageInputContainer, { 
-              borderTopColor: theme.colors.border,
-              backgroundColor: theme.colors.surface 
-            }]}>
+            <View style={styles.messageInputContainer}>
               <TextInput
-                style={[styles.messageInput, { 
-                  borderColor: theme.colors.border,
-                  color: theme.colors.text,
-                  backgroundColor: theme.colors.background
-                }]}
+                style={styles.messageInput}
                 placeholder="Type a message..."
-                placeholderTextColor={theme.colors.textSecondary}
                 value={newMessage}
                 onChangeText={setNewMessage}
                 multiline
@@ -390,7 +434,7 @@ export default function VideoCallScreen() {
                 <Ionicons 
                   name="send" 
                   size={20} 
-                  color={newMessage.trim() ? theme.colors.primary : theme.colors.textDisabled} 
+                  color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
                 />
               </TouchableOpacity>
             </View>
@@ -401,13 +445,10 @@ export default function VideoCallScreen() {
   );
 }
 
-/**
- * Stylesheet for VideoCallScreen component
- * Now includes dynamic font scaling via scaledFontSize parameter
- */
-const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#1A1A1A",
   },
   videoContainer: {
     flex: 1,
@@ -420,10 +461,22 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     height: "100%",
     position: "absolute",
   },
-  videoImage: {
+  videoPlaceholder: {
     width: "100%",
     height: "100%",
-    opacity: 0.8,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
+  },
+  placeholderText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    marginTop: 10,
+  },
+  placeholderSubtext: {
+    color: "#999",
+    fontSize: 14,
+    marginTop: 5,
   },
   participantInfo: {
     position: "absolute",
@@ -431,15 +484,17 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     left: 20,
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     padding: 8,
     borderRadius: 20,
   },
   participantName: {
     color: "#FFFFFF",
-    fontSize: scaledFontSize(16),
+    fontSize: 16,
     marginRight: 8,
   },
   audioIndicator: {
+    backgroundColor: "#4CAF50",
     borderRadius: 10,
     padding: 4,
   },
@@ -452,10 +507,20 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 2,
+    borderColor: "#FFFFFF",
+    backgroundColor: "#333",
   },
-  selfVideoImage: {
+  videoPlaceholderSmall: {
     width: "100%",
     height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#2a2a2a",
+  },
+  placeholderTextSmall: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    marginTop: 5,
   },
   cameraOffOverlay: {
     position: "absolute",
@@ -463,6 +528,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -470,24 +536,42 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     position: "absolute",
     top: 20,
     alignSelf: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   callStatusText: {
     color: "#FFFFFF",
-    fontSize: scaledFontSize(16),
+    fontSize: 16,
     fontWeight: "600",
   },
-  // Reaction styles
+  connectionBanner: {
+    position: "absolute",
+    top: 60,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 152, 0, 0.9)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    maxWidth: "90%",
+  },
+  connectionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    marginLeft: 8,
+    flex: 1,
+  },
   reaction: {
     position: "absolute",
     fontSize: 30,
     zIndex: 100,
   },
-  // Controls styles
   controlsContainer: {
     padding: 15,
+    backgroundColor: "#2D2D2D",
   },
   controlsRow: {
     flexDirection: "row",
@@ -499,18 +583,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     alignItems: "center",
     padding: 10,
     borderRadius: 8,
+    backgroundColor: "#404040",
     minWidth: 60,
     marginBottom: 5,
   },
   controlButtonActive: {
-    // backgroundColor applied via inline style
+    backgroundColor: "#4CAF50",
   },
   controlButtonMuted: {
-    // backgroundColor applied via inline style
+    backgroundColor: "#F44336",
   },
   controlText: {
     color: "#FFFFFF",
-    fontSize: scaledFontSize(12),
+    fontSize: 12,
     marginTop: 4,
   },
   leaveButtonContainer: {
@@ -523,18 +608,20 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 8,
+    backgroundColor: "#F44336",
     width: "80%",
     gap: 8,
   },
   leaveButtonText: {
     color: "#FFFFFF",
-    fontSize: scaledFontSize(14),
+    fontSize: 14,
     fontWeight: "600",
   },
-  // Emoji Panel styles
   emojiPanel: {
     position: "absolute",
     bottom: 150,
+    alignSelf: "center",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",
@@ -548,11 +635,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     zIndex: 1000,
   },
   emojiPanelTitle: {
-    fontSize: scaledFontSize(12),
+    fontSize: 12,
     fontWeight: "600",
     marginBottom: 12,
+    color: "#333333",
     textAlign: "center",
-    // color applied inline via theme
   },
   emojiGrid: {
     flexDirection: "row",
@@ -563,11 +650,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     padding: 8,
     borderRadius: 8,
     margin: 4,
+    backgroundColor: "#F0F0F0",
   },
   emoji: {
     fontSize: 24,
   },
-  // Chat Panel Styles
   chatPanelContainer: {
     position: "absolute",
     right: 20,
@@ -578,6 +665,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   chatPanel: {
     flex: 1,
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
@@ -595,11 +683,13 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    backgroundColor: "#F8F9FA",
   },
   chatTitle: {
-    fontSize: scaledFontSize(18),
+    fontSize: 18,
     fontWeight: "600",
-    // color applied inline via theme
+    color: "#333333",
   },
   messagesContainer: {
     flex: 1,
@@ -613,35 +703,39 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   myMessage: {
     alignSelf: "flex-end",
+    backgroundColor: "#DCF8C6",
   },
   theirMessage: {
     alignSelf: "flex-start",
+    backgroundColor: "#F1F0F0",
   },
   messageText: {
-    fontSize: scaledFontSize(14),
+    fontSize: 14,
+    color: "#333333",
     marginBottom: 4,
-    // color applied inline via theme
   },
   messageTime: {
-    fontSize: scaledFontSize(10),
+    fontSize: 10,
+    color: "#666666",
     alignSelf: "flex-end",
-    // color applied inline via theme
   },
   messageInputContainer: {
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
     borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+    backgroundColor: "#FFFFFF",
   },
   messageInput: {
     flex: 1,
     borderWidth: 1,
+    borderColor: "#E0E0E0",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     maxHeight: 100,
     marginRight: 8,
-    fontSize: scaledFontSize(14),
   },
   sendButton: {
     padding: 8,

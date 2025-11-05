@@ -7,6 +7,8 @@ import activityApi from "../../utils/activityApi";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiBaseUrl } from "../../utils/apiBaseUrl";
 import { registerForPushNotifications, addNotificationListeners } from "../../utils/pushNotifications";
+import settingsAPI from "../../utils/settingsApi";
+import { scheduleFromSettings } from "../../utils/reminderScheduler";
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn, userId } = useAuth();
@@ -80,7 +82,10 @@ export default function AppLayout() {
         const newest = rows[0]; // ordered desc by backend
   if (newest && newest.id > lastSeenId) {
           // Find first unread newer than last seen
-          const firstNew = rows.find(r => r.id > lastSeenId && !r.is_read) || rows.find(r => r.id > lastSeenId);
+          // Ignore local reminder types for in-app banner; they still count for the bell
+          const isRemType = (t?: string) => t === 'mood' || t === 'journaling';
+          const firstNew = rows.find(r => r.id > lastSeenId && !r.is_read && !isRemType(r.type))
+                           || rows.find(r => r.id > lastSeenId && !isRemType(r.type));
           if (firstNew && isMounted) {
             setBanner({visible:true, title: firstNew.title || 'Notification', body: firstNew.message || ''});
             // update last seen to newest id to avoid repeated banners
@@ -113,6 +118,31 @@ export default function AppLayout() {
     if (!isSignedIn || !userId) return;
     let mounted = true;
     (async () => {
+      // Ensure a notification handler is set so local notifications show in foreground (incl. Expo Go)
+      try {
+        const Notifications = await import('expo-notifications');
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+            // iOS presentation options
+            shouldShowBanner: true,
+            shouldShowList: true,
+          })
+        });
+      } catch (_e) {
+        // ignore if module not available
+      }
+
+      // Proactively (re)schedule local reminders on app start based on saved settings
+      try {
+        const settings = await settingsAPI.fetchSettings(userId);
+        await scheduleFromSettings(settings);
+      } catch (e) {
+        console.log('🔔 Scheduling reminders on app start failed:', e);
+      }
+
       try {
         await registerForPushNotifications(userId);
       } catch (e) {
@@ -171,7 +201,8 @@ export default function AppLayout() {
           } catch (_e) {
             // no-op
           }
-        }
+        },
+        userId
       );
       pushSubsRef.current = subs;
     })();

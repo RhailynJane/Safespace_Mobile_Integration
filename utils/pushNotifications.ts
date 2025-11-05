@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getApiBaseUrl } from './apiBaseUrl';
+import settingsAPI from './settingsApi';
+import { scheduleFromSettings } from './reminderScheduler';
 import notificationEvents from './notificationEvents';
 
 // Check if running in Expo Go
@@ -88,6 +90,12 @@ export async function registerForPushNotifications(clerkUserId: string): Promise
         console.log('   For now, push notifications will be disabled.');
         return null;
       }
+      if (tokenError.message?.match(/FirebaseApp|DEFAULT|Firebase/i)) {
+        console.log('⚠️ Android push setup incomplete: Firebase app not initialized.');
+        console.log('   Make sure you have google-services.json and FCM configured in your dev build.');
+        console.log('   See: https://docs.expo.dev/push-notifications/fcm/');
+        return null;
+      }
       throw tokenError;
     }
     
@@ -113,6 +121,7 @@ export async function registerForPushNotifications(clerkUserId: string): Promise
 export function addNotificationListeners(
   onReceive: (title: string, body: string) => void,
   onTap?: (data: any) => void,
+  clerkUserId?: string,
 ) {
   // Skip adding listeners in Expo Go (SDK 53+)
   if (isExpoGo) {
@@ -123,21 +132,72 @@ export function addNotificationListeners(
   // Return a promise-based approach since we need to dynamically import
   let receiveSub: any = null;
   let responseSub: any = null;
+  const loggedIds = new Set<string>();
+
+  async function logLocalReminderIfNeeded(notification: any) {
+    try {
+      const data = notification?.request?.content?.data || {};
+      const type = data?.type as string | undefined;
+      const title = notification?.request?.content?.title as string | undefined;
+      const body = notification?.request?.content?.body as string | undefined;
+      const identifier = notification?.request?.identifier as string | undefined;
+      if (!clerkUserId) return;
+      if (!type || (type !== 'mood' && type !== 'journaling')) return;
+      if (identifier && loggedIds.has(identifier)) return; // de-dup
+      
+      // Log when notification fires (use server time since device time is unreliable)
+      const baseURL = getApiBaseUrl();
+      console.log(`📝 Notification fired: type=${type}, title=${title}`);
+      
+      await fetch(`${baseURL}/api/notifications/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clerkUserId,
+          type,
+          title: title || (type === 'mood' ? 'Mood check-in' : 'Journaling reminder'),
+          message: body || (type === 'mood' ? 'How are you feeling today?' : 'Take a moment to jot your thoughts.'),
+          // Backend will use server time
+        })
+      });
+      if (identifier) loggedIds.add(identifier);
+    } catch (_e) {
+      // ignore logging failures
+    }
+  }
 
   // Initialize listeners asynchronously
   (async () => {
     const Notifications = await getNotificationsModule();
     if (!Notifications) return;
 
-    receiveSub = Notifications.addNotificationReceivedListener((notification: any) => {
+    receiveSub = Notifications.addNotificationReceivedListener(async (notification: any) => {
       const { title, body } = notification.request.content;
       if (title || body) onReceive(title || 'Notification', body || '');
       // Let interested parts of the app refresh (e.g., bell badge)
       try { notificationEvents.publish({ type: 'received', title, body }); } catch { /* no-op */ }
+      // If this is a local reminder, log it to backend to appear in bell
+      await logLocalReminderIfNeeded(notification);
+      // If this was a bootstrap one-time reminder, lay down the repeating schedule now
+      try {
+        const data = notification?.request?.content?.data || {};
+        if (clerkUserId && (data?.bootstrap === true || data?.bootstrap === 'true')) {
+          const settings = await settingsAPI.fetchSettings(clerkUserId);
+          await scheduleFromSettings(settings);
+        }
+      } catch (_e) { /* no-op */ }
     });
 
-    responseSub = Notifications.addNotificationResponseReceivedListener((response: any) => {
+    responseSub = Notifications.addNotificationResponseReceivedListener(async (response: any) => {
       const data = response.notification.request.content.data;
+      // Also log on tap in case receive listener didn't run (background state)
+      await logLocalReminderIfNeeded(response.notification);
+      try {
+        if (clerkUserId && (data?.bootstrap === true || data?.bootstrap === 'true')) {
+          const settings = await settingsAPI.fetchSettings(clerkUserId);
+          await scheduleFromSettings(settings);
+        }
+      } catch (_e) { /* no-op */ }
       if (onTap) onTap(data);
     });
   })();

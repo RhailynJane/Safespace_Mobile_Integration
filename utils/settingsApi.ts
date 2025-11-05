@@ -133,8 +133,34 @@ class SettingsAPI {
       console.log('🔧 Settings API result:', JSON.stringify(result, null, 2));
       
       if (result.success && result.settings) {
-        const mappedSettings = this.mapServerToClient(result.settings);
+        let mappedSettings = this.mapServerToClient(result.settings);
         console.log('🔧 Mapped settings:', mappedSettings);
+
+        // Overlay any locally stored values for reminder times since backend may not persist them yet
+        try {
+          const [localMoodTime, localJournalTime, localMoodSchedule, localJournalSchedule] = await Promise.all([
+            AsyncStorage.getItem('moodReminderTime'),
+            AsyncStorage.getItem('journalReminderTime'),
+            AsyncStorage.getItem('moodReminderCustomSchedule'),
+            AsyncStorage.getItem('journalReminderCustomSchedule'),
+          ]);
+
+          if (localMoodTime && /^\d{2}:\d{2}$/.test(localMoodTime)) {
+            mappedSettings.moodReminderTime = localMoodTime;
+          }
+          if (localJournalTime && /^\d{2}:\d{2}$/.test(localJournalTime)) {
+            mappedSettings.journalReminderTime = localJournalTime;
+          }
+          if (localMoodSchedule) {
+            try { mappedSettings.moodReminderCustomSchedule = JSON.parse(localMoodSchedule); } catch (e) { /* ignore parse error */ }
+          }
+          if (localJournalSchedule) {
+            try { mappedSettings.journalReminderCustomSchedule = JSON.parse(localJournalSchedule); } catch (e) { /* ignore parse error */ }
+          }
+        } catch (e) {
+          console.log('🔧 Skipped overlaying local reminder values:', e);
+        }
+
         return mappedSettings;
       } else {
         console.log('🔧 No settings in response, returning defaults');
@@ -200,6 +226,19 @@ class SettingsAPI {
 
       const result = await response.json();
       console.log('🔧 Save settings result:', result);
+
+      // Persist local-only fields so selections survive app restarts
+      try {
+        await Promise.all([
+          AsyncStorage.setItem('moodReminderTime', settings.moodReminderTime || '09:00'),
+          AsyncStorage.setItem('journalReminderTime', settings.journalReminderTime || '20:00'),
+          AsyncStorage.setItem('moodReminderCustomSchedule', JSON.stringify(settings.moodReminderCustomSchedule || {})),
+          AsyncStorage.setItem('journalReminderCustomSchedule', JSON.stringify(settings.journalReminderCustomSchedule || {})),
+        ]);
+      } catch (e) {
+        console.log('🔧 Failed to persist local reminder values:', e);
+      }
+
       return result;
     } catch (error) {
       console.error('❌ Error saving settings:', error);

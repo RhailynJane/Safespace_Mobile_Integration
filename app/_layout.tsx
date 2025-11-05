@@ -7,6 +7,7 @@ import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeProvider } from "../contexts/ThemeContext";
+import activityApi from "../utils/activityApi";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -55,6 +56,7 @@ function UserSyncHandler() {
 
 function RootLayoutNav() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
   const segments = useSegments();
   const router = useRouter();
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
@@ -65,6 +67,25 @@ function RootLayoutNav() {
     segments,
     hasCompletedOnboarding
   });
+
+  // Send heartbeat every 5 minutes to keep status updated
+  useEffect(() => {
+    if (!isSignedIn || !user?.id) return;
+
+    // Send initial heartbeat
+    activityApi.heartbeat(user.id).catch(err => 
+      console.log('Heartbeat failed:', err)
+    );
+
+    // Send heartbeat every 5 minutes (300000ms)
+    const heartbeatInterval = setInterval(() => {
+      activityApi.heartbeat(user.id).catch(err => 
+        console.log('Heartbeat failed:', err)
+      );
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(heartbeatInterval);
+  }, [isSignedIn, user?.id]);
 
   // Check onboarding status on mount
   useEffect(() => {

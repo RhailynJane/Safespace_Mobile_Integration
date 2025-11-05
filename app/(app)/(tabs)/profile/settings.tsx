@@ -23,10 +23,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
+import { scheduleFromSettings } from "../../../../utils/reminderScheduler";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 import { useUser } from '@clerk/clerk-expo';
 import TimePickerModal from "../../../../components/TimePickerModal";
+// (Optional) expo-notifications was used for debug "Test" buttons; removed to avoid accidental fires on Save
 
 /**
  * SettingsScreen Component
@@ -37,6 +39,7 @@ import TimePickerModal from "../../../../components/TimePickerModal";
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
+  const [ready, setReady] = useState(false); // prevent auto-save on initial load
   const { theme, isDarkMode, setDarkMode: setGlobalDarkMode, textSize, setTextSize: setGlobalTextSize, scaledFontSize } = useTheme();
 
   // Settings state
@@ -84,8 +87,8 @@ export default function SettingsScreen() {
   // Track which reminder frequency options to show (only Daily and Custom for reminders)
   const reminderFrequencyOptionsLimited = ["Daily", "Custom"];
 
-  // Text size slider mapping
-  const textSizeLabels = ["Extra Small", "Small", "Medium", "Large"] as const;
+  // Text size slider mapping (includes Extra Large)
+  const textSizeLabels = ["Extra Small", "Small", "Medium", "Large", "Extra Large"] as const;
   type TextSizeLabel = typeof textSizeLabels[number];
   const textSizeToSlider = (size: string): number => Math.max(0, textSizeLabels.indexOf((size as TextSizeLabel)));
   const sliderToTextSize = (val: number): TextSizeLabel => textSizeLabels[Math.min(textSizeLabels.length-1, Math.max(0, Math.round(val)))] as TextSizeLabel;
@@ -107,7 +110,11 @@ export default function SettingsScreen() {
 
   // Load settings from backend on component mount
   useEffect(() => {
-    loadSettings();
+    (async () => {
+      await loadSettings();
+      // Slight delay to allow state to stabilize before enabling auto-save
+      setTimeout(() => setReady(true), 50);
+    })();
   }, []);
 
   // Apply settings when they change
@@ -143,6 +150,8 @@ export default function SettingsScreen() {
         };
         console.log('🔔 Auto-saving notification settings:', settings);
         await settingsAPI.saveSettings(settings, user?.id);
+        // Schedule local notifications based on updated settings
+        try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
       } catch (error) {
         console.log('Auto-save notification settings failed:', error);
       }
@@ -150,11 +159,15 @@ export default function SettingsScreen() {
 
     // Debounce the save to avoid too many API calls (500ms delay)
     const timer = setTimeout(() => {
-      saveNotificationChanges();
+      if (ready) {
+        saveNotificationChanges();
+      } else {
+        console.log('⏭️ Skipping auto-save: initial load not ready');
+      }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [notificationsEnabled, notifMoodTracking, notifJournaling, notifMessages, notifPostReactions, notifAppointments, notifSelfAssessment, moodReminderEnabled, moodReminderTime, moodReminderFrequency, moodReminderCustomSchedule, journalReminderEnabled, journalReminderTime, journalReminderFrequency, journalReminderCustomSchedule, appointmentReminderEnabled, appointmentReminderAdvanceMinutes, user?.id]);
+  }, [ready, notificationsEnabled, notifMoodTracking, notifJournaling, notifMessages, notifPostReactions, notifAppointments, notifSelfAssessment, moodReminderEnabled, moodReminderTime, moodReminderFrequency, moodReminderCustomSchedule, journalReminderEnabled, journalReminderTime, journalReminderFrequency, journalReminderCustomSchedule, appointmentReminderEnabled, appointmentReminderAdvanceMinutes, user?.id]);
 
   /**
    * Loads settings from backend API
@@ -194,6 +207,8 @@ export default function SettingsScreen() {
     }
   };
 
+  // (Removed) testReminderNow helper used for debug notifications to avoid accidental triggers on Save
+
   /**
    * Saves settings to backend API
    */
@@ -222,7 +237,9 @@ export default function SettingsScreen() {
         appointmentReminderAdvanceMinutes,
       };
 
-      const result = await settingsAPI.saveSettings(settings, user?.id);
+  const result = await settingsAPI.saveSettings(settings, user?.id);
+  // Always schedule locally regardless of server result
+  try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
       if (!result.success) {
         setStatusModal({visible:true, type:'error', title:'Save Failed', message: result.message || 'Failed to save settings'});
       } else {
@@ -282,7 +299,7 @@ export default function SettingsScreen() {
       let fontScale = 1.0;
       switch (size) {
         case "Extra Small":
-          fontScale = 0.85;
+          fontScale = 0.85;                                                                       
           break;
         case "Small":
           fontScale = 0.95;
@@ -292,6 +309,9 @@ export default function SettingsScreen() {
           break;
         case "Large":
           fontScale = 1.15;
+          break;
+        case "Extra Large":
+          fontScale = 1.3;
           break;
       }
       
@@ -338,7 +358,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const textSizeOptions = ["Extra Small", "Small", "Medium", "Large"];
+  const textSizeOptions = ["Extra Small", "Small", "Medium", "Large", "Extra Large"];
   const reminderFrequencyOptions = ["Never", "Hourly", "Daily", "Weekdays", "Weekends", "Weekly", "Custom"];
   const daysOfWeek = [
     { key: 'mon', label: 'Monday' },
@@ -517,7 +537,7 @@ export default function SettingsScreen() {
               <Slider
                 style={styles.slider}
                 minimumValue={0}
-                maximumValue={3}
+                maximumValue={4}
                 step={1}
                 value={textSizeSlider}
                 minimumTrackTintColor={theme.colors.primary}

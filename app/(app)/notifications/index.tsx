@@ -10,9 +10,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";
@@ -20,6 +20,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { useUser } from '@clerk/clerk-expo';
 import { getApiBaseUrl } from '../../../utils/apiBaseUrl';
 import StatusModal from "../../../components/StatusModal";
+import { APP_TIME_ZONE } from '../../../utils/timezone';
 
 // Type definition for a Notification object.
 interface Notification {
@@ -74,14 +75,29 @@ export default function NotificationsScreen() {
       }
       const json = await res.json();
       const rows = (json.data || []) as Array<{id:number; type:string; title:string; message:string; is_read:boolean; created_at:string}>;
-      const mapped: Notification[] = rows.map(r => ({
-        id: String(r.id),
-        title: r.title,
-        message: r.message,
-        time: new Date(r.created_at).toLocaleString(),
-        isRead: Boolean(r.is_read),
-        type: (r.type as Notification['type']) || 'system',
-      }));
+      const mapped: Notification[] = rows.map(r => {
+        // Parse the UTC timestamp from DB and format it in the app's configured timezone
+        const utcDate = new Date(r.created_at);
+        const localTime = utcDate.toLocaleString('en-US', {
+          timeZone: APP_TIME_ZONE,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        });
+        console.log(`🔔 Bell: UTC=${r.created_at} → Local(${APP_TIME_ZONE})=${localTime}`);
+        return {
+          id: String(r.id),
+          title: r.title,
+          message: r.message,
+          time: localTime,
+          isRead: Boolean(r.is_read),
+          type: (r.type as Notification['type']) || 'system',
+        };
+      });
       setNotifications(mapped);
     } catch (e) {
       console.log('Error loading notifications:', e);

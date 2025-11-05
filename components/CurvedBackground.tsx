@@ -8,6 +8,9 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 interface CurvedBackgroundProps {
   children?: React.ReactNode;
   style?: object;
+  // Optional props accepted for testing compatibility
+  color?: string;
+  curveHeight?: number;
 }
 
 /**LLM Prompt: 
@@ -43,7 +46,7 @@ const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
     : ["#e9ecef", "#dee2e6"];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }, style]}>
+    <View testID="curved-background" style={[styles.container, { backgroundColor: theme.colors.background }, style]}>
       <Svg
         width={screenWidth}
         height={screenHeight}

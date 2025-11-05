@@ -29,7 +29,7 @@ export default function BottomNavigation({
   const insets = useSafeAreaInsets();
   
   return (
-    <View style={[
+    <View testID="bottom-navigation" style={[
       styles.bottomNav, 
       { 
         backgroundColor: theme.colors.surface,
@@ -41,6 +41,8 @@ export default function BottomNavigation({
           key={tab.id}
           style={styles.navItem}
           onPress={() => onTabPress(tab.id)} // Handles tab selection
+          testID={`nav-tab-${tab.id}`}
+          accessibilityState={{ selected: activeTab === tab.id }}
           accessibilityRole="button"
           accessibilityLabel={`Navigate to ${tab.name}`}
         >
@@ -52,6 +54,7 @@ export default function BottomNavigation({
               name={tab.icon as any}
               size={24}
               color={activeTab === tab.id ? "#2EA78F" : theme.colors.icon} // Active/inactive colors
+              testID={`nav-icon-${tab.id}`}
             />
           </View>
         </TouchableOpacity>

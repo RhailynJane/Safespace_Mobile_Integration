@@ -1,0 +1,72 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`OptimizedImage Component should match snapshot 1`] = `
+<View
+  style={
+    [
+      {
+        "position": "relative",
+      },
+      {
+        "height": undefined,
+        "width": undefined,
+      },
+    ]
+  }
+>
+  <ViewManagerAdapter_ExpoImage
+    cachePolicy="memory-disk"
+    containerViewRef={"[React.ref]"}
+    contentFit="cover"
+    contentPosition={
+      {
+        "left": "50%",
+        "top": "50%",
+      }
+    }
+    nativeViewRef={"[React.ref]"}
+    onError={[Function]}
+    onLoad={[Function]}
+    onLoadEnd={[Function]}
+    onLoadStart={[Function]}
+    onProgress={[Function]}
+    placeholder={[]}
+    source={
+      [
+        {
+          "uri": "https://example.com/image.jpg",
+        },
+      ]
+    }
+    style={{}}
+    transition={
+      {
+        "duration": 150,
+      }
+    }
+  />
+  <View
+    style={
+      [
+        {
+          "backgroundColor": "#F5F5F5",
+          "bottom": 0,
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+          "top": 0,
+        },
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+        },
+      ]
+    }
+  >
+    <ActivityIndicator
+      color="#2196F3"
+      size="small"
+    />
+  </View>
+</View>
+`;

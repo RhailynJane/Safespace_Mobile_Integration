@@ -365,6 +365,7 @@ model ConversationParticipant {
   role            String?   @default("member")
   joined_at       DateTime  @default(now())
   left_at         DateTime?
+  last_read_at    DateTime? // Track when user last read this conversation
 
   // Relations
   conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)

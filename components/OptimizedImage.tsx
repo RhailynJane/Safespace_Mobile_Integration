@@ -137,7 +137,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = memo((props) => {
           cachePolicy={expoCachePolicy}
           transition={transition}
           accessibilityLabel={accessibilityLabel}
-          testID={testID}
+          testID={testID ?? 'optimized-image'}
           onLoadStart={handleLoadStart}
           onLoadEnd={handleLoadEnd}
           onError={handleError}
@@ -152,7 +152,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = memo((props) => {
         onLoadEnd={handleLoadEnd}
         onError={handleError}
         accessibilityLabel={accessibilityLabel}
-        testID={testID}
+        testID={testID ?? 'optimized-image'}
       />
     );
   }
@@ -178,7 +178,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = memo((props) => {
           cachePolicy={expoCachePolicy}
           transition={transition}
           accessibilityLabel={accessibilityLabel}
-          testID={testID}
+          testID={testID ?? 'optimized-image'}
           onLoadStart={handleLoadStart}
           onLoadEnd={handleLoadEnd}
           onError={handleError}
@@ -191,18 +191,18 @@ const OptimizedImage: React.FC<OptimizedImageProps> = memo((props) => {
           onLoadEnd={handleLoadEnd}
           onError={handleError}
           accessibilityLabel={accessibilityLabel}
-          testID={testID}
+          testID={testID ?? 'optimized-image'}
         />
       )}
       
       {loading && !error && (
-        <View style={[styles.overlay, styles.centerContent]}>
+        <View testID="image-loading-indicator" style={[styles.overlay, styles.centerContent]}>
           <ActivityIndicator size={loaderSize} color={loaderColor} />
         </View>
       )}
       
       {error && showErrorIcon && (
-        <View style={[styles.overlay, styles.centerContent, styles.errorContainer]}>
+        <View testID="image-error-placeholder" style={[styles.overlay, styles.centerContent, styles.errorContainer]}>
           <Ionicons name={fallbackIcon} size={32} color="#999" />
         </View>
       )}
