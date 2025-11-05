@@ -1,7 +1,7 @@
 /**
  * DARK MODE COMPATIBLE VERSION - With Mock Data
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,17 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 
+interface Appointment {
+  id: number;
+  supportWorker: string;
+  date: string;
+  time: string;
+  type: string;
+  status: string;
+  meetingLink?: string;
+  notes?: string;
+}
+
 export default function AppointmentList() {
   const { theme, scaledFontSize } = useTheme();
   
@@ -33,6 +44,7 @@ export default function AppointmentList() {
   const [activeTab, setActiveTab] = useState("appointments");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [activeAppointmentsTab, setActiveAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -56,12 +68,65 @@ export default function AppointmentList() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  useEffect(() => {
+  if (user?.id) fetchAppointments();
+  }, [user?.id]);
+
   // Mock data for appointments
 const fetchAppointments = async () => {
-  const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user.id}`);
-  const data = await response.json();
-  setActiveTab(data.appointments);
+  try {
+    setLoading(true);
+    console.log('📅 Fetching appointments for user:', user?.id);
+    
+    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
+    const result = await response.json();
+
+    console.log('📥 Appointments response:', result);
+
+    if (result.success && result.appointments) {
+      // Transform backend data to frontend format
+      const transformedAppointments = result.appointments.map((apt: any) => {
+        const appointmentDate = new Date(apt.date);
+        const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+
+        // Determine if upcoming or past based on date
+        const now = new Date();
+        const isUpcoming = appointmentDate >= now;
+
+        return {
+          id: apt.id,
+          supportWorker: apt.supportWorker || 'Support Worker',
+          date: formattedDate,
+          time: apt.time || '',
+          type: apt.type || 'Video',
+          // ⚡ KEY FIX: Transform status to "upcoming" or "past"
+          status: apt.status === 'cancelled' ? 'cancelled' :
+                  apt.status === 'completed' ? 'past' :
+                  isUpcoming ? 'upcoming' : 'past'
+        };
+      });
+
+      setAppointments(transformedAppointments);
+      console.log('✅ Appointments loaded:', transformedAppointments.length);
+    } else {
+      console.warn('⚠️ No appointments found or error:', result);
+      setAppointments([]);
+    }
+  } catch (error) {
+    console.error('❌ Error fetching appointments:', error);
+    showStatusModal('error', 'Error', 'Unable to fetch appointments. Please try again.');
+    setAppointments([]);
+  } finally {
+    setLoading(false);
+  }
 };
+  
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);

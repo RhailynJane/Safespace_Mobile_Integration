@@ -321,13 +321,37 @@ export default function BookAppointment() {
   // Available session types
   const SESSION_TYPES = ["Video Call", "Phone Call", "In Person"];
 
-  // Mock available dates and times
-  const AVAILABLE_DATES = [
-    "Monday, October 7, 2025",
-    "Wednesday, October 9, 2025",
-    "Friday, October 11, 2025",
-    "Monday, October 14, 2025",
-  ];
+  // Generate dates for the current week (starting from today)
+
+  const generateCurrentWeekDates = () => {
+    const dates = [];
+    const today = new Date();
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      
+      const dayName = daysOfWeek[date.getDay()];
+      const monthName = months[date.getMonth()];
+      const dayNumber = date.getDate();
+      const year = date.getFullYear();
+      
+      // Store both display format and ISO format
+      const displayDate = `${dayName}, ${monthName} ${dayNumber}, ${year}`;
+      const isoDate = date.toISOString().split('T')[0]; // "2025-10-07"
+      
+      dates.push({
+        display: displayDate,
+        iso: isoDate
+      });
+    }
+    
+    return dates;
+  };
+
+  const AVAILABLE_DATES = generateCurrentWeekDates();
 
   const AVAILABLE_TIMES = [
     "9:00 AM",
@@ -341,29 +365,36 @@ export default function BookAppointment() {
    * Handles navigation to confirmation screen with selected appointment details
    */
   const handleContinue = () => {
-      if (!supportWorker) {
-    showStatusModal('error', 'Error', 'Please select a support worker');
-    return;
-  }
-  
-  if (!selectedDate || !selectedTime) {
-    showStatusModal('error', 'Error', 'Please select date and time');
-    return;
-  }
+    if (!supportWorker) {
+      showStatusModal('error', 'Error', 'Please select a support worker');
+      return;
+    }
+    
+    if (!selectedDate || !selectedTime) {
+      showStatusModal('error', 'Error', 'Please select date and time');
+      return;
+    }
 
-  console.log('🚀 Navigating to confirm with:', {
-    supportWorkerId: supportWorker.id,
-    selectedType,
-    selectedDate,
-    selectedTime
-  });
-  
+    // Find the display format for the selected date
+    const selectedDateObj = AVAILABLE_DATES.find(d => d.iso === selectedDate);
+    const displayDate = selectedDateObj?.display || selectedDate;
+
+    console.log('🚀 Navigating to confirm with:', {
+      supportWorkerId: supportWorker.id,
+      selectedDate: selectedDate,        // ISO: "2025-11-05"
+      selectedDateDisplay: displayDate,  // Display: "Tuesday, November 5, 2025"
+      selectedType,
+      selectedTime
+    });
+    
     router.push({
       pathname: "/appointments/confirm",
       params: {
         supportWorkerId: supportWorker.id,
+        supportWorkerName: supportWorker.name,
         selectedType,
-        selectedDate: selectedDate || "",
+        selectedDate: selectedDate || "",           // Pass ISO for DB
+        selectedDateDisplay: displayDate || "",     // Pass display for UI
         selectedTime: selectedTime || "",
       },
     });
@@ -481,42 +512,42 @@ export default function BookAppointment() {
           {/* Date and Time Selection */}
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Date and Time</Text>
 
-          {/* Available Dates Card */}
-          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Dates</Text>
-            <View style={styles.datesContainer}>
-              {AVAILABLE_DATES.map((date) => (
-                <TouchableOpacity
-                  key={date}
+        {/* Available Dates Card */}
+        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Dates</Text>
+          <View style={styles.datesContainer}>
+            {AVAILABLE_DATES.map((dateObj) => (
+              <TouchableOpacity
+                key={dateObj.iso}
+                style={[
+                  styles.dateItem,
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                  selectedDate === dateObj.iso && { borderColor: theme.colors.primary },
+                ]}
+                onPress={() => {
+                  setSelectedDate(dateObj.iso || null);  // Store ISO: "2025-11-05"
+                  setSelectedTime(null);
+                }}
+              >
+                <Ionicons
+                  name="calendar"
+                  size={20}
+                  color={selectedDate === dateObj.iso ? theme.colors.primary : theme.colors.icon}
+                  style={styles.dateIcon}
+                />
+                <Text
                   style={[
-                    styles.dateItem,
-                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                    selectedDate === date && { borderColor: theme.colors.primary },
+                    styles.dateText,
+                    { color: theme.colors.text },
+                    selectedDate === dateObj.iso && { color: theme.colors.primary },
                   ]}
-                  onPress={() => {
-                    setSelectedDate(date);
-                    setSelectedTime(null); // Reset time when date changes
-                  }}
                 >
-                  <Ionicons
-                    name="calendar"
-                    size={20}
-                    color={selectedDate === date ? theme.colors.primary : theme.colors.icon}
-                    style={styles.dateIcon}
-                  />
-                  <Text
-                    style={[
-                      styles.dateText,
-                      { color: theme.colors.text },
-                      selectedDate === date && { color: theme.colors.primary },
-                    ]}
-                  >
-                    {date}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  {dateObj.display}  {/* Show: "Tuesday, November 5, 2025" */}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
+        </View>
 
           {/* Available Times Card (only shown when date is selected) */}
           {selectedDate ? (

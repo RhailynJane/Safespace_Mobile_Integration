@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -28,6 +28,15 @@ import StatusModal from "../../../../components/StatusModal";
 
 const { width } = Dimensions.get("window");
 
+interface Appointment {
+  id: number;
+  supportWorker: string;
+  date: string;
+  time: string;
+  type: string;
+  status: string;
+}
+
 /**
  * AppointmentsScreen Component
  *
@@ -43,6 +52,10 @@ export default function AppointmentsScreen() {
   const [activeTab, setActiveTab] = useState("appointments");
   const [activeView, setActiveView] = useState("main");
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -56,6 +69,83 @@ export default function AppointmentsScreen() {
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  /**
+   * Fetch appointments from API and calculate stats
+   */
+  useEffect(() => {
+    if (user?.id) {
+      fetchAppointments();
+    }
+  }, [user?.id]);
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+      console.log('📅 Fetching appointments for dashboard...');
+      
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
+      const result = await response.json();
+
+      console.log('📥 Dashboard appointments response:', result);
+
+      if (result.success && result.appointments) {
+        const transformedAppointments = result.appointments.map((apt: any) => {
+          const appointmentDate = new Date(apt.date);
+          const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+
+          const now = new Date();
+          const isUpcoming = appointmentDate >= now;
+
+          return {
+            id: apt.id,
+            supportWorker: apt.supportWorker || 'Support Worker',
+            date: formattedDate,
+            time: apt.time || '',
+            type: apt.type || 'Video',
+            status: apt.status === 'cancelled' ? 'cancelled' :
+                    apt.status === 'completed' ? 'past' :
+                    isUpcoming ? 'upcoming' : 'past',
+            rawDate: appointmentDate // Keep for sorting
+          };
+        });
+
+        setAppointments(transformedAppointments);
+
+        // Calculate upcoming count
+        const upcoming = transformedAppointments.filter((a: any) => a.status === 'upcoming');
+        setUpcomingCount(upcoming.length);
+
+        // Calculate completed count
+        const completed = transformedAppointments.filter((a: any) => a.status === 'past');
+        setCompletedCount(completed.length);
+
+        // Get next appointment (soonest upcoming)
+        if (upcoming.length > 0) {
+          const sorted = upcoming.sort((a: any, b: any) => a.rawDate - b.rawDate);
+          setNextAppointment(sorted[0]);
+        }
+
+        console.log('✅ Stats calculated:', { upcoming: upcoming.length, completed: completed.length });
+      } else {
+        console.warn('⚠️ No appointments found');
+        setAppointments([]);
+        setUpcomingCount(0);
+        setCompletedCount(0);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching appointments:', error);
+      showStatusModal('error', 'Error', 'Unable to fetch appointments. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /**
    * Show status modal with given parameters
@@ -237,15 +327,6 @@ export default function AppointmentsScreen() {
     },
   ];
 
-  // Show loading indicator if data is being fetched
-  if (loading) {
-    return (
-      <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </CurvedBackground>
-    );
-  }
-
   /**
    * Handles navigation to book appointment screen
    */
@@ -259,6 +340,15 @@ export default function AppointmentsScreen() {
   const handleViewScheduled = () => {
     router.push("../appointments/appointment-list");
   };
+
+  // Show loading indicator if data is being fetched
+  if (loading) {
+    return (
+      <CurvedBackground style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </CurvedBackground>
+    );
+  }
 
   return (
     <CurvedBackground>
@@ -287,12 +377,12 @@ export default function AppointmentsScreen() {
           <View style={styles.statsContainer}>
             <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
               <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.statNumber, { color: theme.colors.text }]}>2</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{upcomingCount}</Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Upcoming</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
               <Ionicons name="checkmark-circle-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.statNumber, { color: theme.colors.text }]}>5</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{completedCount}</Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Completed</Text>
             </View>
           </View>
@@ -321,38 +411,53 @@ export default function AppointmentsScreen() {
           </View>
 
           {/* Upcoming Session Preview */}
-          <View style={styles.upcomingSection}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Next Session
-            </Text>
-            <View style={[styles.upcomingCard, { backgroundColor: theme.colors.surface }]}>
-              <View style={styles.upcomingHeader}>
-                <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
-                <View style={styles.upcomingInfo}>
-                  <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
-                    Dr. Sarah Johnson
-                  </Text>
-                  <Text style={[styles.upcomingSpecialty, { color: theme.colors.textSecondary }]}>
-                    Clinical Psychologist
-                  </Text>
+          {nextAppointment && (
+            <View style={styles.upcomingSection}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                Next Session
+              </Text>
+              <View style={[styles.upcomingCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.upcomingHeader}>
+                  <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
+                  <View style={styles.upcomingInfo}>
+                    <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
+                      {nextAppointment.supportWorker}
+                    </Text>
+                    <Text style={[styles.upcomingSpecialty, { color: theme.colors.textSecondary }]}>
+                      Support Worker
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.upcomingDetails}>
-                <View style={styles.detailRow}>
-                  <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
-                  <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                    Tomorrow • 2:00 PM
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
-                  <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                    Video Session
-                  </Text>
+                <View style={styles.upcomingDetails}>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                      {nextAppointment.date} • {nextAppointment.time}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                      {nextAppointment.type} Session
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          )}
+
+          {/* No appointments message */}
+          {!nextAppointment && upcomingCount === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
+              <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
+                No upcoming appointments
+              </Text>
+              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+                Book your first session to get started
+              </Text>
+            </View>
+          )}
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -436,7 +541,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 100, // Added padding to prevent overlap with bottom navigation
+    paddingBottom: 100,
   },
   loadingContainer: {
     flex: 1,
@@ -588,6 +693,22 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   detailText: {
     fontSize: scaledFontSize(14),
     marginLeft: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    marginHorizontal: 24,
+  },
+  emptyStateText: {
+    fontSize: scaledFontSize(16),
+    marginTop: 16,
+    fontWeight: '600',
+  },
+  emptyStateSubtext: {
+    fontSize: scaledFontSize(14),
+    marginTop: 8,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
