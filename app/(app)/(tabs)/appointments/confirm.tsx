@@ -61,6 +61,68 @@ export default function ConfirmAppointment() {
   const selectedType = getParam(params.selectedType);
   const selectedDate = getParam(params.selectedDate);
   const selectedTime = getParam(params.selectedTime);
+  const selectedDateDisplay = getParam((params as any).selectedDateDisplay);
+
+  // Mountain Time helpers (America/Denver)
+  const getNowInMountain = useCallback(() => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+    const get = (type: string) => Number(parts.find(p => p.type === type)?.value || 0);
+    return {
+      year: get('year'),
+      month: get('month'),
+      day: get('day'),
+      hour: get('hour'),
+      minute: get('minute'),
+    };
+  }, []);
+
+  const parseTimeTo24h = useCallback((time: string) => {
+    const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return { hour: 0, minute: 0 };
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const ampm = (match[3] || 'AM').toUpperCase();
+    if (ampm === 'AM') {
+      if (hour === 12) hour = 0;
+    } else {
+      if (hour !== 12) hour += 12;
+    }
+    return { hour, minute };
+  }, []);
+
+  const toHHMMSS = useCallback((timeLabel: string) => {
+    const { hour, minute } = parseTimeTo24h(timeLabel);
+    const hh = String(hour).padStart(2, '0');
+    const mm = String(minute).padStart(2, '0');
+    return `${hh}:${mm}:00`;
+  }, [parseTimeTo24h]);
+
+  const isPastInMountain = useCallback((isoDate: string, timeLabel: string) => {
+    const now = getNowInMountain();
+    const [yStr, mStr, dStr] = isoDate.split('-');
+    const y: number = Number(yStr || '0');
+    const m: number = Number(mStr || '0');
+    const d: number = Number(dStr || '0');
+    if (!y || !m || !d) return true;
+    if (y < now.year) return true;
+    if (y > now.year) return false;
+    if (m < now.month) return true;
+    if (m > now.month) return false;
+    if (d < now.day) return true;
+    if (d > now.day) return false;
+    const { hour, minute } = parseTimeTo24h(timeLabel);
+    if (hour < now.hour) return true;
+    if (hour > now.hour) return false;
+    return minute <= now.minute;
+  }, [getNowInMountain, parseTimeTo24h]);
 
   /**
    * Show status modal
@@ -99,12 +161,23 @@ export default function ConfirmAppointment() {
       const normalizedType = selectedType.toLowerCase();
       const sessionType = sessionTypeMap[normalizedType] || 'video';
 
-      const appointmentData = {
+      // Normalize time to HH:MM:SS for DB compatibility
+      const normalizedTime = toHHMMSS(selectedTime);
+
+      // Be backward-compatible with different backend schemas
+      const workerIdInt = parseInt(supportWorkerId);
+      if (!Number.isFinite(workerIdInt)) {
+        throw new Error(`Invalid support worker id: ${supportWorkerId}`);
+      }
+      const appointmentData: any = {
         clerkUserId: user.id,
-        supportWorkerId: parseInt(supportWorkerId),
+        supportWorkerId: workerIdInt,                    // camelCase
+        support_worker_id: workerIdInt,                  // snake_case (Prisma schema)
+        workerId: workerIdInt,                           // legacy schema
         supportWorkerName, // helpful on older DBs without support_worker_id column
         appointmentDate: selectedDate,
-        appointmentTime: selectedTime,
+        appointmentTime: normalizedTime,
+        time: normalizedTime,                            // some backends expect 'time'
         sessionType: sessionType,
         notes: 'Booked via mobile app',
         duration: 60
@@ -137,14 +210,23 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, supportWorkerId, supportWorkerName, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal]);
+  }, [user?.id, supportWorkerId, supportWorkerName, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS]);
 
   // Create appointment when page loads
   useEffect(() => {
     if (user?.id && supportWorkerId && !appointmentCreated) {
+      // Validate against Mountain Time before creating
+      if (selectedDate && selectedTime && isPastInMountain(selectedDate, selectedTime)) {
+        showStatusModal('error', 'Time not available', 'Selected time is in the past for Mountain Time. Please choose a later time.');
+        // Redirect back to details to pick another time
+        setTimeout(() => {
+          router.replace(`/appointments/details?supportWorkerId=${supportWorkerId}`);
+        }, 400);
+        return;
+      }
       createAppointment();
     }
-  }, [user?.id, supportWorkerId, appointmentCreated, createAppointment]);
+  }, [user?.id, supportWorkerId, appointmentCreated, createAppointment, isPastInMountain, selectedDate, selectedTime, showStatusModal]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -398,7 +480,7 @@ export default function ConfirmAppointment() {
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {selectedDate}
+                  {selectedDateDisplay || selectedDate}
                 </Text>
               </View>
 

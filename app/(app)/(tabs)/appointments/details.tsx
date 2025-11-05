@@ -74,6 +74,64 @@ export default function BookAppointment() {
   // Get support worker ID from navigation params
   const { supportWorkerId } = useLocalSearchParams();
 
+  // Mountain Time helpers (America/Denver)
+  const getNowInMountain = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const get = (type: string) => Number(parts.find(p => p.type === type)?.value || 0);
+    return {
+      year: get('year'),
+      month: get('month'), // 1-12
+      day: get('day'),
+      hour: get('hour'), // 00-23
+      minute: get('minute'),
+    };
+  };
+
+  const parseTimeTo24h = (time: string) => {
+    // Expects formats like "9:00 AM" | "10:30 PM"
+  const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return { hour: 0, minute: 0 };
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+  const ampm = (match[3] || 'AM').toUpperCase();
+    if (ampm === 'AM') {
+      if (hour === 12) hour = 0;
+    } else {
+      if (hour !== 12) hour += 12;
+    }
+    return { hour, minute };
+  };
+
+  const isPastInMountain = (isoDate: string, timeLabel: string) => {
+    const now = getNowInMountain();
+    const [yStr, mStr, dStr] = isoDate.split('-');
+    const y: number = Number(yStr || '0');
+    const m: number = Number(mStr || '0');
+    const d: number = Number(dStr || '0');
+    if (!y || !m || !d) return true; // invalid date treated as past/invalid
+    // Compare date first
+    if (y < now.year) return true;
+    if (y > now.year) return false;
+    if (m < now.month) return true;
+    if (m > now.month) return false;
+    if (d < now.day) return true;
+    if (d > now.day) return false;
+    // Same day in Mountain time, compare time
+    const { hour, minute } = parseTimeTo24h(timeLabel);
+    if (hour < now.hour) return true;
+    if (hour > now.hour) return false;
+    return minute <= now.minute; // equal minute means now or past -> treat as past/unavailable
+  };
+
   /**
    * Show status modal with given parameters
    */
@@ -375,6 +433,12 @@ export default function BookAppointment() {
       return;
     }
 
+    // Prevent booking in the past relative to Mountain Time
+    if (isPastInMountain(selectedDate, selectedTime)) {
+      showStatusModal('error', 'Time not available', 'Selected time is in the past for Mountain Time. Please choose a later time.');
+      return;
+    }
+
     // Find the display format for the selected date
     const selectedDateObj = AVAILABLE_DATES.find(d => d.iso === selectedDate);
     const displayDate = selectedDateObj?.display || selectedDate;
@@ -559,35 +623,49 @@ export default function BookAppointment() {
               <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Times</Text>
                 <View style={styles.timesContainer}>
-                  {AVAILABLE_TIMES.map((time) => (
-                    <TouchableOpacity
-                      key={time}
-                      style={[
-                        styles.timeItem,
-                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                        selectedTime === time && { borderColor: theme.colors.primary },
-                      ]}
-                      onPress={() => setSelectedTime(time)}
-                    >
-                      <Ionicons
-                        name="time"
-                        size={16}
-                        color={selectedTime === time ? theme.colors.primary : theme.colors.icon}
-                        style={styles.timeIcon}
-                      />
-                      <Text
+                  {AVAILABLE_TIMES.map((time) => {
+                    const disabled = isPastInMountain(selectedDate, time);
+                    return (
+                      <TouchableOpacity
+                        key={time}
                         style={[
-                          styles.timeText,
-                          { color: theme.colors.text },
-                          selectedTime === time && { color: theme.colors.primary },
+                          styles.timeItem,
+                          { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                          selectedTime === time && { borderColor: theme.colors.primary },
+                          disabled && styles.timeItemDisabled,
                         ]}
+                        onPress={() => !disabled && setSelectedTime(time)}
+                        disabled={disabled}
+                        accessibilityState={{ disabled }}
                       >
-                        {time}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Ionicons
+                          name="time"
+                          size={16}
+                          color={disabled ? theme.colors.iconDisabled : (selectedTime === time ? theme.colors.primary : theme.colors.icon)}
+                          style={styles.timeIcon}
+                        />
+                        <Text
+                          style={[
+                            styles.timeText,
+                            { color: disabled ? theme.colors.textSecondary : theme.colors.text },
+                            selectedTime === time && !disabled && { color: theme.colors.primary },
+                          ]}
+                        >
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
+              {
+                // All times disabled today
+                AVAILABLE_TIMES.every(t => isPastInMountain(selectedDate, t)) && (
+                  <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                    No times left today in Mountain Time. Please pick another date.
+                  </Text>
+                )
+              }
             </>
           ) : (
             <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
@@ -1000,6 +1078,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     borderColor: "#E9ECEF",
     width: "48%",
     minWidth: 140,
+  },
+  timeItemDisabled: {
+    opacity: 0.5,
   },
   timeItemSelected: {
     backgroundColor: "#E8F5E9",
