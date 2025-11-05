@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -23,7 +24,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 
@@ -37,16 +37,26 @@ import StatusModal from "../../../../components/StatusModal";
  * - Navigate to confirmation screen
  * Features a multi-step process with visual indicators and elegant curved background.
  */
+
+interface SupportWorker {
+  id: number;
+  name: string;
+  title: string;
+  avatar: string;
+  specialties: string[];
+}
+
 export default function BookAppointment() {
   const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("appointments");
   const [selectedType, setSelectedType] = useState("Video Call");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [supportWorker, setSupportWorker] = useState<SupportWorker | null>(null);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -74,28 +84,46 @@ export default function BookAppointment() {
     setStatusModalVisible(true);
   };
 
-  // Mock data for support workers (replaces backend data)
-  const supportWorkers = [
-    {
-      id: 1,
-      name: "Eric Young",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-  ];
+  // Fetch support worker on mount
+  useEffect(() => {
+    if (supportWorkerId) {
+      fetchSupportWorker();
+    }
+  }, [supportWorkerId]);
 
-  // Find the support worker based on the ID from the URL
-  const supportWorker = supportWorkers.find(
-    (sw) => sw.id === Number(supportWorkerId)
-  );
+  /**
+   * Fetch support worker details from API
+   */
+  const fetchSupportWorker = async () => {
+    try {
+      setLoading(true);
+      
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/support-workers/${supportWorkerId}`);
+      const result = await response.json();
+
+      if (result.success) {
+        // Transform the data
+        const worker = result.data;
+        setSupportWorker({
+          id: worker.id,
+          name: `${worker.first_name} ${worker.last_name}`,
+          title: "Support Worker",
+          avatar: worker.avatar_url || "https://via.placeholder.com/150",
+          specialties: worker.specialization 
+            ? worker.specialization.split(',').map((s: string) => s.trim())
+            : [],
+        });
+      } else {
+        showStatusModal('error', 'Error', 'Failed to load support worker details');
+      }
+    } catch (error) {
+      console.error('Error fetching support worker:', error);
+      showStatusModal('error', 'Error', 'Unable to fetch support worker. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -113,17 +141,6 @@ export default function BookAppointment() {
       "No email available"
     );
   };
-
-  // Show error if support worker not found
-  if (!supportWorker) {
-    return (
-      <CurvedBackground>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <Text style={[styles.errorText, { color: theme.colors.text }]}>Support worker not found</Text>
-        </SafeAreaView>
-      </CurvedBackground>
-    );
-  }
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -259,7 +276,7 @@ export default function BookAppointment() {
       title: "Community Forum",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/community-forum");
+        router.push("/(app)/(tabs)/community-forum");
       },
     },
     {
@@ -283,6 +300,20 @@ export default function BookAppointment() {
     return (
       <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
+      </CurvedBackground>
+    );
+  }
+
+  // Show error if support worker not found
+  if (!supportWorker) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <AppHeader title="Book Appointment" showBack={true} />
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>
+            Support worker not found
+          </Text>
+        </SafeAreaView>
       </CurvedBackground>
     );
   }

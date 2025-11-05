@@ -60,7 +60,7 @@ export default function BookAppointment() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
   // State for support workers
-  const [supportWorkers, setSupportWorkers] = useState<any[]>([]);
+  const [supportWorkers, setSupportWorkers] = useState<SupportWorker[]>([]);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
