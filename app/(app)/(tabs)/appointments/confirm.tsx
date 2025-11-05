@@ -82,6 +82,8 @@ export default function ConfirmAppointment() {
   const selectedDateDisplay = getParam((params as any).selectedDateDisplay);
   const backendWorkerIdParam = getParam((params as any).backendWorkerId);
   const supportWorkerEmail = getParam((params as any).supportWorkerEmail);
+  const isReschedule = getParam((params as any).reschedule) === '1' || getParam((params as any).reschedule) === 'true';
+  const rescheduleAppointmentId = getParam((params as any).appointmentId);
 
   // Mountain Time helpers (America/Denver)
   const getNowInMountain = useCallback(() => {
@@ -332,21 +334,70 @@ export default function ConfirmAppointment() {
     }
     }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder]);
 
+    /**
+     * Reschedule an existing appointment
+     */
+    const rescheduleAppointment = useCallback(async () => {
+      if (!user?.id || !rescheduleAppointmentId) return;
+      try {
+        setLoading(true);
+        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+        const normalizedTime = toHHMMSS(selectedTime);
+        const payload = {
+          newDate: selectedDate,
+          newTime: normalizedTime,
+          reason: `Rescheduled via app by user ${user.id}`,
+        };
+        const response = await fetch(`${API_URL}/api/appointments/${rescheduleAppointmentId}/reschedule`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+          setAppointmentCreated(true);
+          setAppointmentId(result.appointment?.id || Number(rescheduleAppointmentId));
+          // Re-schedule reminder for the new time
+          try {
+            await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
+          } catch (e) {
+            console.warn('⚠️ Failed to schedule reminder after reschedule:', e);
+          }
+        } else {
+          showStatusModal('error', 'Reschedule Failed', result.error || 'Unable to reschedule appointment.');
+        }
+      } catch (e) {
+        console.error('Reschedule error:', e);
+        showStatusModal('error', 'Reschedule Failed', 'Unable to reschedule appointment. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }, [user?.id, rescheduleAppointmentId, selectedDate, selectedTime, toHHMMSS, scheduleAppointmentReminder, supportWorkerName, showStatusModal]);
+
   // Create appointment when page loads
   useEffect(() => {
-    if (user?.id && supportWorkerId && !appointmentCreated) {
-      // Validate against Mountain Time before creating
-      if (selectedDate && selectedTime && isPastInMountain(selectedDate, selectedTime)) {
-        showStatusModal('error', 'Time not available', 'Selected time is in the past for Mountain Time. Please choose a later time.');
-        // Redirect back to details to pick another time
-        setTimeout(() => {
+    if (!user?.id || appointmentCreated) return;
+    // Validate Mountain Time before proceeding
+    if (selectedDate && selectedTime && isPastInMountain(selectedDate, selectedTime)) {
+      showStatusModal('error', 'Time not available', 'Selected time is in the past for Mountain Time. Please choose a later time.');
+      // Redirect back to details to pick another time
+      setTimeout(() => {
+        if (supportWorkerId) {
           router.replace(`/appointments/details?supportWorkerId=${supportWorkerId}`);
-        }, 400);
-        return;
-      }
+        } else {
+          router.back();
+        }
+      }, 400);
+      return;
+    }
+    if (isReschedule && rescheduleAppointmentId) {
+      // Reschedule existing appointment
+      rescheduleAppointment();
+    } else if (supportWorkerId) {
+      // Create a new appointment
       createAppointment();
     }
-  }, [user?.id, supportWorkerId, appointmentCreated, createAppointment, isPastInMountain, selectedDate, selectedTime, showStatusModal]);
+  }, [user?.id, appointmentCreated, isReschedule, rescheduleAppointmentId, supportWorkerId, selectedDate, selectedTime, isPastInMountain, showStatusModal, rescheduleAppointment, createAppointment]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -584,9 +635,11 @@ export default function ConfirmAppointment() {
               <Ionicons name="checkmark-circle" size={64} color={theme.colors.success || '#4CAF50'} />
             </View>
 
-            <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>Appointment Booked!</Text>
+            <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>
+              {isReschedule ? 'Appointment Rescheduled!' : 'Appointment Booked!'}
+            </Text>
             <Text style={[styles.confirmationMessage, { color: theme.colors.textSecondary }]}>
-              Your appointment has been successfully scheduled.
+              {isReschedule ? 'Your appointment time has been updated.' : 'Your appointment has been successfully scheduled.'}
             </Text>
 
             <View style={[styles.appointmentDetails, { backgroundColor: theme.colors.background }]}>

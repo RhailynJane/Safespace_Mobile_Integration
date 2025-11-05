@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import * as Linking from 'expo-linking';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
@@ -29,6 +30,7 @@ import StatusModal from "../../../../../components/StatusModal";
 interface Appointment {
   id: number;
   supportWorker: string;
+  supportWorkerId?: number;
   date: string;
   time: string;
   type: string;
@@ -116,6 +118,7 @@ const fetchAppointments = useCallback(async () => {
           return {
             id: apt.id,
             supportWorker: apt.supportWorker || 'Support Worker',
+            supportWorkerId: apt.supportWorkerId || apt.support_worker_id,
             date: formattedDate,
             time: apt.time || '',
             type: apt.type || 'Video',
@@ -226,14 +229,38 @@ const fetchAppointments = useCallback(async () => {
    * Handles navigation to video consultation screen
    */
   const handleJoinSession = () => {
-    router.push("/video-consultations");
+    if (!appointment) return;
+    // Route to the pre-join Video Consultation screen
+    router.push({
+      pathname: "/(app)/video-consultations/video-call",
+      params: {
+        appointmentId: String(appointment.id),
+        supportWorkerName: appointment.supportWorker,
+        date: appointment.date,
+        time: appointment.time,
+        meetingLink: appointment.meetingLink || '',
+      },
+    });
   };
 
   /**
    * Opens reschedule modal
    */
   const handleReschedule = () => {
-    setRescheduleModalVisible(true);
+    if (!appointment?.supportWorkerId) {
+      // If we don't have the worker id, fall back to the booking flow
+      router.push(`/appointments/book`);
+      return;
+    }
+    // Navigate to details screen in reschedule mode; user selects new date/time there
+    router.push({
+      pathname: '/appointments/details',
+      params: {
+        supportWorkerId: String(appointment.supportWorkerId),
+        reschedule: '1',
+        appointmentId: String(appointment.id),
+      },
+    });
   };
 
   /**
@@ -247,14 +274,31 @@ const fetchAppointments = useCallback(async () => {
    * Confirms appointment cancellation
    * Simulates API call with timeout
    */
-  const confirmCancel = () => {
-    setLoading(true);
-    setTimeout(() => {
+  const confirmCancel = async () => {
+    try {
+      setLoading(true);
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/appointments/${id}/cancel`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cancellationReason: 'Cancelled by user' }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setCancelModalVisible(false);
+        showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
+        // Update local state optimistically
+        setAppointment(prev => prev ? { ...prev, status: 'Cancelled' } : prev);
+        setTimeout(() => router.back(), 1200);
+      } else {
+        showStatusModal('error', 'Cancel Failed', result.error || 'Unable to cancel appointment.');
+      }
+    } catch (e) {
+      console.error('Cancel error:', e);
+      showStatusModal('error', 'Cancel Failed', 'Unable to cancel appointment. Please try again.');
+    } finally {
       setLoading(false);
-      setCancelModalVisible(false);
-      showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
-      setTimeout(() => router.back(), 1500);
-    }, 1500);
+    }
   };
 
   /**
@@ -568,109 +612,7 @@ const fetchAppointments = useCallback(async () => {
             </Pressable>
           </Modal>
 
-          {/* Reschedule Modal */}
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={rescheduleModalVisible}
-            onRequestClose={() => setRescheduleModalVisible(false)}
-          >
-            <Pressable
-              style={styles.modalOverlay}
-              onPress={() => setRescheduleModalVisible(false)}
-            >
-              <View style={styles.blurContainer}>
-                <View style={[styles.confirmationModalContent, { backgroundColor: theme.colors.surface }]}>
-                  <View style={[styles.modalIconContainer, { backgroundColor: theme.colors.surface }]}>
-                    <Ionicons name="calendar" size={48} color={theme.colors.primary} />
-                  </View>
-                  <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Reschedule Appointment</Text>
-                  <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
-                    Select a new date and time for your session with{" "}
-                    {appointment.supportWorker}.
-                  </Text>
-
-                  {/* Available Time Slots */}
-                  <View style={styles.rescheduleOptions}>
-                    <Text style={[styles.rescheduleHint, { color: theme.colors.textSecondary }]}>
-                      Available time slots:
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.timeSlot,
-                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 },
-                        selectedTimeSlot === "slot1" && { borderColor: theme.colors.primary, borderWidth: 2 },
-                      ]}
-                      onPress={() => setSelectedTimeSlot("slot1")}
-                    >
-                      <Text
-                        style={[
-                          styles.timeSlotText,
-                          { color: theme.colors.text },
-                          selectedTimeSlot === "slot1" && { color: theme.colors.primary },
-                        ]}
-                      >
-                        October 08, 2025 at 2:00 PM
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.timeSlot,
-                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 },
-                        selectedTimeSlot === "slot2" && { borderColor: theme.colors.primary, borderWidth: 2 },
-                      ]}
-                      onPress={() => setSelectedTimeSlot("slot2")}
-                    >
-                      <Text
-                        style={[
-                          styles.timeSlotText,
-                          { color: theme.colors.text },
-                          selectedTimeSlot === "slot2" && { color: theme.colors.primary },
-                        ]}
-                      >
-                        October 09, 2025 at 11:00 AM
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.timeSlot,
-                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 },
-                        selectedTimeSlot === "slot3" && { borderColor: theme.colors.primary, borderWidth: 2 },
-                      ]}
-                      onPress={() => setSelectedTimeSlot("slot3")}
-                    >
-                      <Text
-                        style={[
-                          styles.timeSlotText,
-                          { color: theme.colors.text },
-                          selectedTimeSlot === "slot3" && { color: theme.colors.primary },
-                        ]}
-                      >
-                        October 10, 2025 at 4:30 PM
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.modalCancelButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-                      onPress={() => setRescheduleModalVisible(false)}
-                    >
-                      <Text style={[styles.modalCancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.modalConfirmButton, { backgroundColor: theme.colors.primary }]}
-                      onPress={confirmReschedule}
-                    >
-                      <Text style={styles.modalConfirmButtonText}>
-                        Confirm Reschedule
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Pressable>
-          </Modal>
+          {/* Reschedule Modal removed: rescheduling handled by navigating to details screen */}
         </ScrollView>
 
         {/* Side Menu Modal */}

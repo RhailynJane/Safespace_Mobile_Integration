@@ -74,7 +74,7 @@ export default function BookAppointment() {
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Get support worker ID from navigation params
-  const { supportWorkerId } = useLocalSearchParams();
+  const { supportWorkerId, reschedule, appointmentId } = useLocalSearchParams();
 
   // Mountain Time helpers (America/Denver)
   const getNowInMountain = () => {
@@ -474,6 +474,9 @@ export default function BookAppointment() {
         selectedDate: selectedDate || "",           // Pass ISO for DB
         selectedDateDisplay: displayDate || "",     // Pass display for UI
         selectedTime: selectedTime || "",
+        // Reschedule context passthrough if present
+        reschedule: reschedule ? '1' : undefined,
+        appointmentId: appointmentId ? String(appointmentId) : undefined,
       },
     });
   };

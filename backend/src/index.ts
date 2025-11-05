@@ -5395,75 +5395,114 @@ app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) 
 
     const currentAppointment = appointmentCheck.rows[0];
 
-    // Check if appointment can be rescheduled (not completed or cancelled)
-    if (['completed', 'cancelled'].includes(currentAppointment.status)) {
+    // Detect legacy/dynamic column names
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
+    );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+
+    const supportWorkerIdCol = pickCol('support_worker_id', ['worker_id']);
+    const dateCol = pickCol('appointment_date', ['date']);
+    const timeCol = pickCol('appointment_time', ['time']);
+    const statusCol = pickCol('status', []);
+    const notesCol = pickCol('notes', ['note', 'description']);
+
+    // Check if appointment can be rescheduled (only if status column exists)
+    const curStatus = statusCol ? currentAppointment[statusCol] : null;
+    if (statusCol && curStatus && ['completed', 'cancelled'].includes(String(curStatus))) {
       return res.status(400).json({ 
-        error: `Cannot reschedule ${currentAppointment.status} appointment` 
+        error: `Cannot reschedule ${curStatus} appointment` 
       });
     }
 
-    // Check for time slot conflicts with the new time
-    const conflictCheck = await pool.query(
-      `SELECT id FROM appointments 
-       WHERE support_worker_id = $1 
-       AND appointment_date = $2 
-       AND appointment_time = $3 
-       AND status IN ('scheduled', 'confirmed')
-       AND id != $4`,
-      [currentAppointment.support_worker_id, newDate, newTime, id]
-    );
-
-    if (conflictCheck.rows.length > 0) {
-      return res.status(409).json({ 
-        error: "Time slot already booked",
-        message: "The new time slot is not available. Please select another time."
-      });
+    // Check for time slot conflicts with the new time (if columns exist)
+    if (dateCol && timeCol) {
+      let conflictRows: any[] = [];
+      if (supportWorkerIdCol) {
+        const workerIdVal = currentAppointment[supportWorkerIdCol];
+        const conflictQuery = `SELECT id FROM appointments 
+          WHERE ${supportWorkerIdCol} = $1 
+          AND ${dateCol} = $2 
+          AND ${timeCol} = $3 
+          ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}
+          AND id != $4`;
+        const params = [workerIdVal, newDate, newTime, id];
+        const conflictCheck = await pool.query(conflictQuery, params);
+        conflictRows = conflictCheck.rows;
+      } else {
+        const conflictQuery = `SELECT id FROM appointments 
+          WHERE ${dateCol} = $1 
+          AND ${timeCol} = $2 
+          ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}
+          AND id != $3`;
+        const conflictCheck = await pool.query(conflictQuery, [newDate, newTime, id]);
+        conflictRows = conflictCheck.rows;
+      }
+      if (conflictRows.length > 0) {
+        return res.status(409).json({ 
+          error: "Time slot already booked",
+          message: "The new time slot is not available. Please select another time."
+        });
+      }
     }
 
-    // Update the appointment
-    const updateQuery = `
-      UPDATE appointments 
-      SET 
-        appointment_date = $1, 
-        appointment_time = $2,
-        notes = CASE 
-          WHEN notes IS NULL THEN $3
-          ELSE notes || E'\\n\\nRescheduled: ' || $3
-        END,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
-      RETURNING *
-    `;
+    // Build dynamic UPDATE for date/time and notes
+    const updates: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+    if (dateCol) { updates.push(`${dateCol} = $${idx++}`); params.push(newDate); }
+    if (timeCol) { updates.push(`${timeCol} = $${idx++}`); params.push(newTime); }
+    if (notesCol) {
+      // Append a rescheduling note
+      const prevDate = dateCol ? currentAppointment[dateCol] : currentAppointment.appointment_date;
+      const prevTime = timeCol ? currentAppointment[timeCol] : currentAppointment.appointment_time;
+      const reschedulingNote = reason || `Rescheduled from ${prevDate} at ${prevTime}`;
+      // Use concatenation if existing notes, else set new
+      updates.push(`${notesCol} = CASE WHEN ${notesCol} IS NULL OR ${notesCol} = '' THEN $${idx} ELSE ${notesCol} || E'\\n\\nRescheduled: ' || $${idx} END`);
+      params.push(reschedulingNote);
+      idx++;
+    }
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
 
-    const reschedulingNote = reason || `Rescheduled from ${currentAppointment.appointment_date} at ${currentAppointment.appointment_time}`;
+    const updateSql = `UPDATE appointments SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+    params.push(id);
+    const result = await pool.query(updateSql, params);
 
-    const result = await pool.query(updateQuery, [
-      newDate,
-      newTime,
-      reschedulingNote,
-      id
-    ]);
-
-    // Get support worker details for response
-    const swResult = await pool.query(
-      "SELECT first_name, last_name FROM support_workers WHERE id = $1",
-      [currentAppointment.support_worker_id]
-    );
+    // Get support worker details for response if possible
+    let supportWorkerName = 'Support Worker';
+    if (supportWorkerIdCol) {
+      const workerIdVal = currentAppointment[supportWorkerIdCol];
+      // If schema uses support_workers.id, this will find a row; if not, best-effort
+      try {
+        const swResult = await pool.query(
+          "SELECT first_name, last_name FROM support_workers WHERE id = $1",
+          [workerIdVal]
+        );
+        if (swResult.rows.length > 0) {
+          supportWorkerName = `${swResult.rows[0].first_name} ${swResult.rows[0].last_name}`;
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     const appointment = result.rows[0];
-    const supportWorker = swResult.rows[0];
-
     res.json({
       success: true,
       message: "Appointment rescheduled successfully",
       appointment: {
         id: appointment.id,
-        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
+        supportWorker: supportWorkerName,
+        date: dateCol ? appointment[dateCol] : appointment.appointment_date,
+        time: timeCol ? appointment[timeCol] : appointment.appointment_time,
         type: appointment.session_type,
-        status: appointment.status,
-        notes: appointment.notes
+        status: statusCol ? appointment[statusCol] : appointment.status,
+        notes: notesCol ? appointment[notesCol] : appointment.notes
       }
     });
 
@@ -5494,28 +5533,47 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
 
     const currentAppointment = appointmentCheck.rows[0];
 
-    // Check if appointment can be cancelled
-    if (['completed', 'cancelled'].includes(currentAppointment.status)) {
+    // Detect legacy/dynamic column names
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
+    );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+
+    const statusCol = pickCol('status', []);
+    const cancellationReasonCol = pickCol('cancellation_reason', ['cancel_reason', 'reason']);
+    const notesCol = pickCol('notes', ['note', 'description']);
+
+    // Check if appointment can be cancelled (only if status column exists)
+    const curStatus = statusCol ? currentAppointment[statusCol] : null;
+    if (statusCol && curStatus && ['completed', 'cancelled'].includes(String(curStatus))) {
       return res.status(400).json({ 
-        error: `Cannot cancel ${currentAppointment.status} appointment` 
+        error: `Cannot cancel ${curStatus} appointment` 
       });
     }
 
-    // Update the appointment status to cancelled
-    const updateQuery = `
-      UPDATE appointments 
-      SET 
-        status = 'cancelled',
-        cancellation_reason = $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-      RETURNING *
-    `;
+    // Build dynamic UPDATE for cancellation
+    const updates: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+    if (statusCol) { updates.push(`${statusCol} = 'cancelled'`); }
+    if (cancellationReasonCol) {
+      updates.push(`${cancellationReasonCol} = $${idx++}`);
+      params.push(cancellationReason || 'Cancelled by user');
+    } else if (notesCol) {
+      updates.push(`${notesCol} = CASE WHEN ${notesCol} IS NULL OR ${notesCol} = '' THEN $${idx} ELSE ${notesCol} || E'\\n\\nCancelled: ' || $${idx} END`);
+      params.push(cancellationReason || 'Cancelled by user');
+      idx++;
+    }
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
 
-    const result = await pool.query(updateQuery, [
-      cancellationReason || 'Cancelled by user',
-      id
-    ]);
+    const updateSql = `UPDATE appointments SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+    params.push(id);
+    const result = await pool.query(updateSql, params);
 
     const appointment = result.rows[0];
 
@@ -5524,8 +5582,8 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
       message: "Appointment cancelled successfully",
       appointment: {
         id: appointment.id,
-        status: appointment.status,
-        cancellationReason: appointment.cancellation_reason,
+        status: statusCol ? appointment[statusCol] : 'cancelled',
+        cancellationReason: cancellationReasonCol ? appointment[cancellationReasonCol] : (cancellationReason || 'Cancelled by user'),
         cancelledAt: appointment.updated_at
       }
     });
