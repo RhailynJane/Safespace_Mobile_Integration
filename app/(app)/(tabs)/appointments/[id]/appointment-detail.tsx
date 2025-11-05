@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,18 @@ import { AppHeader } from "../../../../../components/AppHeader";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
+
+
+interface Appointment {
+  id: number;
+  supportWorker: string;
+  date: string;
+  time: string;
+  type: string;
+  status: string;
+  meetingLink?: string;
+  notes?: string;
+}
 
 /**
  * AppointmentDetail Component
@@ -47,6 +59,8 @@ export default function AppointmentList() {
   const [rescheduleModalVisible, setRescheduleModalVisible] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+
   
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -61,22 +75,77 @@ export default function AppointmentList() {
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 07, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "Upcoming",
-      meetingLink: "https://meet.google.com/knr-pkav-xpt",
-    },
-  ];
+
 
   // Find the appointment based on the ID from the URL
-  const appointment = appointments.find((appt) => appt.id === Number(id));
 
+  useEffect(() => {
+    if (user?.id && id) fetchAppointments();
+  }, [user?.id, id]);
+
+const fetchAppointments = async () => {
+  try {
+    setLoading(true);
+    console.log('📅 Fetching appointment detail for ID:', id, 'User:', user?.id);
+    
+    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
+    const result = await response.json();
+
+    console.log('📥 Appointments response:', result);
+
+      if (result.success && result.appointments) {
+        // Transform backend data to frontend format
+        const transformedAppointments = result.appointments.map((apt: any) => {
+          const appointmentDate = new Date(apt.date);
+          const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+
+          const now = new Date();
+          const isUpcoming = appointmentDate >= now;
+
+          return {
+            id: apt.id,
+            supportWorker: apt.supportWorker || 'Support Worker',
+            date: formattedDate,
+            time: apt.time || '',
+            type: apt.type || 'Video',
+            meetingLink: apt.meetingLink || apt.meeting_link, // Handle both formats
+            notes: apt.notes,
+            status: apt.status === 'cancelled' ? 'Cancelled' :
+                    apt.status === 'completed' ? 'Completed' :
+                    isUpcoming ? 'Upcoming' : 'Past'
+          };
+        });
+
+        const foundAppointment = transformedAppointments.find(
+          (apt: Appointment) => apt.id === parseInt(id as string)
+        );
+        
+        if (foundAppointment) {
+          setAppointment(foundAppointment);
+          console.log('✅ Appointment found:', foundAppointment);
+        } else {
+          console.warn('⚠️ Appointment with ID', id, 'not found');
+          setAppointment(null);
+          showStatusModal('error', 'Not Found', 'Appointment not found');
+        }
+      } else {
+        console.warn('⚠️ No appointments found or error:', result);
+        setAppointment(null);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching appointment:', error);
+      showStatusModal('error', 'Error', 'Unable to fetch appointment. Please try again.');
+      setAppointment(null);
+    } finally {
+      setLoading(false);
+    }
+  };
   /**
    * Show status modal with given parameters
    */
@@ -148,27 +217,6 @@ export default function AppointmentList() {
     );
   };
 
-  // Show error if appointment not found
-  if (!appointment) {
-    return (
-      <CurvedBackground>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={28} color="#4CAF50" />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Appointment Details</Text>
-            <View style={{ width: 28 }} />
-          </View>
-          <View style={styles.errorContainer}>
-            <Ionicons name="warning" size={48} color="#FF6B6B" />
-            <Text style={[styles.errorText, { color: theme.colors.text }]}>Appointment not found</Text>
-          </View>
-        </SafeAreaView>
-      </CurvedBackground>
-    );
-  }
-
   /**
    * Handles navigation to video consultation screen
    */
@@ -230,6 +278,27 @@ export default function AppointmentList() {
     return (
       <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
+      </CurvedBackground>
+    );
+  }
+
+    // Show error if appointment not found
+  if (!appointment) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={28} color="#4CAF50" />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Appointment Details</Text>
+            <View style={{ width: 28 }} />
+          </View>
+          <View style={styles.errorContainer}>
+            <Ionicons name="warning" size={48} color="#FF6B6B" />
+            <Text style={[styles.errorText, { color: theme.colors.text }]}>Appointment not found</Text>
+          </View>
+        </SafeAreaView>
       </CurvedBackground>
     );
   }
