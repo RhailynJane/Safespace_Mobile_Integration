@@ -59,7 +59,7 @@ import { useAuth } from "@clerk/clerk-expo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { Audio } from 'expo-av';
+// import { useAudioRecorder, RecordingPresets, useAudioPlayer } from 'expo-audio'; // Temporarily disabled
 import CurvedBackground from "../../../../components/CurvedBackground";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
@@ -750,75 +750,17 @@ export default function ChatScreen() {
 
   // Handle voice recording (start/stop)
   const handleMicPress = async () => {
+    // Voice recording temporarily disabled - will be re-implemented with expo-audio
+    showStatusModal('info', 'Feature Unavailable', 'Voice recording is temporarily unavailable. Please use text or attachments instead.');
+    return;
+    
+    /* 
     if (isRecording) {
-      // Stop recording
-      try {
-        if (recordingRef.current) {
-          await recordingRef.current.stopAndUnloadAsync();
-          const uri = recordingRef.current.getURI();
-          recordingRef.current = null;
-          setIsRecording(false);
-          if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
-          // Move to pending state so user can preview/cancel/send from UI
-          if (uri) {
-            setPendingRecordingUri(uri);
-            setPendingRecordingDuration(Math.max(1, Math.floor(recordingDuration)));
-          }
-          setRecordingDuration(0);
-        }
-      } catch (error) {
-        console.error('Error stopping recording:', error);
-        showStatusModal('error', 'Error', 'Failed to stop recording');
-        setIsRecording(false);
-        recordingRef.current = null;
-      }
+      // Stop recording logic here
     } else {
-      // Start recording
-      try {
-        const permission = await Audio.requestPermissionsAsync();
-        if (!permission.granted) {
-          showStatusModal('error', 'Permission Required', 'Please allow microphone access to record voice messages.');
-          return;
-        }
-
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
-
-        const { recording } = await Audio.Recording.createAsync(
-          Audio.RecordingOptionsPresets.HIGH_QUALITY
-        );
-        
-        recordingRef.current = recording;
-        setIsRecording(true);
-        
-        // Track duration
-        const durationInterval = setInterval(() => {
-          if (recordingRef.current) {
-            recordingRef.current.getStatusAsync().then((status: any) => {
-              if (status.isRecording) {
-                setRecordingDuration(status.durationMillis / 1000);
-              }
-            });
-          }
-        }, 100);
-        recordingTimerRef.current = durationInterval as unknown as NodeJS.Timeout;
-        
-        // Auto-stop after 2 minutes
-        setTimeout(async () => {
-          if (recordingRef.current && isRecording) {
-            clearInterval(durationInterval);
-            await handleMicPress(); // This will stop the recording
-          }
-        }, 120000);
-        
-      } catch (error) {
-        console.error('Error starting recording:', error);
-        showStatusModal('error', 'Error', 'Failed to start recording. Please check your microphone permissions.');
-        setIsRecording(false);
-      }
+      // Start recording logic here
     }
+    */
   };
 
   // Cancel/remove pending recording (or abort active recording)
@@ -1112,56 +1054,11 @@ export default function ChatScreen() {
     const AudioBubble = ({ uri }: { uri: string }) => {
       const [playing, setPlaying] = useState(false);
       const [barAnim] = useState([new Animated.Value(2), new Animated.Value(8), new Animated.Value(4)]);
-      const soundRef = useRef<Audio.Sound | null>(null);
-
-      const startWave = () => {
-        const loops = barAnim.map((v, i) => Animated.loop(
-          Animated.sequence([
-            Animated.timing(v, { toValue: 14 - i * 2, duration: 250, useNativeDriver: false }),
-            Animated.timing(v, { toValue: 2 + i * 2, duration: 250, useNativeDriver: false }),
-          ])
-        ));
-        Animated.parallel(loops).start();
-      };
-
-      const stopWave = () => {
-        barAnim.forEach(v => v.stopAnimation());
-      };
-
+      // Audio playback temporarily disabled - will be re-implemented with expo-audio
+      
       const toggle = async () => {
-        try {
-          if (!soundRef.current) {
-            const { sound } = await Audio.Sound.createAsync({ uri: resolveRemoteUri(uri) });
-            soundRef.current = sound;
-            await sound.playAsync();
-            setPlaying(true);
-            startWave();
-            sound.setOnPlaybackStatusUpdate((st: any) => {
-              if (st.didJustFinish) {
-                setPlaying(false);
-                stopWave();
-              }
-            });
-          } else {
-            const status: any = await soundRef.current.getStatusAsync();
-            if (status.isPlaying) {
-              await soundRef.current.pauseAsync();
-              setPlaying(false);
-              stopWave();
-            } else {
-              await soundRef.current.playAsync();
-              setPlaying(true);
-              startWave();
-            }
-          }
-        } catch (_e) {
-          // ignore
-        }
+        showStatusModal('info', 'Feature Unavailable', 'Audio playback is temporarily unavailable.');
       };
-
-      useEffect(() => {
-        return () => { try { soundRef.current?.unloadAsync(); } catch { /* noop */ } };
-      }, []);
 
       return (
         <View style={styles.audioBubble}>

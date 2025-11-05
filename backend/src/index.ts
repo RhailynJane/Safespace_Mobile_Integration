@@ -2942,12 +2942,12 @@ app.get(
 
       // Get online status for all participants
       const conversationsWithOnlineStatus = await Promise.all(
-        conversations.map(async (conversation) => {
+        conversations.map(async (conversation: any) => {
           const lastMessage = conversation.messages[0];
           
           // Find the current user's participant record to get their last_read_at
           const currentUserParticipant = conversation.participants.find(
-            p => p.user.clerk_user_id === clerkUserId
+            (p: any) => p.user.clerk_user_id === clerkUserId
           );
           
           // Count unread messages: messages from others created after last_read_at
@@ -2972,7 +2972,7 @@ app.get(
           
           // Get participants with real online status
           const participantsWithStatus = await Promise.all(
-            conversation.participants.map(async (p) => {
+            conversation.participants.map(async (p: any) => {
               const online = await getUserOnlineStatus(p.user.clerk_user_id);
               return {
                 id: p.user.id,
@@ -3081,7 +3081,7 @@ app.get(
       });
 
       // Format response with file attachments
-      const formattedMessages = messages.map(message => ({
+      const formattedMessages = messages.map((message: any) => ({
         id: message.id.toString(),
         message_text: message.message_text,
         message_type: message.message_type,
@@ -3135,7 +3135,7 @@ app.post(
       }
 
       // Get user and verify participation in transaction
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: any) => {
         // Get user and verify they're a participant
         const user = await tx.user.findUnique({
           where: { clerk_user_id: clerkUserId }
@@ -3211,8 +3211,8 @@ app.post(
         });
 
         const recipients = participants
-          .map(p => p.user.clerk_user_id)
-          .filter(id => id && id !== result.sender.clerk_user_id);
+          .map((p: any) => p.user.clerk_user_id)
+          .filter((id: any) => id && id !== result.sender.clerk_user_id);
 
         for (const recipientId of recipients) {
           await notifyUserByClerkId(
@@ -3381,7 +3381,7 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       });
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Get creator user
       const creator = await tx.user.findUnique({
         where: { clerk_user_id: clerkUserId }
@@ -3407,8 +3407,8 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       // Generate conversation title if not provided
       let conversationTitle = title;
       if (!conversationTitle) {
-        const otherParticipants = participants.filter(p => p.clerk_user_id !== clerkUserId);
-        const names = otherParticipants.map(p => `${p.first_name} ${p.last_name}`.trim());
+        const otherParticipants = participants.filter((p: any) => p.clerk_user_id !== clerkUserId);
+        const names = otherParticipants.map((p: any) => `${p.first_name} ${p.last_name}`.trim());
         conversationTitle = names.join(', ');
       }
 
@@ -3419,7 +3419,7 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
           conversation_type: conversationType,
           created_by: creator.id,
           participants: {
-            create: participants.map(participant => ({
+            create: participants.map((participant: any) => ({
               user_id: participant.id
             }))
           }
@@ -3485,7 +3485,7 @@ app.get(
 
       // Check for existing conversations
       const contactsWithConversations = await Promise.all(
-        contacts.map(async (contact) => {
+        contacts.map(async (contact: any) => {
           const existingConversation = await prisma.conversation.findFirst({
             where: {
               AND: [
@@ -3562,7 +3562,7 @@ app.delete("/api/messages/conversations/:conversationId", async (req: Request, r
       return res.status(403).json({ success: false, message: 'Not a participant of this conversation' });
     }
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Remove the participant (delete for this user)
       await tx.conversationParticipant.delete({ where: { id: participant.id } });
 
@@ -3628,7 +3628,7 @@ app.get(
         take: 20
       });
 
-      const formattedUsers = users.map(user => ({
+      const formattedUsers = users.map((user: any) => ({
         ...user,
         online: false,
         has_existing_conversation: false
@@ -3769,11 +3769,11 @@ app.get(
 
       // console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
 
-      const formattedConversations = conversations.map(conversation => {
+      const formattedConversations = conversations.map((conversation: any) => {
         const lastMessage = conversation.messages[0];
         
         // Get ALL participants with online status
-        const allParticipants = conversation.participants.map(p => ({
+        const allParticipants = conversation.participants.map((p: any) => ({
           id: p.user.id,
           clerk_user_id: p.user.clerk_user_id,
           first_name: p.user.first_name,

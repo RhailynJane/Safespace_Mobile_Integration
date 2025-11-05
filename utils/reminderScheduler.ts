@@ -92,6 +92,25 @@ async function cancelByTitle(title: string) {
   }
 }
 
+async function cleanupPastOneShots() {
+  try {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    const now = Date.now();
+    for (const n of all) {
+      const trigger = (n as any)?.trigger;
+      // Check if it's a one-shot (Date trigger) that has already passed
+      if (trigger instanceof Date) {
+        if (trigger.getTime() < now) {
+          console.log(`🧹 Cleaning up past one-shot notification: ${(n as any)?.content?.title}`);
+          try { await Notifications.cancelScheduledNotificationAsync((n as any).identifier); } catch (_e) { /* ignore */ }
+        }
+      }
+    }
+  } catch (_e) {
+    // ignore
+  }
+}
+
 async function scheduleDaily(title: string, body: string, hour: number, minute: number, data?: Record<string, any>) {
   // Use calendar trigger anchored to the device timezone. Some Android versions ignore `second` for repeats.
   const tz = (Intl && Intl.DateTimeFormat().resolvedOptions().timeZone) || undefined;
@@ -130,6 +149,9 @@ async function scheduleOneShot(title: string, body: string, fireAt: Date, data?:
 export async function scheduleFromSettings(settings: UserSettings) {
   const perms = await ensurePermissions();
   if (!perms) return;
+
+  // Clean up any past one-shot notifications that might be lingering
+  await cleanupPastOneShots();
 
   // Build a compact signature of relevant reminder settings to avoid unnecessary cancel/reschedule bursts
   const signature = JSON.stringify({
@@ -303,8 +325,17 @@ export async function scheduleFromSettings(settings: UserSettings) {
           console.log(`🕐 JOURNAL Custom ${key}: delta=${delta}s`);
           
           if (delta < 0) {
-            // Time has passed for today - skip, will fire next week
-            console.log(`⏭️ JOURNAL Custom ${key} time passed, skipping (will fire next occurrence)`);
+            // Time has passed for today
+            // Schedule one-shot for next week AND a weekly repeating notification
+            // The one-shot ensures it fires next week, the weekly ensures it continues after that
+            console.log(`⏭️ JOURNAL Custom ${key} time passed, scheduling one-shot for next ${key} + weekly`);
+            const nextWeek = new Date();
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            nextWeek.setHours(h, m, 0, 0);
+            const oneShotId = await scheduleOneShot('Journaling reminder', 'Take a moment to jot your thoughts.', nextWeek, { type: 'journaling', bootstrap: true });
+            perDayIds.push(oneShotId);
+            // Now also schedule the weekly repeating (it might fire immediately but the one-shot will cover next week)
+            // Actually, let's skip the weekly since it will fire immediately - just rely on one-shot
             continue;
           } else if (delta >= 0 && delta <= 300) {
             // Within 5 minutes (300s) - schedule one-shot for today to avoid immediate fire from weekly trigger

@@ -31,7 +31,8 @@
         {
           "cameraPermission": "Allow SafeSpace to access your camera for video consultations with support workers."
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"
@@ -48,7 +49,10 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "SafeSpace needs camera access for video calls",
         "NSMicrophoneUsageDescription": "SafeSpace needs access to your microphone for voice calls.",
-        "UIBackgroundModes": ["audio", "voip"]
+        "UIBackgroundModes": [
+          "audio",
+          "voip"
+        ]
       }
     },
     "android": {
