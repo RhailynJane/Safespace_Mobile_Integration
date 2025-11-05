@@ -67,11 +67,16 @@ export default function VideoCallScreen() {
   const [showFullCamera, setShowFullCamera] = useState(false);
 
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
+  const cameraReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper: request permissions on demand
   const requestCameraPermissionImmediately = useCallback(async () => {
     try {
-      await requestPermission();
+      const result = await requestPermission();
+      if (result.granted) {
+        // Force a refresh after permission is granted
+        setCameraRefresh(prev => prev + 1);
+      }
     } catch (e) {
       console.warn('Camera permission request failed', e);
     }
@@ -79,6 +84,7 @@ export default function VideoCallScreen() {
 
   // Flip between front/back camera
   const handleFlipCamera = useCallback(() => {
+    setCameraReady(false);
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
   }, []);
 
@@ -122,7 +128,7 @@ export default function VideoCallScreen() {
         setCallStatus("Connected (Demo)");
         setIsCallConnected(true);
         startCallTimer();
-      }, 2000); // 2 second delay to simulate real connection
+      }, 2000);
       
       return;
     }
@@ -147,8 +153,6 @@ export default function VideoCallScreen() {
       );
     }
   }, [isDemoMode, supportWorkerId, user?.id, setupCallListeners]);
-
-  
 
   // Start call duration timer
   const startCallTimer = () => {
@@ -206,16 +210,45 @@ export default function VideoCallScreen() {
     initializeCall();
 
     return () => {
-      endCall();
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
+      if (cameraReadyTimeoutRef.current) {
+        clearTimeout(cameraReadyTimeoutRef.current);
+      }
     };
-  }, [initializeCall, endCall]);
+  }, [initializeCall]);
+
+  // Add a timeout fallback for camera ready
+  useEffect(() => {
+    if (isFocused && isCameraOn && permission?.granted && !cameraReady) {
+      // Clear any existing timeout
+      if (cameraReadyTimeoutRef.current) {
+        clearTimeout(cameraReadyTimeoutRef.current);
+      }
+      
+      // Set camera as ready after 3 seconds if it hasn't triggered onCameraReady
+      cameraReadyTimeoutRef.current = setTimeout(() => {
+        console.log('Camera ready timeout - forcing ready state');
+        setCameraReady(true);
+      }, 3000);
+    }
+    
+    return () => {
+      if (cameraReadyTimeoutRef.current) {
+        clearTimeout(cameraReadyTimeoutRef.current);
+      }
+    };
+  }, [isFocused, isCameraOn, permission?.granted, cameraReady]);
 
   const handleToggleCamera = () => {
     const newState = !isCameraOn;
     setIsCameraOn(newState);
+    
+    if (newState) {
+      // Reset camera ready state when turning camera back on
+      setCameraReady(false);
+    }
     
     if (!isDemoMode) {
       SendBirdCallService.toggleVideo(newState);
@@ -295,12 +328,24 @@ export default function VideoCallScreen() {
     setIsEmojiPanelOpen(false);
   };
 
+  const handleCameraReady = useCallback(() => {
+    console.log('Camera is ready');
+    setCameraReady(true);
+    if (cameraReadyTimeoutRef.current) {
+      clearTimeout(cameraReadyTimeoutRef.current);
+    }
+  }, []);
+
+  const handleCameraError = useCallback((e: any) => {
+    console.log('CameraView onMountError', e?.nativeEvent || e);
+    setCameraReady(false);
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#1A1A1A' }}>
       <View style={{ flex: 1 }}>
         {/* Permission Debug Banner */}
-  {!permission?.granted && (
+        {!permission?.granted && (
           <View style={styles.permissionBanner}>
             <Ionicons name="warning" size={20} color="#FFF" />
             <Text style={styles.permissionBannerText}>
@@ -334,22 +379,21 @@ export default function VideoCallScreen() {
             </View>
 
             {/* Local Video Preview with REAL CAMERA */}
-            <View renderToHardwareTextureAndroid={true} style={[
-              styles.selfVideoPreview,
-              Platform.OS === 'ios' ? styles.previewClipIOS : styles.previewClipAndroid,
-              { bottom: Math.max(insets.bottom, 8) + 110 }
-            ]}>
+            <View 
+              style={[
+                styles.selfVideoPreview,
+                Platform.OS === 'ios' ? styles.previewClipIOS : styles.previewClipAndroid,
+                { bottom: Math.max(insets.bottom, 8) + 110 }
+              ]}
+            >
               {isFocused && isCameraOn && permission?.granted ? (
                 <>
                   <CameraView
-                    style={[styles.camera, { backgroundColor: '#222' }]}
+                    style={[styles.camera, { backgroundColor: '#000' }]}
                     facing={facing}
-                    onCameraReady={() => setCameraReady(true)}
-                    onMountError={(e: any) => {
-                      console.log('CameraView onMountError', e?.nativeEvent || e);
-                      setCameraReady(false);
-                    }}
-                    key={`${facing}-${permission?.granted}-${isFocused}-${cameraRefresh}`}
+                    onCameraReady={handleCameraReady}
+                    onMountError={handleCameraError}
+                    key={`camera-${facing}-${cameraRefresh}`}
                   />
                   {/* Expand to full screen */}
                   <TouchableOpacity
@@ -366,14 +410,21 @@ export default function VideoCallScreen() {
                     <Ionicons name="camera-reverse" size={20} color="#FFFFFF" />
                   </TouchableOpacity>
                   {/* Non-clipping rounded border overlay for Android */}
-                  <View pointerEvents="none" style={styles.previewBorderOverlay} />
+                  {Platform.OS === 'android' && (
+                    <View pointerEvents="none" style={styles.previewBorderOverlay} />
+                  )}
                   {!cameraReady && (
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      onPress={() => setCameraRefresh(r => r + 1)}
-                      style={[styles.cameraOffOverlay, { position: 'absolute', left: 0, top: 0 }]}
+                      onPress={() => {
+                        setCameraReady(false);
+                        setCameraRefresh(r => r + 1);
+                      }}
+                      style={[styles.cameraOffOverlay, { position: 'absolute', left: 0, top: 0, zIndex: 10 }]}
                     >
-                      <Text style={styles.cameraOffText}>Initializing camera… (tap to refresh)</Text>
+                      <Ionicons name="videocam" size={24} color="#FFFFFF" />
+                      <Text style={styles.cameraOffText}>Initializing camera…</Text>
+                      <Text style={[styles.cameraOffText, { fontSize: 10, marginTop: 4 }]}>(tap to refresh)</Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -457,30 +508,6 @@ export default function VideoCallScreen() {
           </View>
         )}
 
-        {/* Debug banner to help diagnose camera state (auto shows when not ready) */}
-        {(__DEV__ && isFocused && isCameraOn && permission?.granted && !cameraReady) && (
-          <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-            <Text style={{ color: '#fff', fontSize: 10 }}>
-              focused:{String(isFocused)} camOn:{String(isCameraOn)} granted:{String(!!permission?.granted)}
-            </Text>
-            <Text style={{ color: '#fff', fontSize: 10 }}>
-              ready:{String(cameraReady)} facing:{facing} refresh:{cameraRefresh}
-            </Text>
-          </View>
-        )}
-
-        {/* Debug banner to help diagnose camera state (shows in dev when not ready) */}
-        {(__DEV__ && isFocused && isCameraOn && permission?.granted && !cameraReady) && (
-          <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-            <Text style={{ color: '#fff', fontSize: 10 }}>
-              focused:{String(isFocused)} camOn:{String(isCameraOn)} granted:{String(!!permission?.granted)}
-            </Text>
-            <Text style={{ color: '#fff', fontSize: 10 }}>
-              ready:{String(cameraReady)} facing:{facing} refresh:{cameraRefresh}
-            </Text>
-          </View>
-        )}
-
         {/* Full-screen Camera (debug/expand) */}
         <Modal
           visible={showFullCamera}
@@ -494,9 +521,9 @@ export default function VideoCallScreen() {
                 <CameraView
                   style={{ flex: 1, backgroundColor: '#000' }}
                   facing={facing}
-                  onCameraReady={() => setCameraReady(true)}
-                  onMountError={() => setCameraReady(false)}
-                  key={`full-${facing}-${permission?.granted}-${isFocused}-${cameraRefresh}`}
+                  onCameraReady={handleCameraReady}
+                  onMountError={handleCameraError}
+                  key={`full-camera-${facing}-${cameraRefresh}`}
                 />
               ) : (
                 <View style={[styles.cameraOffOverlay, { flex: 1 }]}>
@@ -572,66 +599,67 @@ export default function VideoCallScreen() {
             </View>
           </KeyboardAvoidingView>
         )}
-        {/* Bottom Controls and Leave Button - inside SafeAreaView */}
-  <View style={{ backgroundColor: '#2D2D2D', paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) + 16 }}>
-        <View style={styles.controlsRow}>
-          <TouchableOpacity 
-            style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
-            onPress={handleToggleChat}
-          >
-            <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
-            <Text style={styles.controlText}>Chat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
-            onPress={handleToggleRaiseHand}
-          >
-            <Ionicons 
-              name={isRaiseHand ? "hand-left" : "hand-left-outline"} 
-              size={24} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.controlText}>Raise</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.controlButton, isEmojiPanelOpen && styles.controlButtonActive]}
-            onPress={handleToggleEmojiPanel}
-          >
-            <Ionicons name="happy" size={24} color="#FFFFFF" />
-            <Text style={styles.controlText}>React</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.controlButton, !isCameraOn && styles.controlButtonMuted]}
-            onPress={handleToggleCamera}
-          >
-            <Ionicons 
-              name={isCameraOn ? "videocam" : "videocam-off"} 
-              size={24} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.controlText}>Camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.controlButton, !isMicOn && styles.controlButtonMuted]}
-            onPress={handleToggleMic}
-          >
-            <Ionicons 
-              name={isMicOn ? "mic" : "mic-off"} 
-              size={24} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.controlText}>Mic</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={[styles.leaveButtonContainer, { marginBottom: 8 }]}> 
-          <TouchableOpacity 
-            style={styles.leaveButton}
-            onPress={handleLeaveCall}
-          >
-            <Ionicons name="call" size={16} color="#FFFFFF" />
-            <Text style={styles.leaveButtonText}>Leave</Text>
-          </TouchableOpacity>
-        </View>
+
+        {/* Bottom Controls and Leave Button */}
+        <View style={{ backgroundColor: '#2D2D2D', paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) + 16 }}>
+          <View style={styles.controlsRow}>
+            <TouchableOpacity 
+              style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
+              onPress={handleToggleChat}
+            >
+              <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
+              <Text style={styles.controlText}>Chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
+              onPress={handleToggleRaiseHand}
+            >
+              <Ionicons 
+                name={isRaiseHand ? "hand-left" : "hand-left-outline"} 
+                size={24} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlText}>Raise</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, isEmojiPanelOpen && styles.controlButtonActive]}
+              onPress={handleToggleEmojiPanel}
+            >
+              <Ionicons name="happy" size={24} color="#FFFFFF" />
+              <Text style={styles.controlText}>React</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, !isCameraOn && styles.controlButtonMuted]}
+              onPress={handleToggleCamera}
+            >
+              <Ionicons 
+                name={isCameraOn ? "videocam" : "videocam-off"} 
+                size={24} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlText}>Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, !isMicOn && styles.controlButtonMuted]}
+              onPress={handleToggleMic}
+            >
+              <Ionicons 
+                name={isMicOn ? "mic" : "mic-off"} 
+                size={24} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlText}>Mic</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.leaveButtonContainer, { marginBottom: 8 }]}> 
+            <TouchableOpacity 
+              style={styles.leaveButton}
+              onPress={handleLeaveCall}
+            >
+              <Ionicons name="call" size={16} color="#FFFFFF" />
+              <Text style={styles.leaveButtonText}>Leave</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -658,7 +686,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 30,
+    padding: 16,
     zIndex: 10000,
   },
   permissionBannerText: {
@@ -733,17 +761,14 @@ const styles = StyleSheet.create({
     right: 20,
     width: 120,
     height: 160,
-    // Do NOT clip or round on Android to avoid SurfaceView/TextureView black preview issues
-    backgroundColor: "#333",
+    backgroundColor: "#000",
     zIndex: 2,
     elevation: 6,
   },
-  // iOS-only clip for rounded preview
   previewClipIOS: {
     borderRadius: 12,
     overflow: 'hidden',
   },
-  // Android: keep square edges; don't clip
   previewClipAndroid: {
     borderRadius: 0,
     overflow: 'visible',
@@ -759,6 +784,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     borderRadius: 20,
     padding: 8,
+    zIndex: 11,
   },
   expandButton: {
     position: "absolute",
@@ -767,17 +793,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     borderRadius: 20,
     padding: 6,
+    zIndex: 11,
   },
   previewBorderOverlay: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    zIndex: 9,
   },
   cameraOffOverlay: {
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -785,6 +813,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     marginTop: 8,
+    textAlign: "center",
   },
   miniButton: {
     backgroundColor: "#4CAF50",
