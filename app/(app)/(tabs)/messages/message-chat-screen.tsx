@@ -59,7 +59,7 @@ import { useAuth } from "@clerk/clerk-expo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-// import { useAudioRecorder, RecordingPresets, useAudioPlayer } from 'expo-audio'; // Temporarily disabled
+import { useAudioRecorder, useAudioPlayer } from 'expo-audio';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
@@ -147,6 +147,28 @@ export default function ChatScreen() {
     confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
     actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
+
+  // Audio recording hook - using default recording options
+  const audioRecorder = useAudioRecorder(
+    {
+      extension: '.m4a',
+      sampleRate: 44100,
+      numberOfChannels: 2,
+      bitRate: 128000,
+      android: {
+        extension: '.m4a',
+        outputFormat: 'mpeg4' as any,
+        audioEncoder: 'aac' as any,
+      },
+      ios: {
+        extension: '.m4a',
+        audioQuality: 127, // MAX
+      },
+      web: {
+        mimeType: 'audio/webm',
+      },
+    }
+  );
 
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
@@ -750,28 +772,61 @@ export default function ChatScreen() {
 
   // Handle voice recording (start/stop)
   const handleMicPress = async () => {
-    // Voice recording temporarily disabled - will be re-implemented with expo-audio
-    showStatusModal('info', 'Feature Unavailable', 'Voice recording is temporarily unavailable. Please use text or attachments instead.');
-    return;
-    
-    /* 
-    if (isRecording) {
-      // Stop recording logic here
-    } else {
-      // Start recording logic here
+    try {
+      if (audioRecorder.isRecording) {
+        // Stop recording
+        console.log('🎤 Stopping recording...');
+        await audioRecorder.stop();
+        
+        const uri = audioRecorder.uri;
+        if (uri) {
+          console.log('🎤 Recording saved:', uri);
+          const info = await FileSystem.getInfoAsync(uri);
+          if (info.exists) {
+            setPendingRecordingUri(uri);
+            setPendingRecordingDuration(recordingDuration);
+          }
+        }
+        setIsRecording(false);
+        
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+      } else {
+        // Start recording
+        console.log('🎤 Starting recording...');
+        await audioRecorder.record();
+        setIsRecording(true);
+        setRecordingDuration(0);
+        
+        // Update duration every second
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingDuration(prev => prev + 1);
+        }, 1000);
+      }
+    } catch (error: any) {
+      console.error('❌ Audio recording error:', error);
+      setIsRecording(false);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      showStatusModal('error', 'Recording Error', error.message || 'Failed to record audio');
     }
-    */
   };
 
   // Cancel/remove pending recording (or abort active recording)
   const cancelPendingRecording = async () => {
     try {
-      if (isRecording && recordingRef.current) {
-        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
-        recordingRef.current = null;
+      if (audioRecorder.isRecording) {
+        await audioRecorder.stop();
         setIsRecording(false);
       }
-      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+      if (recordingTimerRef.current) { 
+        clearInterval(recordingTimerRef.current); 
+        recordingTimerRef.current = null; 
+      }
       if (pendingRecordingUri) {
         await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }).catch(() => {});
       }
@@ -1054,10 +1109,47 @@ export default function ChatScreen() {
     const AudioBubble = ({ uri }: { uri: string }) => {
       const [playing, setPlaying] = useState(false);
       const [barAnim] = useState([new Animated.Value(2), new Animated.Value(8), new Animated.Value(4)]);
-      // Audio playback temporarily disabled - will be re-implemented with expo-audio
+      const audioPlayer = useAudioPlayer(resolveRemoteUri(uri));
       
+      useEffect(() => {
+        // Animate bars when playing
+        if (playing) {
+          Animated.loop(
+            Animated.stagger(100, barAnim.map(v =>
+              Animated.sequence([
+                Animated.timing(v, { toValue: 12, duration: 300, useNativeDriver: false }),
+                Animated.timing(v, { toValue: 2, duration: 300, useNativeDriver: false }),
+              ])
+            ))
+          ).start();
+        } else {
+          barAnim.forEach(v => v.setValue(4));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [playing]);
+
+      useEffect(() => {
+        // Listen to playback status
+        if (audioPlayer.playing) {
+          setPlaying(true);
+        } else {
+          setPlaying(false);
+        }
+      }, [audioPlayer.playing]);
+
       const toggle = async () => {
-        showStatusModal('info', 'Feature Unavailable', 'Audio playback is temporarily unavailable.');
+        try {
+          if (audioPlayer.playing) {
+            audioPlayer.pause();
+            setPlaying(false);
+          } else {
+            audioPlayer.play();
+            setPlaying(true);
+          }
+        } catch (error) {
+          console.error('❌ Audio playback error:', error);
+          showStatusModal('error', 'Playback Error', 'Failed to play audio');
+        }
       };
 
       return (
