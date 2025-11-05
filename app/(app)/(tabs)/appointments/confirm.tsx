@@ -62,6 +62,8 @@ export default function ConfirmAppointment() {
   const selectedDate = getParam(params.selectedDate);
   const selectedTime = getParam(params.selectedTime);
   const selectedDateDisplay = getParam((params as any).selectedDateDisplay);
+  const backendWorkerIdParam = getParam((params as any).backendWorkerId);
+  const supportWorkerEmail = getParam((params as any).supportWorkerEmail);
 
   // Mountain Time helpers (America/Denver)
   const getNowInMountain = useCallback(() => {
@@ -165,20 +167,27 @@ export default function ConfirmAppointment() {
       const normalizedTime = toHHMMSS(selectedTime);
 
       // Be backward-compatible with different backend schemas
-      const workerIdInt = parseInt(supportWorkerId);
+      const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
+      const workerIdInt = parseInt(chosenIdRaw);
       if (!Number.isFinite(workerIdInt)) {
-        throw new Error(`Invalid support worker id: ${supportWorkerId}`);
+        throw new Error(`Invalid support worker id: ${chosenIdRaw}`);
       }
       const appointmentData: any = {
         clerkUserId: user.id,
         supportWorkerId: workerIdInt,                    // camelCase
         support_worker_id: workerIdInt,                  // snake_case (Prisma schema)
         workerId: workerIdInt,                           // legacy schema
+        worker_id: workerIdInt,                          // legacy snake_case
         supportWorkerName, // helpful on older DBs without support_worker_id column
+        supportWorkerEmail: supportWorkerEmail || undefined,
+        support_worker_email: supportWorkerEmail || undefined,
         appointmentDate: selectedDate,
+        appointment_date: selectedDate,                  // snake_case alternative
         appointmentTime: normalizedTime,
+        appointment_time: normalizedTime,                // snake_case alternative
         time: normalizedTime,                            // some backends expect 'time'
         sessionType: sessionType,
+        session_type: sessionType,                       // snake_case alternative
         notes: 'Booked via mobile app',
         duration: 60
       };
@@ -202,7 +211,16 @@ export default function ConfirmAppointment() {
         console.log('✅ Appointment created successfully!');
       } else {
         console.error('❌ Failed to create appointment:', result);
-        showStatusModal('error', 'Booking Failed', result.error || 'Failed to create appointment');
+        const details = (result && result.details) ? String(result.details) : '';
+        if (details.includes('appointments_worker_id_fkey')) {
+          showStatusModal(
+            'error',
+            'Support worker unavailable',
+            'This support worker isn\'t configured on the server yet (missing worker record). Please select a different support worker for now.'
+          );
+        } else {
+          showStatusModal('error', 'Booking Failed', result.error || 'Failed to create appointment');
+        }
       }
     } catch (error) {
       console.error('❌ Error creating appointment:', error);
@@ -210,7 +228,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, supportWorkerId, supportWorkerName, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS]);
+  }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS]);
 
   // Create appointment when page loads
   useEffect(() => {

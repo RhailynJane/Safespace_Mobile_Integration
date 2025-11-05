@@ -101,9 +101,39 @@ const fetchAppointments = useCallback(async () => {
           day: 'numeric' 
         });
 
-        // Determine if upcoming or past based on date
-        const now = new Date();
-        const isUpcoming = appointmentDate >= now;
+        // Determine if upcoming or past based on BOTH date AND time in MST
+        // Parse UTC date and extract date components (ignore timezone offset)
+        const utcDate = new Date(apt.date);
+        const year = utcDate.getUTCFullYear();
+        const month = utcDate.getUTCMonth();
+        const day = utcDate.getUTCDate();
+        
+        // Get current date/time in MST using Intl.DateTimeFormat
+        const mstFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Denver',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const mstParts = mstFormatter.formatToParts(new Date());
+        const nowMSTYear = parseInt(mstParts.find(p => p.type === 'year')?.value || '0');
+        const nowMSTMonth = parseInt(mstParts.find(p => p.type === 'month')?.value || '0') - 1;
+        const nowMSTDay = parseInt(mstParts.find(p => p.type === 'day')?.value || '0');
+        const nowMSTHour = parseInt(mstParts.find(p => p.type === 'hour')?.value || '0');
+        const nowMSTMinute = parseInt(mstParts.find(p => p.type === 'minute')?.value || '0');
+        
+        // Parse appointment time
+        const timeStr = apt.time || '00:00:00';
+        const [aptHours, aptMinutes] = timeStr.split(':').map(Number);
+        
+        // Compare as numeric values: YYYYMMDDHHMM
+        const nowMSTNumeric = nowMSTYear * 100000000 + (nowMSTMonth + 1) * 1000000 + nowMSTDay * 10000 + nowMSTHour * 100 + nowMSTMinute;
+        const aptMSTNumeric = year * 100000000 + (month + 1) * 1000000 + day * 10000 + aptHours * 100 + aptMinutes;
+        
+        const isUpcoming = aptMSTNumeric > nowMSTNumeric;
 
         return {
           id: apt.id,
@@ -111,7 +141,7 @@ const fetchAppointments = useCallback(async () => {
           date: formattedDate,
           time: apt.time || '',
           type: apt.type || 'Video',
-          // ⚡ KEY FIX: Transform status to "upcoming" or "past"
+          // ⚡ KEY FIX: Transform status to "upcoming" or "past" based on date+time
           status: apt.status === 'cancelled' ? 'cancelled' :
                   apt.status === 'completed' ? 'past' :
                   isUpcoming ? 'upcoming' : 'past'

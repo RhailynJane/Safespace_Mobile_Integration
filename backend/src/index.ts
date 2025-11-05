@@ -5037,9 +5037,20 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
       supportWorkerIdCol ? `sw.avatar_url` : `NULL as avatar_url`
     ];
 
-    const joinClause = supportWorkerIdCol
-      ? `LEFT JOIN support_workers sw ON a.${supportWorkerIdCol} = sw.id`
-      : '';
+    // If legacy schema uses worker_id (references users.id), join via users → support_workers by email
+    let joinClause = '';
+    if (supportWorkerIdCol) {
+      if (supportWorkerIdCol === 'worker_id') {
+        // worker_id references users.id; join users first, then support_workers by email match
+        joinClause = `
+          LEFT JOIN users wu ON a.${supportWorkerIdCol} = wu.id
+          LEFT JOIN support_workers sw ON wu.email = sw.email
+        `;
+      } else {
+        // Standard: support_worker_id references support_workers.id directly
+        joinClause = `LEFT JOIN support_workers sw ON a.${supportWorkerIdCol} = sw.id`;
+      }
+    }
 
     const orderBy = [
       dateCol ? `a.${dateCol} DESC` : null,
@@ -5132,13 +5143,13 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
 
     const userId = userResult.rows[0].id;
 
-    // Check if support worker exists
-    const supportWorkerCheck = await pool.query(
-      "SELECT id FROM support_workers WHERE id = $1",
+    // Check if support worker exists and fetch minimal profile (for mapping)
+    const supportWorkerRow = await pool.query(
+      "SELECT id, first_name, last_name, email FROM support_workers WHERE id = $1",
       [supportWorkerId]
     );
 
-    if (supportWorkerCheck.rows.length === 0) {
+    if (supportWorkerRow.rows.length === 0) {
       return res.status(404).json({ error: "Support worker not found" });
     }
 
@@ -5152,8 +5163,8 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
       for (const a of alts) if (cols.has(a)) return a;
       return null as string | null;
     };
-  const userIdCol = pickCol('user_id', ['client_id', 'patient_id', 'member_id', 'customer_id']);
-  const hasUserId = !!userIdCol;
+    const userIdCol = pickCol('user_id', ['client_id', 'patient_id', 'member_id', 'customer_id']);
+    const hasUserId = !!userIdCol;
     const supportWorkerIdCol = pickCol('support_worker_id', ['worker_id']);
     const hasSupportWorkerId = !!supportWorkerIdCol;
     const dateCol = pickCol('appointment_date', ['date']);
@@ -5164,15 +5175,56 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
     const meetingLinkCol = pickCol('meeting_link', ['meeting_url', 'link', 'url']);
     const notesCol = pickCol('notes', ['note', 'description']);
 
+    // If legacy schema uses worker_id that references a different table (e.g., users.id),
+    // map the selected support worker to a backing user row (create if missing),
+    // and use that ID for conflict checks and insertion.
+    let fkWorkerIdForInsert: number | null = null;
+    if (hasSupportWorkerId && supportWorkerIdCol === 'worker_id') {
+      const sw = supportWorkerRow.rows[0] as { id: number; first_name: string; last_name: string; email: string | null };
+      // Try to resolve existing user by email first
+      let userIdForWorker: number | null = null;
+      if (sw.email) {
+        const u = await pool.query("SELECT id FROM users WHERE email = $1", [sw.email]);
+        if (u.rows.length > 0) {
+          userIdForWorker = u.rows[0].id as number;
+        }
+      }
+      // Fallback: find by name if email missing
+      if (!userIdForWorker) {
+        const uByName = await pool.query(
+          "SELECT id FROM users WHERE LOWER(first_name) = LOWER($1) AND LOWER(last_name) = LOWER($2) ORDER BY id ASC LIMIT 1",
+          [sw.first_name, sw.last_name]
+        );
+        if (uByName.rows.length > 0) {
+          userIdForWorker = uByName.rows[0].id as number;
+        }
+      }
+      // Create a minimal user record for this support worker if not found
+      if (!userIdForWorker) {
+        const pseudoClerkId = `support-worker:${sw.id}`;
+        const emailToUse = sw.email || `worker${sw.id}@safespace.local`;
+        const created = await pool.query(
+          `INSERT INTO users (clerk_user_id, first_name, last_name, email, role, status, email_verified, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, 'support_worker', 'active', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT (email) DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, role = 'support_worker', status = 'active', updated_at = CURRENT_TIMESTAMP
+           RETURNING id`,
+          [pseudoClerkId, sw.first_name, sw.last_name, emailToUse]
+        );
+        userIdForWorker = created.rows[0].id as number;
+      }
+      fkWorkerIdForInsert = userIdForWorker;
+    }
+
     // Check for time slot conflicts (supports legacy schemas)
     if (hasSupportWorkerId && dateCol && timeCol) {
+      const workerIdForConflict = fkWorkerIdForInsert ?? supportWorkerId;
       const conflictCheck = await pool.query(
         `SELECT id FROM appointments 
          WHERE ${supportWorkerIdCol} = $1 
          AND ${dateCol} = $2 
          AND ${timeCol} = $3 
          ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}`,
-        [supportWorkerId, appointmentDate, appointmentTime]
+        [workerIdForConflict, appointmentDate, appointmentTime]
       );
       if (conflictCheck.rows.length > 0) {
         return res.status(409).json({ 
@@ -5214,7 +5266,8 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
     }
     if (hasSupportWorkerId && supportWorkerIdCol) {
       columns.push(supportWorkerIdCol);
-      values.push(supportWorkerId);
+      // If schema expects worker_id (legacy), use mapped users.id; otherwise use support_workers.id
+      values.push(fkWorkerIdForInsert ?? supportWorkerId);
     }
     // Add date/time if present
     if (dateCol) { columns.push(dateCol); values.push(appointmentDate); }

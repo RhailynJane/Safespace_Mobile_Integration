@@ -44,6 +44,8 @@ interface SupportWorker {
   title: string;
   avatar: string;
   specialties: string[];
+  backendWorkerId?: number; // optional: FK-friendly id from backend (e.g., worker_id or user_id)
+  email?: string;
 }
 
 export default function BookAppointment() {
@@ -154,8 +156,14 @@ export default function BookAppointment() {
       const result = await response.json();
 
       if (result.success) {
-        // Transform the data
+        // Transform the data and keep possible FK-friendly identifiers
         const worker = result.data;
+        const backendWorkerId: number | undefined =
+          (typeof worker.worker_id === 'number' && worker.worker_id) ||
+          (typeof worker.user_id === 'number' && worker.user_id) ||
+          (typeof worker.id === 'number' && worker.id) ||
+          undefined;
+
         setSupportWorker({
           id: worker.id,
           name: `${worker.first_name} ${worker.last_name}`,
@@ -164,6 +172,8 @@ export default function BookAppointment() {
           specialties: worker.specialization 
             ? worker.specialization.split(',').map((s: string) => s.trim())
             : [],
+          backendWorkerId,
+          email: worker.email,
         });
       } else {
         showStatusModal('error', 'Error', 'Failed to load support worker details');
@@ -445,10 +455,12 @@ export default function BookAppointment() {
 
     console.log('🚀 Navigating to confirm with:', {
       supportWorkerId: supportWorker.id,
+      backendWorkerId: supportWorker.backendWorkerId,
       selectedDate: selectedDate,        // ISO: "2025-11-05"
       selectedDateDisplay: displayDate,  // Display: "Tuesday, November 5, 2025"
       selectedType,
-      selectedTime
+      selectedTime,
+      supportWorkerEmail: supportWorker.email,
     });
     
     router.push({
@@ -456,6 +468,8 @@ export default function BookAppointment() {
       params: {
         supportWorkerId: supportWorker.id,
         supportWorkerName: supportWorker.name,
+        backendWorkerId: supportWorker.backendWorkerId ?? '',
+        supportWorkerEmail: supportWorker.email ?? '',
         selectedType,
         selectedDate: selectedDate || "",           // Pass ISO for DB
         selectedDateDisplay: displayDate || "",     // Pass display for UI
