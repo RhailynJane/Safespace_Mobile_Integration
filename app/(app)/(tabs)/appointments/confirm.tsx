@@ -23,6 +23,24 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import settingsAPI from "../../../../utils/settingsApi";
+import Constants from 'expo-constants';
+
+// Check if running in Expo Go
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Lazy load notifications module to avoid importing in Expo Go
+let Notifications: any = null;
+
+async function getNotificationsModule() {
+  if (isExpoGo) {
+    return null;
+  }
+  if (!Notifications) {
+    Notifications = await import('expo-notifications');
+  }
+  return Notifications;
+}
 
 export default function ConfirmAppointment() {
   const { theme, scaledFontSize } = useTheme();
@@ -127,6 +145,82 @@ export default function ConfirmAppointment() {
   }, [getNowInMountain, parseTimeTo24h]);
 
   /**
+   * Schedule appointment reminder notification
+   */
+  const scheduleAppointmentReminder = useCallback(async (
+    appointmentDate: string,
+    appointmentTime: string,
+    workerName: string
+  ) => {
+    // Skip in Expo Go
+    if (isExpoGo) {
+      console.log('⚠️ Appointment reminders not available in Expo Go');
+      return;
+    }
+
+    // Check user settings to see if appointment reminders are enabled
+    if (!user?.id) return;
+    
+    try {
+      const settings = await settingsAPI.fetchSettings(user.id);
+      if (!settings.appointmentReminderEnabled) {
+        console.log('📅 Appointment reminders are disabled in settings');
+        return;
+      }
+
+      const advanceMinutes = settings.appointmentReminderAdvanceMinutes || 60;
+      
+      // Parse appointment datetime
+      const { hour, minute } = parseTimeTo24h(appointmentTime);
+        const dateParts = appointmentDate.split('-').map(Number);
+        const year = dateParts[0];
+        const month = dateParts[1];
+        const day = dateParts[2];
+      
+        // Validate date parts
+        if (!year || !month || !day) {
+          console.log('⚠️ Invalid appointment date format');
+          return;
+        }
+      
+      // Create appointment datetime
+      const appointmentDateTime = new Date(year, month - 1, day, hour, minute);
+      
+      // Calculate reminder time (advance minutes before appointment)
+      const reminderDateTime = new Date(appointmentDateTime.getTime() - (advanceMinutes * 60 * 1000));
+      
+      // Don't schedule if reminder time is in the past
+      const now = new Date();
+      if (reminderDateTime <= now) {
+        console.log('⚠️ Reminder time is in the past, skipping schedule');
+        return;
+      }
+
+      const Notifications = await getNotificationsModule();
+      if (!Notifications) return;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Appointment Reminder',
+          body: `Your appointment with ${workerName} is in ${advanceMinutes} minutes`,
+          data: {
+            type: 'appointment',
+            appointmentDate,
+            appointmentTime,
+            workerName,
+          },
+        },
+        trigger: reminderDateTime,
+      });
+
+      console.log(`✅ Scheduled appointment reminder for ${reminderDateTime.toLocaleString()}`);
+    } catch (error) {
+      console.error('❌ Failed to schedule appointment reminder:', error);
+      throw error;
+    }
+    }, [user?.id, parseTimeTo24h]);
+
+  /**
    * Show status modal
    */
   const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
@@ -209,6 +303,14 @@ export default function ConfirmAppointment() {
         setAppointmentCreated(true);
         setAppointmentId(result.appointment?.id);
         console.log('✅ Appointment created successfully!');
+        
+        // Schedule appointment reminder notification 1 hour before
+        try {
+          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
+        } catch (reminderError) {
+          console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
+          // Don't fail the whole appointment if reminder scheduling fails
+        }
       } else {
         console.error('❌ Failed to create appointment:', result);
         const details = (result && result.details) ? String(result.details) : '';
@@ -228,7 +330,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS]);
+    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder]);
 
   // Create appointment when page loads
   useEffect(() => {

@@ -1397,11 +1397,27 @@ app.post(
           if (postRes.rows.length > 0) {
             const ownerClerkId = postRes.rows[0].author_id as string;
             if (ownerClerkId && ownerClerkId !== clerkUserId) {
+              // Resolve reactor's display name
+              let reactorName = 'Someone';
+              try {
+                const actorRes = await pool.query(
+                  `SELECT first_name, last_name FROM users WHERE clerk_user_id = $1`,
+                  [clerkUserId]
+                );
+                if (actorRes.rows.length > 0) {
+                  const a = actorRes.rows[0];
+                  const full = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+                  reactorName = full || reactorName;
+                }
+              } catch (_e) {
+                // Fallback to 'Someone' if lookup fails
+              }
+
               await notifyUserByClerkId(
                 ownerClerkId,
                 'New reaction on your post',
-                `${emoji} Someone reacted to your post`,
-                { postId: Number.parseInt(id), emoji }
+                `${emoji} ${reactorName} reacted to your post`,
+                { postId: Number.parseInt(id), emoji, actorName: reactorName, actorClerkId: clerkUserId }
               );
             }
           }
@@ -5298,6 +5314,38 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
 
     const appointment = appointmentRow;
     const supportWorker = swResult.rows[0];
+
+    // Send notification to user about the new appointment
+    try {
+      const workerName = supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : (supportWorkerName || 'Support Worker');
+      const aptDate = dateCol ? appointment[dateCol] : appointment.appointment_date;
+      const aptTime = timeCol ? appointment[timeCol] : appointment.appointment_time;
+      
+      // Format date and time for notification
+      const date = new Date(aptDate);
+      const formattedDate = date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric',
+        timeZone: 'America/Denver'
+      });
+      
+      await notifyUserByClerkId(
+        clerkUserId,
+        'Appointment Confirmed',
+        `Your appointment with ${workerName} is scheduled for ${formattedDate} at ${aptTime}`,
+        { 
+          type: 'appointment',
+          appointmentId: appointment.id,
+          supportWorker: workerName,
+          date: formattedDate,
+          time: aptTime
+        }
+      );
+    } catch (notifyError: any) {
+      console.error('⚠️ Failed to send appointment notification:', notifyError.message);
+      // Don't fail the appointment creation if notification fails
+    }
 
     res.status(201).json({
       success: true,

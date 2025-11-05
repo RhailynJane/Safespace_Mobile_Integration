@@ -28,6 +28,9 @@ async function ensurePermissions(): Promise<boolean> {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
       importance: Notifications.AndroidImportance.MAX,
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      vibrationPattern: [0, 250, 250, 250],
     });
   }
   return true;
