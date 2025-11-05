@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -23,7 +24,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 
@@ -34,14 +34,24 @@ import StatusModal from "../../../../components/StatusModal";
  * add optional notes for the support worker, and confirm their appointment.
  * Features a multi-step progress indicator and elegant curved background.
  */
+
+interface SupportWorker {
+  id: number;
+  name: string;
+  title: string;
+  avatar: string;
+  specialties: string[];
+}
+
 export default function ConfirmAppointment() {
   const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("appointments");
   const [appointmentNotes, setAppointmentNotes] = useState<string>("");
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [supportWorker, setSupportWorker] = useState<SupportWorker | null>(null);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -56,8 +66,8 @@ export default function ConfirmAppointment() {
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Get support worker ID from navigation params
-  const { supportWorkerId } = useLocalSearchParams();
+  // Get params from navigation
+  const { supportWorkerId, selectedType, selectedDate, selectedTime } = useLocalSearchParams();
 
   /**
    * Show status modal with given parameters
@@ -69,28 +79,45 @@ export default function ConfirmAppointment() {
     setStatusModalVisible(true);
   };
 
-  // Mock data for support workers (replaces backend data)
-  const supportWorkers = [
-    {
-      id: 1,
-      name: "Eric Young",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-  ];
+  /**
+   * Fetch support worker details from API
+   */
+  const fetchSupportWorker = async () => {
+    try {
+      setLoading(true);
+      
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/support-workers/${supportWorkerId}`);
+      const result = await response.json();
 
-  // Find the support worker based on the ID from the URL
-  const supportWorker = supportWorkers.find(
-    (sw) => sw.id === Number(supportWorkerId)
-  );
+      if (result.success) {
+        const worker = result.data;
+        setSupportWorker({
+          id: worker.id,
+          name: `${worker.first_name} ${worker.last_name}`,
+          title: "Support Worker",
+          avatar: worker.avatar_url || "https://via.placeholder.com/150",
+          specialties: worker.specialization 
+            ? worker.specialization.split(',').map((s: string) => s.trim())
+            : [],
+        });
+      } else {
+        showStatusModal('error', 'Error', 'Failed to load support worker details');
+      }
+    } catch (error) {
+      console.error('Error fetching support worker:', error);
+      showStatusModal('error', 'Error', 'Unable to fetch support worker. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch support worker on mount
+  useEffect(() => {
+    if (supportWorkerId) {
+      fetchSupportWorker();
+    }
+  }, [supportWorkerId]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -108,17 +135,6 @@ export default function ConfirmAppointment() {
       "No email available"
     );
   };
-
-  // Show error if support worker not found
-  if (!supportWorker) {
-    return (
-      <CurvedBackground>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <Text style={[styles.errorText, { color: theme.colors.text }]}>Support worker not found</Text>
-        </SafeAreaView>
-      </CurvedBackground>
-    );
-  }
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -254,7 +270,7 @@ export default function ConfirmAppointment() {
       title: "Community Forum",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/community-forum");
+        router.push("/(app)/(tabs)/community-forum");
       },
     },
     {
@@ -278,42 +294,42 @@ export default function ConfirmAppointment() {
    * Passes appointment details as navigation parameters
    */
   const handleConfirmBooking = () => {
+    if (!supportWorker) return;
+    
     router.replace({
       pathname: "/appointments/confirmation",
       params: {
         supportWorkerId: supportWorker.id,
         supportWorkerName: supportWorker.name,
-        selectedType: "Video", // Default value for demo
-        selectedDate: "October 07, 2025", // Default value for demo
-        selectedTime: "10:30 AM", // Default value for demo
+        selectedType: selectedType || "Video Call",
+        selectedDate: selectedDate || "",
+        selectedTime: selectedTime || "",
       },
     });
   };
 
-  // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 07, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "upcoming",
-    },
-  ];
-
   // Show loading indicator if data is being fetched
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <CurvedBackground style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </CurvedBackground>
-      </SafeAreaView>
+      <CurvedBackground style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </CurvedBackground>
     );
   }
 
-  const appointment = appointments.length > 0 ? appointments[0] : null;
+  // Show error if support worker not found
+  if (!supportWorker) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <AppHeader title="Confirm Appointment" showBack={true} />
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>
+            Support worker not found
+          </Text>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
 
   return (
     <CurvedBackground>
@@ -360,37 +376,39 @@ export default function ConfirmAppointment() {
             <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Booking Details</Text>
             <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>Appointment Summary</Text>
 
-            {appointment ? (
-              <View style={styles.summaryContainer}>
-                {/* Support Worker Details */}
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: theme.colors.text } ]}>Support Worker:</Text>
-                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
-                    {appointment.supportWorker}
-                  </Text>
-                </View>
-
-                {/* Appointment Date */}
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Date:</Text>
-                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>{appointment.date}</Text>
-                </View>
-
-                {/* Appointment Time */}
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Time:</Text>
-                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>{appointment.time}</Text>
-                </View>
-
-                {/* Session Type */}
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Session Type:</Text>
-                  <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>{appointment.type}</Text>
-                </View>
+            <View style={styles.summaryContainer}>
+              {/* Support Worker Details */}
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Support Worker:</Text>
+                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
+                  {supportWorker.name}
+                </Text>
               </View>
-            ) : (
-              <Text style={[styles.errorText, { color: theme.colors.text }]}>No appointment data available</Text>
-            )}
+
+              {/* Appointment Date */}
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Date:</Text>
+                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
+                  {selectedDate || 'Not selected'}
+                </Text>
+              </View>
+
+              {/* Appointment Time */}
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Time:</Text>
+                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
+                  {selectedTime || 'Not selected'}
+                </Text>
+              </View>
+
+              {/* Session Type */}
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Session Type:</Text>
+                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
+                  {selectedType || 'Video Call'}
+                </Text>
+              </View>
+            </View>
 
             <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
 

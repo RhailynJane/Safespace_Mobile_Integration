@@ -1,6 +1,9 @@
 {
   "name": "backend",
   "version": "1.0.0",
+  "prisma": {
+    "seed": "ts-node prisma/seed.js"
+  },
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -11,7 +14,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "commonJS",
   "dependencies": {
     "@prisma/client": "^6.18.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -24,9 +27,11 @@
     "express": "^5.1.0",
     "multer": "^2.0.2",
     "pg": "^8.16.3",
-    "prisma": "^6.18.0"
+    "prisma": "^6.18.0",
+    "twilio": "^5.10.4"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.1.0",
     "@types/axios": "^0.14.4",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",

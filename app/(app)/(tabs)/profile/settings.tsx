@@ -16,7 +16,7 @@ import {
   TextInput,
   Modal,
 } from "react-native";
-import Slider from '@react-native-community/slider';
+// import Slider from '@react-native-community/slider';
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -534,7 +534,7 @@ export default function SettingsScreen() {
                 <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>Size</Text>
                 <Text style={[styles.sliderValue, { color: theme.colors.text }]}>{textSizeLabels[textSizeSlider]}</Text>
               </View>
-              <Slider
+              {/* <Slider
                 style={styles.slider}
                 minimumValue={0}
                 maximumValue={4}
@@ -545,7 +545,7 @@ export default function SettingsScreen() {
                 thumbTintColor={theme.colors.primary}
                 onValueChange={(val) => setTextSizeSlider(val)}
                 onSlidingComplete={(val) => handleTextSizeChange(sliderToTextSize(val))}
-              />
+              /> */}
               <View style={styles.sliderLabelsRow}>
                 {textSizeLabels.map((lbl, idx) => (
                   <Text key={lbl} style={[styles.sliderTickLabel, { color: idx === textSizeSlider ? theme.colors.text : theme.colors.textSecondary }]}>

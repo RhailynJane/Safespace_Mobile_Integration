@@ -7,8 +7,9 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "plugins": [
+      "expo-dev-client",
       [
         "expo-router"
       ],
@@ -24,6 +25,12 @@
             "photo"
           ]
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SafeSpace to access your camera for video consultations with support workers."
+        }
       ]
     ],
     "assetBundlePatterns": [
@@ -35,7 +42,14 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.safespacedev.SafeSpace",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "SafeSpace needs camera access for video calls",
+        "NSMicrophoneUsageDescription": "SafeSpace needs access to your microphone for voice calls.",
+        "UIBackgroundModes": ["audio", "voip"]
+      }
     },
     "android": {
       "package": "com.safespacedev.SafeSpace",
@@ -43,7 +57,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -51,7 +76,8 @@
     "extra": {
       "eas": {
         "projectId": "e7c636be-6f7e-403c-8731-4ec9a0ec2d48"
-      }
+      },
+      "sendbirdAppId": "E30F2BDE-F34E-464F-9689-7D5C443231A3"
     },
     "owner": "safespacedev"
   }

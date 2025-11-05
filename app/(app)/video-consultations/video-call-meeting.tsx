@@ -16,7 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import TwilioVideoService from "../../../lib/twilio-service";
+import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 
 const { width, height } = Dimensions.get("window");
 
@@ -30,37 +30,37 @@ const initialMessages = [
 // Emoji options
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
-export default function VideoCallMeetingScreen() {
+export default function VideoCallScreen() {
+  const [isDemoMode] = useState(true);
   const { user } = useUser();
   const params = useLocalSearchParams();
-  const supportWorkerId = params.supportWorkerId as string;
-  const supportWorkerName = params.supportWorkerName as string || "Support Worker";
-  const appointmentId = params.appointmentId as string;
-  const audioOption = params.audioOption as string;
+  const supportWorkerName = (params.supportWorkerName as string) || "Support Worker";
 
+  // Camera permissions
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<CameraType>("front");
+
+  // Call states
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(audioOption !== "none");
+  const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRaiseHand, setIsRaiseHand] = useState(false);
   const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState("");
-  const [reactions, setReactions] = useState< 
-  { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
+  const [reactions, setReactions] = useState<
+    { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
   >([]);
   const [callStatus, setCallStatus] = useState("Connecting...");
   const [callDuration, setCallDuration] = useState(0);
   const [isCallConnected, setIsCallConnected] = useState(false);
+  const [permissionRequested, setPermissionRequested] = useState(false);
 
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    console.log("🎥 Initializing video call...");
-    console.log("Support Worker:", supportWorkerName);
-    console.log("Appointment ID:", appointmentId);
-    console.log("Audio Option:", audioOption);
-    
     initializeCall();
+    requestCameraPermissionImmediately();
 
     return () => {
       endCall();
@@ -70,39 +70,65 @@ export default function VideoCallMeetingScreen() {
     };
   }, []);
 
-  // Initialize Twilio and start call
-  const initializeCall = async () => {
+  // FORCE camera permission request immediately
+  const requestCameraPermissionImmediately = async () => {
+    console.log("🎥 FORCING camera permission request...");
+    
     try {
-      // Initialize Twilio
-      await TwilioVideoService.initialize();
-
-      // Get user ID from Clerk
-      const userId = user?.id || `user_${Date.now()}`;
+      // Small delay to ensure component is mounted
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Create room name
-      const roomName = `appointment_${appointmentId}`;
+      if (!permission) {
+        console.log("⚠️ Permission object not ready yet");
+        return;
+      }
 
-      console.log("🔑 Authenticating with Twilio...");
-      // Get access token from your backend
-      const accessToken = await TwilioVideoService.authenticate(userId, roomName);
+      console.log("📊 Current status:", permission.status);
+      console.log("📊 Granted:", permission.granted);
 
-      console.log("📞 Connecting to room:", roomName);
-      // Connect to room
-      await TwilioVideoService.connectToRoom(accessToken, roomName);
+      if (!permission.granted && !permissionRequested) {
+        console.log("🔔 Requesting permission NOW...");
+        setPermissionRequested(true);
+        
+        const result = await requestPermission();
+        console.log("✅ Permission result:", result);
 
-      setCallStatus("Connected");
+        if (!result.granted) {
+          Alert.alert(
+            "Camera Permission Required",
+            "Please go to Settings → SafeSpace → Camera and enable access.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { 
+                text: "Open Settings",
+                onPress: () => {
+                  // On iOS, this doesn't directly open settings
+                  // But we can at least inform the user
+                  console.log("User needs to open Settings manually");
+                }
+              }
+            ]
+          );
+        } else {
+          console.log("✅ Camera permission granted!");
+        }
+      } else if (permission.granted) {
+        console.log("✅ Permission already granted");
+      }
+    } catch (error) {
+      console.error("❌ Error requesting permission:", error);
+    }
+  };
+
+  // Initialize call (demo mode)
+  const initializeCall = async () => {
+    setCallStatus("Connecting...");
+    
+    setTimeout(() => {
+      setCallStatus("Connected (Demo)");
       setIsCallConnected(true);
       startCallTimer();
-      
-      console.log("✅ Video call connected successfully");
-    } catch (error) {
-      console.error("❌ Failed to initialize call:", error);
-      Alert.alert(
-        "Call Failed",
-        "Unable to start video call. Please try again.",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
-    }
+    }, 2000);
   };
 
   // Start call duration timer
@@ -135,29 +161,36 @@ export default function VideoCallMeetingScreen() {
   };
 
   const endCall = async () => {
-    try {
-      await TwilioVideoService.disconnect();
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
-      }
-      console.log("📴 Call ended");
-      router.back();
-    } catch (error) {
-      console.error("Error ending call:", error);
-      router.back();
+    if (callDurationInterval.current) {
+      clearInterval(callDurationInterval.current);
     }
+    router.back();
   };
 
   const handleToggleCamera = () => {
-    const newState = !isCameraOn;
-    setIsCameraOn(newState);
-    TwilioVideoService.toggleVideo(newState);
+    if (!permission?.granted) {
+      Alert.alert(
+        "Camera Permission Required",
+        "Camera permission is not granted. Please enable it in Settings.",
+        [
+          { text: "OK" },
+          {
+            text: "Request Again",
+            onPress: requestCameraPermissionImmediately
+          }
+        ]
+      );
+      return;
+    }
+    setIsCameraOn(!isCameraOn);
+  };
+
+  const handleFlipCamera = () => {
+    setFacing(current => (current === "back" ? "front" : "back"));
   };
 
   const handleToggleMic = () => {
-    const newState = !isMicOn;
-    setIsMicOn(newState);
-    TwilioVideoService.toggleAudio(newState);
+    setIsMicOn(!isMicOn);
   };
 
   const handleToggleChat = () => {
@@ -224,11 +257,36 @@ export default function VideoCallMeetingScreen() {
     setIsEmojiPanelOpen(false);
   };
 
+  // Show loading if permissions not loaded
+  if (!permission) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.permissionText}>Loading camera...</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Permission Debug Banner */}
+      {!permission.granted && (
+        <View style={styles.permissionBanner}>
+          <Ionicons name="warning" size={20} color="#FFF" />
+          <Text style={styles.permissionBannerText}>
+            Camera access needed
+          </Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestCameraPermissionImmediately}
+          >
+            <Text style={styles.permissionButtonText}>Grant Access</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Main Video Content */}
       <View style={styles.videoContainer}>
-        {/* Video Placeholder - Replace with actual Twilio native video views */}
+        {/* Remote Video Placeholder */}
         <View style={styles.participantVideo}>
           <View style={styles.videoPlaceholder}>
             <Ionicons name="person-circle" size={100} color="#FFFFFF" />
@@ -243,16 +301,36 @@ export default function VideoCallMeetingScreen() {
           </View>
         </View>
 
-        {/* Local Video Preview */}
+        {/* Local Video Preview with REAL CAMERA */}
         <View style={styles.selfVideoPreview}>
-          {isCameraOn ? (
-            <View style={styles.videoPlaceholderSmall}>
-              <Ionicons name="person-circle" size={40} color="#FFFFFF" />
-              <Text style={styles.placeholderTextSmall}>You</Text>
-            </View>
+          {isCameraOn && permission?.granted ? (
+            <>
+              <CameraView 
+                style={styles.camera}
+                facing={facing}
+              />
+              {/* Flip Camera Button */}
+              <TouchableOpacity 
+                style={styles.flipCameraButton}
+                onPress={handleFlipCamera}
+              >
+                <Ionicons name="camera-reverse" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </>
           ) : (
             <View style={styles.cameraOffOverlay}>
               <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
+              <Text style={styles.cameraOffText}>
+                {!permission?.granted ? "No Permission" : "Camera Off"}
+              </Text>
+              {!permission?.granted && (
+                <TouchableOpacity
+                  style={styles.miniButton}
+                  onPress={requestCameraPermissionImmediately}
+                >
+                  <Text style={styles.miniButtonText}>Grant Access</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -265,11 +343,11 @@ export default function VideoCallMeetingScreen() {
         </View>
 
         {/* Connection Info Banner */}
-        {!isCallConnected && (
+        {isCallConnected && (
           <View style={styles.connectionBanner}>
             <Ionicons name="information-circle" size={20} color="#FFF" />
             <Text style={styles.connectionText}>
-              Connecting to Twilio Video...
+              {permission?.granted ? "Connected to Support Worker" : "Tap to grant camera access"}
             </Text>
           </View>
         )}
@@ -450,6 +528,42 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#1A1A1A",
   },
+  permissionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    textAlign: "center",
+    marginTop: 20,
+  },
+  permissionBanner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FF9800",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 30,
+    zIndex: 10000,
+  },
+  permissionBannerText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    marginLeft: 8,
+    marginRight: 12,
+    fontWeight: "600",
+  },
+  permissionButton: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  permissionButtonText: {
+    color: "#FF9800",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   videoContainer: {
     flex: 1,
     backgroundColor: "#000000",
@@ -510,27 +624,41 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
     backgroundColor: "#333",
   },
-  videoPlaceholderSmall: {
+  camera: {
     width: "100%",
     height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#2a2a2a",
   },
-  placeholderTextSmall: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    marginTop: 5,
+  flipCameraButton: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 8,
   },
   cameraOffOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    width: "100%",
+    height: "100%",
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  cameraOffText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    marginTop: 8,
+  },
+  miniButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  miniButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
   },
   callStatus: {
     position: "absolute",
@@ -552,7 +680,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 152, 0, 0.9)",
+    backgroundColor: "rgba(76, 175, 80, 0.9)",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -625,10 +753,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -669,10 +794,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
