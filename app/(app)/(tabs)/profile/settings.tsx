@@ -39,6 +39,7 @@ import TimePickerModal from "../../../../components/TimePickerModal";
 export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
+  const [ready, setReady] = useState(false); // prevent auto-save on initial load
   const { theme, isDarkMode, setDarkMode: setGlobalDarkMode, textSize, setTextSize: setGlobalTextSize, scaledFontSize } = useTheme();
 
   // Settings state
@@ -109,7 +110,11 @@ export default function SettingsScreen() {
 
   // Load settings from backend on component mount
   useEffect(() => {
-    loadSettings();
+    (async () => {
+      await loadSettings();
+      // Slight delay to allow state to stabilize before enabling auto-save
+      setTimeout(() => setReady(true), 50);
+    })();
   }, []);
 
   // Apply settings when they change
@@ -144,9 +149,9 @@ export default function SettingsScreen() {
           appointmentReminderAdvanceMinutes,
         };
         console.log('🔔 Auto-saving notification settings:', settings);
-  await settingsAPI.saveSettings(settings, user?.id);
-  // Schedule local notifications based on updated settings
-  try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
+        await settingsAPI.saveSettings(settings, user?.id);
+        // Schedule local notifications based on updated settings
+        try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
       } catch (error) {
         console.log('Auto-save notification settings failed:', error);
       }
@@ -154,11 +159,15 @@ export default function SettingsScreen() {
 
     // Debounce the save to avoid too many API calls (500ms delay)
     const timer = setTimeout(() => {
-      saveNotificationChanges();
+      if (ready) {
+        saveNotificationChanges();
+      } else {
+        console.log('⏭️ Skipping auto-save: initial load not ready');
+      }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [notificationsEnabled, notifMoodTracking, notifJournaling, notifMessages, notifPostReactions, notifAppointments, notifSelfAssessment, moodReminderEnabled, moodReminderTime, moodReminderFrequency, moodReminderCustomSchedule, journalReminderEnabled, journalReminderTime, journalReminderFrequency, journalReminderCustomSchedule, appointmentReminderEnabled, appointmentReminderAdvanceMinutes, user?.id]);
+  }, [ready, notificationsEnabled, notifMoodTracking, notifJournaling, notifMessages, notifPostReactions, notifAppointments, notifSelfAssessment, moodReminderEnabled, moodReminderTime, moodReminderFrequency, moodReminderCustomSchedule, journalReminderEnabled, journalReminderTime, journalReminderFrequency, journalReminderCustomSchedule, appointmentReminderEnabled, appointmentReminderAdvanceMinutes, user?.id]);
 
   /**
    * Loads settings from backend API

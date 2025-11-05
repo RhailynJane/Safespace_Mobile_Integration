@@ -127,13 +127,33 @@ async function ensureNotificationsSchema() {
         title TEXT NOT NULL,
         message TEXT NOT NULL,
         is_read BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
       CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
     `);
-    console.log('✅ Ensured notifications table exists');
+    
+    // Migrate existing column if needed
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'notifications' 
+          AND column_name = 'created_at' 
+          AND data_type = 'timestamp without time zone'
+        ) THEN
+          ALTER TABLE notifications 
+          ALTER COLUMN created_at TYPE TIMESTAMPTZ 
+          USING created_at AT TIME ZONE 'UTC';
+          
+          RAISE NOTICE '✅ Migrated created_at column to TIMESTAMPTZ';
+        END IF;
+      END $$;
+    `);
+    
+    console.log('✅ Ensured notifications table exists with TIMESTAMPTZ');
   } catch (e: any) {
     console.error('⚠️ Failed to ensure notifications schema:', e.message);
   }
@@ -187,6 +207,28 @@ async function notifyUserByClerkId(clerkUserId: string, title: string, message: 
     await notifyUserByIds(userId, title, message, data);
   } catch (e: any) {
     console.error('⚠️ notifyUserByClerkId failed:', e.message);
+  }
+}
+
+// Insert a notification into DB without sending push (for local-only reminders)
+async function logNotificationByClerkId(clerkUserId: string, type: string, title: string, message: string, clientTimeIso?: string) {
+  try {
+    const u = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (u.rows.length === 0) return;
+    const userId = u.rows[0].id as number;
+    if (clientTimeIso) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, created_at) VALUES ($1, $2, $3, $4, $5)`,
+        [userId, type || 'system', title, message, clientTimeIso]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, $2, $3, $4)`,
+        [userId, type || 'system', title, message]
+      );
+    }
+  } catch (e: any) {
+    console.error('⚠️ logNotificationByClerkId failed:', e.message);
   }
 }
 
@@ -1026,6 +1068,44 @@ app.post('/api/appointments/notify', async (req: Request, res: Response) => {
   }
 });
 
+// Simple test endpoints to validate push/notification pipeline from local scripts
+app.post('/api/test-reminder/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { type = 'mood' } = (req.body || {}) as { type?: string };
+    let title = 'Reminder';
+    let message = 'This is a test reminder';
+    switch (type) {
+      case 'mood':
+        title = 'Mood check-in';
+        message = 'How are you feeling today?';
+        break;
+      case 'journaling':
+        title = 'Journaling reminder';
+        message = 'Take a moment to jot your thoughts.';
+        break;
+      default:
+        break;
+    }
+    await notifyUserByClerkId(clerkUserId, title, message, { type });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error in /api/test-reminder:', e.message);
+    res.status(500).json({ success: false, message: 'Failed', error: e.message });
+  }
+});
+
+app.post('/api/test-push/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    await notifyUserByClerkId(clerkUserId, 'Test notification', 'This is a test push notification', { type: 'system' });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error in /api/test-push:', e.message);
+    res.status(500).json({ success: false, message: 'Failed', error: e.message });
+  }
+});
+
 // Send an immediate notification to a user (debug/utility)
 app.post('/api/notifications/send', async (req: Request, res: Response) => {
   try {
@@ -1038,6 +1118,36 @@ app.post('/api/notifications/send', async (req: Request, res: Response) => {
   } catch (e: any) {
     console.error('❌ Error sending notification:', e.message);
     res.status(500).json({ success: false, message: 'Failed to send notification', error: e.message });
+  }
+});
+
+// Log a notification without sending push (used by client when local reminders fire)
+app.post('/api/notifications/log', async (req: Request, res: Response) => {
+  try {
+    const serverNow = new Date();
+    console.log(`📝 Backend /api/notifications/log called at: ${serverNow.toISOString()} (local: ${serverNow.toLocaleString()})`);
+    const { clerkUserId, type, title, message, clientLocal, clientEpochMs, tzOffsetMinutes, clientTimeZone } = req.body as {
+      clerkUserId?: string;
+      type?: string;
+      title?: string;
+      message?: string;
+      clientLocal?: string;
+      clientEpochMs?: number;
+      tzOffsetMinutes?: number;
+      clientTimeZone?: string;
+    };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+    console.log(`📝 Backend received: clientEpochMs=${clientEpochMs}, clientLocal=${clientLocal}, tz=${clientTimeZone}, offset=${tzOffsetMinutes}min`);
+    // Since client time was unreliable, just use server time
+    const createdAt = new Date(); // Use current server time
+    console.log(`📝 Backend using server time: ${createdAt.toISOString()} (local: ${createdAt.toLocaleString()})`);
+    await logNotificationByClerkId(clerkUserId, type || 'system', title, message, createdAt.toISOString());
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error logging notification:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to log notification', error: e.message });
   }
 });
 
@@ -3090,6 +3200,29 @@ app.post(
         }
       };
 
+      // Create notifications for other participants in the conversation (bell badge)
+      try {
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversation_id: Number.parseInt(conversationId) },
+          include: { user: { select: { clerk_user_id: true } } }
+        });
+
+        const recipients = participants
+          .map(p => p.user.clerk_user_id)
+          .filter(id => id && id !== result.sender.clerk_user_id);
+
+        for (const recipientId of recipients) {
+          await notifyUserByClerkId(
+            recipientId,
+            'New message',
+            result.message_text || 'You have a new message',
+            { type: 'message', conversationId: Number.parseInt(conversationId) }
+          );
+        }
+      } catch (e: any) {
+        console.error('⚠️ Failed to create message notifications:', e.message);
+      }
+
       res.json({
         success: true,
         message: "Message sent successfully",
@@ -4225,12 +4358,35 @@ interface UserSettings {
   // Privacy & Security
   autoLockTimer: string;
 
-  // Notifications
+  // Notifications (core)
   notificationsEnabled: boolean;
   quietHoursEnabled: boolean;
   quietStartTime: string;
   quietEndTime: string;
   reminderFrequency: string;
+
+  // Granular notification categories
+  notifMoodTracking?: boolean;
+  notifJournaling?: boolean;
+  notifMessages?: boolean;
+  notifPostReactions?: boolean;
+  notifAppointments?: boolean;
+  notifSelfAssessment?: boolean;
+
+  // Per-category reminders and schedules
+  moodReminderEnabled?: boolean;
+  moodReminderTime?: string;
+  moodReminderFrequency?: string;
+  moodReminderCustomSchedule?: any;
+
+  journalReminderEnabled?: boolean;
+  journalReminderTime?: string;
+  journalReminderFrequency?: string;
+  journalReminderCustomSchedule?: any;
+
+  // Appointment reminders
+  appointmentReminderEnabled?: boolean;
+  appointmentReminderAdvanceMinutes?: number;
 }
 
 // Get user settings
@@ -4270,18 +4426,21 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           text_size: "Medium",
           auto_lock_timer: "5 minutes",
           notifications_enabled: true,
+          // Quiet hours removed
           quiet_hours_enabled: false,
-          quiet_start_time: "22:00",
-          quiet_end_time: "08:00",
+          quiet_start_time: null,
+          quiet_end_time: null,
           reminder_frequency: "Daily",
         },
       });
     }
 
-    console.log('🔧 Settings found:', result.rows[0]);
+    // Quiet hours removed from API
+    const row = { ...result.rows[0], quiet_hours_enabled: false, quiet_start_time: null, quiet_end_time: null };
+    console.log('🔧 Settings found:', row);
     res.json({
       success: true,
-      settings: result.rows[0],
+      settings: row,
     });
   } catch (error: any) {
     console.error("❌ Error fetching settings:", error.message);
@@ -4346,21 +4505,71 @@ app.put(
              auto_lock_timer = COALESCE($3, auto_lock_timer),
              notifications_enabled = COALESCE($4, notifications_enabled),
              quiet_hours_enabled = COALESCE($5, quiet_hours_enabled),
-             quiet_start_time = COALESCE($6, quiet_start_time),
-             quiet_end_time = COALESCE($7, quiet_end_time),
+             quiet_start_time = CASE WHEN $5 = false THEN NULL ELSE COALESCE($6, quiet_start_time) END,
+             quiet_end_time = CASE WHEN $5 = false THEN NULL ELSE COALESCE($7, quiet_end_time) END,
              reminder_frequency = COALESCE($8, reminder_frequency),
+
+             -- granular categories
+             notif_mood_tracking = COALESCE($9, notif_mood_tracking),
+             notif_journaling = COALESCE($10, notif_journaling),
+             notif_messages = COALESCE($11, notif_messages),
+             notif_post_reactions = COALESCE($12, notif_post_reactions),
+             notif_appointments = COALESCE($13, notif_appointments),
+             notif_self_assessment = COALESCE($14, notif_self_assessment),
+
+             -- reminders (mood)
+             mood_reminder_enabled = COALESCE($15, mood_reminder_enabled),
+             mood_reminder_time = COALESCE($16, mood_reminder_time),
+             mood_reminder_frequency = COALESCE($17, mood_reminder_frequency),
+             mood_reminder_custom_schedule = COALESCE($18, mood_reminder_custom_schedule),
+
+             -- reminders (journal)
+             journal_reminder_enabled = COALESCE($19, journal_reminder_enabled),
+             journal_reminder_time = COALESCE($20, journal_reminder_time),
+             journal_reminder_frequency = COALESCE($21, journal_reminder_frequency),
+             journal_reminder_custom_schedule = COALESCE($22, journal_reminder_custom_schedule),
+
+             -- appointment reminders
+             appointment_reminder_enabled = COALESCE($23, appointment_reminder_enabled),
+             appointment_reminder_advance_minutes = COALESCE($24, appointment_reminder_advance_minutes),
+
              updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $9
+           WHERE user_id = $25
            RETURNING *`,
           [
             settings.darkMode,
             settings.textSize,
             settings.autoLockTimer,
             settings.notificationsEnabled,
-            settings.quietHoursEnabled,
-            settings.quietStartTime,
-            settings.quietEndTime,
+            false, // quiet hours removed
+            null,
+            null,
             settings.reminderFrequency,
+
+            // granular
+            settings.notifMoodTracking,
+            settings.notifJournaling,
+            settings.notifMessages,
+            settings.notifPostReactions,
+            settings.notifAppointments,
+            settings.notifSelfAssessment,
+
+            // mood
+            settings.moodReminderEnabled,
+            settings.moodReminderTime,
+            settings.moodReminderFrequency,
+            settings.moodReminderCustomSchedule ? JSON.stringify(settings.moodReminderCustomSchedule) : null,
+
+            // journal
+            settings.journalReminderEnabled,
+            settings.journalReminderTime,
+            settings.journalReminderFrequency,
+            settings.journalReminderCustomSchedule ? JSON.stringify(settings.journalReminderCustomSchedule) : null,
+
+            // appointment
+            settings.appointmentReminderEnabled,
+            settings.appointmentReminderAdvanceMinutes,
+
             userId
           ]
         );
@@ -4368,10 +4577,22 @@ app.put(
         // INSERT new settings
         result = await pool.query(
           `INSERT INTO user_settings (
-            user_id, clerk_user_id, 
+            user_id, clerk_user_id,
             dark_mode, text_size, auto_lock_timer,
-            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+            notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+            mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+            journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
+            appointment_reminder_enabled, appointment_reminder_advance_minutes
+          ) VALUES (
+            $1, $2,
+            $3, $4, $5,
+            $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20,
+            $21, $22, $23, $24,
+            $25, $26
+          )
           RETURNING *`,
           [
             userId,
@@ -4380,10 +4601,34 @@ app.put(
             settings.textSize ?? 'Medium',
             settings.autoLockTimer ?? '5 minutes',
             settings.notificationsEnabled ?? true,
-            settings.quietHoursEnabled ?? false,
-            settings.quietStartTime ?? '22:00',
-            settings.quietEndTime ?? '08:00',
-            settings.reminderFrequency ?? 'Daily'
+            false,
+            null,
+            null,
+            settings.reminderFrequency ?? 'Daily',
+
+            // granular defaults to true to match previous behavior
+            settings.notifMoodTracking ?? true,
+            settings.notifJournaling ?? true,
+            settings.notifMessages ?? true,
+            settings.notifPostReactions ?? true,
+            settings.notifAppointments ?? true,
+            settings.notifSelfAssessment ?? true,
+
+            // mood
+            settings.moodReminderEnabled ?? false,
+            settings.moodReminderTime ?? '09:00',
+            settings.moodReminderFrequency ?? 'Daily',
+            (settings.moodReminderCustomSchedule ? JSON.stringify(settings.moodReminderCustomSchedule) : JSON.stringify({})),
+
+            // journal
+            settings.journalReminderEnabled ?? false,
+            settings.journalReminderTime ?? '20:00',
+            settings.journalReminderFrequency ?? 'Daily',
+            (settings.journalReminderCustomSchedule ? JSON.stringify(settings.journalReminderCustomSchedule) : JSON.stringify({})),
+
+            // appointment
+            settings.appointmentReminderEnabled ?? true,
+            settings.appointmentReminderAdvanceMinutes ?? 60
           ]
         );
       }
