@@ -341,6 +341,23 @@ export default function BookAppointment() {
    * Handles navigation to confirmation screen with selected appointment details
    */
   const handleContinue = () => {
+      if (!supportWorker) {
+    showStatusModal('error', 'Error', 'Please select a support worker');
+    return;
+  }
+  
+  if (!selectedDate || !selectedTime) {
+    showStatusModal('error', 'Error', 'Please select date and time');
+    return;
+  }
+
+  console.log('🚀 Navigating to confirm with:', {
+    supportWorkerId: supportWorker.id,
+    selectedType,
+    selectedDate,
+    selectedTime
+  });
+  
     router.push({
       pathname: "/appointments/confirm",
       params: {

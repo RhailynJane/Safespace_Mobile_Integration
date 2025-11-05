@@ -14,6 +14,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -22,7 +23,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import StatusModal from "../../../../components/StatusModal";
@@ -56,8 +56,22 @@ export default function ConfirmAppointment() {
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Get support worker ID from navigation params
-  const { supportWorkerId } = useLocalSearchParams();
+  // Get ALL params from navigation
+  const { 
+    supportWorkerId, 
+    supportWorkerName, 
+    selectedType, 
+    selectedDate, 
+    selectedTime 
+  } = useLocalSearchParams();
+
+  console.log('📋 Confirmation page params:', { 
+    supportWorkerId, 
+    supportWorkerName, 
+    selectedType, 
+    selectedDate, 
+    selectedTime 
+  });
 
   /**
    * Show status modal with given parameters
@@ -68,29 +82,6 @@ export default function ConfirmAppointment() {
     setStatusModalMessage(message);
     setStatusModalVisible(true);
   };
-
-  // Mock data for support workers (replaces backend data)
-  const supportWorkers = [
-    {
-      id: 1,
-      name: "Eric Young",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-  ];
-
-  // Find the support worker based on the ID from the URL
-  const supportWorker = supportWorkers.find(
-    (sw) => sw.id === Number(supportWorkerId)
-  );
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -151,12 +142,21 @@ export default function ConfirmAppointment() {
     ]);
   };
 
-  // Show error if support worker not found
-  if (!supportWorker) {
+  // Check if we have the required data
+  if (!supportWorkerName || !selectedDate || !selectedTime) {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <Text style={[styles.errorText, { color: theme.colors.text }]}>Support worker not found</Text>
+          <AppHeader title="Appointment Confirmation" showBack={true} />
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>
+            Missing appointment details. Please try booking again.
+          </Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, { backgroundColor: theme.colors.primary, marginHorizontal: 20 }]}
+            onPress={() => router.replace("/appointments/book")}
+          >
+            <Text style={styles.buttonText}>Book Appointment</Text>
+          </TouchableOpacity>
         </SafeAreaView>
       </CurvedBackground>
     );
@@ -263,7 +263,7 @@ export default function ConfirmAppointment() {
       title: "Community Forum",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/community-forum");
+        router.push("/(app)/(tabs)/community-forum");
       },
     },
     {
@@ -290,20 +290,6 @@ export default function ConfirmAppointment() {
       </CurvedBackground>
     );
   }
-
-  // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 07, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "upcoming",
-    },
-  ];
-
-  const appointment = appointments.length > 0 ? appointments[0] : null;
 
   return (
     <CurvedBackground>
@@ -347,7 +333,12 @@ export default function ConfirmAppointment() {
 
           {/* Confirmation Card */}
           <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.confirmationTitle, { color: theme.colors.text }]}>Appointment Booked</Text>
+            {/* Success Icon */}
+            <View style={[styles.successIcon, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="checkmark-circle" size={64} color={theme.colors.surface} />
+            </View>
+
+            <Text style={[styles.confirmationTitle, { color: theme.colors.text }]}>Appointment Booked!</Text>
             <Text style={[styles.confirmationMessage, { color: theme.colors.textSecondary }]}>
               Your appointment has been successfully scheduled.
             </Text>
@@ -357,7 +348,7 @@ export default function ConfirmAppointment() {
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {appointment ? appointment.supportWorker : ""}
+                  {supportWorkerName}
                 </Text>
               </View>
 
@@ -365,7 +356,7 @@ export default function ConfirmAppointment() {
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {appointment ? `${appointment.date}` : ""}
+                  {selectedDate}
                 </Text>
               </View>
 
@@ -373,7 +364,7 @@ export default function ConfirmAppointment() {
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {appointment ? `${appointment.time}` : ""}
+                  {selectedTime}
                 </Text>
               </View>
 
@@ -381,28 +372,28 @@ export default function ConfirmAppointment() {
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {appointment ? appointment.type : ""}
+                  {selectedType}
                 </Text>
               </View>
-
-              {/* Primary Action Button - View Appointments */}
-              <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-                onPress={() => router.replace("/appointments/appointment-list")}
-              >
-                <Text style={styles.buttonText}>Check Appointments</Text>
-              </TouchableOpacity>
-
-              {/* Secondary Action Button - Book Another Appointment */}
-              <TouchableOpacity
-                style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
-                onPress={() => router.replace("/appointments/book")}
-              >
-                <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-                  Book Another Appointment
-                </Text>
-              </TouchableOpacity>
             </View>
+
+            {/* Primary Action Button - View Appointments */}
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              onPress={() => router.replace("/(app)/(tabs)/appointments")}
+            >
+              <Text style={styles.buttonText}>View My Appointments</Text>
+            </TouchableOpacity>
+
+            {/* Secondary Action Button - Book Another Appointment */}
+            <TouchableOpacity
+              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
+              onPress={() => router.replace("/appointments/book")}
+            >
+              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
+                Book Another Appointment
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
@@ -488,6 +479,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#666",
     textAlign: "center",
     marginTop: 50,
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   scrollContainer: {
     flex: 1,
@@ -577,6 +570,15 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowRadius: 4,
     elevation: 3,
     alignItems: "center",
+  },
+  successIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#E8F5E9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
   },
   confirmationTitle: {
     fontSize: scaledFontSize(24),

@@ -22,6 +22,8 @@ export const Colors = {
   warning: "#FF9800", // Warning orange
   info: "#2196F3", // Info blue
 
+  
+
   // Social Colors
   facebook: "#1877F2",
   google: "#DB4437",
