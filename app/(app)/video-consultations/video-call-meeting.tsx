@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
 
@@ -55,58 +56,34 @@ export default function VideoCallScreen() {
   const [callDuration, setCallDuration] = useState(0);
   const [isCallConnected, setIsCallConnected] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    initializeCall();
-    requestCameraPermissionImmediately();
-
-    return () => {
-      endCall();
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
-      }
-    };
-  }, []);
-
   // FORCE camera permission request immediately
-  const requestCameraPermissionImmediately = async () => {
+  const requestCameraPermissionImmediately = useCallback(async () => {
     console.log("🎥 FORCING camera permission request...");
-    
     try {
       // Small delay to ensure component is mounted
       await new Promise(resolve => setTimeout(resolve, 500));
-      
       if (!permission) {
         console.log("⚠️ Permission object not ready yet");
         return;
       }
-
       console.log("📊 Current status:", permission.status);
       console.log("📊 Granted:", permission.granted);
-
       if (!permission.granted && !permissionRequested) {
         console.log("🔔 Requesting permission NOW...");
         setPermissionRequested(true);
-        
         const result = await requestPermission();
         console.log("✅ Permission result:", result);
-
         if (!result.granted) {
           Alert.alert(
             "Camera Permission Required",
             "Please go to Settings → SafeSpace → Camera and enable access.",
             [
               { text: "Cancel", style: "cancel" },
-              { 
-                text: "Open Settings",
-                onPress: () => {
-                  // On iOS, this doesn't directly open settings
-                  // But we can at least inform the user
-                  console.log("User needs to open Settings manually");
-                }
-              }
+              { text: "Open Settings", onPress: () => console.log("User needs to open Settings manually") }
             ]
           );
         } else {
@@ -118,18 +95,29 @@ export default function VideoCallScreen() {
     } catch (error) {
       console.error("❌ Error requesting permission:", error);
     }
-  };
+  }, [permission, permissionRequested, requestPermission]);
 
   // Initialize call (demo mode)
-  const initializeCall = async () => {
+  const initializeCall = useCallback(async () => {
     setCallStatus("Connecting...");
-    
     setTimeout(() => {
       setCallStatus("Connected (Demo)");
       setIsCallConnected(true);
       startCallTimer();
     }, 2000);
-  };
+  }, []);
+
+  useEffect(() => {
+    initializeCall();
+    requestCameraPermissionImmediately();
+
+    return () => {
+      // Don't navigate on unmount; just clear timers
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+    };
+  }, [initializeCall, requestCameraPermissionImmediately]);
 
   // Start call duration timer
   const startCallTimer = () => {
@@ -267,119 +255,197 @@ export default function VideoCallScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Permission Debug Banner */}
-      {!permission.granted && (
-        <View style={styles.permissionBanner}>
-          <Ionicons name="warning" size={20} color="#FFF" />
-          <Text style={styles.permissionBannerText}>
-            Camera access needed
-          </Text>
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={requestCameraPermissionImmediately}
-          >
-            <Text style={styles.permissionButtonText}>Grant Access</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Main Video Content */}
-      <View style={styles.videoContainer}>
-        {/* Remote Video Placeholder */}
-        <View style={styles.participantVideo}>
-          <View style={styles.videoPlaceholder}>
-            <Ionicons name="person-circle" size={100} color="#FFFFFF" />
-            <Text style={styles.placeholderText}>Remote Video</Text>
-            <Text style={styles.placeholderSubtext}>{supportWorkerName}</Text>
-          </View>
-          <View style={styles.participantInfo}>
-            <Text style={styles.participantName}>{supportWorkerName}</Text>
-            <View style={styles.audioIndicator}>
-              <Ionicons name="mic" size={12} color="#FFFFFF" />
-            </View>
-          </View>
-        </View>
-
-        {/* Local Video Preview with REAL CAMERA */}
-        <View style={styles.selfVideoPreview}>
-          {isCameraOn && permission?.granted ? (
-            <>
-              <CameraView 
-                style={styles.camera}
-                facing={facing}
-              />
-              {/* Flip Camera Button */}
-              <TouchableOpacity 
-                style={styles.flipCameraButton}
-                onPress={handleFlipCamera}
-              >
-                <Ionicons name="camera-reverse" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </>
-          ) : (
-            <View style={styles.cameraOffOverlay}>
-              <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
-              <Text style={styles.cameraOffText}>
-                {!permission?.granted ? "No Permission" : "Camera Off"}
-              </Text>
-              {!permission?.granted && (
-                <TouchableOpacity
-                  style={styles.miniButton}
-                  onPress={requestCameraPermissionImmediately}
-                >
-                  <Text style={styles.miniButtonText}>Grant Access</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Call Status */}
-        <View style={styles.callStatus}>
-          <Text style={styles.callStatusText}>
-            {isCallConnected ? formatDuration(callDuration) : callStatus}
-          </Text>
-        </View>
-
-        {/* Connection Info Banner */}
-        {isCallConnected && (
-          <View style={styles.connectionBanner}>
-            <Ionicons name="information-circle" size={20} color="#FFF" />
-            <Text style={styles.connectionText}>
-              {permission?.granted ? "Connected to Support Worker" : "Tap to grant camera access"}
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#1A1A1A' }}>
+      <View style={{ flex: 1 }}>
+        {/* Permission Debug Banner */}
+        {!permission.granted && (
+          <View style={styles.permissionBanner}>
+            <Ionicons name="warning" size={20} color="#FFF" />
+            <Text style={styles.permissionBannerText}>
+              Camera access needed
             </Text>
+            <TouchableOpacity
+              style={styles.permissionButton}
+              onPress={requestCameraPermissionImmediately}
+            >
+              <Text style={styles.permissionButtonText}>Grant Access</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* Reactions displayed on screen */}
-        {reactions.map((reaction) => (
-          <Animated.Text
-            key={reaction.id}
-            style={[
-              styles.reaction,
-              {
-                left: reaction.position.x,
-                top: reaction.position.y,
-                opacity: reaction.opacity,
-                transform: [
-                  {
-                    translateY: reaction.opacity.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -50],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            {reaction.emoji}
-          </Animated.Text>
-        ))}
-      </View>
+        {/* Main Video Content */}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={[styles.videoContainer, { flex: 1, width: '100%', height: undefined, minHeight: 0, maxHeight: '100%' }]}> 
+            {/* Remote Video Placeholder */}
+            <View style={styles.participantVideo}>
+              <View style={styles.videoPlaceholder}>
+                <Ionicons name="person-circle" size={100} color="#FFFFFF" />
+                <Text style={styles.placeholderText}>Remote Video</Text>
+                <Text style={styles.placeholderSubtext}>{supportWorkerName}</Text>
+              </View>
+              <View style={styles.participantInfo}>
+                <Text style={styles.participantName}>{supportWorkerName}</Text>
+                <View style={styles.audioIndicator}>
+                  <Ionicons name="mic" size={12} color="#FFFFFF" />
+                </View>
+              </View>
+            </View>
 
-      {/* Bottom Controls */}
-      <View style={styles.controlsContainer}>
+            {/* Local Video Preview with REAL CAMERA */}
+            <View style={[
+              styles.selfVideoPreview,
+              { bottom: Math.max(insets.bottom, 8) + 140 }
+            ]}>
+              {isCameraOn && permission?.granted ? (
+                <>
+                  <CameraView 
+                    style={[styles.camera, { backgroundColor: '#222' }]}
+                    facing={facing}
+                  />
+                  {/* Flip Camera Button */}
+                  <TouchableOpacity 
+                    style={styles.flipCameraButton}
+                    onPress={handleFlipCamera}
+                  >
+                    <Ionicons name="camera-reverse" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.cameraOffOverlay}>
+                  <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
+                  <Text style={styles.cameraOffText}>
+                    {!permission?.granted ? "No Permission" : "Camera Off"}
+                  </Text>
+                  {!permission?.granted && (
+                    <TouchableOpacity
+                      style={styles.miniButton}
+                      onPress={requestCameraPermissionImmediately}
+                    >
+                      <Text style={styles.miniButtonText}>Grant Access</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Call Status */}
+            <View style={styles.callStatus}>
+              <Text style={styles.callStatusText}>
+                {isCallConnected ? formatDuration(callDuration) : callStatus}
+              </Text>
+            </View>
+
+            {/* Connection Info Banner */}
+            {isCallConnected && (
+              <View style={styles.connectionBanner}>
+                <Ionicons name="information-circle" size={20} color="#FFF" />
+                <Text style={styles.connectionText}>
+                  {permission?.granted ? "Connected to Support Worker" : "Tap to grant camera access"}
+                </Text>
+              </View>
+            )}
+
+            {/* Reactions displayed on screen */}
+            {reactions.map((reaction) => (
+              <Animated.Text
+                key={reaction.id}
+                style={[
+                  styles.reaction,
+                  {
+                    left: reaction.position.x,
+                    top: reaction.position.y,
+                    opacity: reaction.opacity,
+                    transform: [
+                      {
+                        translateY: reaction.opacity.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, -50],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                {reaction.emoji}
+              </Animated.Text>
+            ))}
+          </View>
+        </View>
+
+        {/* Emoji Panel */}
+        {isEmojiPanelOpen && (
+          <View style={styles.emojiPanel}>
+            <Text style={styles.emojiPanelTitle}>React</Text>
+            <View style={styles.emojiGrid}>
+              {emojiOptions.map((emoji, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.emojiButton}
+                  onPress={() => handleAddReaction(emoji)}
+                >
+                  <Text style={styles.emoji}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Chat Panel */}
+        {isChatOpen && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.chatPanelContainer}
+          >
+            <View style={styles.chatPanel}>
+              <View style={styles.chatHeader}>
+                <Text style={styles.chatTitle}>Chat</Text>
+                <TouchableOpacity onPress={handleToggleChat}>
+                  <Ionicons name="close" size={24} color="#333333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView 
+                style={styles.messagesContainer}
+                contentContainerStyle={{ paddingBottom: 16 }}
+              >
+                {messages.map((message) => (
+                  <View
+                    key={message.id}
+                    style={[
+                      styles.messageBubble,
+                      message.sender === "You" ? styles.myMessage : styles.theirMessage,
+                    ]}
+                  >
+                    <Text style={styles.messageText}>{message.text}</Text>
+                    <Text style={styles.messageTime}>{message.time}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.messageInputContainer}>
+                <TextInput
+                  style={styles.messageInput}
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChangeText={setNewMessage}
+                  multiline
+                  maxLength={500}
+                />
+                <TouchableOpacity 
+                  style={styles.sendButton}
+                  onPress={handleSendMessage}
+                  disabled={!newMessage.trim()}
+                >
+                  <Ionicons 
+                    name="send" 
+                    size={20} 
+                    color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+        {/* Bottom Controls and Leave Button - inside SafeAreaView */}
+  <View style={{ backgroundColor: '#2D2D2D', paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) + 16 }}>
         <View style={styles.controlsRow}>
           <TouchableOpacity 
             style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
@@ -388,7 +454,6 @@ export default function VideoCallScreen() {
             <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
             <Text style={styles.controlText}>Chat</Text>
           </TouchableOpacity>
-
           <TouchableOpacity 
             style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
             onPress={handleToggleRaiseHand}
@@ -400,7 +465,6 @@ export default function VideoCallScreen() {
             />
             <Text style={styles.controlText}>Raise</Text>
           </TouchableOpacity>
-
           <TouchableOpacity 
             style={[styles.controlButton, isEmojiPanelOpen && styles.controlButtonActive]}
             onPress={handleToggleEmojiPanel}
@@ -408,7 +472,6 @@ export default function VideoCallScreen() {
             <Ionicons name="happy" size={24} color="#FFFFFF" />
             <Text style={styles.controlText}>React</Text>
           </TouchableOpacity>
-
           <TouchableOpacity 
             style={[styles.controlButton, !isCameraOn && styles.controlButtonMuted]}
             onPress={handleToggleCamera}
@@ -420,7 +483,6 @@ export default function VideoCallScreen() {
             />
             <Text style={styles.controlText}>Camera</Text>
           </TouchableOpacity>
-
           <TouchableOpacity 
             style={[styles.controlButton, !isMicOn && styles.controlButtonMuted]}
             onPress={handleToggleMic}
@@ -433,8 +495,7 @@ export default function VideoCallScreen() {
             <Text style={styles.controlText}>Mic</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.leaveButtonContainer}>
+        <View style={[styles.leaveButtonContainer, { marginBottom: 8 }]}> 
           <TouchableOpacity 
             style={styles.leaveButton}
             onPress={handleLeaveCall}
@@ -443,82 +504,8 @@ export default function VideoCallScreen() {
             <Text style={styles.leaveButtonText}>Leave</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Emoji Panel */}
-      {isEmojiPanelOpen && (
-        <View style={styles.emojiPanel}>
-          <Text style={styles.emojiPanelTitle}>React</Text>
-          <View style={styles.emojiGrid}>
-            {emojiOptions.map((emoji, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.emojiButton}
-                onPress={() => handleAddReaction(emoji)}
-              >
-                <Text style={styles.emoji}>{emoji}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
-      )}
-
-      {/* Chat Panel */}
-      {isChatOpen && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.chatPanelContainer}
-        >
-          <View style={styles.chatPanel}>
-            <View style={styles.chatHeader}>
-              <Text style={styles.chatTitle}>Chat</Text>
-              <TouchableOpacity onPress={handleToggleChat}>
-                <Ionicons name="close" size={24} color="#333333" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView 
-              style={styles.messagesContainer}
-              contentContainerStyle={{ paddingBottom: 16 }}
-            >
-              {messages.map((message) => (
-                <View
-                  key={message.id}
-                  style={[
-                    styles.messageBubble,
-                    message.sender === "You" ? styles.myMessage : styles.theirMessage,
-                  ]}
-                >
-                  <Text style={styles.messageText}>{message.text}</Text>
-                  <Text style={styles.messageTime}>{message.time}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            
-            <View style={styles.messageInputContainer}>
-              <TextInput
-                style={styles.messageInput}
-                placeholder="Type a message..."
-                value={newMessage}
-                onChangeText={setNewMessage}
-                multiline
-                maxLength={500}
-              />
-              <TouchableOpacity 
-                style={styles.sendButton}
-                onPress={handleSendMessage}
-                disabled={!newMessage.trim()}
-              >
-                <Ionicons 
-                  name="send" 
-                  size={20} 
-                  color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -623,6 +610,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFFFFF",
     backgroundColor: "#333",
+    zIndex: 2,
   },
   camera: {
     width: "100%",

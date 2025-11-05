@@ -9,9 +9,12 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
@@ -19,10 +22,6 @@ import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
-
-// Mock user/profile data for UI testing (no backend dependency)
-const mockUser = { displayName: "Demo User", email: "demo@gmail.com" };
-const mockProfile = { firstName: "Demo", lastName: "User" };
 
 export default function VideoCallScreen() {
   // Params passed from appointment-detail
@@ -38,33 +37,88 @@ export default function VideoCallScreen() {
   // Local UI state
   const [audioOption, setAudioOption] = useState<"phone" | "none">("phone");
   const [activeTab, setActiveTab] = useState<string>("home");
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   // Styles with dynamic text scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Simple display name helper based on mock data
-  const user = mockUser;
-  const profile = mockProfile;
+  // Use Clerk user for display name instead of demo
+  const { user } = useUser();
   const getDisplayName = () => {
-    if (profile?.firstName) return profile.firstName;
-    if (user?.displayName) return user.displayName.split(" ")[0];
-    if (user?.email) return user.email.split("@")[0];
+    if (user?.firstName) return user.firstName;
+    if (user?.fullName) return user.fullName.split(" ")[0];
+    const email = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
+    if (email) return email.split("@")[0];
     return "User";
   };
 
   // Start meeting: navigate to the in-call screen, forward context
   const handleStartMeeting = () => {
+    // If appointment is in the future (MST), show confirmation modal
+    if (shouldConfirmFutureJoin(date, time)) {
+      setConfirmVisible(true);
+      return;
+    }
+    pushToMeeting();
+  };
+
+  const pushToMeeting = () => {
     router.push({
       pathname: "/(app)/video-consultations/video-call-meeting",
-      params: {
-        supportWorkerName,
-        appointmentId,
-        audioOption,
-        meetingLink,
-        date,
-        time,
-      },
+      params: { supportWorkerName, appointmentId, audioOption, meetingLink, date, time },
     });
+  };
+
+  // Determine if appointment time (date + time) is in the future relative to now in MST
+  const shouldConfirmFutureJoin = (dateStr?: string, timeStr?: string) => {
+    if (!dateStr || !timeStr) return false; // no guard if missing
+    // Build MST now numeric
+    const mst = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Denver",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const nowParts = mst.formatToParts(new Date());
+    const nowYear = parseInt(nowParts.find(p => p.type === "year")?.value || "0");
+    const nowMonth = parseInt(nowParts.find(p => p.type === "month")?.value || "0");
+    const nowDay = parseInt(nowParts.find(p => p.type === "day")?.value || "0");
+    const nowHour = parseInt(nowParts.find(p => p.type === "hour")?.value || "0");
+    const nowMinute = parseInt(nowParts.find(p => p.type === "minute")?.value || "0");
+    const nowNumeric = nowYear * 100000000 + nowMonth * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
+
+    // Parse date string into Y/M/D (tolerate weekday prefix)
+    const d = new Date(String(dateStr));
+    if (isNaN(d.getTime())) return false; // if unparseable, don’t block
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1; // 1-based
+    const day = d.getDate();
+
+    // Parse time string (supports HH:mm, HH:mm:ss, or 12h with AM/PM)
+    const { h, m } = parseTime(timeStr);
+    const aptNumeric = year * 100000000 + month * 1000000 + day * 10000 + h * 100 + m;
+    return aptNumeric > nowNumeric;
+  };
+
+  const parseTime = (t: string) => {
+    try {
+      const s = t.trim();
+      const ampm = /am|pm/i.test(s) ? s.match(/am|pm/i)![0].toLowerCase() : null;
+      const timePart = s.replace(/am|pm/ig, "").trim();
+      const parts = timePart.split(":");
+      let hh = parseInt(parts[0] || "0", 10);
+      const mm = parseInt(parts[1] || "0", 10);
+      if (ampm) {
+        if (ampm === "pm" && hh < 12) hh += 12;
+        if (ampm === "am" && hh === 12) hh = 0;
+      }
+      return { h: hh, m: mm };
+    } catch {
+      return { h: 0, m: 0 };
+    }
   };
 
   // Bottom navigation tabs config (UI only)
@@ -99,7 +153,11 @@ export default function VideoCallScreen() {
           {/* Avatar + user name */}
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={50} color="#FFFFFF" />
+              {user?.imageUrl ? (
+                <Image source={{ uri: user.imageUrl }} style={styles.avatarImage} />
+              ) : (
+                <Ionicons name="person" size={50} color="#FFFFFF" />
+              )}
             </View>
             <View style={styles.profileTextContainer}>
               <Text style={[styles.avatarName, { color: theme.colors.text }]}>
@@ -168,7 +226,7 @@ export default function VideoCallScreen() {
         </View>
 
         {/* Actions */}
-        <View style={styles.meetingActions}>
+  <View style={styles.meetingActions}>
           <TouchableOpacity
             style={[styles.cancelButton, { borderColor: theme.colors.borderLight, backgroundColor: theme.colors.surface }]}
             onPress={() => router.back()}
@@ -185,6 +243,37 @@ export default function VideoCallScreen() {
             <Text style={styles.joinNowButtonText}>Join Now</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Join confirmation for future appointments */}
+        <Modal
+          visible={confirmVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setConfirmVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { backgroundColor: theme.colors.surface }] }>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Join early?</Text>
+              <Text style={[styles.modalMessage, { color: theme.colors.textSecondary }]}>
+                The meeting is scheduled for {date} at {time}. Your support worker will join at the scheduled time.
+              </Text>
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { borderColor: theme.colors.borderLight, backgroundColor: theme.colors.surface }]}
+                  onPress={() => { setConfirmVisible(false); router.back(); }}
+                >
+                  <Text style={[styles.modalButtonText, { color: theme.colors.textSecondary }]}>Join later</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalPrimaryButton, { backgroundColor: theme.colors.primary }]}
+                  onPress={() => { setConfirmVisible(false); pushToMeeting(); }}
+                >
+                  <Text style={styles.modalPrimaryText}>Join now</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Bottom Nav (UI only) */}
         <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
@@ -244,6 +333,11 @@ const createStyles = (scaledFontSize: (size: number) => number) =>
       alignItems: "center",
       marginBottom: 15,
     },
+    avatarImage: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+    },
     avatarName: {
       fontSize: scaledFontSize(18),
       fontWeight: "600",
@@ -297,7 +391,7 @@ const createStyles = (scaledFontSize: (size: number) => number) =>
       padding: 10,
       borderTopWidth: 1,
       borderTopColor: "rgba(224,224,224,0.5)",
-      marginBottom: 100,
+      marginBottom: 140, // increase space above bottom nav
       paddingHorizontal: 20,
       width: "100%",
       maxWidth: 360,
@@ -326,5 +420,55 @@ const createStyles = (scaledFontSize: (size: number) => number) =>
       color: "#FFFFFF",
       fontSize: scaledFontSize(13),
       fontWeight: "600",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 420,
+      borderRadius: 12,
+      padding: 16,
+    },
+    modalTitle: {
+      fontSize: scaledFontSize(18),
+      fontWeight: '700',
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    modalMessage: {
+      fontSize: scaledFontSize(14),
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      alignItems: 'center',
+    },
+    modalButtonText: {
+      fontSize: scaledFontSize(14),
+      fontWeight: '600',
+    },
+    modalPrimaryButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    modalPrimaryText: {
+      color: '#fff',
+      fontSize: scaledFontSize(14),
+      fontWeight: '700',
     },
   });
