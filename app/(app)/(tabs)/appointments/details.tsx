@@ -405,7 +405,11 @@ export default function BookAppointment() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title=" Book Appointments" showBack={true} />
 
-        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <ScrollView 
+            style={{ flex: 1, backgroundColor: theme.colors.background }}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+          >
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>

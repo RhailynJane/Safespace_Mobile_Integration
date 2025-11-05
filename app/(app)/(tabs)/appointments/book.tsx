@@ -339,7 +339,11 @@ const fetchSupportWorkers = async () => {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Book Appointment" showBack={true} />
 
-        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <ScrollView 
+          style={{ flex: 1, backgroundColor: theme.colors.background }}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>
@@ -727,11 +731,12 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   specialtyText: {
     backgroundColor: "#d0cad8ff",
-    color: "#00000",
+    color: "#333333",
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 16,
     fontSize: scaledFontSize(12),
+    fontWeight: "500",
   },
   selectText: {
     // color moved to theme via inline override

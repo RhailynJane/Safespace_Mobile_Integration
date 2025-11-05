@@ -255,7 +255,11 @@ const fetchAppointments = async () => {
         </View>
 
         {/* Appointments List */}
-        <ScrollView style={styles.appointmentsContainer}>
+          <ScrollView 
+            style={styles.appointmentsContainer}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+          >
           {activeAppointmentsTab === "upcoming" ? (
             appointments.filter((a) => a.status === "upcoming").length > 0 ? (
               appointments

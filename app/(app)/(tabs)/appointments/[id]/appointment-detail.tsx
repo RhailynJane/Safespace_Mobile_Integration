@@ -453,7 +453,11 @@ const fetchAppointments = async () => {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointment Details" showBack={true} />
 
-        <ScrollView style={styles.content}>
+          <ScrollView 
+            style={styles.content}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+          >
           {/* Appointment Card */}
           <View style={[styles.appointmentCard, { backgroundColor: theme.colors.surface }]}>
             <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>

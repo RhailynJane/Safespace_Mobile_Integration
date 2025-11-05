@@ -341,7 +341,11 @@ export default function ConfirmAppointment() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointment Confirmation" showBack={true} />
 
-        <ScrollView style={styles.scrollContainer}>
+          <ScrollView 
+            style={styles.scrollContainer}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+          >
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>

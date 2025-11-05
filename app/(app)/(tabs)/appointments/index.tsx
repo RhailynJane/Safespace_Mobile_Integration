@@ -541,7 +541,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,
