@@ -82,6 +82,8 @@ const getScaleForTextSize = (size: string): number => {
       return 1.0;
     case "Large":
       return 1.15;
+    case "Extra Large":
+      return 1.3;
     default:
       return 1.0;
   }

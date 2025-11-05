@@ -48,7 +48,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   Dimensions,
   Modal,
   Keyboard,
@@ -101,6 +100,8 @@ export default function ChatScreen() {
   const API_BASE_URL = getApiBaseUrl();
 
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
+  const lastMessageIdRef = useRef<string | null>(null);
+  const lastMarkedAtRef = useRef<number>(0);
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -143,6 +144,8 @@ export default function ChatScreen() {
     type: 'info' as 'success' | 'error' | 'info',
     title: '',
     message: '',
+    confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
+    actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
 
   // Get safe area insets for proper spacing
@@ -154,7 +157,32 @@ export default function ChatScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalData({ type, title, message });
+    setStatusModalData({ type, title, message, confirm: undefined, actions: undefined });
+    setStatusModalVisible(true);
+  };
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    opts?: { confirmText?: string; cancelText?: string }
+  ) => {
+    setStatusModalData({
+      type: 'info',
+      title,
+      message,
+      confirm: { onConfirm, confirmText: opts?.confirmText, cancelText: opts?.cancelText },
+      actions: undefined,
+    });
+    setStatusModalVisible(true);
+  };
+
+  const showActions = (
+    title: string,
+    message: string,
+    actions: Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>
+  ) => {
+    setStatusModalData({ type: 'info', title, message, confirm: undefined, actions });
     setStatusModalVisible(true);
   };
 
@@ -259,9 +287,9 @@ export default function ChatScreen() {
       // Fire and forget: update activity in background (don't await)
       updateUserActivity().catch(() => {});
 
-      // Load messages (this is the critical path) - limit to 30 to reduce memory usage
+      // Load messages (this is the critical path) - no limit to show all messages
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=30`
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&t=${Date.now()}`
       );
 
       if (response.ok) {
@@ -269,6 +297,38 @@ export default function ChatScreen() {
         const loadTime = Date.now() - startTime;
         console.log(`[${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
         setMessages(result.data);
+
+        // Detect new last message and mark as read when appropriate
+        const latest = result.data[result.data.length - 1];
+        const latestId = latest ? String(latest.id) : null;
+        const prevId = lastMessageIdRef.current;
+        const nowTs = Date.now();
+        const shouldMark =
+          latestId && latestId !== prevId &&
+          // Do not mark if the latest is mine
+          !(latest && latest.sender && latest.sender.clerk_user_id === userId) &&
+          // Throttle mark-as-read to avoid spamming
+          nowTs - lastMarkedAtRef.current > 2000;
+
+        if (shouldMark) {
+          lastMessageIdRef.current = latestId;
+          lastMarkedAtRef.current = nowTs;
+          // Fire-and-forget: mark as read both in SendBird (if enabled) and backend
+          (async () => {
+            try {
+              if (channelUrl && messagingService.isSendBirdEnabled()) {
+                await messagingService.markAsRead(channelUrl);
+              }
+            } catch (_e) { /* ignore SendBird mark-as-read errors */ }
+            try {
+              await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clerkUserId: userId })
+              });
+            } catch (_e) { /* ignore backend mark-read errors */ }
+          })();
+        }
 
         // Fire and forget: mark as read in background (don't block UI)
         Promise.all([
@@ -287,14 +347,18 @@ export default function ChatScreen() {
           (async () => {
             try {
               if (userId && conversationId) {
-                await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+                console.log(`📭 Calling mark-read API for conversation ${conversationId}`);
+                const markResponse = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ clerkUserId: userId })
                 });
+                console.log(`✅ Mark-read API responded:`, markResponse.status, markResponse.ok);
+              } else {
+                console.log(`⚠️ Skip mark-read: userId=${userId}, conversationId=${conversationId}`);
               }
-            } catch (_e) {
-              // ignore transient errors
+            } catch (e) {
+              console.log(`❌ Mark-read API failed:`, e);
             }
           })()
         ]).catch(() => {}); // Don't block on mark-read failures
@@ -337,19 +401,20 @@ export default function ChatScreen() {
     updateUserActivity,
   ]);
 
-  // Load messages with 60-second polling
+  // Load messages with fast polling while in the chat screen
   useEffect(() => {
     if (!isFocused || !conversationId || !userId) return;
 
     loadMessages(); // Load immediately
 
-    // Use a longer interval for polling
+    // Poll faster when the user is near the bottom (actively viewing latest)
+    const intervalMs = userNearBottom ? 4000 : 8000; // 4s vs 8s
     const pollInterval = setInterval(() => {
       loadMessages();
-    }, 60000); // 60 seconds
+    }, intervalMs);
 
     return () => clearInterval(pollInterval);
-  }, [isFocused, conversationId, userId, loadMessages]);
+  }, [isFocused, conversationId, userId, loadMessages, userNearBottom]);
 
   // One-time status refresh after mount (no polling)
   useEffect(() => {
@@ -595,11 +660,23 @@ export default function ChatScreen() {
       }
 
       const json = await res.json();
+      console.log('📦 Backend upload response:', json);
       if (json?.data) {
         // Optimistically add the new message returned by server
-        setMessages((prev) => [...prev, json.data]);
+        console.log('📎 Upload successful, adding message:', { 
+          id: json.data.id, 
+          type: json.data.message_type, 
+          fileName: json.data.file_name,
+          attachmentUrl: json.data.attachment_url 
+        });
+        setMessages((prev) => {
+          console.log(`📝 Current messages count: ${prev.length}, adding uploaded attachment`);
+          return [...prev, json.data];
+        });
         // Optionally refresh to sync ordering/unread states
         setTimeout(() => loadMessages(), 800);
+      } else {
+        console.warn('⚠️ Upload response missing data:', json);
       }
     } catch (error) {
       console.error("ðŸ“ Upload error:", error);
@@ -639,7 +716,11 @@ export default function ChatScreen() {
       if (response.ok) {
         const result = await response.json();
         // console.log("Message sent successfully");
-        setMessages((prev) => [...prev, result.data]);
+        console.log('✅ Text message sent, adding to UI:', result.data);
+        setMessages((prev) => {
+          console.log(`📝 Current messages count: ${prev.length}, adding new message`);
+          return [...prev, result.data];
+        });
         setNewMessage("");
         setIsTyping(false); // Reset typing state after sending
 
@@ -696,7 +777,7 @@ export default function ChatScreen() {
       try {
         const permission = await Audio.requestPermissionsAsync();
         if (!permission.granted) {
-          Alert.alert('Permission Required', 'Please allow microphone access to record voice messages.');
+          showStatusModal('error', 'Permission Required', 'Please allow microphone access to record voice messages.');
           return;
         }
 
@@ -765,10 +846,11 @@ export default function ChatScreen() {
     try {
       setUploading(true);
       const fileName = `voice_${Date.now()}.m4a`;
+      console.log('🎤 Sending voice message:', { fileName, uri: pendingRecordingUri });
       await uploadAttachment(pendingRecordingUri, 'file', fileName);
       showStatusModal('success', 'Sent', 'Voice message sent successfully');
     } catch (error) {
-      console.error('Error sending voice message:', error);
+      console.error('❌ Error sending voice message:', error);
       showStatusModal('error', 'Error', 'Failed to send voice message');
     } finally {
       setUploading(false);
@@ -1009,6 +1091,15 @@ export default function ChatScreen() {
 
   // Enhanced renderMessageContent function
   const renderMessageContent = (message: ExtendedMessage) => {
+    // Normalize message text to avoid odd line breaks (Android sometimes inserts newlines)
+    const sanitizeText = (txt?: string) => {
+      if (!txt) return '';
+      // Remove zero-width spaces and collapse newlines into single spaces
+      return txt
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/\r?\n+/g, ' ')
+        .trim();
+    };
     // Helper: detect audio files by extension/name
     const isAudioFile = (name?: string, url?: string) => {
       const target = (name || url || '').toLowerCase();
@@ -1094,18 +1185,16 @@ export default function ChatScreen() {
           style={styles.imageAttachment}
           onPress={() => handleViewAttachment(message)}
           onLongPress={() => {
-            Alert.alert("Image Options", "What would you like to do?", [
-              { text: "View", onPress: () => { handleViewAttachment(message); } },
-              {
-                text: "Save to Gallery",
-                onPress: () => { saveImageToGallery(message.attachment_url!); },
-              },
-              {
-                text: "Download",
-                onPress: () => { handleDownloadFile(message); },
-              },
-              { text: "Cancel", style: "cancel" },
-            ]);
+            showActions(
+              'Image options',
+              message.file_name || 'Choose an action for this image',
+              [
+                { label: 'View', onPress: () => handleViewAttachment(message), variant: 'primary' },
+                { label: 'Save to Gallery', onPress: () => saveImageToGallery(message.attachment_url!), variant: 'default' },
+                { label: 'Download', onPress: () => handleDownloadFile(message), variant: 'default' },
+                { label: 'Cancel', onPress: () => {}, variant: 'default' },
+              ]
+            );
           }}
         >
           <OptimizedImage
@@ -1117,7 +1206,7 @@ export default function ChatScreen() {
           />
           <View style={styles.imageOverlay}>
             <Ionicons name="expand" size={20} color="#FFFFFF" />
-            <Text style={styles.imageText}>ðŸ“· Photo â€¢ Tap to view</Text>
+            <Text style={styles.imageText}>Tap to view</Text>
           </View>
         </TouchableOpacity>
       );
@@ -1125,22 +1214,33 @@ export default function ChatScreen() {
 
     // Handle audio attachments (voice notes)
     if (message.message_type === 'file' && message.attachment_url && isAudioFile(message.file_name, message.attachment_url)) {
+      console.log('🎵 Rendering audio message:', { 
+        id: message.id, 
+        fileName: message.file_name, 
+        url: message.attachment_url,
+        isAudio: isAudioFile(message.file_name, message.attachment_url)
+      });
       return <AudioBubble uri={message.attachment_url} />;
     }
 
     // Handle other file attachments - dark bubble with icon, name and size
     if (message.message_type === "file" && message.attachment_url) {
+      console.log('📄 Rendering file message:', { 
+        id: message.id, 
+        fileName: message.file_name, 
+        url: message.attachment_url 
+      });
       return (
         <TouchableOpacity
           onPress={() => handleDownloadFile(message)}
           onLongPress={() => {
-            Alert.alert(
-              "File Options",
-              `File: ${message.file_name || "Unknown file"}`,
+            showActions(
+              'File options',
+              message.file_name || 'Choose an action',
               [
-                { text: "Download & Share", onPress: () => { handleDownloadFile(message); } },
-                { text: "Open in Browser", onPress: () => { WebBrowser.openBrowserAsync(message.attachment_url!); } },
-                { text: "Cancel", style: "cancel" },
+                { label: 'Download & Share', onPress: () => handleDownloadFile(message), variant: 'primary' },
+                { label: 'Open in Browser', onPress: () => { if (message.attachment_url) WebBrowser.openBrowserAsync(message.attachment_url); }, variant: 'default' },
+                { label: 'Cancel', onPress: () => {}, variant: 'default' },
               ]
             );
           }}
@@ -1171,7 +1271,7 @@ export default function ChatScreen() {
           isMyMessage(message) ? styles.myMessageText : styles.theirMessageText,
         ]}
       >
-        {message.message_text}
+        {sanitizeText(message.message_text)}
       </Text>
     );
   };
@@ -1210,28 +1310,23 @@ export default function ChatScreen() {
     const fileUri = message.attachment_url;
     const fileName = message.file_name || `file_${Date.now()}`;
 
-    // Show download confirmation
-    Alert.alert(
-      "Download File",
-      `Download "${message.file_name || "this file"}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Download",
-          onPress: async () => {
-            try {
-              setDownloading(true);
-              await downloadAndShareFile(fileUri, fileName);
-            } catch (error) {
-              console.error("Download error:", error);
-              setFileErrorMessage("Failed to download file. Please try again.");
-              setFileErrorModalVisible(true);
-            } finally {
-              setDownloading(false);
-            }
-          },
-        },
-      ]
+    // Show download confirmation via status modal
+    showConfirm(
+      'Download File',
+      `Download "${message.file_name || 'this file'}"?`,
+      async () => {
+        try {
+          setDownloading(true);
+          await downloadAndShareFile(fileUri, fileName);
+        } catch (error) {
+          console.error('Download error:', error);
+          setFileErrorMessage('Failed to download file. Please try again.');
+          setFileErrorModalVisible(true);
+        } finally {
+          setDownloading(false);
+        }
+      },
+      { confirmText: 'Download', cancelText: 'Cancel' }
     );
   };
 
@@ -1299,11 +1394,11 @@ export default function ChatScreen() {
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          behavior={Platform.select({ ios: "padding", android: "height" })}
+          behavior={Platform.select({ ios: 'padding', android: 'height' })}
           style={styles.container}
           keyboardVerticalOffset={keyboardOffset}
         >
-          {/* Status Modal */}
+          {/* Status Modal (also used for confirmations) */}
           <Modal
             visible={statusModalVisible}
             transparent
@@ -1345,19 +1440,57 @@ export default function ChatScreen() {
                   {statusModalData.message}
                 </Text>
 
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton, 
-                    { 
-                      backgroundColor: 
-                        statusModalData.type === 'success' ? '#4CAF50' :
-                        statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
-                    }
-                  ]}
-                  onPress={() => setStatusModalVisible(false)}
-                >
-                  <Text style={styles.modalButtonText}>OK</Text>
-                </TouchableOpacity>
+                {statusModalData.actions && statusModalData.actions.length > 0 ? (
+                  <View style={{ alignSelf: 'stretch', gap: 12 }}>
+                    {statusModalData.actions.map((a, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[
+                          styles.modalButton,
+                          { backgroundColor: a.variant === 'danger' ? '#FF3B30' : a.variant === 'primary' ? '#007AFF' : '#6B7280' }
+                        ]}
+                        onPress={() => {
+                          setStatusModalVisible(false);
+                          setTimeout(() => { try { a.onPress(); } catch { /* noop */ } }, 120);
+                        }}
+                      >
+                        <Text style={styles.modalButtonText}>{a.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : statusModalData.confirm ? (
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: '#6B7280' }]}
+                      onPress={() => setStatusModalVisible(false)}
+                    >
+                      <Text style={styles.modalButtonText}>{statusModalData.confirm.cancelText || 'Cancel'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, { backgroundColor: '#FF3B30' }]}
+                      onPress={() => {
+                        setStatusModalVisible(false);
+                        setTimeout(() => { try { statusModalData.confirm?.onConfirm(); } catch { /* noop */ } }, 120);
+                      }}
+                    >
+                      <Text style={styles.modalButtonText}>{statusModalData.confirm.confirmText || 'Delete'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.modalButton, 
+                      { 
+                        backgroundColor: 
+                          statusModalData.type === 'success' ? '#4CAF50' :
+                          statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                      }
+                    ]}
+                    onPress={() => setStatusModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>OK</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </Modal>
@@ -1416,11 +1549,33 @@ export default function ChatScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                onPress={() => router.push("../appointments/book")}
-              >
-                <Ionicons name="call-outline" size={24} color={theme.colors.primary} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                {/* Delete conversation */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!conversationId || !userId) return;
+                    showConfirm(
+                      'Delete conversation',
+                      'This will remove the conversation from your inbox. Continue?',
+                      async () => {
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            router.back();
+                          } else {
+                            showStatusModal('error', 'Delete failed', 'Unable to delete this conversation.');
+                          }
+                        } catch (_e) {
+                          showStatusModal('error', 'Network error', 'Please check your connection and try again.');
+                        }
+                      },
+                      { confirmText: 'Delete', cancelText: 'Cancel' }
+                    );
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={22} color={theme.colors.primary} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -1429,6 +1584,7 @@ export default function ChatScreen() {
             ref={messagesListRef}
             data={messages}
             keyExtractor={(item) => String(item.id)}
+            onLayout={() => console.log(`📋 FlatList rendering ${messages.length} messages`)}
             renderItem={({ item }) => {
               const myMessage = isMyMessage(item);
               // Decide bubble style: for non-audio files use a dark file bubble like the mock
@@ -1470,7 +1626,31 @@ export default function ChatScreen() {
                     </View>
                   )}
 
-                  <View style={[styles.messageBubble, bubbleStyle]}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onLongPress={() => {
+                      // Allow deleting only own messages
+                      if (!myMessage) return;
+                      showConfirm(
+                        'Delete message',
+                        'Are you sure you want to delete this message?',
+                        async () => {
+                          try {
+                            const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${encodeURIComponent(String(conversationId))}/messages/${encodeURIComponent(String(item.id))}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                            if (res.ok) {
+                              setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
+                            } else {
+                              showStatusModal('error', 'Delete failed', 'Could not delete this message.');
+                            }
+                          } catch (_e) {
+                            showStatusModal('error', 'Network error', 'Please try again.');
+                          }
+                        },
+                        { confirmText: 'Delete', cancelText: 'Cancel' }
+                      );
+                    }}
+                  >
+                    <View style={[styles.messageBubble, bubbleStyle]}>
                     {renderMessageContent(item)}
                     <Text
                       style={[
@@ -1480,7 +1660,8 @@ export default function ChatScreen() {
                     >
                       {formatTime(item.created_at)}
                     </Text>
-                  </View>
+                    </View>
+                  </TouchableOpacity>
 
                   {myMessage && (
                     <View style={styles.avatarContainer}>
@@ -1506,6 +1687,7 @@ export default function ChatScreen() {
               );
             }}
             contentContainerStyle={styles.messagesContent}
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             onScroll={(e) => {
               const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -1554,8 +1736,8 @@ export default function ChatScreen() {
             styles.bottomInputSection, 
             { 
               backgroundColor: 'transparent',
-              // When keyboard hidden, keep input 10px above safe-area bottom; when shown, keep it tight
-              paddingBottom: keyboardVisible ? Math.max(insets.bottom, 4) : insets.bottom + 10,
+              // Add safe-area bottom padding so the input doesn't touch system navigation
+              paddingBottom: Math.max(insets.bottom || 0, 8),
             }
           ]}>
             {/* Show expand button when icons are hidden */}
@@ -1763,7 +1945,7 @@ export default function ChatScreen() {
 
               <View style={styles.viewerFooter}>
                 <Text style={styles.viewerFooterText}>
-                  Pinch to zoom â€¢ Tap download to save
+                  Pinch to zoom. Tap download to save
                 </Text>
               </View>
             </View>
@@ -2305,7 +2487,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
   },
   messageBubble: {
-    maxWidth: "70%",
+    maxWidth: "100%",
+    minWidth: 80,
+    flexShrink: 1,
     padding: 12,
     borderRadius: 18,
     marginBottom: 4,
@@ -2325,6 +2509,12 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   messageText: {
     fontSize: scaledFontSize(16),
+    textAlign: 'left',
+    writingDirection: 'ltr',
+    flexShrink: 1,
+    includeFontPadding: false,
+    // @ts-ignore Android-only prop to improve word wrapping
+    textBreakStrategy: 'highQuality',
     marginBottom: 4,
   },
   myMessageText: {

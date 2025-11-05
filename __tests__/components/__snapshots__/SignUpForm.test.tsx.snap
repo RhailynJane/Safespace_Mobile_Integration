@@ -1,0 +1,450 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`SignUpDetailsForm Component should match snapshot 1`] = `
+<View
+  style={
+    {
+      "alignItems": "center",
+      "flex": 1,
+    }
+  }
+>
+  <Text
+    style={
+      [
+        {
+          "color": "#333",
+          "fontSize": 24,
+          "fontWeight": "600",
+          "marginBottom": 8,
+          "textAlign": "center",
+        },
+        {
+          "color": "#1A1A1A",
+        },
+      ]
+    }
+  >
+    Personal Information
+  </Text>
+  <Text
+    style={
+      [
+        {
+          "color": "#666",
+          "fontSize": 16,
+          "marginBottom": 32,
+          "textAlign": "center",
+        },
+        {
+          "color": "#555",
+        },
+      ]
+    }
+  >
+    Step 
+    1
+     of 3
+  </Text>
+  <View
+    style={
+      {
+        "width": "100%",
+      }
+    }
+  >
+    <View
+      style={
+        {
+          "marginBottom": 20,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#333",
+            "fontSize": 14,
+            "fontWeight": "500",
+            "marginBottom": 8,
+          }
+        }
+      >
+        First Name
+      </Text>
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": 12,
+            "elevation": 1,
+            "flexDirection": "row",
+            "height": 50,
+            "paddingHorizontal": 16,
+            "shadowColor": "#000",
+            "shadowOffset": {
+              "height": 1,
+              "width": 0,
+            },
+            "shadowOpacity": 0.05,
+            "shadowRadius": 2,
+          }
+        }
+      >
+        <View
+          color="#999"
+          size={20}
+          style={
+            {
+              "marginRight": 12,
+            }
+          }
+        >
+          <Text>
+            person-outline
+          </Text>
+        </View>
+        <TextInput
+          autoCapitalize="words"
+          maxLength={50}
+          onChangeText={[Function]}
+          placeholder="Enter your First Name"
+          style={
+            {
+              "color": "#757575",
+              "flex": 1,
+              "fontSize": 12,
+            }
+          }
+          value=""
+        />
+      </View>
+    </View>
+    <View
+      style={
+        {
+          "marginBottom": 20,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#333",
+            "fontSize": 14,
+            "fontWeight": "500",
+            "marginBottom": 8,
+          }
+        }
+      >
+        Last Name
+      </Text>
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": 12,
+            "elevation": 1,
+            "flexDirection": "row",
+            "height": 50,
+            "paddingHorizontal": 16,
+            "shadowColor": "#000",
+            "shadowOffset": {
+              "height": 1,
+              "width": 0,
+            },
+            "shadowOpacity": 0.05,
+            "shadowRadius": 2,
+          }
+        }
+      >
+        <View
+          color="#999"
+          size={20}
+          style={
+            {
+              "marginRight": 12,
+            }
+          }
+        >
+          <Text>
+            person-outline
+          </Text>
+        </View>
+        <TextInput
+          autoCapitalize="words"
+          maxLength={50}
+          onChangeText={[Function]}
+          placeholder="Enter your Last Name"
+          style={
+            {
+              "color": "#757575",
+              "flex": 1,
+              "fontSize": 12,
+            }
+          }
+          value=""
+        />
+      </View>
+    </View>
+    <View
+      style={
+        {
+          "marginBottom": 20,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#333",
+            "fontSize": 14,
+            "fontWeight": "500",
+            "marginBottom": 8,
+          }
+        }
+      >
+        Email Address
+      </Text>
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": 12,
+            "elevation": 1,
+            "flexDirection": "row",
+            "height": 50,
+            "paddingHorizontal": 16,
+            "shadowColor": "#000",
+            "shadowOffset": {
+              "height": 1,
+              "width": 0,
+            },
+            "shadowOpacity": 0.05,
+            "shadowRadius": 2,
+          }
+        }
+      >
+        <View
+          color="#999"
+          size={20}
+          style={
+            {
+              "marginRight": 12,
+            }
+          }
+        >
+          <Text>
+            mail-outline
+          </Text>
+        </View>
+        <TextInput
+          autoCapitalize="none"
+          keyboardType="email-address"
+          maxLength={100}
+          onChangeText={[Function]}
+          placeholder="Enter your Email Address"
+          style={
+            {
+              "color": "#757575",
+              "flex": 1,
+              "fontSize": 12,
+            }
+          }
+          value=""
+        />
+      </View>
+    </View>
+    <View
+      style={
+        {
+          "marginBottom": 20,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#333",
+            "fontSize": 14,
+            "fontWeight": "500",
+            "marginBottom": 8,
+          }
+        }
+      >
+        Age
+      </Text>
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": 12,
+            "elevation": 1,
+            "flexDirection": "row",
+            "height": 50,
+            "paddingHorizontal": 16,
+            "shadowColor": "#000",
+            "shadowOffset": {
+              "height": 1,
+              "width": 0,
+            },
+            "shadowOpacity": 0.05,
+            "shadowRadius": 2,
+          }
+        }
+      >
+        <View
+          color="#999"
+          size={20}
+          style={
+            {
+              "marginRight": 12,
+            }
+          }
+        >
+          <Text>
+            calendar-outline
+          </Text>
+        </View>
+        <TextInput
+          keyboardType="numeric"
+          maxLength={3}
+          onChangeText={[Function]}
+          placeholder="Enter your Age (16+)"
+          style={
+            {
+              "color": "#757575",
+              "flex": 1,
+              "fontSize": 12,
+            }
+          }
+          value=""
+        />
+      </View>
+    </View>
+    <View
+      style={
+        {
+          "marginBottom": 20,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#333",
+            "fontSize": 14,
+            "fontWeight": "500",
+            "marginBottom": 8,
+          }
+        }
+      >
+        Phone Number
+      </Text>
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#FFFFFF",
+            "borderRadius": 12,
+            "elevation": 1,
+            "flexDirection": "row",
+            "height": 50,
+            "paddingHorizontal": 16,
+            "shadowColor": "#000",
+            "shadowOffset": {
+              "height": 1,
+              "width": 0,
+            },
+            "shadowOpacity": 0.05,
+            "shadowRadius": 2,
+          }
+        }
+      >
+        <View
+          color="#999"
+          size={20}
+          style={
+            {
+              "marginRight": 12,
+            }
+          }
+        >
+          <Text>
+            call-outline
+          </Text>
+        </View>
+        <TextInput
+          keyboardType="phone-pad"
+          maxLength={10}
+          onChangeText={[Function]}
+          placeholder="Enter your Phone Number (10 digits)"
+          style={
+            {
+              "color": "#757575",
+              "flex": 1,
+              "fontSize": 12,
+            }
+          }
+          value=""
+        />
+      </View>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "backgroundColor": "#7FDBDA",
+          "borderRadius": 25,
+          "marginTop": 20,
+          "opacity": 1,
+          "paddingVertical": 16,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#FFFFFF",
+            "fontSize": 18,
+            "fontWeight": "600",
+          }
+        }
+      >
+        Continue
+      </Text>
+    </View>
+  </View>
+</View>
+`;

@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 
-
+// Backend server with mark-read support and last_read_at tracking
 // Extend the Request interface to include the `file` property
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -91,6 +91,146 @@ pool.connect((err, client, release) => {
     if (release) release();
   }
 });
+
+// Ensure database schema for push tokens
+async function ensurePushTokensSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        platform VARCHAR(20),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        revoked BOOLEAN NOT NULL DEFAULT FALSE
+      );
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON push_tokens(user_id);
+      CREATE INDEX IF NOT EXISTS idx_push_tokens_revoked ON push_tokens(revoked);
+    `);
+    console.log('✅ Ensured push_tokens table exists');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure push_tokens schema:', e.message);
+  }
+}
+
+// Kick off lightweight auto-migration for push-related schema
+ensurePushTokensSchema();
+
+// Ensure database schema for notifications
+async function ensureNotificationsSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(40) NOT NULL DEFAULT 'system',
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
+      CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+    `);
+    
+    // Migrate existing column if needed
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'notifications' 
+          AND column_name = 'created_at' 
+          AND data_type = 'timestamp without time zone'
+        ) THEN
+          ALTER TABLE notifications 
+          ALTER COLUMN created_at TYPE TIMESTAMPTZ 
+          USING created_at AT TIME ZONE 'UTC';
+          
+          RAISE NOTICE '✅ Migrated created_at column to TIMESTAMPTZ';
+        END IF;
+      END $$;
+    `);
+    
+    console.log('✅ Ensured notifications table exists with TIMESTAMPTZ');
+  } catch (e: any) {
+    console.error('⚠️ Failed to ensure notifications schema:', e.message);
+  }
+}
+
+ensureNotificationsSchema();
+
+// ==============================
+// Helper: create DB notification and send Expo push
+// ==============================
+async function notifyUserByIds(userId: number, title: string, message: string, data?: any) {
+  try {
+    // Insert into notifications table
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, $2, $3, $4)`,
+      [userId, 'system', title, message]
+    );
+
+    // Fetch active Expo push tokens
+    const toks = await pool.query(
+      `SELECT token FROM push_tokens WHERE user_id = $1 AND revoked = FALSE`,
+      [userId]
+    );
+    if (toks.rows.length === 0) return;
+
+    // Send batched push via Expo endpoint
+    const messages = toks.rows.map((r: any) => ({
+      to: r.token,
+      title,
+      sound: 'default',
+      body: message,
+      data: data || {},
+    }));
+    try {
+      await axios.post('https://exp.host/--/api/v2/push/send', messages, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (e: any) {
+      console.error('⚠️ Expo push send failed:', e?.response?.data || e.message);
+    }
+  } catch (e: any) {
+    console.error('⚠️ notifyUserByIds failed:', e.message);
+  }
+}
+
+async function notifyUserByClerkId(clerkUserId: string, title: string, message: string, data?: any) {
+  try {
+    const u = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (u.rows.length === 0) return;
+    const userId = u.rows[0].id as number;
+    await notifyUserByIds(userId, title, message, data);
+  } catch (e: any) {
+    console.error('⚠️ notifyUserByClerkId failed:', e.message);
+  }
+}
+
+// Insert a notification into DB without sending push (for local-only reminders)
+async function logNotificationByClerkId(clerkUserId: string, type: string, title: string, message: string, clientTimeIso?: string) {
+  try {
+    const u = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (u.rows.length === 0) return;
+    const userId = u.rows[0].id as number;
+    if (clientTimeIso) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message, created_at) VALUES ($1, $2, $3, $4, $5)`,
+        [userId, type || 'system', title, message, clientTimeIso]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, $2, $3, $4)`,
+        [userId, type || 'system', title, message]
+      );
+    }
+  } catch (e: any) {
+    console.error('⚠️ logNotificationByClerkId failed:', e.message);
+  }
+}
 
 // Test endpoint
 app.get("/", (req: Request, res: Response) => {
@@ -698,6 +838,389 @@ app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
   }
 });
 
+// =============================================
+// USER ACTIVITY ENDPOINTS (login/logout/heartbeat/status)
+// =============================================
+
+// Record successful login (and set active)
+app.post("/api/users/login-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_login_at = CURRENT_TIMESTAMP,
+           last_login = CURRENT_TIMESTAMP,
+           last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating login activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Record logout
+app.post("/api/users/logout-activity", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_logout_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating logout activity:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Heartbeat to update last_active_at
+app.post("/api/users/heartbeat", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.body as { clerkUserId?: string };
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: "clerkUserId is required" });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET last_active_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE clerk_user_id = $1
+       RETURNING id, clerk_user_id, last_login_at, last_active_at, last_logout_at`,
+      [clerkUserId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error("Error updating heartbeat:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Get single user's presence and timestamps
+app.get("/api/users/status/:clerkUserId", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const result = await pool.query(
+      `SELECT last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id = $1`,
+      [clerkUserId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const { last_active_at, last_login_at, last_logout_at } = result.rows[0];
+    const now = new Date();
+    const activeAt = last_active_at ? new Date(last_active_at) : null;
+    const loginAt = last_login_at ? new Date(last_login_at) : null;
+    const logoutAt = last_logout_at ? new Date(last_logout_at) : null;
+
+    const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+
+    let presence: 'online' | 'away' | 'offline' = 'offline';
+    if (loggedIn) presence = activeRecently ? 'online' : 'away';
+
+    const online = presence === 'online';
+    res.json({ success: true, data: { online, presence, last_active_at, last_login_at, last_logout_at } });
+  } catch (error: any) {
+    console.error("Error fetching user status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// Batch presence for multiple users
+app.post("/api/users/status-batch", async (req: Request, res: Response) => {
+  try {
+    const { clerkUserIds } = req.body as { clerkUserIds?: string[] };
+    if (!clerkUserIds || clerkUserIds.length === 0) {
+      return res.status(400).json({ success: false, message: "clerkUserIds[] is required" });
+    }
+
+    const params = clerkUserIds.map((_, i) => `$${i + 1}`).join(",");
+    const result = await pool.query(
+      `SELECT clerk_user_id, last_active_at, last_login_at, last_logout_at
+       FROM users WHERE clerk_user_id IN (${params})`,
+      clerkUserIds
+    );
+
+    const now = new Date();
+    const awayThresholdMs = 30 * 60 * 1000; // 30 minutes
+    const statusMap: Record<string, { online: boolean; presence: 'online' | 'away' | 'offline'; last_active_at: string | null; last_login_at: string | null; last_logout_at: string | null; }> = {};
+
+    for (const row of result.rows) {
+      const activeAt = row.last_active_at ? new Date(row.last_active_at) : null;
+      const loginAt = row.last_login_at ? new Date(row.last_login_at) : null;
+      const logoutAt = row.last_logout_at ? new Date(row.last_logout_at) : null;
+      const loggedIn = !!(loginAt && (!logoutAt || loginAt > logoutAt));
+      const activeRecently = activeAt ? (now.getTime() - activeAt.getTime()) < awayThresholdMs : false;
+      let presence: 'online' | 'away' | 'offline' = 'offline';
+      if (loggedIn) presence = activeRecently ? 'online' : 'away';
+      statusMap[row.clerk_user_id] = {
+        online: presence === 'online',
+        presence,
+        last_active_at: row.last_active_at || null,
+        last_login_at: row.last_login_at || null,
+        last_logout_at: row.last_logout_at || null,
+      };
+    }
+
+    res.json({ success: true, data: statusMap });
+  } catch (error: any) {
+    console.error("Error fetching batch status:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+  }
+});
+
+// =============================================
+// PUSH TOKEN REGISTRATION ENDPOINTS
+// =============================================
+
+// Register or update an Expo push token for a user
+app.post('/api/push/register', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, token, platform } = req.body as { clerkUserId?: string; token?: string; platform?: string };
+    if (!clerkUserId || !token) {
+      return res.status(400).json({ success: false, message: 'clerkUserId and token are required' });
+    }
+
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const userId = userRes.rows[0].id as number;
+
+    // Upsert by unique token
+    await pool.query(
+      `INSERT INTO push_tokens (user_id, token, platform, revoked)
+       VALUES ($1, $2, $3, FALSE)
+       ON CONFLICT (token)
+       DO UPDATE SET user_id = EXCLUDED.user_id, platform = EXCLUDED.platform, revoked = FALSE`,
+      [userId, token, (platform || '').toString().slice(0, 20)]
+    );
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error registering push token:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to register push token', error: error.message });
+  }
+});
+
+// Revoke a token (e.g., on logout or uninstall)
+app.post('/api/push/revoke', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body as { token?: string };
+    if (!token) return res.status(400).json({ success: false, message: 'token is required' });
+    await pool.query(`UPDATE push_tokens SET revoked = TRUE WHERE token = $1`, [token]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('❌ Error revoking push token:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to revoke push token', error: error.message });
+  }
+});
+
+// Backward-compatible appointment notify endpoint
+app.post('/api/appointments/notify', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, title, message, data } = req.body as { clerkUserId?: string; title?: string; message?: string; data?: any };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+    await notifyUserByClerkId(clerkUserId, title, message, data || {});
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error in /api/appointments/notify:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to notify', error: e.message });
+  }
+});
+
+// Simple test endpoints to validate push/notification pipeline from local scripts
+app.post('/api/test-reminder/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const { type = 'mood' } = (req.body || {}) as { type?: string };
+    let title = 'Reminder';
+    let message = 'This is a test reminder';
+    switch (type) {
+      case 'mood':
+        title = 'Mood check-in';
+        message = 'How are you feeling today?';
+        break;
+      case 'journaling':
+        title = 'Journaling reminder';
+        message = 'Take a moment to jot your thoughts.';
+        break;
+      default:
+        break;
+    }
+    await notifyUserByClerkId(clerkUserId, title, message, { type });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error in /api/test-reminder:', e.message);
+    res.status(500).json({ success: false, message: 'Failed', error: e.message });
+  }
+});
+
+app.post('/api/test-push/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    await notifyUserByClerkId(clerkUserId, 'Test notification', 'This is a test push notification', { type: 'system' });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error in /api/test-push:', e.message);
+    res.status(500).json({ success: false, message: 'Failed', error: e.message });
+  }
+});
+
+// Send an immediate notification to a user (debug/utility)
+app.post('/api/notifications/send', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId, title, message, data } = req.body as { clerkUserId?: string; title?: string; message?: string; data?: any };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+    await notifyUserByClerkId(clerkUserId, title, message, data || {});
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error sending notification:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to send notification', error: e.message });
+  }
+});
+
+// Log a notification without sending push (used by client when local reminders fire)
+app.post('/api/notifications/log', async (req: Request, res: Response) => {
+  try {
+    const serverNow = new Date();
+    console.log(`📝 Backend /api/notifications/log called at: ${serverNow.toISOString()} (local: ${serverNow.toLocaleString()})`);
+    const { clerkUserId, type, title, message, clientLocal, clientEpochMs, tzOffsetMinutes, clientTimeZone } = req.body as {
+      clerkUserId?: string;
+      type?: string;
+      title?: string;
+      message?: string;
+      clientLocal?: string;
+      clientEpochMs?: number;
+      tzOffsetMinutes?: number;
+      clientTimeZone?: string;
+    };
+    if (!clerkUserId || !title || !message) {
+      return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
+    }
+    console.log(`📝 Backend received: clientEpochMs=${clientEpochMs}, clientLocal=${clientLocal}, tz=${clientTimeZone}, offset=${tzOffsetMinutes}min`);
+    // Since client time was unreliable, just use server time
+    const createdAt = new Date(); // Use current server time
+    console.log(`📝 Backend using server time: ${createdAt.toISOString()} (local: ${createdAt.toLocaleString()})`);
+    await logNotificationByClerkId(clerkUserId, type || 'system', title, message, createdAt.toISOString());
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('❌ Error logging notification:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to log notification', error: e.message });
+  }
+});
+
+// =============================================
+// NOTIFICATIONS ENDPOINTS
+// =============================================
+
+// Get notifications for a user by Clerk ID
+app.get('/api/notifications/:clerkUserId', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    const userId = userRes.rows[0].id as number;
+    const rows = await pool.query(
+      `SELECT id, type, title, message, is_read, created_at
+       FROM notifications
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [userId]
+    );
+    res.json({ success: true, data: rows.rows });
+  } catch (error: any) {
+    console.error('Error fetching notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch notifications', error: error.message });
+  }
+});
+
+// Mark a single notification as read
+app.post('/api/notifications/:id/read', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE id = $1`, [id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error marking notification read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark notification as read', error: error.message });
+  }
+});
+
+// Mark all notifications for a user as read
+app.post('/api/notifications/:clerkUserId/read-all', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.json({ success: true });
+    const userId = userRes.rows[0].id as number;
+    await pool.query(`UPDATE notifications SET is_read = TRUE WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error marking all notifications read:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to mark all read', error: error.message });
+  }
+});
+
+// Clear all notifications for a user
+app.delete('/api/notifications/:clerkUserId/clear-all', async (req: Request, res: Response) => {
+  try {
+    const { clerkUserId } = req.params;
+    const userRes = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
+    if (userRes.rows.length === 0) return res.json({ success: true });
+    const userId = userRes.rows[0].id as number;
+    await pool.query(`DELETE FROM notifications WHERE user_id = $1`, [userId]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error clearing notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to clear notifications', error: error.message });
+  }
+});
+
 // Create new post
 app.post(
   "/api/community/posts",
@@ -863,6 +1386,29 @@ app.post(
           : null;
 
       await client.query("COMMIT");
+
+      // Notify post owner on new reaction (do not notify on removal)
+      try {
+        if (reactionChange > 0) {
+          const postRes = await pool.query(
+            `SELECT author_id, title FROM community_posts WHERE id = $1`,
+            [Number.parseInt(id)]
+          );
+          if (postRes.rows.length > 0) {
+            const ownerClerkId = postRes.rows[0].author_id as string;
+            if (ownerClerkId && ownerClerkId !== clerkUserId) {
+              await notifyUserByClerkId(
+                ownerClerkId,
+                'New reaction on your post',
+                `${emoji} Someone reacted to your post`,
+                { postId: Number.parseInt(id), emoji }
+              );
+            }
+          }
+        }
+      } catch (e: any) {
+        console.error('⚠️ Post reaction notify failed:', e.message);
+      }
 
       res.json({
         success: true,
@@ -2387,28 +2933,6 @@ app.get(
               created_at: 'desc'
             },
             take: 1
-          },
-          _count: {
-            select: {
-              messages: {
-                where: {
-                  NOT: {
-                    read_status: {
-                      some: {
-                        user: {
-                          clerk_user_id: clerkUserId
-                        }
-                      }
-                    }
-                  },
-                  sender: {
-                    clerk_user_id: {
-                      not: clerkUserId
-                    }
-                  }
-                }
-              }
-            }
           }
         },
         orderBy: {
@@ -2420,6 +2944,31 @@ app.get(
       const conversationsWithOnlineStatus = await Promise.all(
         conversations.map(async (conversation) => {
           const lastMessage = conversation.messages[0];
+          
+          // Find the current user's participant record to get their last_read_at
+          const currentUserParticipant = conversation.participants.find(
+            p => p.user.clerk_user_id === clerkUserId
+          );
+          
+          // Count unread messages: messages from others created after last_read_at
+          // @ts-ignore - last_read_at exists in DB but Prisma types not updated yet
+          const lastReadAt = currentUserParticipant?.last_read_at;
+          
+          const unreadCount = await prisma.message.count({
+            where: {
+              conversation_id: conversation.id,
+              sender: {
+                clerk_user_id: {
+                  not: clerkUserId
+                }
+              },
+              ...(lastReadAt && {
+                created_at: {
+                  gt: lastReadAt
+                }
+              })
+            }
+          });
           
           // Get participants with real online status
           const participantsWithStatus = await Promise.all(
@@ -2446,7 +2995,7 @@ app.get(
             created_at: conversation.created_at.toISOString(),
             last_message: lastMessage?.message_text || '',
             last_message_time: lastMessage?.created_at.toISOString(),
-            unread_count: conversation._count.messages,
+            unread_count: unreadCount,
             participants: participantsWithStatus
           };
         })
@@ -2654,6 +3203,29 @@ app.post(
         }
       };
 
+      // Create notifications for other participants in the conversation (bell badge)
+      try {
+        const participants = await prisma.conversationParticipant.findMany({
+          where: { conversation_id: Number.parseInt(conversationId) },
+          include: { user: { select: { clerk_user_id: true } } }
+        });
+
+        const recipients = participants
+          .map(p => p.user.clerk_user_id)
+          .filter(id => id && id !== result.sender.clerk_user_id);
+
+        for (const recipientId of recipients) {
+          await notifyUserByClerkId(
+            recipientId,
+            'New message',
+            result.message_text || 'You have a new message',
+            { type: 'message', conversationId: Number.parseInt(conversationId) }
+          );
+        }
+      } catch (e: any) {
+        console.error('⚠️ Failed to create message notifications:', e.message);
+      }
+
       res.json({
         success: true,
         message: "Message sent successfully",
@@ -2666,6 +3238,126 @@ app.post(
         message: "Failed to send message",
         error: error.message,
       });
+    }
+  }
+);
+
+// Mark conversation as read for a user
+app.post(
+  "/api/messages/conversations/:conversationId/mark-read",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId } = req.body;
+
+      if (!clerkUserId) {
+        return res.status(400).json({
+          success: false,
+          message: "clerkUserId is required",
+        });
+      }
+
+      console.log(`📭 Marking conversation ${conversationId} as read for user ${clerkUserId}`);
+
+      // Verify user exists and is participant
+      const user = await prisma.user.findUnique({
+        where: { clerk_user_id: clerkUserId }
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      const participant = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversation_id: Number.parseInt(conversationId),
+          user_id: user.id
+        }
+      });
+
+      if (!participant) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this conversation",
+        });
+      }
+
+      // Update last_read_at timestamp for this participant
+      // @ts-ignore - last_read_at exists in DB but Prisma types not updated yet
+      await prisma.conversationParticipant.update({
+        where: { id: participant.id },
+        data: { last_read_at: new Date() }
+      });
+      
+      console.log(`✅ Conversation ${conversationId} marked as read for user ${clerkUserId}`);
+
+      res.json({
+        success: true,
+        message: "Conversation marked as read",
+      });
+    } catch (error: any) {
+      console.error("💬 Mark-read error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to mark conversation as read",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Delete a single message (sender only)
+app.delete(
+  "/api/messages/conversations/:conversationId/messages/:messageId",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId, messageId } = req.params;
+      const clerkUserId = (req.query.clerkUserId as string) || '';
+
+      if (!clerkUserId) {
+        return res.status(400).json({ success: false, message: 'clerkUserId is required' });
+      }
+
+      // Verify user exists and is sender of the message
+      const user = await prisma.user.findUnique({ where: { clerk_user_id: clerkUserId } });
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const message = await prisma.message.findUnique({ where: { id: Number.parseInt(messageId) } });
+      if (!message || message.conversation_id !== Number.parseInt(conversationId)) {
+        return res.status(404).json({ success: false, message: 'Message not found' });
+      }
+
+      if (message.sender_id !== user.id) {
+        return res.status(403).json({ success: false, message: 'Only the sender can delete this message' });
+      }
+
+      // If attachment exists and is stored locally, attempt to delete the file
+      try {
+        if (message.attachment_url && message.attachment_url.includes('/uploads/')) {
+          const url = new URL(message.attachment_url);
+          const fileName = url.pathname.split('/').pop();
+          if (fileName) {
+            const filePath = path.join(__dirname, '../uploads', fileName);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          }
+        }
+      } catch (e) {
+        // Non-fatal if file cleanup fails
+        console.warn('⚠️ Attachment cleanup failed:', e);
+      }
+
+      await prisma.message.delete({ where: { id: Number.parseInt(messageId) } });
+      return res.json({ success: true, message: 'Message deleted' });
+    } catch (error: any) {
+      console.error('💬 Delete message error:', error.message);
+      return res.status(500).json({ success: false, message: 'Failed to delete message', error: error.message });
     }
   }
 );
@@ -2846,6 +3538,48 @@ app.get(
     }
   }
 );
+
+// Delete/leave a conversation for current user
+app.delete("/api/messages/conversations/:conversationId", async (req: Request, res: Response) => {
+  try {
+    const { conversationId } = req.params;
+    const clerkUserId = (req.query.clerkUserId as string) || '';
+
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, message: 'clerkUserId is required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { clerk_user_id: clerkUserId } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const participant = await prisma.conversationParticipant.findFirst({
+      where: { conversation_id: Number.parseInt(conversationId), user_id: user.id }
+    });
+
+    if (!participant) {
+      return res.status(403).json({ success: false, message: 'Not a participant of this conversation' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Remove the participant (delete for this user)
+      await tx.conversationParticipant.delete({ where: { id: participant.id } });
+
+      // If no participants remain, delete conversation and its messages
+      const remaining = await tx.conversationParticipant.count({ where: { conversation_id: Number.parseInt(conversationId) } });
+      if (remaining === 0) {
+        await tx.message.deleteMany({ where: { conversation_id: Number.parseInt(conversationId) } });
+        await tx.conversation.delete({ where: { id: Number.parseInt(conversationId) } });
+      }
+    });
+
+    return res.json({ success: true, message: 'Conversation removed' });
+  } catch (error: any) {
+    console.error('💬 Delete conversation error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to delete conversation', error: error.message });
+  }
+});
 
 // Search users by name or email
 app.get(
@@ -3694,12 +4428,35 @@ interface UserSettings {
   // Privacy & Security
   autoLockTimer: string;
 
-  // Notifications
+  // Notifications (core)
   notificationsEnabled: boolean;
   quietHoursEnabled: boolean;
   quietStartTime: string;
   quietEndTime: string;
   reminderFrequency: string;
+
+  // Granular notification categories
+  notifMoodTracking?: boolean;
+  notifJournaling?: boolean;
+  notifMessages?: boolean;
+  notifPostReactions?: boolean;
+  notifAppointments?: boolean;
+  notifSelfAssessment?: boolean;
+
+  // Per-category reminders and schedules
+  moodReminderEnabled?: boolean;
+  moodReminderTime?: string;
+  moodReminderFrequency?: string;
+  moodReminderCustomSchedule?: any;
+
+  journalReminderEnabled?: boolean;
+  journalReminderTime?: string;
+  journalReminderFrequency?: string;
+  journalReminderCustomSchedule?: any;
+
+  // Appointment reminders
+  appointmentReminderEnabled?: boolean;
+  appointmentReminderAdvanceMinutes?: number;
 }
 
 // Get user settings
@@ -3739,18 +4496,21 @@ app.get("/api/settings/:clerkUserId", async (req: Request, res: Response) => {
           text_size: "Medium",
           auto_lock_timer: "5 minutes",
           notifications_enabled: true,
+          // Quiet hours removed
           quiet_hours_enabled: false,
-          quiet_start_time: "22:00",
-          quiet_end_time: "08:00",
+          quiet_start_time: null,
+          quiet_end_time: null,
           reminder_frequency: "Daily",
         },
       });
     }
 
-    console.log('🔧 Settings found:', result.rows[0]);
+    // Quiet hours removed from API
+    const row = { ...result.rows[0], quiet_hours_enabled: false, quiet_start_time: null, quiet_end_time: null };
+    console.log('🔧 Settings found:', row);
     res.json({
       success: true,
-      settings: result.rows[0],
+      settings: row,
     });
   } catch (error: any) {
     console.error("❌ Error fetching settings:", error.message);
@@ -3815,21 +4575,71 @@ app.put(
              auto_lock_timer = COALESCE($3, auto_lock_timer),
              notifications_enabled = COALESCE($4, notifications_enabled),
              quiet_hours_enabled = COALESCE($5, quiet_hours_enabled),
-             quiet_start_time = COALESCE($6, quiet_start_time),
-             quiet_end_time = COALESCE($7, quiet_end_time),
+             quiet_start_time = CASE WHEN $5 = false THEN NULL ELSE COALESCE($6, quiet_start_time) END,
+             quiet_end_time = CASE WHEN $5 = false THEN NULL ELSE COALESCE($7, quiet_end_time) END,
              reminder_frequency = COALESCE($8, reminder_frequency),
+
+             -- granular categories
+             notif_mood_tracking = COALESCE($9, notif_mood_tracking),
+             notif_journaling = COALESCE($10, notif_journaling),
+             notif_messages = COALESCE($11, notif_messages),
+             notif_post_reactions = COALESCE($12, notif_post_reactions),
+             notif_appointments = COALESCE($13, notif_appointments),
+             notif_self_assessment = COALESCE($14, notif_self_assessment),
+
+             -- reminders (mood)
+             mood_reminder_enabled = COALESCE($15, mood_reminder_enabled),
+             mood_reminder_time = COALESCE($16, mood_reminder_time),
+             mood_reminder_frequency = COALESCE($17, mood_reminder_frequency),
+             mood_reminder_custom_schedule = COALESCE($18, mood_reminder_custom_schedule),
+
+             -- reminders (journal)
+             journal_reminder_enabled = COALESCE($19, journal_reminder_enabled),
+             journal_reminder_time = COALESCE($20, journal_reminder_time),
+             journal_reminder_frequency = COALESCE($21, journal_reminder_frequency),
+             journal_reminder_custom_schedule = COALESCE($22, journal_reminder_custom_schedule),
+
+             -- appointment reminders
+             appointment_reminder_enabled = COALESCE($23, appointment_reminder_enabled),
+             appointment_reminder_advance_minutes = COALESCE($24, appointment_reminder_advance_minutes),
+
              updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $9
+           WHERE user_id = $25
            RETURNING *`,
           [
             settings.darkMode,
             settings.textSize,
             settings.autoLockTimer,
             settings.notificationsEnabled,
-            settings.quietHoursEnabled,
-            settings.quietStartTime,
-            settings.quietEndTime,
+            false, // quiet hours removed
+            null,
+            null,
             settings.reminderFrequency,
+
+            // granular
+            settings.notifMoodTracking,
+            settings.notifJournaling,
+            settings.notifMessages,
+            settings.notifPostReactions,
+            settings.notifAppointments,
+            settings.notifSelfAssessment,
+
+            // mood
+            settings.moodReminderEnabled,
+            settings.moodReminderTime,
+            settings.moodReminderFrequency,
+            settings.moodReminderCustomSchedule ? JSON.stringify(settings.moodReminderCustomSchedule) : null,
+
+            // journal
+            settings.journalReminderEnabled,
+            settings.journalReminderTime,
+            settings.journalReminderFrequency,
+            settings.journalReminderCustomSchedule ? JSON.stringify(settings.journalReminderCustomSchedule) : null,
+
+            // appointment
+            settings.appointmentReminderEnabled,
+            settings.appointmentReminderAdvanceMinutes,
+
             userId
           ]
         );
@@ -3837,10 +4647,22 @@ app.put(
         // INSERT new settings
         result = await pool.query(
           `INSERT INTO user_settings (
-            user_id, clerk_user_id, 
+            user_id, clerk_user_id,
             dark_mode, text_size, auto_lock_timer,
-            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            notifications_enabled, quiet_hours_enabled, quiet_start_time, quiet_end_time, reminder_frequency,
+            notif_mood_tracking, notif_journaling, notif_messages, notif_post_reactions, notif_appointments, notif_self_assessment,
+            mood_reminder_enabled, mood_reminder_time, mood_reminder_frequency, mood_reminder_custom_schedule,
+            journal_reminder_enabled, journal_reminder_time, journal_reminder_frequency, journal_reminder_custom_schedule,
+            appointment_reminder_enabled, appointment_reminder_advance_minutes
+          ) VALUES (
+            $1, $2,
+            $3, $4, $5,
+            $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16,
+            $17, $18, $19, $20,
+            $21, $22, $23, $24,
+            $25, $26
+          )
           RETURNING *`,
           [
             userId,
@@ -3849,10 +4671,34 @@ app.put(
             settings.textSize ?? 'Medium',
             settings.autoLockTimer ?? '5 minutes',
             settings.notificationsEnabled ?? true,
-            settings.quietHoursEnabled ?? false,
-            settings.quietStartTime ?? '22:00',
-            settings.quietEndTime ?? '08:00',
-            settings.reminderFrequency ?? 'Daily'
+            false,
+            null,
+            null,
+            settings.reminderFrequency ?? 'Daily',
+
+            // granular defaults to true to match previous behavior
+            settings.notifMoodTracking ?? true,
+            settings.notifJournaling ?? true,
+            settings.notifMessages ?? true,
+            settings.notifPostReactions ?? true,
+            settings.notifAppointments ?? true,
+            settings.notifSelfAssessment ?? true,
+
+            // mood
+            settings.moodReminderEnabled ?? false,
+            settings.moodReminderTime ?? '09:00',
+            settings.moodReminderFrequency ?? 'Daily',
+            (settings.moodReminderCustomSchedule ? JSON.stringify(settings.moodReminderCustomSchedule) : JSON.stringify({})),
+
+            // journal
+            settings.journalReminderEnabled ?? false,
+            settings.journalReminderTime ?? '20:00',
+            settings.journalReminderFrequency ?? 'Daily',
+            (settings.journalReminderCustomSchedule ? JSON.stringify(settings.journalReminderCustomSchedule) : JSON.stringify({})),
+
+            // appointment
+            settings.appointmentReminderEnabled ?? true,
+            settings.appointmentReminderAdvanceMinutes ?? 60
           ]
         );
       }

@@ -36,6 +36,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import { useRef } from "react";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MessagesScreen() {
     // Access isDarkMode and fontScale from useTheme
@@ -54,9 +55,39 @@ export default function MessagesScreen() {
     type: 'info' as 'success' | 'error' | 'info',
     title: '',
     message: '',
+    confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
   });
-  // Removed session-based unread suppression; rely on backend read receipts instead
+  // Track conversations marked read in this session to keep unread count at 0
+  // Key: conversationId, Value: true if marked read
+  const recentlyReadRef = useRef<Record<string, boolean>>({});
   const API_BASE_URL = getApiBaseUrl();
+
+  // Load read conversations from AsyncStorage on mount
+  useEffect(() => {
+    const loadReadConversations = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('readConversations');
+        if (stored) {
+          recentlyReadRef.current = JSON.parse(stored);
+          console.log('📖 Loaded read conversations:', Object.keys(recentlyReadRef.current).length);
+        }
+      } catch (e) {
+        console.log('Failed to load read conversations:', e);
+      }
+    };
+    loadReadConversations();
+  }, []);
+
+  // Save read conversations to AsyncStorage
+  const saveReadConversations = async (conversationId: string) => {
+    try {
+      recentlyReadRef.current[conversationId] = true;
+      await AsyncStorage.setItem('readConversations', JSON.stringify(recentlyReadRef.current));
+      console.log('💾 Saved read conversation:', conversationId);
+    } catch (e) {
+      console.log('Failed to save read conversation:', e);
+    }
+  };
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -70,7 +101,22 @@ export default function MessagesScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalData({ type, title, message });
+    setStatusModalData({ type, title, message, confirm: undefined });
+    setStatusModalVisible(true);
+  };
+
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    opts?: { confirmText?: string; cancelText?: string }
+  ) => {
+    setStatusModalData({
+      type: 'info',
+      title,
+      message,
+      confirm: { onConfirm, confirmText: opts?.confirmText, cancelText: opts?.cancelText },
+    });
     setStatusModalVisible(true);
   };
 
@@ -213,6 +259,8 @@ export default function MessagesScreen() {
           console.log("Presence batch update failed:", e);
         }
 
+        // Don't suppress unread counts - let backend be the source of truth
+        // Backend's mark-read API will handle clearing unread when conversation is opened
         setConversations(convs);
         setFilteredConversations(convs); // Initialize filtered conversations
       } else {
@@ -242,18 +290,50 @@ export default function MessagesScreen() {
       try {
         console.log('📬 Polling for new messages...');
         const response = await fetch(
-          `${API_BASE_URL}/api/messages/conversations/${userId}`
+          `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
         );
         
         if (response.ok) {
           const result = await response.json();
           let freshConvs: Conversation[] = result.data;
           
+          // Refresh presence for all other participants
+          try {
+            const otherIds = Array.from(
+              new Set(
+                freshConvs
+                  .flatMap((c) => c.participants)
+                  .filter((p) => p.clerk_user_id !== userId)
+                  .map((p) => p.clerk_user_id)
+                  .filter(Boolean)
+              )
+            );
+
+            if (otherIds.length > 0) {
+              const statusMap = await activityApi.statusBatch(otherIds);
+              freshConvs = freshConvs.map((c) => ({
+                ...c,
+                participants: c.participants.map((p) => {
+                  if (p.clerk_user_id === userId) return p;
+                  const s = statusMap[p.clerk_user_id];
+                  return s
+                    ? { ...p, online: !!s.online, presence: s.presence as any, last_active_at: s.last_active_at }
+                    : p;
+                }),
+              }));
+            }
+          } catch (e) {
+            console.log('Presence update during poll failed:', e);
+          }
+          
+          // Don't suppress unread counts - backend is the source of truth
+          // Backend mark-read API handles clearing unread when messages are actually read
+          
           console.log(`📬 Polled ${freshConvs.length} conversations, unread counts:`, 
             freshConvs.map(c => ({ id: c.id, unread: c.unread_count }))
           );
           
-          // Update conversations with fresh unread counts
+          // Update conversations with fresh unread counts from backend
           setConversations(freshConvs);
           setFilteredConversations((prev) => {
             // Maintain search filter
@@ -383,11 +463,11 @@ export default function MessagesScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView testID="messages-screen" style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
 
-        {/* Status Modal */}
+        {/* Status Modal (also supports confirmations) */}
         <Modal
           visible={statusModalVisible}
           transparent
@@ -429,19 +509,39 @@ export default function MessagesScreen() {
                 {statusModalData.message}
               </Text>
 
-              <TouchableOpacity
-                style={[
-                  styles.modalButton, 
-                  { 
-                    backgroundColor: 
-                      statusModalData.type === 'success' ? '#4CAF50' :
-                      statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
-                  }
-                ]}
-                onPress={() => setStatusModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>OK</Text>
-              </TouchableOpacity>
+              {statusModalData.confirm ? (
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#6B7280' }]}
+                    onPress={() => setStatusModalVisible(false)}
+                  >
+                    <Text style={styles.modalButtonText}>{statusModalData.confirm.cancelText || 'Cancel'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: '#FF3B30' }]}
+                    onPress={() => {
+                      setStatusModalVisible(false);
+                      setTimeout(() => { try { statusModalData.confirm?.onConfirm(); } catch { /* noop */ } }, 120);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>{statusModalData.confirm.confirmText || 'Delete'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton, 
+                    { 
+                      backgroundColor: 
+                        statusModalData.type === 'success' ? '#4CAF50' :
+                        statusModalData.type === 'error' ? '#FF3B30' : '#007AFF'
+                    }
+                  ]}
+                  onPress={() => setStatusModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </Modal>
@@ -449,6 +549,7 @@ export default function MessagesScreen() {
         {/* New Message Button */}
         <View>
           <TouchableOpacity
+            testID="new-message-button"
             style={styles.newMessageButton}
             onPress={() => {
               if (!userId) {
@@ -476,6 +577,7 @@ export default function MessagesScreen() {
             style={styles.searchIcon}
           />
           <TextInput
+            testID="messages-search"
             style={[styles.searchInput, { color: theme.colors.text }]}
             placeholder="Search conversations..."
             value={searchQuery}
@@ -578,6 +680,8 @@ export default function MessagesScreen() {
                         });
                       } catch (_e) { /* ignore transient errors */ }
                     })();
+                    // Mark as read and save to AsyncStorage to persist across tab switches
+                    saveReadConversations(conversation.id);
                     setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
                     setFilteredConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
 
@@ -600,6 +704,28 @@ export default function MessagesScreen() {
                         initialPresence: initialPresence,
                       },
                     });
+                  }}
+                  onLongPress={() => {
+                    if (!userId) return;
+                    showConfirm(
+                      'Delete conversation',
+                      'This will remove the conversation from your inbox. Continue?',
+                      async () => {
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+                            setFilteredConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+                            showStatusModal('success', 'Deleted', 'Conversation removed');
+                          } else {
+                            showStatusModal('error', 'Delete failed', 'Unable to delete this conversation');
+                          }
+                        } catch (_e) {
+                          showStatusModal('error', 'Network error', 'Please try again.');
+                        }
+                      },
+                      { confirmText: 'Delete', cancelText: 'Cancel' }
+                    );
                   }}
                 >
                   <View style={styles.avatarContainer}>
@@ -641,6 +767,7 @@ export default function MessagesScreen() {
 
                       return (
                         <View
+                          testID={`online-indicator-${conversation.id}`}
                           style={[
                             styles.onlineIndicator,
                             {

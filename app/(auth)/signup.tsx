@@ -4,13 +4,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TouchableOpacity,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
 import { useSignUp } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";

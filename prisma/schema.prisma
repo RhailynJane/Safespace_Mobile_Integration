@@ -215,7 +215,8 @@ model User {
   bookmarks                 Bookmark[]
   created_conversations     Conversation[]            @relation("ConversationCreator")
   assigned_assessments      Assessment[]              @relation("AssignedWorker")
-  file_uploads              FileUpload[]              @relation("FileUploadUploadedBy") // Add this reverse relation
+  file_uploads              FileUpload[]              @relation("FileUploadUploadedBy")
+  appointments              Appointment[]
 
   @@map("users")
 }
@@ -365,6 +366,7 @@ model ConversationParticipant {
   role            String?   @default("member")
   joined_at       DateTime  @default(now())
   left_at         DateTime?
+  last_read_at    DateTime? // Track when user last read this conversation
 
   // Relations
   conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
@@ -622,4 +624,56 @@ model WellbeingSetting {
   user User? @relation(fields: [clerk_user_id], references: [clerk_user_id], onDelete: Cascade)
 
   @@map("wellbeing_settings")
+}
+
+// =============================================
+// NEW MODEL: Support Workers
+// =============================================
+model SupportWorker {
+  id                   Int       @id @default(autoincrement())
+  first_name           String    @db.VarChar(100)
+  last_name            String    @db.VarChar(100)
+  email                String    @unique @db.VarChar(255)
+  phone_number         String?   @db.VarChar(20)
+  specialization       String?   @db.Text
+  bio                  String?   @db.Text
+  years_of_experience  Int?
+  avatar_url           String?   @db.Text
+  status               String    @default("active") @db.VarChar(20)
+  availability         Json?
+  hourly_rate          Decimal?  @db.Decimal(10, 2)
+  languages_spoken     String[]
+  certifications       String[]
+  education            String?   @db.Text
+  license_number       String?   @db.VarChar(100)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  appointments  Appointment[]
+
+  @@map("support_workers")
+}
+
+// =============================================
+// NEW MODEL: Appointments
+// =============================================
+model Appointment {
+  id                   Int       @id @default(autoincrement())
+  user_id              Int
+  support_worker_id    Int
+  appointment_date     DateTime  @db.Date
+  appointment_time     DateTime  @db.Time
+  duration_minutes     Int       @default(60)
+  session_type         String    @db.VarChar(50)
+  status               String    @default("scheduled") @db.VarChar(50)
+  meeting_link         String?   @db.Text
+  notes                String?   @db.Text
+  cancellation_reason  String?   @db.Text
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  user           User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  support_worker SupportWorker @relation(fields: [support_worker_id], references: [id], onDelete: Restrict)
+
+  @@map("appointments")
 }

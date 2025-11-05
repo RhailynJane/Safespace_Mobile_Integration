@@ -14,9 +14,9 @@ interface ThemeContextType {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   setDarkMode: (value: boolean) => void;
-  textSize: string;              // "Extra Small" | "Small" | "Medium" | "Large"
+  textSize: string;              // "Extra Small" | "Small" | "Medium" | "Large" | "Extra Large"
   setTextSize: (size: string) => void;
-  fontScale: number;             // 0.85, 0.95, 1.0, 1.15
+  fontScale: number;             // 0.85, 0.95, 1.0, 1.15, 1.3
   scaledFontSize: (baseSize: number) => number;  // Helper function
 }
 ```
@@ -27,6 +27,7 @@ Font scales are defined as follows:
 - **Small**: 0.95x
 - **Medium**: 1.0x (default)
 - **Large**: 1.15x
+- **Extra Large**: 1.3x
 
 The `scaledFontSize` function takes a base font size and multiplies it by the current scale:
 ```typescript
@@ -40,7 +41,7 @@ scaledFontSize(16) // Returns: 13.6 (XS), 15.2 (S), 16 (M), 18.4 (L)
 Text size is controlled via a slider with four steps and labels:
 
 ```typescript
-const textSizeLabels = ["Extra Small", "Small", "Medium", "Large"] as const;
+const textSizeLabels = ["Extra Small", "Small", "Medium", "Large", "Extra Large"] as const;
 type TextSizeLabel = typeof textSizeLabels[number];
 
 // Conversion helpers
@@ -53,7 +54,7 @@ const [textSizeSlider, setTextSizeSlider] = useState<number>(textSizeToSlider(te
 
 <Slider
   minimumValue={0}
-  maximumValue={3}
+  maximumValue={4}
   step={1}
   value={textSizeSlider}
   onValueChange={setTextSizeSlider}
