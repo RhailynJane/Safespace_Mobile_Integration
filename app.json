@@ -21,17 +21,17 @@
           "photosPermission": "Allow SafeSpace to access your photos",
           "savePhotosPermission": "Allow SafeSpace to save photos to your library",
           "isAccessMediaLocationEnabled": false,
-              "granularPermissions": [
-                "photo"
-              ]
-            }
-          ],
-          [
-          "expo-camera",
-          {
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
           "cameraPermission": "Allow SafeSpace to access your camera for video consultations with support workers."
-          }
-          ],
+        }
+      ]
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"
@@ -47,8 +47,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "SafeSpace needs camera access for video calls",
-        "NSMicrophoneUsageDescription": "SafeSpace needs access to your microphone for voice calls.",  //Added for SendBird
-        "UIBackgroundModes": ["audio", "voip"]  // Added for SendBird background calls
+        "NSMicrophoneUsageDescription": "SafeSpace needs access to your microphone for voice calls.",
+        "UIBackgroundModes": ["audio", "voip"]
       }
     },
     "android": {
@@ -68,7 +68,6 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_CONNECT"
-
       ]
     },
     "web": {

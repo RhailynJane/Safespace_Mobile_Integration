@@ -54,12 +54,13 @@ export default function VideoCallScreen() {
   const [callStatus, setCallStatus] = useState("Connecting...");
   const [callDuration, setCallDuration] = useState(0);
   const [isCallConnected, setIsCallConnected] = useState(false);
+  const [permissionRequested, setPermissionRequested] = useState(false);
 
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     initializeCall();
-    checkCameraPermissions();
+    requestCameraPermissionImmediately();
 
     return () => {
       endCall();
@@ -69,21 +70,53 @@ export default function VideoCallScreen() {
     };
   }, []);
 
-  // Check and request camera permissions
-  const checkCameraPermissions = async () => {
-    if (!permission) {
-      return;
-    }
-
-    if (!permission.granted) {
-      const { granted } = await requestPermission();
-      if (!granted) {
-        Alert.alert(
-          "Camera Permission Required",
-          "Please enable camera access to use video calling.",
-          [{ text: "OK" }]
-        );
+  // FORCE camera permission request immediately
+  const requestCameraPermissionImmediately = async () => {
+    console.log("🎥 FORCING camera permission request...");
+    
+    try {
+      // Small delay to ensure component is mounted
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!permission) {
+        console.log("⚠️ Permission object not ready yet");
+        return;
       }
+
+      console.log("📊 Current status:", permission.status);
+      console.log("📊 Granted:", permission.granted);
+
+      if (!permission.granted && !permissionRequested) {
+        console.log("🔔 Requesting permission NOW...");
+        setPermissionRequested(true);
+        
+        const result = await requestPermission();
+        console.log("✅ Permission result:", result);
+
+        if (!result.granted) {
+          Alert.alert(
+            "Camera Permission Required",
+            "Please go to Settings → SafeSpace → Camera and enable access.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { 
+                text: "Open Settings",
+                onPress: () => {
+                  // On iOS, this doesn't directly open settings
+                  // But we can at least inform the user
+                  console.log("User needs to open Settings manually");
+                }
+              }
+            ]
+          );
+        } else {
+          console.log("✅ Camera permission granted!");
+        }
+      } else if (permission.granted) {
+        console.log("✅ Permission already granted");
+      }
+    } catch (error) {
+      console.error("❌ Error requesting permission:", error);
     }
   };
 
@@ -135,6 +168,20 @@ export default function VideoCallScreen() {
   };
 
   const handleToggleCamera = () => {
+    if (!permission?.granted) {
+      Alert.alert(
+        "Camera Permission Required",
+        "Camera permission is not granted. Please enable it in Settings.",
+        [
+          { text: "OK" },
+          {
+            text: "Request Again",
+            onPress: requestCameraPermissionImmediately
+          }
+        ]
+      );
+      return;
+    }
     setIsCameraOn(!isCameraOn);
   };
 
@@ -221,6 +268,22 @@ export default function VideoCallScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Permission Debug Banner */}
+      {!permission.granted && (
+        <View style={styles.permissionBanner}>
+          <Ionicons name="warning" size={20} color="#FFF" />
+          <Text style={styles.permissionBannerText}>
+            Camera access needed
+          </Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestCameraPermissionImmediately}
+          >
+            <Text style={styles.permissionButtonText}>Grant Access</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Main Video Content */}
       <View style={styles.videoContainer}>
         {/* Remote Video Placeholder */}
@@ -257,7 +320,17 @@ export default function VideoCallScreen() {
           ) : (
             <View style={styles.cameraOffOverlay}>
               <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
-              <Text style={styles.cameraOffText}>Camera Off</Text>
+              <Text style={styles.cameraOffText}>
+                {!permission?.granted ? "No Permission" : "Camera Off"}
+              </Text>
+              {!permission?.granted && (
+                <TouchableOpacity
+                  style={styles.miniButton}
+                  onPress={requestCameraPermissionImmediately}
+                >
+                  <Text style={styles.miniButtonText}>Grant Access</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -270,11 +343,11 @@ export default function VideoCallScreen() {
         </View>
 
         {/* Connection Info Banner */}
-        {!isCallConnected && (
+        {isCallConnected && (
           <View style={styles.connectionBanner}>
             <Ionicons name="information-circle" size={20} color="#FFF" />
             <Text style={styles.connectionText}>
-              Demo mode - Your camera is working! 📹
+              {permission?.granted ? "Camera ready! 📹" : "Tap to grant camera access"}
             </Text>
           </View>
         )}
@@ -461,6 +534,36 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
   },
+  permissionBanner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FF9800",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 30,
+    zIndex: 10000,
+  },
+  permissionBannerText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    marginLeft: 8,
+    marginRight: 12,
+    fontWeight: "600",
+  },
+  permissionButton: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  permissionButtonText: {
+    color: "#FF9800",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   videoContainer: {
     flex: 1,
     backgroundColor: "#000000",
@@ -544,6 +647,18 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     marginTop: 8,
+  },
+  miniButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  miniButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
   },
   callStatus: {
     position: "absolute",
