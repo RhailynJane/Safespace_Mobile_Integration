@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,15 @@ import {
   Platform,
   Animated,
   Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import TwilioVideoService from "../../../lib/twilio-service";
+import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
+import SendBirdCallService from "../../../lib/sendbird-service";
 
 const { width, height } = Dimensions.get("window");
 
@@ -30,80 +34,125 @@ const initialMessages = [
 // Emoji options
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
-export default function VideoCallMeetingScreen() {
+export default function VideoCallScreen() {
+  const [isDemoMode] = useState(true); 
   const { user } = useUser();
   const params = useLocalSearchParams();
   const supportWorkerId = params.supportWorkerId as string;
   const supportWorkerName = params.supportWorkerName as string || "Support Worker";
-  const appointmentId = params.appointmentId as string;
-  const audioOption = params.audioOption as string;
 
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(audioOption !== "none");
+  const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRaiseHand, setIsRaiseHand] = useState(false);
   const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState("");
-  const [reactions, setReactions] = useState< 
-  { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
+  const [reactions, setReactions] = useState<
+    { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
   >([]);
   const [callStatus, setCallStatus] = useState("Connecting...");
   const [callDuration, setCallDuration] = useState(0);
   const [isCallConnected, setIsCallConnected] = useState(false);
 
+  // Safe area and focus
+  const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+
+  // Camera & permissions state
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<CameraType>('front');
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraRefresh, setCameraRefresh] = useState(0);
+  const [showFullCamera, setShowFullCamera] = useState(false);
+
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
+  const cameraReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    console.log("🎥 Initializing video call...");
-    console.log("Support Worker:", supportWorkerName);
-    console.log("Appointment ID:", appointmentId);
-    console.log("Audio Option:", audioOption);
-    
-    initializeCall();
-
-    return () => {
-      endCall();
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
+  // Helper: request permissions on demand
+  const requestCameraPermissionImmediately = useCallback(async () => {
+    try {
+      const result = await requestPermission();
+      if (result.granted) {
+        // Force a refresh after permission is granted
+        setCameraRefresh(prev => prev + 1);
       }
-    };
+    } catch (e) {
+      console.warn('Camera permission request failed', e);
+    }
+  }, [requestPermission]);
+
+  // Flip between front/back camera
+  const handleFlipCamera = useCallback(() => {
+    setCameraReady(false);
+    setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
   }, []);
 
-  // Initialize Twilio and start call
-  const initializeCall = async () => {
-    try {
-      // Initialize Twilio
-      await TwilioVideoService.initialize();
-
-      // Get user ID from Clerk
-      const userId = user?.id || `user_${Date.now()}`;
-      
-      // Create room name
-      const roomName = `appointment_${appointmentId}`;
-
-      console.log("🔑 Authenticating with Twilio...");
-      // Get access token from your backend
-      const accessToken = await TwilioVideoService.authenticate(userId, roomName);
-
-      console.log("📞 Connecting to room:", roomName);
-      // Connect to room
-      await TwilioVideoService.connectToRoom(accessToken, roomName);
-
+  // Set up call event listeners (defined before initializeCall for hook deps ordering)
+  const setupCallListeners = useCallback((call: any) => {
+    call.onEstablished = () => {
       setCallStatus("Connected");
       setIsCallConnected(true);
       startCallTimer();
+    };
+
+    call.onConnected = () => {
+      console.log("Call connected");
+    };
+
+    call.onEnded = () => {
+      setCallStatus("Call Ended");
+      setIsCallConnected(false);
+      setTimeout(() => {
+        router.back();
+      }, 2000);
+    };
+
+    call.onRemoteAudioSettingsChanged = () => {
+      console.log("Remote audio settings changed");
+    };
+
+    call.onRemoteVideoSettingsChanged = () => {
+      console.log("Remote video settings changed");
+    };
+  }, []);
+
+  // Initialize SendBird and start call
+  const initializeCall = useCallback(async () => {
+    // Demo mode - simulate successful connection
+    if (isDemoMode) {
+      setCallStatus("Connecting...");
       
-      console.log("✅ Video call connected successfully");
+      // Simulate connection delay
+      setTimeout(() => {
+        setCallStatus("Connected (Demo)");
+        setIsCallConnected(true);
+        startCallTimer();
+      }, 2000);
+      
+      return;
+    }
+
+    // Real SendBird code (only runs if isDemoMode is false)
+    try {
+      await SendBirdCallService.initialize();
+      const userId = user?.id || `user_${Date.now()}`;
+      await SendBirdCallService.authenticate(userId);
+      const call = await SendBirdCallService.createCall(
+        `support_worker_${supportWorkerId}`,
+        true
+      );
+      setupCallListeners(call);
+      setCallStatus("Ringing...");
     } catch (error) {
-      console.error("❌ Failed to initialize call:", error);
+      console.error("Failed to initialize call:", error);
       Alert.alert(
         "Call Failed",
         "Unable to start video call. Please try again.",
         [{ text: "OK", onPress: () => router.back() }]
       );
     }
-  };
+  }, [isDemoMode, supportWorkerId, user?.id, setupCallListeners]);
 
   // Start call duration timer
   const startCallTimer = () => {
@@ -134,30 +183,85 @@ export default function VideoCallMeetingScreen() {
     );
   };
 
-  const endCall = async () => {
-    try {
-      await TwilioVideoService.disconnect();
+  const endCall = useCallback(async () => {
+    // Demo mode - just go back
+    if (isDemoMode) {
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      console.log("📴 Call ended");
+      router.back();
+      return;
+    }
+
+    // Real SendBird code
+    try {
+      await SendBirdCallService.endCall();
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
       router.back();
     } catch (error) {
       console.error("Error ending call:", error);
       router.back();
     }
-  };
+  }, [isDemoMode]);
+
+  useEffect(() => {
+    initializeCall();
+
+    return () => {
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+      if (cameraReadyTimeoutRef.current) {
+        clearTimeout(cameraReadyTimeoutRef.current);
+      }
+    };
+  }, [initializeCall]);
+
+  // Add a timeout fallback for camera ready
+  useEffect(() => {
+    if (isFocused && isCameraOn && permission?.granted && !cameraReady) {
+      // Clear any existing timeout
+      if (cameraReadyTimeoutRef.current) {
+        clearTimeout(cameraReadyTimeoutRef.current);
+      }
+      
+      // Set camera as ready after 3 seconds if it hasn't triggered onCameraReady
+      cameraReadyTimeoutRef.current = setTimeout(() => {
+        console.log('Camera ready timeout - forcing ready state');
+        setCameraReady(true);
+      }, 3000);
+    }
+    
+    return () => {
+      if (cameraReadyTimeoutRef.current) {
+        clearTimeout(cameraReadyTimeoutRef.current);
+      }
+    };
+  }, [isFocused, isCameraOn, permission?.granted, cameraReady]);
 
   const handleToggleCamera = () => {
     const newState = !isCameraOn;
     setIsCameraOn(newState);
-    TwilioVideoService.toggleVideo(newState);
+    
+    if (newState) {
+      // Reset camera ready state when turning camera back on
+      setCameraReady(false);
+    }
+    
+    if (!isDemoMode) {
+      SendBirdCallService.toggleVideo(newState);
+    }
   };
 
   const handleToggleMic = () => {
     const newState = !isMicOn;
     setIsMicOn(newState);
-    TwilioVideoService.toggleAudio(newState);
+    
+    if (!isDemoMode) {
+      SendBirdCallService.toggleAudio(newState);
+    }
   };
 
   const handleToggleChat = () => {
@@ -224,223 +328,340 @@ export default function VideoCallMeetingScreen() {
     setIsEmojiPanelOpen(false);
   };
 
+  const handleCameraReady = useCallback(() => {
+    console.log('Camera is ready');
+    setCameraReady(true);
+    if (cameraReadyTimeoutRef.current) {
+      clearTimeout(cameraReadyTimeoutRef.current);
+    }
+  }, []);
+
+  const handleCameraError = useCallback((e: any) => {
+    console.log('CameraView onMountError', e?.nativeEvent || e);
+    setCameraReady(false);
+  }, []);
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Main Video Content */}
-      <View style={styles.videoContainer}>
-        {/* Video Placeholder - Replace with actual Twilio native video views */}
-        <View style={styles.participantVideo}>
-          <View style={styles.videoPlaceholder}>
-            <Ionicons name="person-circle" size={100} color="#FFFFFF" />
-            <Text style={styles.placeholderText}>Remote Video</Text>
-            <Text style={styles.placeholderSubtext}>{supportWorkerName}</Text>
-          </View>
-          <View style={styles.participantInfo}>
-            <Text style={styles.participantName}>{supportWorkerName}</Text>
-            <View style={styles.audioIndicator}>
-              <Ionicons name="mic" size={12} color="#FFFFFF" />
-            </View>
-          </View>
-        </View>
-
-        {/* Local Video Preview */}
-        <View style={styles.selfVideoPreview}>
-          {isCameraOn ? (
-            <View style={styles.videoPlaceholderSmall}>
-              <Ionicons name="person-circle" size={40} color="#FFFFFF" />
-              <Text style={styles.placeholderTextSmall}>You</Text>
-            </View>
-          ) : (
-            <View style={styles.cameraOffOverlay}>
-              <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
-            </View>
-          )}
-        </View>
-
-        {/* Call Status */}
-        <View style={styles.callStatus}>
-          <Text style={styles.callStatusText}>
-            {isCallConnected ? formatDuration(callDuration) : callStatus}
-          </Text>
-        </View>
-
-        {/* Connection Info Banner */}
-        {!isCallConnected && (
-          <View style={styles.connectionBanner}>
-            <Ionicons name="information-circle" size={20} color="#FFF" />
-            <Text style={styles.connectionText}>
-              Connecting to Twilio Video...
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#1A1A1A' }}>
+      <View style={{ flex: 1 }}>
+        {/* Permission Debug Banner */}
+        {!permission?.granted && (
+          <View style={styles.permissionBanner}>
+            <Ionicons name="warning" size={20} color="#FFF" />
+            <Text style={styles.permissionBannerText}>
+              Camera access needed
             </Text>
+            <TouchableOpacity
+              style={styles.permissionButton}
+              onPress={requestCameraPermissionImmediately}
+            >
+              <Text style={styles.permissionButtonText}>Grant Access</Text>
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* Reactions displayed on screen */}
-        {reactions.map((reaction) => (
-          <Animated.Text
-            key={reaction.id}
-            style={[
-              styles.reaction,
-              {
-                left: reaction.position.x,
-                top: reaction.position.y,
-                opacity: reaction.opacity,
-                transform: [
+        {/* Main Video Content */}
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={[styles.videoContainer, { flex: 1, width: '100%', height: undefined, minHeight: 0, maxHeight: '100%' }]}> 
+            {/* Remote Video Placeholder */}
+            <View style={styles.participantVideo}>
+              <View style={styles.videoPlaceholder}>
+                <Ionicons name="person-circle" size={100} color="#FFFFFF" />
+                <Text style={styles.placeholderText}>Remote Video</Text>
+                <Text style={styles.placeholderSubtext}>{supportWorkerName}</Text>
+              </View>
+              <View style={styles.participantInfo}>
+                <Text style={styles.participantName}>{supportWorkerName}</Text>
+                <View style={styles.audioIndicator}>
+                  <Ionicons name="mic" size={12} color="#FFFFFF" />
+                </View>
+              </View>
+            </View>
+
+            {/* Local Video Preview with REAL CAMERA */}
+            <View 
+              style={[
+                styles.selfVideoPreview,
+                Platform.OS === 'ios' ? styles.previewClipIOS : styles.previewClipAndroid,
+                { bottom: Math.max(insets.bottom, 8) + 110 }
+              ]}
+            >
+              {isFocused && isCameraOn && permission?.granted ? (
+                <>
+                  <CameraView
+                    style={[styles.camera, { backgroundColor: '#000' }]}
+                    facing={facing}
+                    onCameraReady={handleCameraReady}
+                    onMountError={handleCameraError}
+                    key={`camera-${facing}-${cameraRefresh}`}
+                  />
+                  {/* Expand to full screen */}
+                  <TouchableOpacity
+                    style={styles.expandButton}
+                    onPress={() => setShowFullCamera(true)}
+                  >
+                    <Ionicons name="expand" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  {/* Flip Camera Button */}
+                  <TouchableOpacity
+                    style={styles.flipCameraButton}
+                    onPress={handleFlipCamera}
+                  >
+                    <Ionicons name="camera-reverse" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  {/* Non-clipping rounded border overlay for Android */}
+                  {Platform.OS === 'android' && (
+                    <View pointerEvents="none" style={styles.previewBorderOverlay} />
+                  )}
+                  {!cameraReady && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setCameraReady(false);
+                        setCameraRefresh(r => r + 1);
+                      }}
+                      style={[styles.cameraOffOverlay, { position: 'absolute', left: 0, top: 0, zIndex: 10 }]}
+                    >
+                      <Ionicons name="videocam" size={24} color="#FFFFFF" />
+                      <Text style={styles.cameraOffText}>Initializing camera…</Text>
+                      <Text style={[styles.cameraOffText, { fontSize: 10, marginTop: 4 }]}>(tap to refresh)</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ) : (
+                <View style={styles.cameraOffOverlay}>
+                  <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
+                  <Text style={styles.cameraOffText}>
+                    {!permission?.granted ? "No Permission" : "Camera Off"}
+                  </Text>
+                  {!permission?.granted && (
+                    <TouchableOpacity
+                      style={styles.miniButton}
+                      onPress={requestCameraPermissionImmediately}
+                    >
+                      <Text style={styles.miniButtonText}>Grant Access</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Call Status */}
+            <View style={styles.callStatus}>
+              <Text style={styles.callStatusText}>
+                {isCallConnected ? formatDuration(callDuration) : callStatus}
+              </Text>
+            </View>
+
+            {/* Connection Info Banner */}
+            {isCallConnected && (
+              <View style={styles.connectionBanner}>
+                <Ionicons name="information-circle" size={20} color="#FFF" />
+                <Text style={styles.connectionText}>
+                  {permission?.granted ? "Connected to Support Worker" : "Tap to grant camera access"}
+                </Text>
+              </View>
+            )}
+
+            {/* Reactions displayed on screen */}
+            {reactions.map((reaction) => (
+              <Animated.Text
+                key={reaction.id}
+                style={[
+                  styles.reaction,
                   {
-                    translateY: reaction.opacity.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -50],
-                    }),
+                    left: reaction.position.x,
+                    top: reaction.position.y,
+                    opacity: reaction.opacity,
+                    transform: [
+                      {
+                        translateY: reaction.opacity.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, -50],
+                        }),
+                      },
+                    ],
                   },
-                ],
-              },
-            ]}
-          >
-            {reaction.emoji}
-          </Animated.Text>
-        ))}
-      </View>
-
-      {/* Bottom Controls */}
-      <View style={styles.controlsContainer}>
-        <View style={styles.controlsRow}>
-          <TouchableOpacity 
-            style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
-            onPress={handleToggleChat}
-          >
-            <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
-            <Text style={styles.controlText}>Chat</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
-            onPress={handleToggleRaiseHand}
-          >
-            <Ionicons 
-              name={isRaiseHand ? "hand-left" : "hand-left-outline"} 
-              size={24} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.controlText}>Raise</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.controlButton, isEmojiPanelOpen && styles.controlButtonActive]}
-            onPress={handleToggleEmojiPanel}
-          >
-            <Ionicons name="happy" size={24} color="#FFFFFF" />
-            <Text style={styles.controlText}>React</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.controlButton, !isCameraOn && styles.controlButtonMuted]}
-            onPress={handleToggleCamera}
-          >
-            <Ionicons 
-              name={isCameraOn ? "videocam" : "videocam-off"} 
-              size={24} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.controlText}>Camera</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.controlButton, !isMicOn && styles.controlButtonMuted]}
-            onPress={handleToggleMic}
-          >
-            <Ionicons 
-              name={isMicOn ? "mic" : "mic-off"} 
-              size={24} 
-              color="#FFFFFF" 
-            />
-            <Text style={styles.controlText}>Mic</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.leaveButtonContainer}>
-          <TouchableOpacity 
-            style={styles.leaveButton}
-            onPress={handleLeaveCall}
-          >
-            <Ionicons name="call" size={16} color="#FFFFFF" />
-            <Text style={styles.leaveButtonText}>Leave</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Emoji Panel */}
-      {isEmojiPanelOpen && (
-        <View style={styles.emojiPanel}>
-          <Text style={styles.emojiPanelTitle}>React</Text>
-          <View style={styles.emojiGrid}>
-            {emojiOptions.map((emoji, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.emojiButton}
-                onPress={() => handleAddReaction(emoji)}
+                ]}
               >
-                <Text style={styles.emoji}>{emoji}</Text>
-              </TouchableOpacity>
+                {reaction.emoji}
+              </Animated.Text>
             ))}
           </View>
         </View>
-      )}
 
-      {/* Chat Panel */}
-      {isChatOpen && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.chatPanelContainer}
-        >
-          <View style={styles.chatPanel}>
-            <View style={styles.chatHeader}>
-              <Text style={styles.chatTitle}>Chat</Text>
-              <TouchableOpacity onPress={handleToggleChat}>
-                <Ionicons name="close" size={24} color="#333333" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView 
-              style={styles.messagesContainer}
-              contentContainerStyle={{ paddingBottom: 16 }}
-            >
-              {messages.map((message) => (
-                <View
-                  key={message.id}
-                  style={[
-                    styles.messageBubble,
-                    message.sender === "You" ? styles.myMessage : styles.theirMessage,
-                  ]}
+        {/* Emoji Panel */}
+        {isEmojiPanelOpen && (
+          <View style={styles.emojiPanel}>
+            <Text style={styles.emojiPanelTitle}>React</Text>
+            <View style={styles.emojiGrid}>
+              {emojiOptions.map((emoji, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.emojiButton}
+                  onPress={() => handleAddReaction(emoji)}
                 >
-                  <Text style={styles.messageText}>{message.text}</Text>
-                  <Text style={styles.messageTime}>{message.time}</Text>
-                </View>
+                  <Text style={styles.emoji}>{emoji}</Text>
+                </TouchableOpacity>
               ))}
-            </ScrollView>
-            
-            <View style={styles.messageInputContainer}>
-              <TextInput
-                style={styles.messageInput}
-                placeholder="Type a message..."
-                value={newMessage}
-                onChangeText={setNewMessage}
-                multiline
-                maxLength={500}
-              />
-              <TouchableOpacity 
-                style={styles.sendButton}
-                onPress={handleSendMessage}
-                disabled={!newMessage.trim()}
-              >
-                <Ionicons 
-                  name="send" 
-                  size={20} 
-                  color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
-                />
-              </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
-      )}
+        )}
+
+        {/* Full-screen Camera (debug/expand) */}
+        <Modal
+          visible={showFullCamera}
+          animationType="fade"
+          onRequestClose={() => setShowFullCamera(false)}
+          transparent={false}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+            <View style={{ flex: 1 }}>
+              {isFocused && isCameraOn && permission?.granted ? (
+                <CameraView
+                  style={{ flex: 1, backgroundColor: '#000' }}
+                  facing={facing}
+                  onCameraReady={handleCameraReady}
+                  onMountError={handleCameraError}
+                  key={`full-camera-${facing}-${cameraRefresh}`}
+                />
+              ) : (
+                <View style={[styles.cameraOffOverlay, { flex: 1 }]}>
+                  <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
+                  <Text style={styles.cameraOffText}>
+                    {!permission?.granted ? "No Permission" : "Camera Off"}
+                  </Text>
+                </View>
+              )}
+              <View style={{ position: 'absolute', top: 16, right: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setShowFullCamera(false)}
+                  style={{ backgroundColor: 'rgba(0,0,0,0.6)', padding: 10, borderRadius: 8 }}
+                >
+                  <Ionicons name="close" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Chat Panel */}
+        {isChatOpen && (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.chatPanelContainer}
+          >
+            <View style={styles.chatPanel}>
+              <View style={styles.chatHeader}>
+                <Text style={styles.chatTitle}>Chat</Text>
+                <TouchableOpacity onPress={handleToggleChat}>
+                  <Ionicons name="close" size={24} color="#333333" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView 
+                style={styles.messagesContainer}
+                contentContainerStyle={{ paddingBottom: 16 }}
+              >
+                {messages.map((message) => (
+                  <View
+                    key={message.id}
+                    style={[
+                      styles.messageBubble,
+                      message.sender === "You" ? styles.myMessage : styles.theirMessage,
+                    ]}
+                  >
+                    <Text style={styles.messageText}>{message.text}</Text>
+                    <Text style={styles.messageTime}>{message.time}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.messageInputContainer}>
+                <TextInput
+                  style={styles.messageInput}
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChangeText={setNewMessage}
+                  multiline
+                  maxLength={500}
+                />
+                <TouchableOpacity 
+                  style={styles.sendButton}
+                  onPress={handleSendMessage}
+                  disabled={!newMessage.trim()}
+                >
+                  <Ionicons 
+                    name="send" 
+                    size={20} 
+                    color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        )}
+
+        {/* Bottom Controls and Leave Button */}
+        <View style={{ backgroundColor: '#2D2D2D', paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) + 16 }}>
+          <View style={styles.controlsRow}>
+            <TouchableOpacity 
+              style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
+              onPress={handleToggleChat}
+            >
+              <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
+              <Text style={styles.controlText}>Chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
+              onPress={handleToggleRaiseHand}
+            >
+              <Ionicons 
+                name={isRaiseHand ? "hand-left" : "hand-left-outline"} 
+                size={24} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlText}>Raise</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, isEmojiPanelOpen && styles.controlButtonActive]}
+              onPress={handleToggleEmojiPanel}
+            >
+              <Ionicons name="happy" size={24} color="#FFFFFF" />
+              <Text style={styles.controlText}>React</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, !isCameraOn && styles.controlButtonMuted]}
+              onPress={handleToggleCamera}
+            >
+              <Ionicons 
+                name={isCameraOn ? "videocam" : "videocam-off"} 
+                size={24} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlText}>Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, !isMicOn && styles.controlButtonMuted]}
+              onPress={handleToggleMic}
+            >
+              <Ionicons 
+                name={isMicOn ? "mic" : "mic-off"} 
+                size={24} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.controlText}>Mic</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.leaveButtonContainer, { marginBottom: 8 }]}> 
+            <TouchableOpacity 
+              style={styles.leaveButton}
+              onPress={handleLeaveCall}
+            >
+              <Ionicons name="call" size={16} color="#FFFFFF" />
+              <Text style={styles.leaveButtonText}>Leave</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -449,6 +670,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#1A1A1A",
+  },
+  permissionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    textAlign: "center",
+    marginTop: 20,
+  },
+  permissionBanner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FF9800",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    zIndex: 10000,
+  },
+  permissionBannerText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    marginLeft: 8,
+    marginRight: 12,
+    fontWeight: "600",
+  },
+  permissionButton: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  permissionButtonText: {
+    color: "#FF9800",
+    fontSize: 12,
+    fontWeight: "600",
   },
   videoContainer: {
     flex: 1,
@@ -504,33 +761,71 @@ const styles = StyleSheet.create({
     right: 20,
     width: 120,
     height: 160,
-    borderRadius: 12,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-    backgroundColor: "#333",
+    backgroundColor: "#000",
+    zIndex: 2,
+    elevation: 6,
   },
-  videoPlaceholderSmall: {
+  previewClipIOS: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  previewClipAndroid: {
+    borderRadius: 0,
+    overflow: 'visible',
+  },
+  camera: {
     width: "100%",
     height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#2a2a2a",
   },
-  placeholderTextSmall: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    marginTop: 5,
+  flipCameraButton: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 8,
+    zIndex: 11,
+  },
+  expandButton: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 6,
+    zIndex: 11,
+  },
+  previewBorderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    zIndex: 9,
   },
   cameraOffOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  cameraOffText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  miniButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  miniButtonText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
   },
   callStatus: {
     position: "absolute",
@@ -552,7 +847,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 152, 0, 0.9)",
+    backgroundColor: "rgba(76, 175, 80, 0.9)",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -625,10 +920,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -669,10 +961,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,

@@ -1397,11 +1397,27 @@ app.post(
           if (postRes.rows.length > 0) {
             const ownerClerkId = postRes.rows[0].author_id as string;
             if (ownerClerkId && ownerClerkId !== clerkUserId) {
+              // Resolve reactor's display name
+              let reactorName = 'Someone';
+              try {
+                const actorRes = await pool.query(
+                  `SELECT first_name, last_name FROM users WHERE clerk_user_id = $1`,
+                  [clerkUserId]
+                );
+                if (actorRes.rows.length > 0) {
+                  const a = actorRes.rows[0];
+                  const full = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+                  reactorName = full || reactorName;
+                }
+              } catch (_e) {
+                // Fallback to 'Someone' if lookup fails
+              }
+
               await notifyUserByClerkId(
                 ownerClerkId,
                 'New reaction on your post',
-                `${emoji} Someone reacted to your post`,
-                { postId: Number.parseInt(id), emoji }
+                `${emoji} ${reactorName} reacted to your post`,
+                { postId: Number.parseInt(id), emoji, actorName: reactorName, actorClerkId: clerkUserId }
               );
             }
           }
@@ -2942,12 +2958,12 @@ app.get(
 
       // Get online status for all participants
       const conversationsWithOnlineStatus = await Promise.all(
-        conversations.map(async (conversation) => {
+        conversations.map(async (conversation: any) => {
           const lastMessage = conversation.messages[0];
           
           // Find the current user's participant record to get their last_read_at
           const currentUserParticipant = conversation.participants.find(
-            p => p.user.clerk_user_id === clerkUserId
+            (p: any) => p.user.clerk_user_id === clerkUserId
           );
           
           // Count unread messages: messages from others created after last_read_at
@@ -2972,7 +2988,7 @@ app.get(
           
           // Get participants with real online status
           const participantsWithStatus = await Promise.all(
-            conversation.participants.map(async (p) => {
+            conversation.participants.map(async (p: any) => {
               const online = await getUserOnlineStatus(p.user.clerk_user_id);
               return {
                 id: p.user.id,
@@ -3081,7 +3097,7 @@ app.get(
       });
 
       // Format response with file attachments
-      const formattedMessages = messages.map(message => ({
+      const formattedMessages = messages.map((message: any) => ({
         id: message.id.toString(),
         message_text: message.message_text,
         message_type: message.message_type,
@@ -3135,7 +3151,7 @@ app.post(
       }
 
       // Get user and verify participation in transaction
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx: any) => {
         // Get user and verify they're a participant
         const user = await tx.user.findUnique({
           where: { clerk_user_id: clerkUserId }
@@ -3211,8 +3227,8 @@ app.post(
         });
 
         const recipients = participants
-          .map(p => p.user.clerk_user_id)
-          .filter(id => id && id !== result.sender.clerk_user_id);
+          .map((p: any) => p.user.clerk_user_id)
+          .filter((id: any) => id && id !== result.sender.clerk_user_id);
 
         for (const recipientId of recipients) {
           await notifyUserByClerkId(
@@ -3381,7 +3397,7 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       });
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Get creator user
       const creator = await tx.user.findUnique({
         where: { clerk_user_id: clerkUserId }
@@ -3407,8 +3423,8 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
       // Generate conversation title if not provided
       let conversationTitle = title;
       if (!conversationTitle) {
-        const otherParticipants = participants.filter(p => p.clerk_user_id !== clerkUserId);
-        const names = otherParticipants.map(p => `${p.first_name} ${p.last_name}`.trim());
+        const otherParticipants = participants.filter((p: any) => p.clerk_user_id !== clerkUserId);
+        const names = otherParticipants.map((p: any) => `${p.first_name} ${p.last_name}`.trim());
         conversationTitle = names.join(', ');
       }
 
@@ -3419,7 +3435,7 @@ app.post("/api/messages/conversations", async (req: Request, res: Response) => {
           conversation_type: conversationType,
           created_by: creator.id,
           participants: {
-            create: participants.map(participant => ({
+            create: participants.map((participant: any) => ({
               user_id: participant.id
             }))
           }
@@ -3485,7 +3501,7 @@ app.get(
 
       // Check for existing conversations
       const contactsWithConversations = await Promise.all(
-        contacts.map(async (contact) => {
+        contacts.map(async (contact: any) => {
           const existingConversation = await prisma.conversation.findFirst({
             where: {
               AND: [
@@ -3562,7 +3578,7 @@ app.delete("/api/messages/conversations/:conversationId", async (req: Request, r
       return res.status(403).json({ success: false, message: 'Not a participant of this conversation' });
     }
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Remove the participant (delete for this user)
       await tx.conversationParticipant.delete({ where: { id: participant.id } });
 
@@ -3628,7 +3644,7 @@ app.get(
         take: 20
       });
 
-      const formattedUsers = users.map(user => ({
+      const formattedUsers = users.map((user: any) => ({
         ...user,
         online: false,
         has_existing_conversation: false
@@ -3769,11 +3785,11 @@ app.get(
 
       // console.log(`💬 Raw conversations data:`, JSON.stringify(conversations, null, 2));
 
-      const formattedConversations = conversations.map(conversation => {
+      const formattedConversations = conversations.map((conversation: any) => {
         const lastMessage = conversation.messages[0];
         
         // Get ALL participants with online status
-        const allParticipants = conversation.participants.map(p => ({
+        const allParticipants = conversation.participants.map((p: any) => ({
           id: p.user.id,
           clerk_user_id: p.user.clerk_user_id,
           first_name: p.user.first_name,
@@ -4972,7 +4988,7 @@ app.get('/api/help-sections/:sectionId/items', async (req, res) => {
 // APPOINTMENTS ENDPOINTS
 // =============================================
 
-// Get all appointments for a user
+// Get all appointments for a user (supports legacy column names)
 app.get("/api/appointments", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.query;
@@ -4993,28 +5009,77 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
 
     const userId = userResult.rows[0].id;
 
-    // Get all appointments for this user
+    // Detect legacy column names dynamically
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
+    );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+
+    const userIdCol = pickCol('user_id', ['client_id', 'patient_id', 'member_id', 'customer_id']);
+    const supportWorkerIdCol = pickCol('support_worker_id', ['worker_id']);
+    const dateCol = pickCol('appointment_date', ['date']);
+    const timeCol = pickCol('appointment_time', ['time']);
+    const durationCol = pickCol('duration_minutes', ['duration', 'length_minutes']);
+    const sessionTypeCol = pickCol('session_type', ['type', 'session']);
+    const statusCol = pickCol('status', []);
+    const meetingLinkCol = pickCol('meeting_link', ['meeting_url', 'link', 'url']);
+    const notesCol = pickCol('notes', ['note', 'description']);
+
+    if (!userIdCol) {
+      console.warn('⚠️ appointments user reference column missing; returning empty list for compatibility');
+      return res.json({ success: true, appointments: [], count: 0 });
+    }
+
+    const selectParts: string[] = [
+      'a.id',
+      dateCol ? `a.${dateCol} as appointment_date` : `NULL as appointment_date`,
+      timeCol ? `a.${timeCol} as appointment_time` : `NULL as appointment_time`,
+      durationCol ? `a.${durationCol} as duration_minutes` : `NULL as duration_minutes`,
+      sessionTypeCol ? `a.${sessionTypeCol} as session_type` : `NULL as session_type`,
+      statusCol ? `a.${statusCol} as status` : `NULL as status`,
+      meetingLinkCol ? `a.${meetingLinkCol} as meeting_link` : `NULL as meeting_link`,
+      notesCol ? `a.${notesCol} as notes` : `NULL as notes`,
+      'a.created_at',
+      'a.updated_at',
+      supportWorkerIdCol ? `sw.id as support_worker_id` : `NULL as support_worker_id`,
+      supportWorkerIdCol ? `sw.first_name as support_worker_first_name` : `NULL as support_worker_first_name`,
+      supportWorkerIdCol ? `sw.last_name as support_worker_last_name` : `NULL as support_worker_last_name`,
+      supportWorkerIdCol ? `sw.specialization` : `NULL as specialization`,
+      supportWorkerIdCol ? `sw.avatar_url` : `NULL as avatar_url`
+    ];
+
+    // If legacy schema uses worker_id (references users.id), join via users → support_workers by email
+    let joinClause = '';
+    if (supportWorkerIdCol) {
+      if (supportWorkerIdCol === 'worker_id') {
+        // worker_id references users.id; join users first, then support_workers by email match
+        joinClause = `
+          LEFT JOIN users wu ON a.${supportWorkerIdCol} = wu.id
+          LEFT JOIN support_workers sw ON wu.email = sw.email
+        `;
+      } else {
+        // Standard: support_worker_id references support_workers.id directly
+        joinClause = `LEFT JOIN support_workers sw ON a.${supportWorkerIdCol} = sw.id`;
+      }
+    }
+
+    const orderBy = [
+      dateCol ? `a.${dateCol} DESC` : null,
+      timeCol ? `a.${timeCol} DESC` : null,
+      'a.id DESC'
+    ].filter(Boolean).join(', ');
+
     const query = `
-      SELECT 
-        a.id,
-        a.appointment_date,
-        a.appointment_time,
-        a.duration_minutes,
-        a.session_type,
-        a.status,
-        a.meeting_link,
-        a.notes,
-        a.created_at,
-        a.updated_at,
-        sw.id as support_worker_id,
-        sw.first_name as support_worker_first_name,
-        sw.last_name as support_worker_last_name,
-        sw.specialization,
-        sw.avatar_url
+      SELECT ${selectParts.join(', ')}
       FROM appointments a
-      LEFT JOIN support_workers sw ON a.support_worker_id = sw.id
-      WHERE a.user_id = $1
-      ORDER BY a.appointment_date DESC, a.appointment_time DESC
+      ${joinClause}
+      WHERE a.${userIdCol} = $1
+      ORDER BY ${orderBy}
     `;
 
     const result = await pool.query(query, [userId]);
@@ -5058,6 +5123,7 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
     const {
       clerkUserId,
       supportWorkerId,
+      supportWorkerName,
       appointmentDate,
       appointmentTime,
       sessionType,
@@ -5093,31 +5159,109 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
 
     const userId = userResult.rows[0].id;
 
-    // Check if support worker exists
-    const supportWorkerCheck = await pool.query(
-      "SELECT id FROM support_workers WHERE id = $1",
+    // Check if support worker exists and fetch minimal profile (for mapping)
+    const supportWorkerRow = await pool.query(
+      "SELECT id, first_name, last_name, email FROM support_workers WHERE id = $1",
       [supportWorkerId]
     );
 
-    if (supportWorkerCheck.rows.length === 0) {
+    if (supportWorkerRow.rows.length === 0) {
       return res.status(404).json({ error: "Support worker not found" });
     }
 
-    // Check for time slot conflicts
-    const conflictCheck = await pool.query(
-      `SELECT id FROM appointments 
-       WHERE support_worker_id = $1 
-       AND appointment_date = $2 
-       AND appointment_time = $3 
-       AND status IN ('scheduled', 'confirmed')`,
-      [supportWorkerId, appointmentDate, appointmentTime]
+    // Determine available columns in legacy schemas (inspect all columns)
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
     );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+    const userIdCol = pickCol('user_id', ['client_id', 'patient_id', 'member_id', 'customer_id']);
+    const hasUserId = !!userIdCol;
+    const supportWorkerIdCol = pickCol('support_worker_id', ['worker_id']);
+    const hasSupportWorkerId = !!supportWorkerIdCol;
+    const dateCol = pickCol('appointment_date', ['date']);
+    const timeCol = pickCol('appointment_time', ['time']);
+    const durationCol = pickCol('duration_minutes', ['duration', 'length_minutes']);
+    const sessionTypeCol = pickCol('session_type', ['type', 'session']);
+    const statusCol = pickCol('status', []);
+    const meetingLinkCol = pickCol('meeting_link', ['meeting_url', 'link', 'url']);
+    const notesCol = pickCol('notes', ['note', 'description']);
 
-    if (conflictCheck.rows.length > 0) {
-      return res.status(409).json({ 
-        error: "Time slot already booked",
-        message: "This time slot is not available. Please select another time."
-      });
+    // If legacy schema uses worker_id that references a different table (e.g., users.id),
+    // map the selected support worker to a backing user row (create if missing),
+    // and use that ID for conflict checks and insertion.
+    let fkWorkerIdForInsert: number | null = null;
+    if (hasSupportWorkerId && supportWorkerIdCol === 'worker_id') {
+      const sw = supportWorkerRow.rows[0] as { id: number; first_name: string; last_name: string; email: string | null };
+      // Try to resolve existing user by email first
+      let userIdForWorker: number | null = null;
+      if (sw.email) {
+        const u = await pool.query("SELECT id FROM users WHERE email = $1", [sw.email]);
+        if (u.rows.length > 0) {
+          userIdForWorker = u.rows[0].id as number;
+        }
+      }
+      // Fallback: find by name if email missing
+      if (!userIdForWorker) {
+        const uByName = await pool.query(
+          "SELECT id FROM users WHERE LOWER(first_name) = LOWER($1) AND LOWER(last_name) = LOWER($2) ORDER BY id ASC LIMIT 1",
+          [sw.first_name, sw.last_name]
+        );
+        if (uByName.rows.length > 0) {
+          userIdForWorker = uByName.rows[0].id as number;
+        }
+      }
+      // Create a minimal user record for this support worker if not found
+      if (!userIdForWorker) {
+        const pseudoClerkId = `support-worker:${sw.id}`;
+        const emailToUse = sw.email || `worker${sw.id}@safespace.local`;
+        const created = await pool.query(
+          `INSERT INTO users (clerk_user_id, first_name, last_name, email, role, status, email_verified, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, 'support_worker', 'active', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+           ON CONFLICT (email) DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, role = 'support_worker', status = 'active', updated_at = CURRENT_TIMESTAMP
+           RETURNING id`,
+          [pseudoClerkId, sw.first_name, sw.last_name, emailToUse]
+        );
+        userIdForWorker = created.rows[0].id as number;
+      }
+      fkWorkerIdForInsert = userIdForWorker;
+    }
+
+    // Check for time slot conflicts (supports legacy schemas)
+    if (hasSupportWorkerId && dateCol && timeCol) {
+      const workerIdForConflict = fkWorkerIdForInsert ?? supportWorkerId;
+      const conflictCheck = await pool.query(
+        `SELECT id FROM appointments 
+         WHERE ${supportWorkerIdCol} = $1 
+         AND ${dateCol} = $2 
+         AND ${timeCol} = $3 
+         ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}`,
+        [workerIdForConflict, appointmentDate, appointmentTime]
+      );
+      if (conflictCheck.rows.length > 0) {
+        return res.status(409).json({ 
+          error: "Time slot already booked",
+          message: "This time slot is not available. Please select another time."
+        });
+      }
+    } else if (dateCol && timeCol) {
+      const fallbackConflict = await pool.query(
+        `SELECT id FROM appointments 
+         WHERE ${dateCol} = $1 
+         AND ${timeCol} = $2 
+         ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}`,
+        [appointmentDate, appointmentTime]
+      );
+      if (fallbackConflict.rows.length > 0) {
+        return res.status(409).json({ 
+          error: "Time slot already booked",
+          message: "This time slot is not available. Please select another time."
+        });
+      }
     }
 
     // Generate meeting link for video sessions
@@ -5127,57 +5271,94 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
       meetingLink = `https://meet.safespace.com/${randomId}`;
     }
 
-    // Create the appointment
-    const insertQuery = `
-      INSERT INTO appointments (
-        user_id, 
-        support_worker_id, 
-        appointment_date, 
-        appointment_time,
-        duration_minutes,
-        session_type, 
-        status,
-        meeting_link,
-        notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *
-    `;
-
+    // Create the appointment (dynamic columns based on schema)
     const formattedSessionType = sessionType.toLowerCase().replace(' ', '_');
-
-    const result = await pool.query(insertQuery, [
-      userId,
-      supportWorkerId,
-      appointmentDate,
-      appointmentTime,
-      duration,
-      formattedSessionType,
-      'scheduled',
-      meetingLink,
-      notes
-    ]);
+    const columns: string[] = [];
+    const values: any[] = [];
+    // Add relational columns if present (respect detected column names)
+    if (hasUserId && userIdCol) {
+      columns.push(userIdCol);
+      values.push(userId);
+    }
+    if (hasSupportWorkerId && supportWorkerIdCol) {
+      columns.push(supportWorkerIdCol);
+      // If schema expects worker_id (legacy), use mapped users.id; otherwise use support_workers.id
+      values.push(fkWorkerIdForInsert ?? supportWorkerId);
+    }
+    // Add date/time if present
+    if (dateCol) { columns.push(dateCol); values.push(appointmentDate); }
+    if (timeCol) { columns.push(timeCol); values.push(appointmentTime); }
+    // Add duration if present
+    if (durationCol) { columns.push(durationCol); values.push(duration); }
+    // Add session type if present
+    if (sessionTypeCol) { columns.push(sessionTypeCol); values.push(formattedSessionType); }
+    // Add status if present
+    if (statusCol) { columns.push(statusCol); values.push('scheduled'); }
+    // Add meeting link if present
+    if (meetingLinkCol) { columns.push(meetingLinkCol); values.push(meetingLink); }
+    // Add notes if present
+    if (notesCol) { columns.push(notesCol); values.push(notes); }
+    // Note: Do NOT re-add relational columns; they have already been added above using detected names.
+  const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+  const insertSql = `INSERT INTO appointments (${columns.join(', ')}) VALUES (${placeholders}) RETURNING *`;
+    const insertRes = await pool.query(insertSql, values);
+    const appointmentRow: any = insertRes.rows[0];
 
     // Get support worker details for response
-    const swResult = await pool.query(
-      "SELECT first_name, last_name, specialization, avatar_url FROM support_workers WHERE id = $1",
-      [supportWorkerId]
-    );
+    const swResult = hasSupportWorkerId
+      ? await pool.query(
+          "SELECT first_name, last_name, specialization, avatar_url FROM support_workers WHERE id = $1",
+          [supportWorkerId]
+        )
+      : { rows: [] } as any;
 
-    const appointment = result.rows[0];
+    const appointment = appointmentRow;
     const supportWorker = swResult.rows[0];
+
+    // Send notification to user about the new appointment
+    try {
+      const workerName = supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : (supportWorkerName || 'Support Worker');
+      const aptDate = dateCol ? appointment[dateCol] : appointment.appointment_date;
+      const aptTime = timeCol ? appointment[timeCol] : appointment.appointment_time;
+      
+      // Format date and time for notification
+      const date = new Date(aptDate);
+      const formattedDate = date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric',
+        timeZone: 'America/Denver'
+      });
+      
+      await notifyUserByClerkId(
+        clerkUserId,
+        'Appointment Confirmed',
+        `Your appointment with ${workerName} is scheduled for ${formattedDate} at ${aptTime}`,
+        { 
+          type: 'appointment',
+          appointmentId: appointment.id,
+          supportWorker: workerName,
+          date: formattedDate,
+          time: aptTime
+        }
+      );
+    } catch (notifyError: any) {
+      console.error('⚠️ Failed to send appointment notification:', notifyError.message);
+      // Don't fail the appointment creation if notification fails
+    }
 
     res.status(201).json({
       success: true,
       message: "Appointment booked successfully",
       appointment: {
         id: appointment.id,
-        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
-        type: appointment.session_type,
-        status: appointment.status,
-        meetingLink: appointment.meeting_link,
-        notes: appointment.notes
+        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : (supportWorkerName || 'Support Worker'),
+        date: dateCol ? appointment[dateCol] : appointment.appointment_date,
+        time: timeCol ? appointment[timeCol] : appointment.appointment_time,
+        type: sessionTypeCol ? appointment[sessionTypeCol] : appointment.session_type,
+        status: statusCol ? appointment[statusCol] : appointment.status,
+        meetingLink: meetingLinkCol ? appointment[meetingLinkCol] : appointment.meeting_link,
+        notes: notesCol ? appointment[notesCol] : appointment.notes
       }
     });
 
@@ -5214,75 +5395,114 @@ app.put("/api/appointments/:id/reschedule", async (req: Request, res: Response) 
 
     const currentAppointment = appointmentCheck.rows[0];
 
-    // Check if appointment can be rescheduled (not completed or cancelled)
-    if (['completed', 'cancelled'].includes(currentAppointment.status)) {
+    // Detect legacy/dynamic column names
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
+    );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+
+    const supportWorkerIdCol = pickCol('support_worker_id', ['worker_id']);
+    const dateCol = pickCol('appointment_date', ['date']);
+    const timeCol = pickCol('appointment_time', ['time']);
+    const statusCol = pickCol('status', []);
+    const notesCol = pickCol('notes', ['note', 'description']);
+
+    // Check if appointment can be rescheduled (only if status column exists)
+    const curStatus = statusCol ? currentAppointment[statusCol] : null;
+    if (statusCol && curStatus && ['completed', 'cancelled'].includes(String(curStatus))) {
       return res.status(400).json({ 
-        error: `Cannot reschedule ${currentAppointment.status} appointment` 
+        error: `Cannot reschedule ${curStatus} appointment` 
       });
     }
 
-    // Check for time slot conflicts with the new time
-    const conflictCheck = await pool.query(
-      `SELECT id FROM appointments 
-       WHERE support_worker_id = $1 
-       AND appointment_date = $2 
-       AND appointment_time = $3 
-       AND status IN ('scheduled', 'confirmed')
-       AND id != $4`,
-      [currentAppointment.support_worker_id, newDate, newTime, id]
-    );
-
-    if (conflictCheck.rows.length > 0) {
-      return res.status(409).json({ 
-        error: "Time slot already booked",
-        message: "The new time slot is not available. Please select another time."
-      });
+    // Check for time slot conflicts with the new time (if columns exist)
+    if (dateCol && timeCol) {
+      let conflictRows: any[] = [];
+      if (supportWorkerIdCol) {
+        const workerIdVal = currentAppointment[supportWorkerIdCol];
+        const conflictQuery = `SELECT id FROM appointments 
+          WHERE ${supportWorkerIdCol} = $1 
+          AND ${dateCol} = $2 
+          AND ${timeCol} = $3 
+          ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}
+          AND id != $4`;
+        const params = [workerIdVal, newDate, newTime, id];
+        const conflictCheck = await pool.query(conflictQuery, params);
+        conflictRows = conflictCheck.rows;
+      } else {
+        const conflictQuery = `SELECT id FROM appointments 
+          WHERE ${dateCol} = $1 
+          AND ${timeCol} = $2 
+          ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}
+          AND id != $3`;
+        const conflictCheck = await pool.query(conflictQuery, [newDate, newTime, id]);
+        conflictRows = conflictCheck.rows;
+      }
+      if (conflictRows.length > 0) {
+        return res.status(409).json({ 
+          error: "Time slot already booked",
+          message: "The new time slot is not available. Please select another time."
+        });
+      }
     }
 
-    // Update the appointment
-    const updateQuery = `
-      UPDATE appointments 
-      SET 
-        appointment_date = $1, 
-        appointment_time = $2,
-        notes = CASE 
-          WHEN notes IS NULL THEN $3
-          ELSE notes || E'\\n\\nRescheduled: ' || $3
-        END,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $4
-      RETURNING *
-    `;
+    // Build dynamic UPDATE for date/time and notes
+    const updates: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+    if (dateCol) { updates.push(`${dateCol} = $${idx++}`); params.push(newDate); }
+    if (timeCol) { updates.push(`${timeCol} = $${idx++}`); params.push(newTime); }
+    if (notesCol) {
+      // Append a rescheduling note
+      const prevDate = dateCol ? currentAppointment[dateCol] : currentAppointment.appointment_date;
+      const prevTime = timeCol ? currentAppointment[timeCol] : currentAppointment.appointment_time;
+      const reschedulingNote = reason || `Rescheduled from ${prevDate} at ${prevTime}`;
+      // Use concatenation if existing notes, else set new
+      updates.push(`${notesCol} = CASE WHEN ${notesCol} IS NULL OR ${notesCol} = '' THEN $${idx} ELSE ${notesCol} || E'\\n\\nRescheduled: ' || $${idx} END`);
+      params.push(reschedulingNote);
+      idx++;
+    }
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
 
-    const reschedulingNote = reason || `Rescheduled from ${currentAppointment.appointment_date} at ${currentAppointment.appointment_time}`;
+    const updateSql = `UPDATE appointments SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+    params.push(id);
+    const result = await pool.query(updateSql, params);
 
-    const result = await pool.query(updateQuery, [
-      newDate,
-      newTime,
-      reschedulingNote,
-      id
-    ]);
-
-    // Get support worker details for response
-    const swResult = await pool.query(
-      "SELECT first_name, last_name FROM support_workers WHERE id = $1",
-      [currentAppointment.support_worker_id]
-    );
+    // Get support worker details for response if possible
+    let supportWorkerName = 'Support Worker';
+    if (supportWorkerIdCol) {
+      const workerIdVal = currentAppointment[supportWorkerIdCol];
+      // If schema uses support_workers.id, this will find a row; if not, best-effort
+      try {
+        const swResult = await pool.query(
+          "SELECT first_name, last_name FROM support_workers WHERE id = $1",
+          [workerIdVal]
+        );
+        if (swResult.rows.length > 0) {
+          supportWorkerName = `${swResult.rows[0].first_name} ${swResult.rows[0].last_name}`;
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     const appointment = result.rows[0];
-    const supportWorker = swResult.rows[0];
-
     res.json({
       success: true,
       message: "Appointment rescheduled successfully",
       appointment: {
         id: appointment.id,
-        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
+        supportWorker: supportWorkerName,
+        date: dateCol ? appointment[dateCol] : appointment.appointment_date,
+        time: timeCol ? appointment[timeCol] : appointment.appointment_time,
         type: appointment.session_type,
-        status: appointment.status,
-        notes: appointment.notes
+        status: statusCol ? appointment[statusCol] : appointment.status,
+        notes: notesCol ? appointment[notesCol] : appointment.notes
       }
     });
 
@@ -5313,28 +5533,47 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
 
     const currentAppointment = appointmentCheck.rows[0];
 
-    // Check if appointment can be cancelled
-    if (['completed', 'cancelled'].includes(currentAppointment.status)) {
+    // Detect legacy/dynamic column names
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
+    );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+
+    const statusCol = pickCol('status', []);
+    const cancellationReasonCol = pickCol('cancellation_reason', ['cancel_reason', 'reason']);
+    const notesCol = pickCol('notes', ['note', 'description']);
+
+    // Check if appointment can be cancelled (only if status column exists)
+    const curStatus = statusCol ? currentAppointment[statusCol] : null;
+    if (statusCol && curStatus && ['completed', 'cancelled'].includes(String(curStatus))) {
       return res.status(400).json({ 
-        error: `Cannot cancel ${currentAppointment.status} appointment` 
+        error: `Cannot cancel ${curStatus} appointment` 
       });
     }
 
-    // Update the appointment status to cancelled
-    const updateQuery = `
-      UPDATE appointments 
-      SET 
-        status = 'cancelled',
-        cancellation_reason = $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-      RETURNING *
-    `;
+    // Build dynamic UPDATE for cancellation
+    const updates: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+    if (statusCol) { updates.push(`${statusCol} = 'cancelled'`); }
+    if (cancellationReasonCol) {
+      updates.push(`${cancellationReasonCol} = $${idx++}`);
+      params.push(cancellationReason || 'Cancelled by user');
+    } else if (notesCol) {
+      updates.push(`${notesCol} = CASE WHEN ${notesCol} IS NULL OR ${notesCol} = '' THEN $${idx} ELSE ${notesCol} || E'\\n\\nCancelled: ' || $${idx} END`);
+      params.push(cancellationReason || 'Cancelled by user');
+      idx++;
+    }
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
 
-    const result = await pool.query(updateQuery, [
-      cancellationReason || 'Cancelled by user',
-      id
-    ]);
+    const updateSql = `UPDATE appointments SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+    params.push(id);
+    const result = await pool.query(updateSql, params);
 
     const appointment = result.rows[0];
 
@@ -5343,8 +5582,8 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
       message: "Appointment cancelled successfully",
       appointment: {
         id: appointment.id,
-        status: appointment.status,
-        cancellationReason: appointment.cancellation_reason,
+        status: statusCol ? appointment[statusCol] : 'cancelled',
+        cancellationReason: cancellationReasonCol ? appointment[cancellationReasonCol] : (cancellationReason || 'Cancelled by user'),
         cancelledAt: appointment.updated_at
       }
     });
@@ -5353,6 +5592,73 @@ app.put("/api/appointments/:id/cancel", async (req: Request, res: Response) => {
     console.error("Error cancelling appointment:", error.message);
     res.status(500).json({
       error: "Failed to cancel appointment",
+      details: error.message,
+    });
+  }
+});
+
+// =============================================
+// SUPPORT WORKERS ENDPOINTS
+// =============================================
+
+// Get all support workers
+app.get("/api/support-workers", async (req: Request, res: Response) => {
+  try {
+    console.log("📋 Fetching all support workers");
+
+    const supportWorkers = await prisma.supportWorker.findMany({
+      where: {
+        status: "active",
+      },
+      orderBy: {
+        first_name: "asc",
+      },
+    });
+
+    console.log(`✅ Found ${supportWorkers.length} support workers`);
+
+    res.json({
+      success: true,
+      data: supportWorkers,
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching support workers:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch support workers",
+      details: error.message,
+    });
+  }
+});
+
+// Get single support worker by ID
+app.get("/api/support-workers/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    console.log(`📋 Fetching support worker ${id}`);
+
+    const supportWorker = await prisma.supportWorker.findUnique({
+      where: {
+        id: parseInt(id),
+      },
+    });
+
+    if (!supportWorker) {
+      return res.status(404).json({
+        success: false,
+        error: "Support worker not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: supportWorker,
+    });
+  } catch (error: any) {
+    console.error("❌ Error fetching support worker:", error.message);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch support worker",
       details: error.message,
     });
   }

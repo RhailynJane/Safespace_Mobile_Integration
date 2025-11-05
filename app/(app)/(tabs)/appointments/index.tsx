@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -28,6 +28,15 @@ import StatusModal from "../../../../components/StatusModal";
 
 const { width } = Dimensions.get("window");
 
+interface Appointment {
+  id: number;
+  supportWorker: string;
+  date: string;
+  time: string;
+  type: string;
+  status: string;
+}
+
 /**
  * AppointmentsScreen Component
  *
@@ -43,6 +52,10 @@ export default function AppointmentsScreen() {
   const [activeTab, setActiveTab] = useState("appointments");
   const [activeView, setActiveView] = useState("main");
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [nextAppointment, setNextAppointment] = useState<Appointment | null>(null);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -60,12 +73,125 @@ export default function AppointmentsScreen() {
   /**
    * Show status modal with given parameters
    */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+  const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);
     setStatusModalTitle(title);
     setStatusModalMessage(message);
     setStatusModalVisible(true);
-  };
+  }, []);
+
+  /**
+   * Fetch appointments from API and calculate stats
+   */
+  const fetchAppointments = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('📅 Fetching appointments for dashboard...');
+      
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
+      const result = await response.json();
+
+      console.log('📥 Dashboard appointments response:', result);
+
+      if (result.success && result.appointments) {
+        // Transform backend data using MST-aware date+time comparison to align with appointment list
+        const transformedAppointments = result.appointments.map((apt: any) => {
+          // Format readable date
+          const appointmentDate = new Date(apt.date);
+          const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+
+          // Extract UTC components from stored date (treat as calendar day)
+          const utcDate = new Date(apt.date);
+          const year = utcDate.getUTCFullYear();
+          const month = utcDate.getUTCMonth();
+          const day = utcDate.getUTCDate();
+
+          // Current date/time in MST (America/Denver)
+          const mstFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Denver',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+          const nowParts = mstFormatter.formatToParts(new Date());
+          const nowYear = parseInt(nowParts.find(p => p.type === 'year')?.value || '0');
+          const nowMonth = (parseInt(nowParts.find(p => p.type === 'month')?.value || '0')) - 1; // zero-based
+          const nowDay = parseInt(nowParts.find(p => p.type === 'day')?.value || '0');
+          const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
+          const nowMinute = parseInt(nowParts.find(p => p.type === 'minute')?.value || '0');
+
+          // Parse stored appointment time (HH:mm or HH:mm:ss)
+          const timeStr: string = apt.time || '00:00:00';
+          const [hStr, mStr] = timeStr.split(':');
+          const aptHour = parseInt(hStr || '0', 10);
+          const aptMinute = parseInt(mStr || '0', 10);
+
+          // Numeric comparison YYYYMMDDHHMM in MST to classify
+          const nowNumeric = nowYear * 100000000 + (nowMonth + 1) * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
+          const aptNumeric = year * 100000000 + (month + 1) * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
+          const isUpcoming = aptNumeric > nowNumeric;
+
+          return {
+            id: apt.id,
+            supportWorker: apt.supportWorker || 'Support Worker',
+            date: formattedDate,
+            time: apt.time || '',
+            type: apt.type || 'Video',
+            status: apt.status === 'cancelled' ? 'cancelled' :
+                    apt.status === 'completed' ? 'past' :
+                    (isUpcoming ? 'upcoming' : 'past'),
+            // Keep numeric marker for sorting "next" without relying on timezone-shifted Date objects
+            mstNumeric: aptNumeric,
+          };
+        });
+
+        setAppointments(transformedAppointments);
+
+        // Calculate upcoming and completed counts using unified MST logic
+        const upcoming = transformedAppointments.filter((a: any) => a.status === 'upcoming');
+        const completed = transformedAppointments.filter((a: any) => a.status === 'past');
+        setUpcomingCount(upcoming.length);
+        setCompletedCount(completed.length);
+
+        // Determine the next appointment: the one with the smallest mstNumeric among upcoming
+        if (upcoming.length > 0) {
+          const sorted = [...upcoming].sort((a: any, b: any) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
+          setNextAppointment(sorted[0]);
+        } else {
+          setNextAppointment(null);
+        }
+
+        console.log('✅ Stats calculated (MST unified):', { upcoming: upcoming.length, completed: completed.length });
+      } else {
+        console.warn('⚠️ No appointments found');
+        setAppointments([]);
+        setUpcomingCount(0);
+        setCompletedCount(0);
+        setNextAppointment(null);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching appointments:', error);
+      showStatusModal('error', 'Error', 'Unable to fetch appointments. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, showStatusModal]);
+
+  // Run fetch on mount and when dependencies change
+  useEffect(() => {
+    if (user?.id) {
+      fetchAppointments();
+    }
+  }, [user?.id, fetchAppointments]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -237,15 +363,6 @@ export default function AppointmentsScreen() {
     },
   ];
 
-  // Show loading indicator if data is being fetched
-  if (loading) {
-    return (
-      <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </CurvedBackground>
-    );
-  }
-
   /**
    * Handles navigation to book appointment screen
    */
@@ -259,6 +376,15 @@ export default function AppointmentsScreen() {
   const handleViewScheduled = () => {
     router.push("../appointments/appointment-list");
   };
+
+  // Show loading indicator if data is being fetched
+  if (loading) {
+    return (
+      <CurvedBackground style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </CurvedBackground>
+    );
+  }
 
   return (
     <CurvedBackground>
@@ -287,12 +413,12 @@ export default function AppointmentsScreen() {
           <View style={styles.statsContainer}>
             <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
               <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.statNumber, { color: theme.colors.text }]}>2</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{upcomingCount}</Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Upcoming</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
               <Ionicons name="checkmark-circle-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.statNumber, { color: theme.colors.text }]}>5</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{completedCount}</Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Completed</Text>
             </View>
           </View>
@@ -321,38 +447,53 @@ export default function AppointmentsScreen() {
           </View>
 
           {/* Upcoming Session Preview */}
-          <View style={styles.upcomingSection}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Next Session
-            </Text>
-            <View style={[styles.upcomingCard, { backgroundColor: theme.colors.surface }]}>
-              <View style={styles.upcomingHeader}>
-                <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
-                <View style={styles.upcomingInfo}>
-                  <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
-                    Dr. Sarah Johnson
-                  </Text>
-                  <Text style={[styles.upcomingSpecialty, { color: theme.colors.textSecondary }]}>
-                    Clinical Psychologist
-                  </Text>
+          {nextAppointment && (
+            <View style={styles.upcomingSection}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                Next Session
+              </Text>
+              <View style={[styles.upcomingCard, { backgroundColor: theme.colors.surface }]}>
+                <View style={styles.upcomingHeader}>
+                  <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
+                  <View style={styles.upcomingInfo}>
+                    <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
+                      {nextAppointment.supportWorker}
+                    </Text>
+                    <Text style={[styles.upcomingSpecialty, { color: theme.colors.textSecondary }]}>
+                      Support Worker
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.upcomingDetails}>
-                <View style={styles.detailRow}>
-                  <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
-                  <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                    Tomorrow • 2:00 PM
-                  </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
-                  <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                    Video Session
-                  </Text>
+                <View style={styles.upcomingDetails}>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                      {nextAppointment.date} • {nextAppointment.time}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                      {nextAppointment.type} Session
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          )}
+
+          {/* No appointments message */}
+          {!nextAppointment && upcomingCount === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
+              <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
+                No upcoming appointments
+              </Text>
+              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+                Book your first session to get started
+              </Text>
+            </View>
+          )}
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -436,7 +577,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 100, // Added padding to prevent overlap with bottom navigation
+    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,
@@ -588,6 +729,22 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   detailText: {
     fontSize: scaledFontSize(14),
     marginLeft: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    marginHorizontal: 24,
+  },
+  emptyStateText: {
+    fontSize: scaledFontSize(16),
+    marginTop: 16,
+    fontWeight: '600',
+  },
+  emptyStateSubtext: {
+    fontSize: scaledFontSize(14),
+    marginTop: 8,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,

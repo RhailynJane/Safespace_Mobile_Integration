@@ -14,6 +14,9 @@ interface ThemeColors {
   primary: string;
   accent: string;
   error: string;
+  success: string;
+  successLight: string;
+
 }
 
 interface Theme {
@@ -45,6 +48,8 @@ const lightTheme: ThemeColors = {
   primary: "#4CAF50",
   accent: "#7FDBDA",
   error: "#FF6B6B",
+  success: '#4CAF50',
+  successLight: '#E8F5E9',
 };
 
 const darkTheme: ThemeColors = {
@@ -60,6 +65,8 @@ const darkTheme: ThemeColors = {
   primary: "#4CAF50",
   accent: "#7FDBDA",
   error: "#FF6B6B",
+  success: '#4CAF50',
+  successLight: "#121212",
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);

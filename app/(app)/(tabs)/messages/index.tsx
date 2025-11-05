@@ -693,7 +693,7 @@ export default function MessagesScreen() {
                     const initialPresence = (other?.presence as any) || (other?.online ? 'online' : 'offline');
 
                     router.push({
-                      pathname: "../messages/message-chat-screen",
+                      pathname: "/(app)/(tabs)/messages/message-chat-screen",
                       params: {
                         id: conversation.id,
                         title: getDisplayName(conversation),

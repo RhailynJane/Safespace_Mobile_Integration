@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -23,7 +24,6 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 
@@ -37,16 +37,28 @@ import StatusModal from "../../../../components/StatusModal";
  * - Navigate to confirmation screen
  * Features a multi-step process with visual indicators and elegant curved background.
  */
+
+interface SupportWorker {
+  id: number;
+  name: string;
+  title: string;
+  avatar: string;
+  specialties: string[];
+  backendWorkerId?: number; // optional: FK-friendly id from backend (e.g., worker_id or user_id)
+  email?: string;
+}
+
 export default function BookAppointment() {
   const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("appointments");
   const [selectedType, setSelectedType] = useState("Video Call");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [supportWorker, setSupportWorker] = useState<SupportWorker | null>(null);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -62,40 +74,124 @@ export default function BookAppointment() {
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Get support worker ID from navigation params
-  const { supportWorkerId } = useLocalSearchParams();
+  const { supportWorkerId, reschedule, appointmentId } = useLocalSearchParams();
+
+  // Mountain Time helpers (America/Denver)
+  const getNowInMountain = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const get = (type: string) => Number(parts.find(p => p.type === type)?.value || 0);
+    return {
+      year: get('year'),
+      month: get('month'), // 1-12
+      day: get('day'),
+      hour: get('hour'), // 00-23
+      minute: get('minute'),
+    };
+  };
+
+  const parseTimeTo24h = (time: string) => {
+    // Expects formats like "9:00 AM" | "10:30 PM"
+  const match = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return { hour: 0, minute: 0 };
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+  const ampm = (match[3] || 'AM').toUpperCase();
+    if (ampm === 'AM') {
+      if (hour === 12) hour = 0;
+    } else {
+      if (hour !== 12) hour += 12;
+    }
+    return { hour, minute };
+  };
+
+  const isPastInMountain = (isoDate: string, timeLabel: string) => {
+    const now = getNowInMountain();
+    const [yStr, mStr, dStr] = isoDate.split('-');
+    const y: number = Number(yStr || '0');
+    const m: number = Number(mStr || '0');
+    const d: number = Number(dStr || '0');
+    if (!y || !m || !d) return true; // invalid date treated as past/invalid
+    // Compare date first
+    if (y < now.year) return true;
+    if (y > now.year) return false;
+    if (m < now.month) return true;
+    if (m > now.month) return false;
+    if (d < now.day) return true;
+    if (d > now.day) return false;
+    // Same day in Mountain time, compare time
+    const { hour, minute } = parseTimeTo24h(timeLabel);
+    if (hour < now.hour) return true;
+    if (hour > now.hour) return false;
+    return minute <= now.minute; // equal minute means now or past -> treat as past/unavailable
+  };
 
   /**
    * Show status modal with given parameters
    */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+  const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);
     setStatusModalTitle(title);
     setStatusModalMessage(message);
     setStatusModalVisible(true);
-  };
+  }, []);
 
-  // Mock data for support workers (replaces backend data)
-  const supportWorkers = [
-    {
-      id: 1,
-      name: "Eric Young",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-    {
-      id: 2,
-      name: "Michael Chen",
-      title: "Support worker",
-      avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-      specialties: ["Anxiety", "Depression", "Trauma"],
-    },
-  ];
+  /**
+   * Fetch support worker details from API
+   */
+  const fetchSupportWorker = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/support-workers/${supportWorkerId}`);
+      const result = await response.json();
 
-  // Find the support worker based on the ID from the URL
-  const supportWorker = supportWorkers.find(
-    (sw) => sw.id === Number(supportWorkerId)
-  );
+      if (result.success) {
+        // Transform the data and keep possible FK-friendly identifiers
+        const worker = result.data;
+        const backendWorkerId: number | undefined =
+          (typeof worker.worker_id === 'number' && worker.worker_id) ||
+          (typeof worker.user_id === 'number' && worker.user_id) ||
+          (typeof worker.id === 'number' && worker.id) ||
+          undefined;
+
+        setSupportWorker({
+          id: worker.id,
+          name: `${worker.first_name} ${worker.last_name}`,
+          title: "Support Worker",
+          avatar: worker.avatar_url || "https://via.placeholder.com/150",
+          specialties: worker.specialization 
+            ? worker.specialization.split(',').map((s: string) => s.trim())
+            : [],
+          backendWorkerId,
+          email: worker.email,
+        });
+      } else {
+        showStatusModal('error', 'Error', 'Failed to load support worker details');
+      }
+    } catch (error) {
+      console.error('Error fetching support worker:', error);
+      showStatusModal('error', 'Error', 'Unable to fetch support worker. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [supportWorkerId, showStatusModal]);
+
+  // Fetch support worker on mount and when id changes
+  useEffect(() => {
+    if (supportWorkerId) {
+      fetchSupportWorker();
+    }
+  }, [supportWorkerId, fetchSupportWorker]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -113,17 +209,6 @@ export default function BookAppointment() {
       "No email available"
     );
   };
-
-  // Show error if support worker not found
-  if (!supportWorker) {
-    return (
-      <CurvedBackground>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <Text style={[styles.errorText, { color: theme.colors.text }]}>Support worker not found</Text>
-        </SafeAreaView>
-      </CurvedBackground>
-    );
-  }
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -259,7 +344,7 @@ export default function BookAppointment() {
       title: "Community Forum",
       onPress: () => {
         setSideMenuVisible(false);
-        router.push("/community-forum");
+        router.push("/(app)/(tabs)/community-forum");
       },
     },
     {
@@ -287,16 +372,54 @@ export default function BookAppointment() {
     );
   }
 
+  // Show error if support worker not found
+  if (!supportWorker) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <AppHeader title="Book Appointment" showBack={true} />
+          <Text style={[styles.errorText, { color: theme.colors.text }]}>
+            Support worker not found
+          </Text>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
   // Available session types
   const SESSION_TYPES = ["Video Call", "Phone Call", "In Person"];
 
-  // Mock available dates and times
-  const AVAILABLE_DATES = [
-    "Monday, October 7, 2025",
-    "Wednesday, October 9, 2025",
-    "Friday, October 11, 2025",
-    "Monday, October 14, 2025",
-  ];
+  // Generate dates for the current week (starting from today)
+
+  const generateCurrentWeekDates = () => {
+    const dates = [];
+    const today = new Date();
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      
+      const dayName = daysOfWeek[date.getDay()];
+      const monthName = months[date.getMonth()];
+      const dayNumber = date.getDate();
+      const year = date.getFullYear();
+      
+      // Store both display format and ISO format
+      const displayDate = `${dayName}, ${monthName} ${dayNumber}, ${year}`;
+      const isoDate = date.toISOString().split('T')[0]; // "2025-10-07"
+      
+      dates.push({
+        display: displayDate,
+        iso: isoDate
+      });
+    }
+    
+    return dates;
+  };
+
+  const AVAILABLE_DATES = generateCurrentWeekDates();
 
   const AVAILABLE_TIMES = [
     "9:00 AM",
@@ -310,13 +433,50 @@ export default function BookAppointment() {
    * Handles navigation to confirmation screen with selected appointment details
    */
   const handleContinue = () => {
+    if (!supportWorker) {
+      showStatusModal('error', 'Error', 'Please select a support worker');
+      return;
+    }
+    
+    if (!selectedDate || !selectedTime) {
+      showStatusModal('error', 'Error', 'Please select date and time');
+      return;
+    }
+
+    // Prevent booking in the past relative to Mountain Time
+    if (isPastInMountain(selectedDate, selectedTime)) {
+      showStatusModal('error', 'Time not available', 'Selected time is in the past for Mountain Time. Please choose a later time.');
+      return;
+    }
+
+    // Find the display format for the selected date
+    const selectedDateObj = AVAILABLE_DATES.find(d => d.iso === selectedDate);
+    const displayDate = selectedDateObj?.display || selectedDate;
+
+    console.log('🚀 Navigating to confirm with:', {
+      supportWorkerId: supportWorker.id,
+      backendWorkerId: supportWorker.backendWorkerId,
+      selectedDate: selectedDate,        // ISO: "2025-11-05"
+      selectedDateDisplay: displayDate,  // Display: "Tuesday, November 5, 2025"
+      selectedType,
+      selectedTime,
+      supportWorkerEmail: supportWorker.email,
+    });
+    
     router.push({
       pathname: "/appointments/confirm",
       params: {
         supportWorkerId: supportWorker.id,
+        supportWorkerName: supportWorker.name,
+        backendWorkerId: supportWorker.backendWorkerId ?? '',
+        supportWorkerEmail: supportWorker.email ?? '',
         selectedType,
-        selectedDate: selectedDate || "",
+        selectedDate: selectedDate || "",           // Pass ISO for DB
+        selectedDateDisplay: displayDate || "",     // Pass display for UI
         selectedTime: selectedTime || "",
+        // Reschedule context passthrough if present
+        reschedule: reschedule ? '1' : undefined,
+        appointmentId: appointmentId ? String(appointmentId) : undefined,
       },
     });
   };
@@ -326,7 +486,11 @@ export default function BookAppointment() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title=" Book Appointments" showBack={true} />
 
-        <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <ScrollView 
+            style={{ flex: 1, backgroundColor: theme.colors.background }}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+          >
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>
@@ -433,42 +597,42 @@ export default function BookAppointment() {
           {/* Date and Time Selection */}
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Date and Time</Text>
 
-          {/* Available Dates Card */}
-          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Dates</Text>
-            <View style={styles.datesContainer}>
-              {AVAILABLE_DATES.map((date) => (
-                <TouchableOpacity
-                  key={date}
+        {/* Available Dates Card */}
+        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Dates</Text>
+          <View style={styles.datesContainer}>
+            {AVAILABLE_DATES.map((dateObj) => (
+              <TouchableOpacity
+                key={dateObj.iso}
+                style={[
+                  styles.dateItem,
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                  selectedDate === dateObj.iso && { borderColor: theme.colors.primary },
+                ]}
+                onPress={() => {
+                  setSelectedDate(dateObj.iso || null);  // Store ISO: "2025-11-05"
+                  setSelectedTime(null);
+                }}
+              >
+                <Ionicons
+                  name="calendar"
+                  size={20}
+                  color={selectedDate === dateObj.iso ? theme.colors.primary : theme.colors.icon}
+                  style={styles.dateIcon}
+                />
+                <Text
                   style={[
-                    styles.dateItem,
-                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                    selectedDate === date && { borderColor: theme.colors.primary },
+                    styles.dateText,
+                    { color: theme.colors.text },
+                    selectedDate === dateObj.iso && { color: theme.colors.primary },
                   ]}
-                  onPress={() => {
-                    setSelectedDate(date);
-                    setSelectedTime(null); // Reset time when date changes
-                  }}
                 >
-                  <Ionicons
-                    name="calendar"
-                    size={20}
-                    color={selectedDate === date ? theme.colors.primary : theme.colors.icon}
-                    style={styles.dateIcon}
-                  />
-                  <Text
-                    style={[
-                      styles.dateText,
-                      { color: theme.colors.text },
-                      selectedDate === date && { color: theme.colors.primary },
-                    ]}
-                  >
-                    {date}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  {dateObj.display}  {/* Show: "Tuesday, November 5, 2025" */}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
+        </View>
 
           {/* Available Times Card (only shown when date is selected) */}
           {selectedDate ? (
@@ -476,35 +640,49 @@ export default function BookAppointment() {
               <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Times</Text>
                 <View style={styles.timesContainer}>
-                  {AVAILABLE_TIMES.map((time) => (
-                    <TouchableOpacity
-                      key={time}
-                      style={[
-                        styles.timeItem,
-                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                        selectedTime === time && { borderColor: theme.colors.primary },
-                      ]}
-                      onPress={() => setSelectedTime(time)}
-                    >
-                      <Ionicons
-                        name="time"
-                        size={16}
-                        color={selectedTime === time ? theme.colors.primary : theme.colors.icon}
-                        style={styles.timeIcon}
-                      />
-                      <Text
+                  {AVAILABLE_TIMES.map((time) => {
+                    const disabled = isPastInMountain(selectedDate, time);
+                    return (
+                      <TouchableOpacity
+                        key={time}
                         style={[
-                          styles.timeText,
-                          { color: theme.colors.text },
-                          selectedTime === time && { color: theme.colors.primary },
+                          styles.timeItem,
+                          { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
+                          selectedTime === time && { borderColor: theme.colors.primary },
+                          disabled && styles.timeItemDisabled,
                         ]}
+                        onPress={() => !disabled && setSelectedTime(time)}
+                        disabled={disabled}
+                        accessibilityState={{ disabled }}
                       >
-                        {time}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Ionicons
+                          name="time"
+                          size={16}
+                          color={disabled ? theme.colors.iconDisabled : (selectedTime === time ? theme.colors.primary : theme.colors.icon)}
+                          style={styles.timeIcon}
+                        />
+                        <Text
+                          style={[
+                            styles.timeText,
+                            { color: disabled ? theme.colors.textSecondary : theme.colors.text },
+                            selectedTime === time && !disabled && { color: theme.colors.primary },
+                          ]}
+                        >
+                          {time}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
+              {
+                // All times disabled today
+                AVAILABLE_TIMES.every(t => isPastInMountain(selectedDate, t)) && (
+                  <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                    No times left today in Mountain Time. Please pick another date.
+                  </Text>
+                )
+              }
             </>
           ) : (
             <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
@@ -917,6 +1095,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     borderColor: "#E9ECEF",
     width: "48%",
     minWidth: 140,
+  },
+  timeItemDisabled: {
+    opacity: 0.5,
   },
   timeItemSelected: {
     backgroundColor: "#E8F5E9",

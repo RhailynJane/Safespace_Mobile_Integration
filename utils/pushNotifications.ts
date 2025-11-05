@@ -69,6 +69,8 @@ export async function registerForPushNotifications(clerkUserId: string): Promise
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
+        bypassDnd: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#FF231F7C',
       });

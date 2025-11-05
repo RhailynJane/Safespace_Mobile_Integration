@@ -53,12 +53,14 @@ import {
   Keyboard,
   Animated,
 } from "react-native";
+import { PermissionsAndroid } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import { useAudioPlayer, RecordingOptions } from 'expo-audio';
 import { Audio } from 'expo-av';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import OptimizedImage from "../../../../components/OptimizedImage";
@@ -130,6 +132,7 @@ export default function ChatScreen() {
   const scrollIdleTimerRef = useRef<any>(null);
   const messagesListRef = useRef<FlatList<ExtendedMessage>>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingRef = useRef<any>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,6 +151,9 @@ export default function ChatScreen() {
     actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
 
+  // Don't use the broken useAudioRecorder hook - use AudioModule directly
+  const audioRecorderRef = useRef<any>(null);
+
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -159,6 +165,48 @@ export default function ChatScreen() {
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalData({ type, title, message, confirm: undefined, actions: undefined });
     setStatusModalVisible(true);
+  };
+
+  // Try to normalize URI from various recorder stop() shapes and hook fields
+  const resolveRecorderUri = (stopResult: any): string | null => {
+    const recorder = audioRecorderRef.current;
+    const candidates = [
+      stopResult?.uri,
+      stopResult?.file?.uri,
+      stopResult?.path,
+      stopResult?.url,
+      recorder?.uri,
+      recorder?.recordingUri,
+      recorder?.recording?.uri,
+      recorder?.recording?.getURI?.(),
+      recorder?._recording?.uri,
+      recorder?._recording?.getURI?.(),
+      typeof recorder?.getURI === 'function' ? recorder?.getURI() : undefined,
+      typeof recorder?.recording?.getURI === 'function' ? recorder?.recording?.getURI() : undefined,
+    ].filter(Boolean).filter((u: any) => u && u.length > 0);
+    return (candidates.length > 0 ? String(candidates[0]) : null);
+  };
+
+  // Ensure microphone permission (Android requires runtime grant)
+  const ensureMicPermission = async (): Promise<boolean> => {
+    try {
+      if (Platform.OS !== 'android') return true; // iOS/Web prompt automatically on first access
+      const already = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      if (already) return true;
+      const res = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: 'Microphone permission',
+          message: 'SafeSpace needs access to your microphone to record voice messages.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Deny',
+          buttonNeutral: 'Ask Me Later',
+        }
+      );
+      return res === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (_e) {
+      return false;
+    }
   };
 
   const showConfirm = (
@@ -748,88 +796,115 @@ export default function ChatScreen() {
     setEmojiPickerVisible(false);
   };
 
-  // Handle voice recording (start/stop)
+  // Handle voice recording (start/stop) - using expo-av Audio.Recording
   const handleMicPress = async () => {
-    if (isRecording) {
-      // Stop recording
-      try {
-        if (recordingRef.current) {
-          await recordingRef.current.stopAndUnloadAsync();
-          const uri = recordingRef.current.getURI();
-          recordingRef.current = null;
-          setIsRecording(false);
-          if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
-          // Move to pending state so user can preview/cancel/send from UI
-          if (uri) {
-            setPendingRecordingUri(uri);
-            setPendingRecordingDuration(Math.max(1, Math.floor(recordingDuration)));
-          }
-          setRecordingDuration(0);
-        }
-      } catch (error) {
-        console.error('Error stopping recording:', error);
-        showStatusModal('error', 'Error', 'Failed to stop recording');
-        setIsRecording(false);
-        recordingRef.current = null;
+    try {
+      // Ensure microphone permission before attempting to record
+      const hasPerm = await ensureMicPermission();
+      if (!hasPerm) {
+        showStatusModal('error', 'Permission required', 'Please allow microphone access to record voice messages.');
+        return;
       }
-    } else {
-      // Start recording
-      try {
-        const permission = await Audio.requestPermissionsAsync();
-        if (!permission.granted) {
-          showStatusModal('error', 'Permission Required', 'Please allow microphone access to record voice messages.');
+      if (isRecording) {
+        // Stop recording
+        console.log('🎤 Stopping recording...');
+        const recorder = audioRecorderRef.current;
+        if (!recorder) {
+          console.log('❌ No recorder instance');
+          showStatusModal('error', 'Recording Error', 'Recording not initialized.');
+          setIsRecording(false);
           return;
         }
-
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
-
-        const { recording } = await Audio.Recording.createAsync(
-          Audio.RecordingOptionsPresets.HIGH_QUALITY
-        );
         
-        recordingRef.current = recording;
-        setIsRecording(true);
-        
-        // Track duration
-        const durationInterval = setInterval(() => {
-          if (recordingRef.current) {
-            recordingRef.current.getStatusAsync().then((status: any) => {
-              if (status.isRecording) {
-                setRecordingDuration(status.durationMillis / 1000);
-              }
-            });
+        try {
+          await recorder.stopAndUnloadAsync();
+          const uri = recorder.getURI();
+          console.log('🎤 Recording URI:', uri);
+          
+          if (uri && uri.length > 0) {
+            console.log('🎤 Recording saved:', uri);
+            setPendingRecordingUri(uri);
+            setPendingRecordingDuration(Math.max(1, recordingDuration));
+            audioRecorderRef.current = null;
+          } else {
+            console.log('❌ No URI from recording');
+            showStatusModal('error', 'Recording Error', 'Could not save the recording. Please try again.');
           }
-        }, 100);
-        recordingTimerRef.current = durationInterval as unknown as NodeJS.Timeout;
+        } catch (stopError: any) {
+          console.error('❌ Error stopping:', stopError);
+          showStatusModal('error', 'Recording Error', stopError.message || 'Failed to stop recording');
+        }
         
-        // Auto-stop after 2 minutes
-        setTimeout(async () => {
-          if (recordingRef.current && isRecording) {
-            clearInterval(durationInterval);
-            await handleMicPress(); // This will stop the recording
-          }
-        }, 120000);
-        
-      } catch (error) {
-        console.error('Error starting recording:', error);
-        showStatusModal('error', 'Error', 'Failed to start recording. Please check your microphone permissions.');
         setIsRecording(false);
+        isRecordingRef.current = false;
+        
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+      } else {
+        // Start recording
+        console.log('🎤 Starting recording...');
+        
+        try {
+          // Request permissions
+          await Audio.requestPermissionsAsync();
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+          });
+          
+          const { recording } = await Audio.Recording.createAsync(
+            Audio.RecordingOptionsPresets.HIGH_QUALITY
+          );
+          
+          audioRecorderRef.current = recording;
+          console.log('🎤 Recording started successfully');
+          
+          setIsRecording(true);
+          isRecordingRef.current = true;
+          setRecordingDuration(0);
+          
+          // Update duration every second
+          recordingTimerRef.current = setInterval(() => {
+            setRecordingDuration(prev => prev + 1);
+          }, 1000);
+        } catch (startError: any) {
+          console.error('❌ Error starting recording:', startError);
+          showStatusModal('error', 'Recording Error', startError.message || 'Failed to start recording');
+        }
       }
+    } catch (error: any) {
+      console.error('❌ Audio recording error:', error);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      showStatusModal('error', 'Recording Error', error.message || 'Failed to record audio');
     }
   };
+
 
   // Cancel/remove pending recording (or abort active recording)
   const cancelPendingRecording = async () => {
     try {
-      if (isRecording && recordingRef.current) {
-        await recordingRef.current.stopAndUnloadAsync().catch(() => {});
-        recordingRef.current = null;
+      if (isRecording) {
+        try { 
+          const recorder = audioRecorderRef.current;
+          if (recorder) {
+            await recorder.stopAndUnloadAsync();
+          }
+          audioRecorderRef.current = null;
+        } catch { /* noop */ }
         setIsRecording(false);
+        isRecordingRef.current = false;
       }
-      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+      if (recordingTimerRef.current) { 
+        clearInterval(recordingTimerRef.current); 
+        recordingTimerRef.current = null; 
+      }
       if (pendingRecordingUri) {
         await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }).catch(() => {});
       }
@@ -840,11 +915,25 @@ export default function ChatScreen() {
     }
   };
 
+  // Cleanup on unmount: stop any active recording and clear timers
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (isRecordingRef.current && audioRecorderRef.current) {
+        try { audioRecorderRef.current.stopAndUnloadAsync(); } catch { /* noop */ }
+      }
+    };
+  }, []);
+
   // Send the prepared recording
   const sendPendingRecording = async () => {
     if (!pendingRecordingUri) return;
     try {
       setUploading(true);
+      // Use m4a extension for all platforms
       const fileName = `voice_${Date.now()}.m4a`;
       console.log('🎤 Sending voice message:', { fileName, uri: pendingRecordingUri });
       await uploadAttachment(pendingRecordingUri, 'file', fileName);
@@ -864,6 +953,10 @@ export default function ChatScreen() {
   const handleMainSend = async () => {
     if (sending || uploading) return;
     try {
+      // If there's a pending voice recording, send it first
+      if (pendingRecordingUri) {
+        await sendPendingRecording();
+      }
       // Send files first
       if (pendingFiles.length > 0) {
         setUploading(true);
@@ -1112,56 +1205,48 @@ export default function ChatScreen() {
     const AudioBubble = ({ uri }: { uri: string }) => {
       const [playing, setPlaying] = useState(false);
       const [barAnim] = useState([new Animated.Value(2), new Animated.Value(8), new Animated.Value(4)]);
-      const soundRef = useRef<Audio.Sound | null>(null);
+      const audioPlayer = useAudioPlayer(resolveRemoteUri(uri));
+      
+      useEffect(() => {
+        // Animate bars when playing
+        if (playing) {
+          Animated.loop(
+            Animated.stagger(100, barAnim.map(v =>
+              Animated.sequence([
+                Animated.timing(v, { toValue: 12, duration: 300, useNativeDriver: false }),
+                Animated.timing(v, { toValue: 2, duration: 300, useNativeDriver: false }),
+              ])
+            ))
+          ).start();
+        } else {
+          barAnim.forEach(v => v.setValue(4));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [playing]);
 
-      const startWave = () => {
-        const loops = barAnim.map((v, i) => Animated.loop(
-          Animated.sequence([
-            Animated.timing(v, { toValue: 14 - i * 2, duration: 250, useNativeDriver: false }),
-            Animated.timing(v, { toValue: 2 + i * 2, duration: 250, useNativeDriver: false }),
-          ])
-        ));
-        Animated.parallel(loops).start();
-      };
-
-      const stopWave = () => {
-        barAnim.forEach(v => v.stopAnimation());
-      };
+      useEffect(() => {
+        // Listen to playback status
+        if (audioPlayer.playing) {
+          setPlaying(true);
+        } else {
+          setPlaying(false);
+        }
+      }, [audioPlayer.playing]);
 
       const toggle = async () => {
         try {
-          if (!soundRef.current) {
-            const { sound } = await Audio.Sound.createAsync({ uri: resolveRemoteUri(uri) });
-            soundRef.current = sound;
-            await sound.playAsync();
-            setPlaying(true);
-            startWave();
-            sound.setOnPlaybackStatusUpdate((st: any) => {
-              if (st.didJustFinish) {
-                setPlaying(false);
-                stopWave();
-              }
-            });
+          if (audioPlayer.playing) {
+            audioPlayer.pause();
+            setPlaying(false);
           } else {
-            const status: any = await soundRef.current.getStatusAsync();
-            if (status.isPlaying) {
-              await soundRef.current.pauseAsync();
-              setPlaying(false);
-              stopWave();
-            } else {
-              await soundRef.current.playAsync();
-              setPlaying(true);
-              startWave();
-            }
+            audioPlayer.play();
+            setPlaying(true);
           }
-        } catch (_e) {
-          // ignore
+        } catch (error) {
+          console.error('❌ Audio playback error:', error);
+          showStatusModal('error', 'Playback Error', 'Failed to play audio');
         }
       };
-
-      useEffect(() => {
-        return () => { try { soundRef.current?.unloadAsync(); } catch { /* noop */ } };
-      }, []);
 
       return (
         <View style={styles.audioBubble}>
@@ -1866,7 +1951,7 @@ export default function ChatScreen() {
               <Ionicons name="happy-outline" size={28} color={theme.colors.primary} />
             </TouchableOpacity>
 
-            {(newMessage.trim() !== "" || pendingFiles.length > 0) && (
+            {(newMessage.trim() !== "" || pendingFiles.length > 0 || !!pendingRecordingUri) && (
               <TouchableOpacity
                 style={styles.iconButton}
                 onPress={handleMainSend}

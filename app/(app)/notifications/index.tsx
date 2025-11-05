@@ -21,6 +21,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { getApiBaseUrl } from '../../../utils/apiBaseUrl';
 import StatusModal from "../../../components/StatusModal";
 import { APP_TIME_ZONE } from '../../../utils/timezone';
+import notificationEvents from '../../../utils/notificationEvents';
 
 // Type definition for a Notification object.
 interface Notification {
@@ -109,6 +110,19 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     loadNotifications();
+  }, [loadNotifications]);
+
+  // Listen for notification events to auto-refresh the list
+  useEffect(() => {
+    const unsubscribe = notificationEvents.subscribe((event) => {
+      if (event.type === 'received') {
+        console.log('🔔 Notification event received, refreshing notification list');
+        loadNotifications();
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
   }, [loadNotifications]);
 
   /**

@@ -16,7 +16,6 @@ import {
   TextInput,
   Modal,
 } from "react-native";
-import Slider from '@react-native-community/slider';
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -534,18 +533,32 @@ export default function SettingsScreen() {
                 <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>Size</Text>
                 <Text style={[styles.sliderValue, { color: theme.colors.text }]}>{textSizeLabels[textSizeSlider]}</Text>
               </View>
-              <Slider
-                style={styles.slider}
-                minimumValue={0}
-                maximumValue={4}
-                step={1}
-                value={textSizeSlider}
-                minimumTrackTintColor={theme.colors.primary}
-                maximumTrackTintColor={theme.colors.border}
-                thumbTintColor={theme.colors.primary}
-                onValueChange={(val) => setTextSizeSlider(val)}
-                onSlidingComplete={(val) => handleTextSizeChange(sliderToTextSize(val))}
-              />
+              <View style={styles.textSizeButtons}>
+                {textSizeLabels.map((label, index) => (
+                  <TouchableOpacity
+                    key={label}
+                    style={[
+                      styles.textSizeButton,
+                      { borderColor: theme.colors.border },
+                      index === textSizeSlider && { 
+                        backgroundColor: theme.colors.primary,
+                        borderColor: theme.colors.primary
+                      }
+                    ]}
+                    onPress={() => {
+                      setTextSizeSlider(index);
+                      handleTextSizeChange(label);
+                    }}
+                  >
+                    <Text style={[
+                      styles.textSizeButtonText,
+                      { color: index === textSizeSlider ? '#FFFFFF' : theme.colors.text }
+                    ]}>
+                      {label.charAt(0)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <View style={styles.sliderLabelsRow}>
                 {textSizeLabels.map((lbl, idx) => (
                   <Text key={lbl} style={[styles.sliderTickLabel, { color: idx === textSizeSlider ? theme.colors.text : theme.colors.textSecondary }]}>
@@ -1066,6 +1079,26 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   sliderTickLabel: {
     fontSize: scaledFontSize(12),
+  },
+  // Text size button styles
+  textSizeButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 12,
+  },
+  textSizeButton: {
+    flex: 1,
+    height: 50,
+    borderWidth: 2,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textSizeButtonText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
   },
   // Selection modal styles
   modalOverlay: {
