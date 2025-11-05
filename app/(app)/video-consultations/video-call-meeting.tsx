@@ -16,22 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-
-// Conditional camera import - will be null if native module not available
-let CameraView: any = null;
-let useCameraPermissions: any = null;
-let cameraAvailable = false;
-
-try {
-  const cameraModule = require("expo-camera");
-  CameraView = cameraModule.CameraView;
-  useCameraPermissions = cameraModule.useCameraPermissions;
-  cameraAvailable = true;
-} catch (error) {
-  console.log("Camera module not available - video calls disabled:", error);
-  // Fallback: Create a dummy hook
-  useCameraPermissions = () => [null, async () => ({ granted: false })];
-}
+import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 
 const { width, height } = Dimensions.get("window");
 
@@ -51,9 +36,9 @@ export default function VideoCallScreen() {
   const params = useLocalSearchParams();
   const supportWorkerName = (params.supportWorkerName as string) || "Support Worker";
 
-  // Camera permissions - always call the hook
+  // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<"front" | "back">("front");
+  const [facing, setFacing] = useState<CameraType>("front");
 
   // Call states
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -83,7 +68,6 @@ export default function VideoCallScreen() {
         clearInterval(callDurationInterval.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // FORCE camera permission request immediately
@@ -272,32 +256,6 @@ export default function VideoCallScreen() {
     
     setIsEmojiPanelOpen(false);
   };
-
-  // Show error if camera module not available
-  if (!cameraAvailable) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
-          <Ionicons name="warning-outline" size={64} color="#FF9800" />
-          <Text style={[styles.permissionText, { fontSize: 18, fontWeight: 'bold', marginTop: 20 }]}>
-            Camera Not Available
-          </Text>
-          <Text style={[styles.permissionText, { textAlign: 'center', marginTop: 10 }]}>
-            The camera module is not loaded. Please restart the app or rebuild it with:
-          </Text>
-          <Text style={[styles.permissionText, { fontFamily: 'monospace', marginTop: 10 }]}>
-            npx expo prebuild --clean
-          </Text>
-          <TouchableOpacity 
-            style={{ marginTop: 20, backgroundColor: '#4CAF50', padding: 12, borderRadius: 8 }}
-            onPress={() => router.back()}
-          >
-            <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   // Show loading if permissions not loaded
   if (!permission) {
