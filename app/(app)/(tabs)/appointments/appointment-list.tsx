@@ -57,24 +57,11 @@ export default function AppointmentList() {
   ];
 
   // Mock data for appointments
-  const appointments = [
-    {
-      id: 1,
-      supportWorker: "Eric Young",
-      date: "October 07, 2025",
-      time: "10:30 AM",
-      type: "Video",
-      status: "upcoming",
-    },
-    {
-      id: 2,
-      supportWorker: "Michael Chen",
-      date: "September 15, 2025",
-      time: "2:00 PM",
-      type: "Phone",
-      status: "past",
-    },
-  ];
+const fetchAppointments = async () => {
+  const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user.id}`);
+  const data = await response.json();
+  setActiveTab(data.appointments);
+};
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);

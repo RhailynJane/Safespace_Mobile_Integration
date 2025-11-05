@@ -347,7 +347,7 @@ export default function VideoCallScreen() {
           <View style={styles.connectionBanner}>
             <Ionicons name="information-circle" size={20} color="#FFF" />
             <Text style={styles.connectionText}>
-              {permission?.granted ? "Camera ready! 📹" : "Tap to grant camera access"}
+              {permission?.granted ? "Connected to Support Worker" : "Tap to grant camera access"}
             </Text>
           </View>
         )}
