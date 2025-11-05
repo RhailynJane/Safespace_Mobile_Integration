@@ -12,12 +12,15 @@ import {
   Platform,
   Animated,
   Alert,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
+import SendBirdCallService from "../../../lib/sendbird-service";
 
 const { width, height } = Dimensions.get("window");
 
@@ -32,16 +35,12 @@ const initialMessages = [
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
 export default function VideoCallScreen() {
-  const [isDemoMode] = useState(true);
+  const [isDemoMode] = useState(true); 
   const { user } = useUser();
   const params = useLocalSearchParams();
-  const supportWorkerName = (params.supportWorkerName as string) || "Support Worker";
+  const supportWorkerId = params.supportWorkerId as string;
+  const supportWorkerName = params.supportWorkerName as string || "Support Worker";
 
-  // Camera permissions
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<CameraType>("front");
-
-  // Call states
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -55,69 +54,101 @@ export default function VideoCallScreen() {
   const [callStatus, setCallStatus] = useState("Connecting...");
   const [callDuration, setCallDuration] = useState(0);
   const [isCallConnected, setIsCallConnected] = useState(false);
-  const [permissionRequested, setPermissionRequested] = useState(false);
+
+  // Safe area and focus
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
+
+  // Camera & permissions state
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<CameraType>('front');
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraRefresh, setCameraRefresh] = useState(0);
+  const [showFullCamera, setShowFullCamera] = useState(false);
 
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // FORCE camera permission request immediately
+  // Helper: request permissions on demand
   const requestCameraPermissionImmediately = useCallback(async () => {
-    console.log("🎥 FORCING camera permission request...");
     try {
-      // Small delay to ensure component is mounted
-      await new Promise(resolve => setTimeout(resolve, 500));
-      if (!permission) {
-        console.log("⚠️ Permission object not ready yet");
-        return;
-      }
-      console.log("📊 Current status:", permission.status);
-      console.log("📊 Granted:", permission.granted);
-      if (!permission.granted && !permissionRequested) {
-        console.log("🔔 Requesting permission NOW...");
-        setPermissionRequested(true);
-        const result = await requestPermission();
-        console.log("✅ Permission result:", result);
-        if (!result.granted) {
-          Alert.alert(
-            "Camera Permission Required",
-            "Please go to Settings → SafeSpace → Camera and enable access.",
-            [
-              { text: "Cancel", style: "cancel" },
-              { text: "Open Settings", onPress: () => console.log("User needs to open Settings manually") }
-            ]
-          );
-        } else {
-          console.log("✅ Camera permission granted!");
-        }
-      } else if (permission.granted) {
-        console.log("✅ Permission already granted");
-      }
-    } catch (error) {
-      console.error("❌ Error requesting permission:", error);
+      await requestPermission();
+    } catch (e) {
+      console.warn('Camera permission request failed', e);
     }
-  }, [permission, permissionRequested, requestPermission]);
+  }, [requestPermission]);
 
-  // Initialize call (demo mode)
-  const initializeCall = useCallback(async () => {
-    setCallStatus("Connecting...");
-    setTimeout(() => {
-      setCallStatus("Connected (Demo)");
-      setIsCallConnected(true);
-      startCallTimer();
-    }, 2000);
+  // Flip between front/back camera
+  const handleFlipCamera = useCallback(() => {
+    setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
   }, []);
 
-  useEffect(() => {
-    initializeCall();
-    requestCameraPermissionImmediately();
-
-    return () => {
-      // Don't navigate on unmount; just clear timers
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
-      }
+  // Set up call event listeners (defined before initializeCall for hook deps ordering)
+  const setupCallListeners = useCallback((call: any) => {
+    call.onEstablished = () => {
+      setCallStatus("Connected");
+      setIsCallConnected(true);
+      startCallTimer();
     };
-  }, [initializeCall, requestCameraPermissionImmediately]);
+
+    call.onConnected = () => {
+      console.log("Call connected");
+    };
+
+    call.onEnded = () => {
+      setCallStatus("Call Ended");
+      setIsCallConnected(false);
+      setTimeout(() => {
+        router.back();
+      }, 2000);
+    };
+
+    call.onRemoteAudioSettingsChanged = () => {
+      console.log("Remote audio settings changed");
+    };
+
+    call.onRemoteVideoSettingsChanged = () => {
+      console.log("Remote video settings changed");
+    };
+  }, []);
+
+  // Initialize SendBird and start call
+  const initializeCall = useCallback(async () => {
+    // Demo mode - simulate successful connection
+    if (isDemoMode) {
+      setCallStatus("Connecting...");
+      
+      // Simulate connection delay
+      setTimeout(() => {
+        setCallStatus("Connected (Demo)");
+        setIsCallConnected(true);
+        startCallTimer();
+      }, 2000); // 2 second delay to simulate real connection
+      
+      return;
+    }
+
+    // Real SendBird code (only runs if isDemoMode is false)
+    try {
+      await SendBirdCallService.initialize();
+      const userId = user?.id || `user_${Date.now()}`;
+      await SendBirdCallService.authenticate(userId);
+      const call = await SendBirdCallService.createCall(
+        `support_worker_${supportWorkerId}`,
+        true
+      );
+      setupCallListeners(call);
+      setCallStatus("Ringing...");
+    } catch (error) {
+      console.error("Failed to initialize call:", error);
+      Alert.alert(
+        "Call Failed",
+        "Unable to start video call. Please try again.",
+        [{ text: "OK", onPress: () => router.back() }]
+      );
+    }
+  }, [isDemoMode, supportWorkerId, user?.id, setupCallListeners]);
+
+  
 
   // Start call duration timer
   const startCallTimer = () => {
@@ -148,37 +179,56 @@ export default function VideoCallScreen() {
     );
   };
 
-  const endCall = async () => {
-    if (callDurationInterval.current) {
-      clearInterval(callDurationInterval.current);
-    }
-    router.back();
-  };
-
-  const handleToggleCamera = () => {
-    if (!permission?.granted) {
-      Alert.alert(
-        "Camera Permission Required",
-        "Camera permission is not granted. Please enable it in Settings.",
-        [
-          { text: "OK" },
-          {
-            text: "Request Again",
-            onPress: requestCameraPermissionImmediately
-          }
-        ]
-      );
+  const endCall = useCallback(async () => {
+    // Demo mode - just go back
+    if (isDemoMode) {
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+      router.back();
       return;
     }
-    setIsCameraOn(!isCameraOn);
-  };
 
-  const handleFlipCamera = () => {
-    setFacing(current => (current === "back" ? "front" : "back"));
+    // Real SendBird code
+    try {
+      await SendBirdCallService.endCall();
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+      router.back();
+    } catch (error) {
+      console.error("Error ending call:", error);
+      router.back();
+    }
+  }, [isDemoMode]);
+
+  useEffect(() => {
+    initializeCall();
+
+    return () => {
+      endCall();
+      if (callDurationInterval.current) {
+        clearInterval(callDurationInterval.current);
+      }
+    };
+  }, [initializeCall, endCall]);
+
+  const handleToggleCamera = () => {
+    const newState = !isCameraOn;
+    setIsCameraOn(newState);
+    
+    if (!isDemoMode) {
+      SendBirdCallService.toggleVideo(newState);
+    }
   };
 
   const handleToggleMic = () => {
-    setIsMicOn(!isMicOn);
+    const newState = !isMicOn;
+    setIsMicOn(newState);
+    
+    if (!isDemoMode) {
+      SendBirdCallService.toggleAudio(newState);
+    }
   };
 
   const handleToggleChat = () => {
@@ -245,20 +295,12 @@ export default function VideoCallScreen() {
     setIsEmojiPanelOpen(false);
   };
 
-  // Show loading if permissions not loaded
-  if (!permission) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.permissionText}>Loading camera...</Text>
-      </View>
-    );
-  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#1A1A1A' }}>
       <View style={{ flex: 1 }}>
         {/* Permission Debug Banner */}
-        {!permission.granted && (
+  {!permission?.granted && (
           <View style={styles.permissionBanner}>
             <Ionicons name="warning" size={20} color="#FFF" />
             <Text style={styles.permissionBannerText}>
@@ -292,23 +334,48 @@ export default function VideoCallScreen() {
             </View>
 
             {/* Local Video Preview with REAL CAMERA */}
-            <View style={[
+            <View renderToHardwareTextureAndroid={true} style={[
               styles.selfVideoPreview,
-              { bottom: Math.max(insets.bottom, 8) + 140 }
+              Platform.OS === 'ios' ? styles.previewClipIOS : styles.previewClipAndroid,
+              { bottom: Math.max(insets.bottom, 8) + 110 }
             ]}>
-              {isCameraOn && permission?.granted ? (
+              {isFocused && isCameraOn && permission?.granted ? (
                 <>
-                  <CameraView 
+                  <CameraView
                     style={[styles.camera, { backgroundColor: '#222' }]}
                     facing={facing}
+                    onCameraReady={() => setCameraReady(true)}
+                    onMountError={(e: any) => {
+                      console.log('CameraView onMountError', e?.nativeEvent || e);
+                      setCameraReady(false);
+                    }}
+                    key={`${facing}-${permission?.granted}-${isFocused}-${cameraRefresh}`}
                   />
+                  {/* Expand to full screen */}
+                  <TouchableOpacity
+                    style={styles.expandButton}
+                    onPress={() => setShowFullCamera(true)}
+                  >
+                    <Ionicons name="expand" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
                   {/* Flip Camera Button */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.flipCameraButton}
                     onPress={handleFlipCamera}
                   >
                     <Ionicons name="camera-reverse" size={20} color="#FFFFFF" />
                   </TouchableOpacity>
+                  {/* Non-clipping rounded border overlay for Android */}
+                  <View pointerEvents="none" style={styles.previewBorderOverlay} />
+                  {!cameraReady && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setCameraRefresh(r => r + 1)}
+                      style={[styles.cameraOffOverlay, { position: 'absolute', left: 0, top: 0 }]}
+                    >
+                      <Text style={styles.cameraOffText}>Initializing camera… (tap to refresh)</Text>
+                    </TouchableOpacity>
+                  )}
                 </>
               ) : (
                 <View style={styles.cameraOffOverlay}>
@@ -389,6 +456,67 @@ export default function VideoCallScreen() {
             </View>
           </View>
         )}
+
+        {/* Debug banner to help diagnose camera state (auto shows when not ready) */}
+        {(__DEV__ && isFocused && isCameraOn && permission?.granted && !cameraReady) && (
+          <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+            <Text style={{ color: '#fff', fontSize: 10 }}>
+              focused:{String(isFocused)} camOn:{String(isCameraOn)} granted:{String(!!permission?.granted)}
+            </Text>
+            <Text style={{ color: '#fff', fontSize: 10 }}>
+              ready:{String(cameraReady)} facing:{facing} refresh:{cameraRefresh}
+            </Text>
+          </View>
+        )}
+
+        {/* Debug banner to help diagnose camera state (shows in dev when not ready) */}
+        {(__DEV__ && isFocused && isCameraOn && permission?.granted && !cameraReady) && (
+          <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+            <Text style={{ color: '#fff', fontSize: 10 }}>
+              focused:{String(isFocused)} camOn:{String(isCameraOn)} granted:{String(!!permission?.granted)}
+            </Text>
+            <Text style={{ color: '#fff', fontSize: 10 }}>
+              ready:{String(cameraReady)} facing:{facing} refresh:{cameraRefresh}
+            </Text>
+          </View>
+        )}
+
+        {/* Full-screen Camera (debug/expand) */}
+        <Modal
+          visible={showFullCamera}
+          animationType="fade"
+          onRequestClose={() => setShowFullCamera(false)}
+          transparent={false}
+        >
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+            <View style={{ flex: 1 }}>
+              {isFocused && isCameraOn && permission?.granted ? (
+                <CameraView
+                  style={{ flex: 1, backgroundColor: '#000' }}
+                  facing={facing}
+                  onCameraReady={() => setCameraReady(true)}
+                  onMountError={() => setCameraReady(false)}
+                  key={`full-${facing}-${permission?.granted}-${isFocused}-${cameraRefresh}`}
+                />
+              ) : (
+                <View style={[styles.cameraOffOverlay, { flex: 1 }]}>
+                  <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
+                  <Text style={styles.cameraOffText}>
+                    {!permission?.granted ? "No Permission" : "Camera Off"}
+                  </Text>
+                </View>
+              )}
+              <View style={{ position: 'absolute', top: 16, right: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setShowFullCamera(false)}
+                  style={{ backgroundColor: 'rgba(0,0,0,0.6)', padding: 10, borderRadius: 8 }}
+                >
+                  <Ionicons name="close" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </SafeAreaView>
+        </Modal>
 
         {/* Chat Panel */}
         {isChatOpen && (
@@ -605,12 +733,20 @@ const styles = StyleSheet.create({
     right: 20,
     width: 120,
     height: 160,
-    borderRadius: 12,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
+    // Do NOT clip or round on Android to avoid SurfaceView/TextureView black preview issues
     backgroundColor: "#333",
     zIndex: 2,
+    elevation: 6,
+  },
+  // iOS-only clip for rounded preview
+  previewClipIOS: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  // Android: keep square edges; don't clip
+  previewClipAndroid: {
+    borderRadius: 0,
+    overflow: 'visible',
   },
   camera: {
     width: "100%",
@@ -623,6 +759,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     borderRadius: 20,
     padding: 8,
+  },
+  expandButton: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 6,
+  },
+  previewBorderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   cameraOffOverlay: {
     width: "100%",
