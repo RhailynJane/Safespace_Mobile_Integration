@@ -147,7 +147,7 @@ export default function ConfirmAppointment() {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <AppHeader title="Appointment Confirmation" showBack={true} />
+          <AppHeader title="Confirmation" showBack={true} />
           <Text style={[styles.errorText, { color: theme.colors.text }]}>
             Missing appointment details. Please try booking again.
           </Text>
@@ -334,16 +334,16 @@ export default function ConfirmAppointment() {
           {/* Confirmation Card */}
           <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
             {/* Success Icon */}
-            <View style={[styles.successIcon, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="checkmark-circle" size={64} color={theme.colors.surface} />
+            <View style={[styles.successIcon, { backgroundColor: theme.colors.successLight }]}>
+              <Ionicons name="checkmark-circle" size={64} color={theme.colors.success} />
             </View>
 
-            <Text style={[styles.confirmationTitle, { color: theme.colors.text }]}>Appointment Booked!</Text>
+            <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>Appointment Booked!</Text>
             <Text style={[styles.confirmationMessage, { color: theme.colors.textSecondary }]}>
               Your appointment has been successfully scheduled.
             </Text>
 
-            <View style={styles.appointmentDetails}>
+            <View style={[styles.appointmentDetails, { backgroundColor: theme.colors.background }]}>
               {/* Support Worker Details */}
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
@@ -380,7 +380,7 @@ export default function ConfirmAppointment() {
             {/* Primary Action Button - View Appointments */}
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => router.replace("/(app)/(tabs)/appointments")}
+              onPress={() => router.replace("/appointments/appointment-list")}
             >
               <Text style={styles.buttonText}>View My Appointments</Text>
             </TouchableOpacity>
@@ -476,7 +476,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   errorText: {
     fontSize: scaledFontSize(18),
-    color: "#666",
     textAlign: "center",
     marginTop: 50,
     marginBottom: 20,
@@ -494,10 +493,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     opacity: 0.5,
   },
   sideMenuItemTextDisabled: {
-    color: "#CCCCCC",
+    // Color handled by theme in JSX
   },
   signOutText: {
-    color: "#FF6B6B",
     fontWeight: "600",
   },
   header: {
@@ -511,12 +509,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   headerTitle: {
     fontSize: scaledFontSize(20),
     fontWeight: "600",
-    color: "#2E7D32",
   },
   title: {
     fontSize: scaledFontSize(15),
     fontWeight: "600",
-    color: "#333",
     marginBottom: 5,
     textAlign: "center",
     marginTop: 16,
@@ -536,17 +532,14 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     height: 30,
     borderRadius: 15,
     borderWidth: 2,
-    borderColor: "#4CAF50",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "white",
   },
   stepCircleActive: {
-    backgroundColor: "#4CAF50",
+    // Colors applied via theme in JSX
   },
   stepNumber: {
     fontSize: scaledFontSize(16),
-    color: "#4CAF50",
     fontWeight: "600",
   },
   stepNumberActive: {
@@ -555,11 +548,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   stepConnector: {
     width: 40,
     height: 2,
-    backgroundColor: "#000000",
     marginHorizontal: 8,
   },
   confirmationCard: {
-    backgroundColor: "#f1f5f9",
     borderRadius: 12,
     padding: 24,
     marginHorizontal: 15,
@@ -575,7 +566,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#E8F5E9",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
@@ -583,20 +573,17 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   confirmationTitle: {
     fontSize: scaledFontSize(24),
     fontWeight: "bold",
-    color: "#2E7D32",
     marginBottom: 12,
     textAlign: "center",
   },
   confirmationMessage: {
     fontSize: scaledFontSize(16),
-    color: "#666",
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 24,
   },
   appointmentDetails: {
     width: "100%",
-    backgroundColor: "#F8F9FA",
     borderRadius: 8,
     padding: 16,
     marginBottom: 24,
@@ -608,16 +595,13 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   detailLabel: {
     fontSize: scaledFontSize(16),
-    color: "#666",
     fontWeight: "600",
   },
   detailValue: {
     fontSize: scaledFontSize(16),
-    color: "#333",
     fontWeight: "500",
   },
   primaryButton: {
-    backgroundColor: "#4CAF50",
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 8,
@@ -636,12 +620,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingHorizontal: 32,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#4CAF50",
     width: "100%",
     alignItems: "center",
   },
   secondaryButtonText: {
-    color: "#4CAF50",
     fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
@@ -655,24 +637,20 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "transparent",
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
     alignItems: "center",
   },
   profileName: {
     fontSize: scaledFontSize(18),
     fontWeight: "600",
-    color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: scaledFontSize(14),
-    color: "#757575",
   },
   sideMenuContent: {
     padding: 10,
@@ -683,11 +661,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
   },
   sideMenuItemText: {
     fontSize: scaledFontSize(16),
-    color: "#333",
     marginLeft: 15,
   },
 });

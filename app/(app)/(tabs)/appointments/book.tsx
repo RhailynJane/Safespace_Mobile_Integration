@@ -344,35 +344,48 @@ const fetchSupportWorkers = async () => {
             Schedule a session with a support worker
           </Text>
 
-          {/* Step Indicator - Shows progress through booking process */}
-          <View style={styles.stepsContainer}>
-            <View style={styles.stepRow}>
-              {/* Step 1 - Active (Current Step) */}
-              <View style={[styles.stepCircle, styles.stepCircleActive]}>
-                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                  1
-                </Text>
-              </View>
-              <View style={styles.stepConnector} />
+    {/* Step Indicator - Shows progress through booking process */}
+    <View style={styles.stepsContainer}>
+      <View style={styles.stepRow}>
+        {/* Step 1 - Active (Current Step) */}
+        <View style={[
+          styles.stepCircle, 
+          styles.stepCircleActive,
+          { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
+        ]}>
+          <Text style={[styles.stepNumber, styles.stepNumberActive]}>
+            1
+          </Text>
+        </View>
+        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 2 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>2</Text>
-              </View>
-              <View style={styles.stepConnector} />
+        {/* Step 2 - Inactive */}
+        <View style={[
+          styles.stepCircle,
+          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
+        ]}>
+          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
+        </View>
+        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 3 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>3</Text>
-              </View>
-              <View style={styles.stepConnector} />
+        {/* Step 3 - Inactive */}
+        <View style={[
+          styles.stepCircle,
+          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
+        ]}>
+          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
+        </View>
+        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 4 - Inactive */}
-              <View style={styles.stepCircle}>
-                <Text style={styles.stepNumber}>4</Text>
-              </View>
-            </View>
-          </View>
+        {/* Step 4 - Inactive */}
+        <View style={[
+          styles.stepCircle,
+          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
+        ]}>
+          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>4</Text>
+        </View>
+      </View>
+    </View>
 
           {/* Search Bar */}
           <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
@@ -653,26 +666,22 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     height: 30,
     borderRadius: 15,
     borderWidth: 2,
-    borderColor: "#4CAF50",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "white",
   },
   stepCircleActive: {
-    backgroundColor: "#4CAF50",
   },
   stepNumber: {
     fontSize: scaledFontSize(16),
-    color: "#4CAF50",
     fontWeight: "600",
   },
   stepNumberActive: {
-    color: "white",
+    color: "white", 
   },
   stepConnector: {
     width: 40,
     height: 2,
-    backgroundColor: "#000000",
+
     marginHorizontal: 8,
   },
   searchContainer: {
