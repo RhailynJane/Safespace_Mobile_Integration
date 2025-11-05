@@ -300,15 +300,12 @@ model JournalEntry {
 }
 
 model Conversation {
-  id              Int              @id @default(autoincrement())
-  conversation_id String           @unique @default(uuid())
-  title           String?
-  conversation_type  ConversationType @default(direct) @map("type")
-  created_by      Int?
-  last_message_at DateTime?
-  is_active       Boolean?         @default(true)
-  created_at      DateTime         @default(now())
-  updated_at      DateTime         @updatedAt
+  id                 Int              @id @default(autoincrement())
+  title              String?
+  conversation_type  ConversationType @default(direct)
+  created_by         Int?
+  created_at         DateTime         @default(now())
+  updated_at         DateTime         @updatedAt
 
   // Relations
   creator      User?                     @relation("ConversationCreator", fields: [created_by], references: [id])
@@ -325,6 +322,7 @@ model ConversationParticipant {
   role            String?   @default("member")
   joined_at       DateTime  @default(now())
   left_at         DateTime?
+  last_read_at    DateTime? // Track when user last read this conversation
 
   // Relations
   conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)

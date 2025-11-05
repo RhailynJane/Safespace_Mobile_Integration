@@ -287,9 +287,9 @@ export default function ChatScreen() {
       // Fire and forget: update activity in background (don't await)
       updateUserActivity().catch(() => {});
 
-      // Load messages (this is the critical path) - limit to 30 to reduce memory usage
+      // Load messages (this is the critical path) - no limit to show all messages
       const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&limit=30&t=${Date.now()}`
+        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&t=${Date.now()}`
       );
 
       if (response.ok) {
@@ -347,14 +347,18 @@ export default function ChatScreen() {
           (async () => {
             try {
               if (userId && conversationId) {
-                await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+                console.log(`📭 Calling mark-read API for conversation ${conversationId}`);
+                const markResponse = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ clerkUserId: userId })
                 });
+                console.log(`✅ Mark-read API responded:`, markResponse.status, markResponse.ok);
+              } else {
+                console.log(`⚠️ Skip mark-read: userId=${userId}, conversationId=${conversationId}`);
               }
-            } catch (_e) {
-              // ignore transient errors
+            } catch (e) {
+              console.log(`❌ Mark-read API failed:`, e);
             }
           })()
         ]).catch(() => {}); // Don't block on mark-read failures
@@ -656,11 +660,23 @@ export default function ChatScreen() {
       }
 
       const json = await res.json();
+      console.log('📦 Backend upload response:', json);
       if (json?.data) {
         // Optimistically add the new message returned by server
-        setMessages((prev) => [...prev, json.data]);
+        console.log('📎 Upload successful, adding message:', { 
+          id: json.data.id, 
+          type: json.data.message_type, 
+          fileName: json.data.file_name,
+          attachmentUrl: json.data.attachment_url 
+        });
+        setMessages((prev) => {
+          console.log(`📝 Current messages count: ${prev.length}, adding uploaded attachment`);
+          return [...prev, json.data];
+        });
         // Optionally refresh to sync ordering/unread states
         setTimeout(() => loadMessages(), 800);
+      } else {
+        console.warn('⚠️ Upload response missing data:', json);
       }
     } catch (error) {
       console.error("ðŸ“ Upload error:", error);
@@ -700,7 +716,11 @@ export default function ChatScreen() {
       if (response.ok) {
         const result = await response.json();
         // console.log("Message sent successfully");
-        setMessages((prev) => [...prev, result.data]);
+        console.log('✅ Text message sent, adding to UI:', result.data);
+        setMessages((prev) => {
+          console.log(`📝 Current messages count: ${prev.length}, adding new message`);
+          return [...prev, result.data];
+        });
         setNewMessage("");
         setIsTyping(false); // Reset typing state after sending
 
@@ -826,10 +846,11 @@ export default function ChatScreen() {
     try {
       setUploading(true);
       const fileName = `voice_${Date.now()}.m4a`;
+      console.log('🎤 Sending voice message:', { fileName, uri: pendingRecordingUri });
       await uploadAttachment(pendingRecordingUri, 'file', fileName);
       showStatusModal('success', 'Sent', 'Voice message sent successfully');
     } catch (error) {
-      console.error('Error sending voice message:', error);
+      console.error('❌ Error sending voice message:', error);
       showStatusModal('error', 'Error', 'Failed to send voice message');
     } finally {
       setUploading(false);
@@ -1185,7 +1206,7 @@ export default function ChatScreen() {
           />
           <View style={styles.imageOverlay}>
             <Ionicons name="expand" size={20} color="#FFFFFF" />
-            <Text style={styles.imageText}>ðŸ“· Photo â€¢ Tap to view</Text>
+            <Text style={styles.imageText}>Tap to view</Text>
           </View>
         </TouchableOpacity>
       );
@@ -1193,11 +1214,22 @@ export default function ChatScreen() {
 
     // Handle audio attachments (voice notes)
     if (message.message_type === 'file' && message.attachment_url && isAudioFile(message.file_name, message.attachment_url)) {
+      console.log('🎵 Rendering audio message:', { 
+        id: message.id, 
+        fileName: message.file_name, 
+        url: message.attachment_url,
+        isAudio: isAudioFile(message.file_name, message.attachment_url)
+      });
       return <AudioBubble uri={message.attachment_url} />;
     }
 
     // Handle other file attachments - dark bubble with icon, name and size
     if (message.message_type === "file" && message.attachment_url) {
+      console.log('📄 Rendering file message:', { 
+        id: message.id, 
+        fileName: message.file_name, 
+        url: message.attachment_url 
+      });
       return (
         <TouchableOpacity
           onPress={() => handleDownloadFile(message)}
@@ -1518,9 +1550,6 @@ export default function ChatScreen() {
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <TouchableOpacity onPress={() => router.push("../appointments/book")}>
-                  <Ionicons name="call-outline" size={24} color={theme.colors.primary} />
-                </TouchableOpacity>
                 {/* Delete conversation */}
                 <TouchableOpacity
                   onPress={() => {
@@ -1555,6 +1584,7 @@ export default function ChatScreen() {
             ref={messagesListRef}
             data={messages}
             keyExtractor={(item) => String(item.id)}
+            onLayout={() => console.log(`📋 FlatList rendering ${messages.length} messages`)}
             renderItem={({ item }) => {
               const myMessage = isMyMessage(item);
               // Decide bubble style: for non-audio files use a dark file bubble like the mock

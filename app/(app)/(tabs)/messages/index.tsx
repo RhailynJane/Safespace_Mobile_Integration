@@ -36,6 +36,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import { useRef } from "react";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MessagesScreen() {
     // Access isDarkMode and fontScale from useTheme
@@ -56,11 +57,37 @@ export default function MessagesScreen() {
     message: '',
     confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
   });
-  // Track conversations marked read in this session to avoid poll flicker
-  // Key: conversationId, Value: timestamp when marked read
-  const recentlyReadRef = useRef<Record<string, number>>({});
-  // Removed session-based unread suppression; rely on backend read receipts instead
+  // Track conversations marked read in this session to keep unread count at 0
+  // Key: conversationId, Value: true if marked read
+  const recentlyReadRef = useRef<Record<string, boolean>>({});
   const API_BASE_URL = getApiBaseUrl();
+
+  // Load read conversations from AsyncStorage on mount
+  useEffect(() => {
+    const loadReadConversations = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('readConversations');
+        if (stored) {
+          recentlyReadRef.current = JSON.parse(stored);
+          console.log('📖 Loaded read conversations:', Object.keys(recentlyReadRef.current).length);
+        }
+      } catch (e) {
+        console.log('Failed to load read conversations:', e);
+      }
+    };
+    loadReadConversations();
+  }, []);
+
+  // Save read conversations to AsyncStorage
+  const saveReadConversations = async (conversationId: string) => {
+    try {
+      recentlyReadRef.current[conversationId] = true;
+      await AsyncStorage.setItem('readConversations', JSON.stringify(recentlyReadRef.current));
+      console.log('💾 Saved read conversation:', conversationId);
+    } catch (e) {
+      console.log('Failed to save read conversation:', e);
+    }
+  };
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -232,18 +259,10 @@ export default function MessagesScreen() {
           console.log("Presence batch update failed:", e);
         }
 
-        // Apply session read suppression (2 minutes) to avoid unread flicker right after opening
-        const now = Date.now();
-        const suppressed = convs.map((c) => {
-          const t = recentlyReadRef.current[c.id];
-          if (t && now - t < 2 * 60 * 1000) {
-            return { ...c, unread_count: 0 };
-          }
-          return c;
-        });
-
-        setConversations(suppressed);
-        setFilteredConversations(suppressed); // Initialize filtered conversations
+        // Don't suppress unread counts - let backend be the source of truth
+        // Backend's mark-read API will handle clearing unread when conversation is opened
+        setConversations(convs);
+        setFilteredConversations(convs); // Initialize filtered conversations
       } else {
         console.log("💬 Failed to load conversations from backend");
         setConversations([]);
@@ -277,21 +296,44 @@ export default function MessagesScreen() {
         if (response.ok) {
           const result = await response.json();
           let freshConvs: Conversation[] = result.data;
-          // Honor session-level suppression window to prevent unread reappearing immediately after open
-          const now = Date.now();
-          freshConvs = freshConvs.map((c) => {
-            const t = recentlyReadRef.current[c.id];
-            if (t && now - t < 2 * 60 * 1000) {
-              return { ...c, unread_count: 0 };
+          
+          // Refresh presence for all other participants
+          try {
+            const otherIds = Array.from(
+              new Set(
+                freshConvs
+                  .flatMap((c) => c.participants)
+                  .filter((p) => p.clerk_user_id !== userId)
+                  .map((p) => p.clerk_user_id)
+                  .filter(Boolean)
+              )
+            );
+
+            if (otherIds.length > 0) {
+              const statusMap = await activityApi.statusBatch(otherIds);
+              freshConvs = freshConvs.map((c) => ({
+                ...c,
+                participants: c.participants.map((p) => {
+                  if (p.clerk_user_id === userId) return p;
+                  const s = statusMap[p.clerk_user_id];
+                  return s
+                    ? { ...p, online: !!s.online, presence: s.presence as any, last_active_at: s.last_active_at }
+                    : p;
+                }),
+              }));
             }
-            return c;
-          });
+          } catch (e) {
+            console.log('Presence update during poll failed:', e);
+          }
+          
+          // Don't suppress unread counts - backend is the source of truth
+          // Backend mark-read API handles clearing unread when messages are actually read
           
           console.log(`📬 Polled ${freshConvs.length} conversations, unread counts:`, 
             freshConvs.map(c => ({ id: c.id, unread: c.unread_count }))
           );
           
-          // Update conversations with fresh unread counts
+          // Update conversations with fresh unread counts from backend
           setConversations(freshConvs);
           setFilteredConversations((prev) => {
             // Maintain search filter
@@ -638,8 +680,8 @@ export default function MessagesScreen() {
                         });
                       } catch (_e) { /* ignore transient errors */ }
                     })();
-                    // Record as recently read to suppress unread flicker for a short window
-                    recentlyReadRef.current[conversation.id] = Date.now();
+                    // Mark as read and save to AsyncStorage to persist across tab switches
+                    saveReadConversations(conversation.id);
                     setConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
                     setFilteredConversations((prev) => prev.map((c) => c.id === conversation.id ? { ...c, unread_count: 0 } : c));
 

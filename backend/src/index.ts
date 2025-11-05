@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 
-
+// Backend server with mark-read support and last_read_at tracking
 // Extend the Request interface to include the `file` property
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -2933,28 +2933,6 @@ app.get(
               created_at: 'desc'
             },
             take: 1
-          },
-          _count: {
-            select: {
-              messages: {
-                where: {
-                  NOT: {
-                    read_status: {
-                      some: {
-                        user: {
-                          clerk_user_id: clerkUserId
-                        }
-                      }
-                    }
-                  },
-                  sender: {
-                    clerk_user_id: {
-                      not: clerkUserId
-                    }
-                  }
-                }
-              }
-            }
           }
         },
         orderBy: {
@@ -2966,6 +2944,31 @@ app.get(
       const conversationsWithOnlineStatus = await Promise.all(
         conversations.map(async (conversation) => {
           const lastMessage = conversation.messages[0];
+          
+          // Find the current user's participant record to get their last_read_at
+          const currentUserParticipant = conversation.participants.find(
+            p => p.user.clerk_user_id === clerkUserId
+          );
+          
+          // Count unread messages: messages from others created after last_read_at
+          // @ts-ignore - last_read_at exists in DB but Prisma types not updated yet
+          const lastReadAt = currentUserParticipant?.last_read_at;
+          
+          const unreadCount = await prisma.message.count({
+            where: {
+              conversation_id: conversation.id,
+              sender: {
+                clerk_user_id: {
+                  not: clerkUserId
+                }
+              },
+              ...(lastReadAt && {
+                created_at: {
+                  gt: lastReadAt
+                }
+              })
+            }
+          });
           
           // Get participants with real online status
           const participantsWithStatus = await Promise.all(
@@ -2992,7 +2995,7 @@ app.get(
             created_at: conversation.created_at.toISOString(),
             last_message: lastMessage?.message_text || '',
             last_message_time: lastMessage?.created_at.toISOString(),
-            unread_count: conversation._count.messages,
+            unread_count: unreadCount,
             participants: participantsWithStatus
           };
         })
@@ -3233,6 +3236,73 @@ app.post(
       res.status(500).json({
         success: false,
         message: "Failed to send message",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Mark conversation as read for a user
+app.post(
+  "/api/messages/conversations/:conversationId/mark-read",
+  async (req: Request, res: Response) => {
+    try {
+      const { conversationId } = req.params;
+      const { clerkUserId } = req.body;
+
+      if (!clerkUserId) {
+        return res.status(400).json({
+          success: false,
+          message: "clerkUserId is required",
+        });
+      }
+
+      console.log(`📭 Marking conversation ${conversationId} as read for user ${clerkUserId}`);
+
+      // Verify user exists and is participant
+      const user = await prisma.user.findUnique({
+        where: { clerk_user_id: clerkUserId }
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      const participant = await prisma.conversationParticipant.findFirst({
+        where: {
+          conversation_id: Number.parseInt(conversationId),
+          user_id: user.id
+        }
+      });
+
+      if (!participant) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to this conversation",
+        });
+      }
+
+      // Update last_read_at timestamp for this participant
+      // @ts-ignore - last_read_at exists in DB but Prisma types not updated yet
+      await prisma.conversationParticipant.update({
+        where: { id: participant.id },
+        data: { last_read_at: new Date() }
+      });
+      
+      console.log(`✅ Conversation ${conversationId} marked as read for user ${clerkUserId}`);
+
+      res.json({
+        success: true,
+        message: "Conversation marked as read",
+      });
+    } catch (error: any) {
+      console.error("💬 Mark-read error:", error.message);
+      res.status(500).json({
+        success: false,
+        message: "Failed to mark conversation as read",
         error: error.message,
       });
     }
