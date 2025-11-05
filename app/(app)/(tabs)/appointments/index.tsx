@@ -95,17 +95,50 @@ export default function AppointmentsScreen() {
       console.log('📥 Dashboard appointments response:', result);
 
       if (result.success && result.appointments) {
+        // Transform backend data using MST-aware date+time comparison to align with appointment list
         const transformedAppointments = result.appointments.map((apt: any) => {
+          // Format readable date
           const appointmentDate = new Date(apt.date);
-          const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+          const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
           });
 
-          const now = new Date();
-          const isUpcoming = appointmentDate >= now;
+          // Extract UTC components from stored date (treat as calendar day)
+          const utcDate = new Date(apt.date);
+          const year = utcDate.getUTCFullYear();
+          const month = utcDate.getUTCMonth();
+          const day = utcDate.getUTCDate();
+
+          // Current date/time in MST (America/Denver)
+          const mstFormatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Denver',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+          const nowParts = mstFormatter.formatToParts(new Date());
+          const nowYear = parseInt(nowParts.find(p => p.type === 'year')?.value || '0');
+          const nowMonth = (parseInt(nowParts.find(p => p.type === 'month')?.value || '0')) - 1; // zero-based
+          const nowDay = parseInt(nowParts.find(p => p.type === 'day')?.value || '0');
+          const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
+          const nowMinute = parseInt(nowParts.find(p => p.type === 'minute')?.value || '0');
+
+          // Parse stored appointment time (HH:mm or HH:mm:ss)
+          const timeStr: string = apt.time || '00:00:00';
+          const [hStr, mStr] = timeStr.split(':');
+          const aptHour = parseInt(hStr || '0', 10);
+          const aptMinute = parseInt(mStr || '0', 10);
+
+          // Numeric comparison YYYYMMDDHHMM in MST to classify
+          const nowNumeric = nowYear * 100000000 + (nowMonth + 1) * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
+          const aptNumeric = year * 100000000 + (month + 1) * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
+          const isUpcoming = aptNumeric > nowNumeric;
 
           return {
             id: apt.id,
@@ -115,33 +148,35 @@ export default function AppointmentsScreen() {
             type: apt.type || 'Video',
             status: apt.status === 'cancelled' ? 'cancelled' :
                     apt.status === 'completed' ? 'past' :
-                    isUpcoming ? 'upcoming' : 'past',
-            rawDate: appointmentDate // Keep for sorting
+                    (isUpcoming ? 'upcoming' : 'past'),
+            // Keep numeric marker for sorting "next" without relying on timezone-shifted Date objects
+            mstNumeric: aptNumeric,
           };
         });
 
         setAppointments(transformedAppointments);
 
-        // Calculate upcoming count
+        // Calculate upcoming and completed counts using unified MST logic
         const upcoming = transformedAppointments.filter((a: any) => a.status === 'upcoming');
-        setUpcomingCount(upcoming.length);
-
-        // Calculate completed count
         const completed = transformedAppointments.filter((a: any) => a.status === 'past');
+        setUpcomingCount(upcoming.length);
         setCompletedCount(completed.length);
 
-        // Get next appointment (soonest upcoming)
+        // Determine the next appointment: the one with the smallest mstNumeric among upcoming
         if (upcoming.length > 0) {
-          const sorted = upcoming.sort((a: any, b: any) => a.rawDate - b.rawDate);
+          const sorted = [...upcoming].sort((a: any, b: any) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
           setNextAppointment(sorted[0]);
+        } else {
+          setNextAppointment(null);
         }
 
-        console.log('✅ Stats calculated:', { upcoming: upcoming.length, completed: completed.length });
+        console.log('✅ Stats calculated (MST unified):', { upcoming: upcoming.length, completed: completed.length });
       } else {
         console.warn('⚠️ No appointments found');
         setAppointments([]);
         setUpcomingCount(0);
         setCompletedCount(0);
+        setNextAppointment(null);
       }
     } catch (error) {
       console.error('❌ Error fetching appointments:', error);
