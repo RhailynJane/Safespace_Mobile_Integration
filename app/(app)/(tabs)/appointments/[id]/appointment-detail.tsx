@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -79,11 +79,16 @@ export default function AppointmentList() {
 
   // Find the appointment based on the ID from the URL
 
-  useEffect(() => {
-    if (user?.id && id) fetchAppointments();
-  }, [user?.id, id]);
+  // (effect moved below after function declarations)
 
-const fetchAppointments = async () => {
+const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
+  setStatusModalType(type);
+  setStatusModalTitle(title);
+  setStatusModalMessage(message);
+  setStatusModalVisible(true);
+}, []);
+
+const fetchAppointments = useCallback(async () => {
   try {
     setLoading(true);
     console.log('📅 Fetching appointment detail for ID:', id, 'User:', user?.id);
@@ -145,16 +150,16 @@ const fetchAppointments = async () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, user?.id, showStatusModal]);
+
+  // Find the appointment based on the ID from the URL
+  useEffect(() => {
+    if (user?.id && id) fetchAppointments();
+  }, [user?.id, id, fetchAppointments]);
   /**
    * Show status modal with given parameters
    */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalType(type);
-    setStatusModalTitle(title);
-    setStatusModalMessage(message);
-    setStatusModalVisible(true);
-  };
+  // showStatusModal moved above and memoized
 
   /**
    * Enhanced logout function with Clerk integration

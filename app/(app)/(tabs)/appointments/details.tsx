@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -77,24 +77,17 @@ export default function BookAppointment() {
   /**
    * Show status modal with given parameters
    */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+  const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);
     setStatusModalTitle(title);
     setStatusModalMessage(message);
     setStatusModalVisible(true);
-  };
-
-  // Fetch support worker on mount
-  useEffect(() => {
-    if (supportWorkerId) {
-      fetchSupportWorker();
-    }
-  }, [supportWorkerId]);
+  }, []);
 
   /**
    * Fetch support worker details from API
    */
-  const fetchSupportWorker = async () => {
+  const fetchSupportWorker = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -123,7 +116,14 @@ export default function BookAppointment() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supportWorkerId, showStatusModal]);
+
+  // Fetch support worker on mount and when id changes
+  useEffect(() => {
+    if (supportWorkerId) {
+      fetchSupportWorker();
+    }
+  }, [supportWorkerId, fetchSupportWorker]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;

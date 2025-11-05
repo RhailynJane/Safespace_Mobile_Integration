@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -71,15 +71,19 @@ export default function AppointmentsScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   /**
+   * Show status modal with given parameters
+   */
+  const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  }, []);
+
+  /**
    * Fetch appointments from API and calculate stats
    */
-  useEffect(() => {
-    if (user?.id) {
-      fetchAppointments();
-    }
-  }, [user?.id]);
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     try {
       setLoading(true);
       console.log('📅 Fetching appointments for dashboard...');
@@ -145,17 +149,14 @@ export default function AppointmentsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, showStatusModal]);
 
-  /**
-   * Show status modal with given parameters
-   */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalType(type);
-    setStatusModalTitle(title);
-    setStatusModalMessage(message);
-    setStatusModalVisible(true);
-  };
+  // Run fetch on mount and when dependencies change
+  useEffect(() => {
+    if (user?.id) {
+      fetchAppointments();
+    }
+  }, [user?.id, fetchAppointments]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;

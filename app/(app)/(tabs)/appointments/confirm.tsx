@@ -1,7 +1,7 @@
 /**
  * COMPLETE FIXED VERSION - Now creates appointments in database!
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -65,17 +65,17 @@ export default function ConfirmAppointment() {
   /**
    * Show status modal
    */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+  const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);
     setStatusModalTitle(title);
     setStatusModalMessage(message);
     setStatusModalVisible(true);
-  };
+  }, []);
 
   /**
    * Create the appointment in the database
    */
-  const createAppointment = async () => {
+  const createAppointment = useCallback(async () => {
     if (!user?.id || !supportWorkerId || appointmentCreated) {
       return;
     }
@@ -102,6 +102,7 @@ export default function ConfirmAppointment() {
       const appointmentData = {
         clerkUserId: user.id,
         supportWorkerId: parseInt(supportWorkerId),
+        supportWorkerName, // helpful on older DBs without support_worker_id column
         appointmentDate: selectedDate,
         appointmentTime: selectedTime,
         sessionType: sessionType,
@@ -136,14 +137,14 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, supportWorkerId, supportWorkerName, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal]);
 
   // Create appointment when page loads
   useEffect(() => {
     if (user?.id && supportWorkerId && !appointmentCreated) {
       createAppointment();
     }
-  }, [user?.id, supportWorkerId, appointmentCreated]);
+  }, [user?.id, supportWorkerId, appointmentCreated, createAppointment]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;

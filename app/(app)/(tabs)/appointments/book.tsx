@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -78,12 +78,12 @@ export default function BookAppointment() {
   /**
    * Show status modal with given parameters
    */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+  const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);
     setStatusModalTitle(title);
     setStatusModalMessage(message);
     setStatusModalVisible(true);
-  };
+  }, []);
 
   /**
    * Handles navigation to support worker details screen
@@ -94,14 +94,13 @@ export default function BookAppointment() {
   };
 
   // Fetch support workers on mount
-useEffect(() => {
-  fetchSupportWorkers();
-}, []);
+// Fetch support workers on mount
+// (moved below fetchSupportWorkers declaration)
 
 /**
  * Fetch support workers from the API
  */
-const fetchSupportWorkers = async () => {
+const fetchSupportWorkers = useCallback(async () => {
   try {
     setLoading(true);
     
@@ -135,7 +134,12 @@ const fetchSupportWorkers = async () => {
   } finally {
     setLoading(false);
   }
-};
+}, [showStatusModal]);
+
+// Fetch support workers on mount
+useEffect(() => {
+  fetchSupportWorkers();
+}, [fetchSupportWorkers]);
 
   // Filter support workers based on search query
   const filteredSupportWorkers = supportWorkers.filter((sw) =>

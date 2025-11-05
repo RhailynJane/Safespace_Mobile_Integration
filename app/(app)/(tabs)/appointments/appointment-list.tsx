@@ -1,7 +1,7 @@
 /**
  * DARK MODE COMPATIBLE VERSION - With Mock Data
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -68,12 +68,18 @@ export default function AppointmentList() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  useEffect(() => {
-  if (user?.id) fetchAppointments();
-  }, [user?.id]);
+  // (useEffect moved below after fetchAppointments is declared)
 
   // Mock data for appointments
-const fetchAppointments = async () => {
+// Show status modal helper
+const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: string, message: string) => {
+  setStatusModalType(type);
+  setStatusModalTitle(title);
+  setStatusModalMessage(message);
+  setStatusModalVisible(true);
+}, []);
+
+const fetchAppointments = useCallback(async () => {
   try {
     setLoading(true);
     console.log('📅 Fetching appointments for user:', user?.id);
@@ -125,15 +131,13 @@ const fetchAppointments = async () => {
   } finally {
     setLoading(false);
   }
-};
+}, [user?.id, showStatusModal]);
   
 
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalType(type);
-    setStatusModalTitle(title);
-    setStatusModalMessage(message);
-    setStatusModalVisible(true);
-  };
+// Run fetch when user id is ready
+useEffect(() => {
+  if (user?.id) fetchAppointments();
+  }, [user?.id, fetchAppointments]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

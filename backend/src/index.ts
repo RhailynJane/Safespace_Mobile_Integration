@@ -4972,7 +4972,7 @@ app.get('/api/help-sections/:sectionId/items', async (req, res) => {
 // APPOINTMENTS ENDPOINTS
 // =============================================
 
-// Get all appointments for a user
+// Get all appointments for a user (supports legacy column names)
 app.get("/api/appointments", async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.query;
@@ -4993,28 +4993,66 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
 
     const userId = userResult.rows[0].id;
 
-    // Get all appointments for this user
+    // Detect legacy column names dynamically
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
+    );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+
+    const userIdCol = pickCol('user_id', ['client_id', 'patient_id', 'member_id', 'customer_id']);
+    const supportWorkerIdCol = pickCol('support_worker_id', ['worker_id']);
+    const dateCol = pickCol('appointment_date', ['date']);
+    const timeCol = pickCol('appointment_time', ['time']);
+    const durationCol = pickCol('duration_minutes', ['duration', 'length_minutes']);
+    const sessionTypeCol = pickCol('session_type', ['type', 'session']);
+    const statusCol = pickCol('status', []);
+    const meetingLinkCol = pickCol('meeting_link', ['meeting_url', 'link', 'url']);
+    const notesCol = pickCol('notes', ['note', 'description']);
+
+    if (!userIdCol) {
+      console.warn('⚠️ appointments user reference column missing; returning empty list for compatibility');
+      return res.json({ success: true, appointments: [], count: 0 });
+    }
+
+    const selectParts: string[] = [
+      'a.id',
+      dateCol ? `a.${dateCol} as appointment_date` : `NULL as appointment_date`,
+      timeCol ? `a.${timeCol} as appointment_time` : `NULL as appointment_time`,
+      durationCol ? `a.${durationCol} as duration_minutes` : `NULL as duration_minutes`,
+      sessionTypeCol ? `a.${sessionTypeCol} as session_type` : `NULL as session_type`,
+      statusCol ? `a.${statusCol} as status` : `NULL as status`,
+      meetingLinkCol ? `a.${meetingLinkCol} as meeting_link` : `NULL as meeting_link`,
+      notesCol ? `a.${notesCol} as notes` : `NULL as notes`,
+      'a.created_at',
+      'a.updated_at',
+      supportWorkerIdCol ? `sw.id as support_worker_id` : `NULL as support_worker_id`,
+      supportWorkerIdCol ? `sw.first_name as support_worker_first_name` : `NULL as support_worker_first_name`,
+      supportWorkerIdCol ? `sw.last_name as support_worker_last_name` : `NULL as support_worker_last_name`,
+      supportWorkerIdCol ? `sw.specialization` : `NULL as specialization`,
+      supportWorkerIdCol ? `sw.avatar_url` : `NULL as avatar_url`
+    ];
+
+    const joinClause = supportWorkerIdCol
+      ? `LEFT JOIN support_workers sw ON a.${supportWorkerIdCol} = sw.id`
+      : '';
+
+    const orderBy = [
+      dateCol ? `a.${dateCol} DESC` : null,
+      timeCol ? `a.${timeCol} DESC` : null,
+      'a.id DESC'
+    ].filter(Boolean).join(', ');
+
     const query = `
-      SELECT 
-        a.id,
-        a.appointment_date,
-        a.appointment_time,
-        a.duration_minutes,
-        a.session_type,
-        a.status,
-        a.meeting_link,
-        a.notes,
-        a.created_at,
-        a.updated_at,
-        sw.id as support_worker_id,
-        sw.first_name as support_worker_first_name,
-        sw.last_name as support_worker_last_name,
-        sw.specialization,
-        sw.avatar_url
+      SELECT ${selectParts.join(', ')}
       FROM appointments a
-      LEFT JOIN support_workers sw ON a.support_worker_id = sw.id
-      WHERE a.user_id = $1
-      ORDER BY a.appointment_date DESC, a.appointment_time DESC
+      ${joinClause}
+      WHERE a.${userIdCol} = $1
+      ORDER BY ${orderBy}
     `;
 
     const result = await pool.query(query, [userId]);
@@ -5058,6 +5096,7 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
     const {
       clerkUserId,
       supportWorkerId,
+      supportWorkerName,
       appointmentDate,
       appointmentTime,
       sessionType,
@@ -5103,21 +5142,58 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Support worker not found" });
     }
 
-    // Check for time slot conflicts
-    const conflictCheck = await pool.query(
-      `SELECT id FROM appointments 
-       WHERE support_worker_id = $1 
-       AND appointment_date = $2 
-       AND appointment_time = $3 
-       AND status IN ('scheduled', 'confirmed')`,
-      [supportWorkerId, appointmentDate, appointmentTime]
+    // Determine available columns in legacy schemas (inspect all columns)
+    const colRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'appointments'`
     );
+    const cols = new Set(colRes.rows.map((r: any) => r.column_name));
+    const pickCol = (primary: string, alts: string[] = []) => {
+      if (cols.has(primary)) return primary;
+      for (const a of alts) if (cols.has(a)) return a;
+      return null as string | null;
+    };
+  const userIdCol = pickCol('user_id', ['client_id', 'patient_id', 'member_id', 'customer_id']);
+  const hasUserId = !!userIdCol;
+    const supportWorkerIdCol = pickCol('support_worker_id', ['worker_id']);
+    const hasSupportWorkerId = !!supportWorkerIdCol;
+    const dateCol = pickCol('appointment_date', ['date']);
+    const timeCol = pickCol('appointment_time', ['time']);
+    const durationCol = pickCol('duration_minutes', ['duration', 'length_minutes']);
+    const sessionTypeCol = pickCol('session_type', ['type', 'session']);
+    const statusCol = pickCol('status', []);
+    const meetingLinkCol = pickCol('meeting_link', ['meeting_url', 'link', 'url']);
+    const notesCol = pickCol('notes', ['note', 'description']);
 
-    if (conflictCheck.rows.length > 0) {
-      return res.status(409).json({ 
-        error: "Time slot already booked",
-        message: "This time slot is not available. Please select another time."
-      });
+    // Check for time slot conflicts (supports legacy schemas)
+    if (hasSupportWorkerId && dateCol && timeCol) {
+      const conflictCheck = await pool.query(
+        `SELECT id FROM appointments 
+         WHERE ${supportWorkerIdCol} = $1 
+         AND ${dateCol} = $2 
+         AND ${timeCol} = $3 
+         ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}`,
+        [supportWorkerId, appointmentDate, appointmentTime]
+      );
+      if (conflictCheck.rows.length > 0) {
+        return res.status(409).json({ 
+          error: "Time slot already booked",
+          message: "This time slot is not available. Please select another time."
+        });
+      }
+    } else if (dateCol && timeCol) {
+      const fallbackConflict = await pool.query(
+        `SELECT id FROM appointments 
+         WHERE ${dateCol} = $1 
+         AND ${timeCol} = $2 
+         ${statusCol ? "AND " + statusCol + " IN ('scheduled', 'confirmed')" : ''}`,
+        [appointmentDate, appointmentTime]
+      );
+      if (fallbackConflict.rows.length > 0) {
+        return res.status(409).json({ 
+          error: "Time slot already booked",
+          message: "This time slot is not available. Please select another time."
+        });
+      }
     }
 
     // Generate meeting link for video sessions
@@ -5127,43 +5203,47 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
       meetingLink = `https://meet.safespace.com/${randomId}`;
     }
 
-    // Create the appointment
-    const insertQuery = `
-      INSERT INTO appointments (
-        user_id, 
-        support_worker_id, 
-        appointment_date, 
-        appointment_time,
-        duration_minutes,
-        session_type, 
-        status,
-        meeting_link,
-        notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *
-    `;
-
+    // Create the appointment (dynamic columns based on schema)
     const formattedSessionType = sessionType.toLowerCase().replace(' ', '_');
-
-    const result = await pool.query(insertQuery, [
-      userId,
-      supportWorkerId,
-      appointmentDate,
-      appointmentTime,
-      duration,
-      formattedSessionType,
-      'scheduled',
-      meetingLink,
-      notes
-    ]);
+    const columns: string[] = [];
+    const values: any[] = [];
+    // Add relational columns if present (respect detected column names)
+    if (hasUserId && userIdCol) {
+      columns.push(userIdCol);
+      values.push(userId);
+    }
+    if (hasSupportWorkerId && supportWorkerIdCol) {
+      columns.push(supportWorkerIdCol);
+      values.push(supportWorkerId);
+    }
+    // Add date/time if present
+    if (dateCol) { columns.push(dateCol); values.push(appointmentDate); }
+    if (timeCol) { columns.push(timeCol); values.push(appointmentTime); }
+    // Add duration if present
+    if (durationCol) { columns.push(durationCol); values.push(duration); }
+    // Add session type if present
+    if (sessionTypeCol) { columns.push(sessionTypeCol); values.push(formattedSessionType); }
+    // Add status if present
+    if (statusCol) { columns.push(statusCol); values.push('scheduled'); }
+    // Add meeting link if present
+    if (meetingLinkCol) { columns.push(meetingLinkCol); values.push(meetingLink); }
+    // Add notes if present
+    if (notesCol) { columns.push(notesCol); values.push(notes); }
+    // Note: Do NOT re-add relational columns; they have already been added above using detected names.
+  const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+  const insertSql = `INSERT INTO appointments (${columns.join(', ')}) VALUES (${placeholders}) RETURNING *`;
+    const insertRes = await pool.query(insertSql, values);
+    const appointmentRow: any = insertRes.rows[0];
 
     // Get support worker details for response
-    const swResult = await pool.query(
-      "SELECT first_name, last_name, specialization, avatar_url FROM support_workers WHERE id = $1",
-      [supportWorkerId]
-    );
+    const swResult = hasSupportWorkerId
+      ? await pool.query(
+          "SELECT first_name, last_name, specialization, avatar_url FROM support_workers WHERE id = $1",
+          [supportWorkerId]
+        )
+      : { rows: [] } as any;
 
-    const appointment = result.rows[0];
+    const appointment = appointmentRow;
     const supportWorker = swResult.rows[0];
 
     res.status(201).json({
@@ -5171,13 +5251,13 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
       message: "Appointment booked successfully",
       appointment: {
         id: appointment.id,
-        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : 'Support Worker',
-        date: appointment.appointment_date,
-        time: appointment.appointment_time,
-        type: appointment.session_type,
-        status: appointment.status,
-        meetingLink: appointment.meeting_link,
-        notes: appointment.notes
+        supportWorker: supportWorker ? `${supportWorker.first_name} ${supportWorker.last_name}` : (supportWorkerName || 'Support Worker'),
+        date: dateCol ? appointment[dateCol] : appointment.appointment_date,
+        time: timeCol ? appointment[timeCol] : appointment.appointment_time,
+        type: sessionTypeCol ? appointment[sessionTypeCol] : appointment.session_type,
+        status: statusCol ? appointment[statusCol] : appointment.status,
+        meetingLink: meetingLinkCol ? appointment[meetingLinkCol] : appointment.meeting_link,
+        notes: notesCol ? appointment[notesCol] : appointment.notes
       }
     });
 
