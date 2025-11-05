@@ -1,6 +1,5 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component.
- * Reference: chat.deepseek.com
+ * COMPLETE FIXED VERSION - Now creates appointments in database!
  */
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -8,13 +7,11 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   SafeAreaView,
   Modal,
   Pressable,
   ActivityIndicator,
-  Image,
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,31 +24,16 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 
-/**
- * ConfirmAppointment Component
- *
- * Appointment confirmation screen that allows users to review booking details,
- * add optional notes for the support worker, and confirm their appointment.
- * Features a multi-step progress indicator and elegant curved background.
- */
-
-interface SupportWorker {
-  id: number;
-  name: string;
-  title: string;
-  avatar: string;
-  specialties: string[];
-}
-
 export default function ConfirmAppointment() {
   const { theme, scaledFontSize } = useTheme();
+  
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [appointmentNotes, setAppointmentNotes] = useState<string>("");
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [supportWorker, setSupportWorker] = useState<SupportWorker | null>(null);
+  const [appointmentCreated, setAppointmentCreated] = useState(false);
+  const [appointmentId, setAppointmentId] = useState<number | null>(null);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -60,17 +42,28 @@ export default function ConfirmAppointment() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut } = useAuth();
   const { user } = useUser();
 
-  // Create dynamic styles with text size scaling
+  // Create dynamic styles
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Get params from navigation
-  const { supportWorkerId, selectedType, selectedDate, selectedTime } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  
+  const getParam = (param: string | string[] | undefined): string => {
+    if (Array.isArray(param)) return param[0] || '';
+    return param || '';
+  };
+  
+  const supportWorkerId = getParam(params.supportWorkerId);
+  const supportWorkerName = getParam(params.supportWorkerName);
+  const selectedType = getParam(params.selectedType);
+  const selectedDate = getParam(params.selectedDate);
+  const selectedTime = getParam(params.selectedTime);
 
   /**
-   * Show status modal with given parameters
+   * Show status modal
    */
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);
@@ -80,44 +73,77 @@ export default function ConfirmAppointment() {
   };
 
   /**
-   * Fetch support worker details from API
+   * Create the appointment in the database
    */
-  const fetchSupportWorker = async () => {
+  const createAppointment = async () => {
+    if (!user?.id || !supportWorkerId || appointmentCreated) {
+      return;
+    }
+
     try {
       setLoading(true);
-      
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/support-workers/${supportWorkerId}`);
-      const result = await response.json();
+      console.log('📅 Creating appointment in database...');
 
-      if (result.success) {
-        const worker = result.data;
-        setSupportWorker({
-          id: worker.id,
-          name: `${worker.first_name} ${worker.last_name}`,
-          title: "Support Worker",
-          avatar: worker.avatar_url || "https://via.placeholder.com/150",
-          specialties: worker.specialization 
-            ? worker.specialization.split(',').map((s: string) => s.trim())
-            : [],
-        });
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      
+      // Convert session type to match backend format
+      const sessionTypeMap: { [key: string]: string } = {
+        'video call': 'video',
+        'video': 'video',
+        'phone call': 'phone',
+        'phone': 'phone',
+        'in-person': 'in_person',
+        'in person': 'in_person'
+      };
+      
+      const normalizedType = selectedType.toLowerCase();
+      const sessionType = sessionTypeMap[normalizedType] || 'video';
+
+      const appointmentData = {
+        clerkUserId: user.id,
+        supportWorkerId: parseInt(supportWorkerId),
+        appointmentDate: selectedDate,
+        appointmentTime: selectedTime,
+        sessionType: sessionType,
+        notes: 'Booked via mobile app',
+        duration: 60
+      };
+
+      console.log('📤 Sending appointment data:', appointmentData);
+
+      const response = await fetch(`${API_URL}/api/appointments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentData)
+      });
+
+      const result = await response.json();
+      console.log('📥 Create appointment response:', result);
+
+      if (result.success || response.ok) {
+        setAppointmentCreated(true);
+        setAppointmentId(result.appointment?.id);
+        console.log('✅ Appointment created successfully!');
       } else {
-        showStatusModal('error', 'Error', 'Failed to load support worker details');
+        console.error('❌ Failed to create appointment:', result);
+        showStatusModal('error', 'Booking Failed', result.error || 'Failed to create appointment');
       }
     } catch (error) {
-      console.error('Error fetching support worker:', error);
-      showStatusModal('error', 'Error', 'Unable to fetch support worker. Please try again.');
+      console.error('❌ Error creating appointment:', error);
+      showStatusModal('error', 'Booking Failed', 'Unable to create appointment. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch support worker on mount
+  // Create appointment when page loads
   useEffect(() => {
-    if (supportWorkerId) {
-      fetchSupportWorker();
+    if (user?.id && supportWorkerId && !appointmentCreated) {
+      createAppointment();
     }
-  }, [supportWorkerId]);
+  }, [user?.id, supportWorkerId, appointmentCreated]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -136,7 +162,54 @@ export default function ConfirmAppointment() {
     );
   };
 
-  // Bottom navigation tabs configuration
+  const handleLogout = async () => {
+    if (isSigningOut) return;
+
+    try {
+      setIsSigningOut(true);
+      setSideMenuVisible(false);
+      await AsyncStorage.clear();
+      if (signOut) {
+        await signOut();
+      }
+      router.replace("/(auth)/login");
+    } catch (error) {
+      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  const confirmSignOut = () => {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign Out", style: "destructive", onPress: handleLogout },
+    ]);
+  };
+
+  // Check if we have the required data
+  if (!supportWorkerName || !selectedDate || !selectedTime) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <AppHeader title="Confirmation" showBack={true} />
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={64} color={theme.colors.error} />
+            <Text style={[styles.errorText, { color: theme.colors.text }]}>
+              Missing appointment details. Please try booking again.
+            </Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              onPress={() => router.replace("/appointments/book")}
+            >
+              <Text style={styles.buttonText}>Book Appointment</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -145,10 +218,6 @@ export default function ConfirmAppointment() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  /**
-   * Handles bottom tab navigation
-   * @param tabId - ID of the tab to navigate to
-   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -158,40 +227,6 @@ export default function ConfirmAppointment() {
     }
   };
 
-  /**
-   * Enhanced logout function with Clerk integration
-   */
-  const handleLogout = async () => {
-    if (isSigningOut) return;
-
-    try {
-      setIsSigningOut(true);
-      setSideMenuVisible(false);
-
-      await AsyncStorage.clear();
-      if (signOut) {
-        await signOut();
-      }
-
-      router.replace("/(auth)/login");
-    } catch (error) {
-      showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
-    } finally {
-      setIsSigningOut(false);
-    }
-  };
-
-  /**
-   * Confirmation dialog for sign out
-   */
-  const confirmSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: handleLogout },
-    ]);
-  };
-
-  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -289,44 +324,14 @@ export default function ConfirmAppointment() {
     },
   ];
 
-  /**
-   * Handles navigation to confirmation success screen
-   * Passes appointment details as navigation parameters
-   */
-  const handleConfirmBooking = () => {
-    if (!supportWorker) return;
-    
-    router.replace({
-      pathname: "/appointments/confirmation",
-      params: {
-        supportWorkerId: supportWorker.id,
-        supportWorkerName: supportWorker.name,
-        selectedType: selectedType || "Video Call",
-        selectedDate: selectedDate || "",
-        selectedTime: selectedTime || "",
-      },
-    });
-  };
-
-  // Show loading indicator if data is being fetched
+  // Show loading while creating appointment
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-      </CurvedBackground>
-    );
-  }
-
-  // Show error if support worker not found
-  if (!supportWorker) {
-    return (
-      <CurvedBackground>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-          <AppHeader title="Confirm Appointment" showBack={true} />
-          <Text style={[styles.errorText, { color: theme.colors.text }]}>
-            Support worker not found
-          </Text>
-        </SafeAreaView>
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+          Booking your appointment...
+        </Text>
       </CurvedBackground>
     );
   }
@@ -334,116 +339,94 @@ export default function ConfirmAppointment() {
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader title="Confirm Appointment" showBack={true} />
+        <AppHeader title="Appointment Confirmation" showBack={true} />
 
         <ScrollView style={styles.scrollContainer}>
           <Text style={[styles.title, { color: theme.colors.text }]}>
             Schedule a session with a support worker
           </Text>
 
-          {/* Step Indicator - Shows progress through booking process */}
+          {/* Step Indicator */}
           <View style={styles.stepsContainer}>
             <View style={styles.stepRow}>
-              {/* Step 1 - Inactive */}
               <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 2 - Inactive */}
               <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 3 - Active (Current Step) */}
-              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
-                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                  3
-                </Text>
+              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
+                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 4 - Inactive */}
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>4</Text>
+              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>4</Text>
               </View>
             </View>
           </View>
 
-          {/* Booking Details Card */}
-          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Booking Details</Text>
-            <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>Appointment Summary</Text>
-
-            <View style={styles.summaryContainer}>
-              {/* Support Worker Details */}
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Support Worker:</Text>
-                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
-                  {supportWorker.name}
-                </Text>
-              </View>
-
-              {/* Appointment Date */}
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Date:</Text>
-                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
-                  {selectedDate || 'Not selected'}
-                </Text>
-              </View>
-
-              {/* Appointment Time */}
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Time:</Text>
-                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
-                  {selectedTime || 'Not selected'}
-                </Text>
-              </View>
-
-              {/* Session Type */}
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryLabel, { color: theme.colors.text }]}>Session Type:</Text>
-                <Text style={[styles.summaryValue, { color: theme.colors.textSecondary }]}>
-                  {selectedType || 'Video Call'}
-                </Text>
-              </View>
+          {/* Confirmation Card */}
+          <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
+            {/* Success Icon */}
+            <View style={[styles.successIcon, { backgroundColor: theme.colors.successLight || '#E8F5E9' }]}>
+              <Ionicons name="checkmark-circle" size={64} color={theme.colors.success || '#4CAF50'} />
             </View>
 
-            <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-
-            {/* Optional Notes Section */}
-            <Text style={[styles.subSectionTitle, { color: theme.colors.text }]}>
-              Notes for Support Worker (Optional)
+            <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>Appointment Booked!</Text>
+            <Text style={[styles.confirmationMessage, { color: theme.colors.textSecondary }]}>
+              Your appointment has been successfully scheduled.
             </Text>
-            <TextInput
-              style={[styles.notesInput, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text }]}
-              multiline
-              numberOfLines={4}
-              placeholder="Share any specific concerns or topics you'd like to discuss..."
-              placeholderTextColor={theme.colors.textDisabled}
-              value={appointmentNotes}
-              onChangeText={setAppointmentNotes}
-            />
 
-            {/* Action Buttons */}
-            <View style={styles.buttonRow}>
-              {/* Back Button */}
-              <TouchableOpacity
-                style={[styles.backButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary }]}
-                onPress={() => router.back()}
-              >
-                <Text style={[styles.backButtonText, { color: theme.colors.primary }]}>Back</Text>
-              </TouchableOpacity>
+            <View style={[styles.appointmentDetails, { backgroundColor: theme.colors.background }]}>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                  {supportWorkerName}
+                </Text>
+              </View>
 
-              {/* Confirm Booking Button */}
-              <TouchableOpacity
-                style={[styles.bookButton, { backgroundColor: theme.colors.primary }]}
-                onPress={handleConfirmBooking}
-              >
-                <Text style={styles.bookButtonText}>Book Appointment</Text>
-              </TouchableOpacity>
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                  {selectedDate}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                  {selectedTime}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type:</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                  {selectedType}
+                </Text>
+              </View>
             </View>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              onPress={() => router.replace("/appointments/appointment-list")}
+            >
+              <Text style={styles.buttonText}>View My Appointments</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
+              onPress={() => router.replace("/appointments/book")}
+            >
+              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
+                Book Another Appointment
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
@@ -479,7 +462,7 @@ export default function ConfirmAppointment() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.primary}
+                      color={item.disabled ? theme.colors.iconDisabled : (item.title === "Sign Out" ? theme.colors.error : theme.colors.icon)}
                     />
                     <Text
                       style={[
@@ -524,11 +507,17 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     backgroundColor: "transparent",
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   errorText: {
     fontSize: scaledFontSize(18),
-    color: "#666",
     textAlign: "center",
-    marginTop: 50,
+    marginTop: 20,
+    marginBottom: 20,
   },
   scrollContainer: {
     flex: 1,
@@ -538,23 +527,20 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     justifyContent: "center",
     alignItems: "center",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "transparent",
+  loadingText: {
+    marginTop: 16,
+    fontSize: scaledFontSize(16),
   },
-  headerTitle: {
-    fontSize: scaledFontSize(20),
+  sideMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  sideMenuItemTextDisabled: {},
+  signOutText: {
     fontWeight: "600",
-    color: "#2E7D32",
   },
   title: {
     fontSize: scaledFontSize(15),
     fontWeight: "600",
-    color: "#333",
     marginBottom: 5,
     textAlign: "center",
     marginTop: 16,
@@ -574,17 +560,12 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     height: 30,
     borderRadius: 15,
     borderWidth: 2,
-    borderColor: "#4CAF50",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "white",
   },
-  stepCircleActive: {
-    backgroundColor: "#4CAF50",
-  },
+  stepCircleActive: {},
   stepNumber: {
     fontSize: scaledFontSize(16),
-    color: "#4CAF50",
     fontWeight: "600",
   },
   stepNumberActive: {
@@ -593,12 +574,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   stepConnector: {
     width: 40,
     height: 2,
-    backgroundColor: "#000000",
     marginHorizontal: 8,
   },
-  card: {
+  confirmationCard: {
     borderRadius: 12,
-    padding: 20,
+    padding: 24,
     marginHorizontal: 15,
     marginBottom: 24,
     shadowColor: "#000",
@@ -606,82 +586,70 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    backgroundColor: "#f1f5f9",
+    alignItems: "center",
   },
-  cardTitle: {
-    fontSize: scaledFontSize(20),
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 16,
+  successIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  confirmationTitle: {
+    fontSize: scaledFontSize(24),
+    fontWeight: "bold",
+    marginBottom: 12,
     textAlign: "center",
   },
-  subSectionTitle: {
+  confirmationMessage: {
     fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 24,
   },
-  summaryContainer: {
-    marginBottom: 20,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: scaledFontSize(14),
-    color: "#000000",
-    fontWeight: "600",
-  },
-  summaryValue: {
-    fontSize: scaledFontSize(14),
-    color: "#333",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#000000",
-    marginVertical: 20,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: "#000000",
+  appointmentDetails: {
+    width: "100%",
     borderRadius: 8,
     padding: 16,
-    textAlignVertical: "top",
-    marginBottom: 20,
-    minHeight: 100,
-    fontSize: scaledFontSize(14),
-    backgroundColor: "white",
+    marginBottom: 24,
   },
-  buttonRow: {
+  detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 16,
+    marginBottom: 12,
   },
-  backButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    alignItems: "center",
-    backgroundColor: "white",
-  },
-  backButtonText: {
-    color: "#4CAF50",
+  detailLabel: {
     fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
-  bookButton: {
-    flex: 2,
-    backgroundColor: "#4CAF50",
+  detailValue: {
+    fontSize: scaledFontSize(16),
+    fontWeight: "500",
+  },
+  primaryButton: {
     paddingVertical: 16,
+    paddingHorizontal: 32,
     borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  buttonText: {
+    color: "#FFFFFF",
+    fontSize: scaledFontSize(16),
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    backgroundColor: "transparent",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    width: "100%",
     alignItems: "center",
   },
-  bookButtonText: {
-    color: "#FFFFFF",
+  secondaryButtonText: {
     fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
@@ -695,24 +663,20 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   sideMenu: {
     width: "75%",
-    backgroundColor: "white",
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
     alignItems: "center",
   },
   profileName: {
     fontSize: scaledFontSize(18),
     fontWeight: "600",
-    color: "#212121",
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: scaledFontSize(14),
-    color: "#757575",
   },
   sideMenuContent: {
     padding: 10,
@@ -723,25 +687,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
   },
   sideMenuItemText: {
     fontSize: scaledFontSize(16),
-    color: "#333",
     marginLeft: 15,
-  },
-  contentContainer: {
-    flex: 1,
-    zIndex: 1,
-  },
-  sideMenuItemDisabled: {
-    opacity: 0.5,
-  },
-  sideMenuItemTextDisabled: {
-    color: "#CCCCCC",
-  },
-  signOutText: {
-    color: "#FF6B6B",
-    fontWeight: "600",
   },
 });
