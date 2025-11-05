@@ -21,11 +21,17 @@
           "photosPermission": "Allow SafeSpace to access your photos",
           "savePhotosPermission": "Allow SafeSpace to save photos to your library",
           "isAccessMediaLocationEnabled": false,
-          "granularPermissions": [
-            "photo"
-          ]
-        }
-      ]
+              "granularPermissions": [
+                "photo"
+              ]
+            }
+          ],
+          [
+          "expo-camera",
+          {
+          "cameraPermission": "Allow SafeSpace to access your camera for video consultations with support workers."
+          }
+          ],
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"

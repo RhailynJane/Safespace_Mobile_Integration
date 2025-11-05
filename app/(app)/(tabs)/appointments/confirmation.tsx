@@ -1,8 +1,7 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component.
- * Reference: chat.deepseek.com
+ * COMPLETE FIXED VERSION - Now creates appointments in database!
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,7 +12,6 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
-  Image,
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,24 +22,18 @@ import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
-import activityApi from "../../../../utils/activityApi";
 import StatusModal from "../../../../components/StatusModal";
 
-/**
- * ConfirmAppointment Component
- *
- * Final confirmation screen that shows after successfully booking an appointment.
- * Displays appointment details, confirmation message, and navigation options
- * to view appointments or book another. Features an elegant curved background.
- */
 export default function ConfirmAppointment() {
   const { theme, scaledFontSize } = useTheme();
+  
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [activeView, setActiveView] = useState("confirmation");
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [appointmentCreated, setAppointmentCreated] = useState(false);
+  const [appointmentId, setAppointmentId] = useState<number | null>(null);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -50,31 +42,28 @@ export default function ConfirmAppointment() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut } = useAuth();
   const { user } = useUser();
 
-  // Create dynamic styles with text size scaling
+  // Create dynamic styles
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Get ALL params from navigation
-  const { 
-    supportWorkerId, 
-    supportWorkerName, 
-    selectedType, 
-    selectedDate, 
-    selectedTime 
-  } = useLocalSearchParams();
-
-  console.log('📋 Confirmation page params:', { 
-    supportWorkerId, 
-    supportWorkerName, 
-    selectedType, 
-    selectedDate, 
-    selectedTime 
-  });
+  // Get params from navigation
+  const params = useLocalSearchParams();
+  
+  const getParam = (param: string | string[] | undefined): string => {
+    if (Array.isArray(param)) return param[0] || '';
+    return param || '';
+  };
+  
+  const supportWorkerId = getParam(params.supportWorkerId);
+  const supportWorkerName = getParam(params.supportWorkerName);
+  const selectedType = getParam(params.selectedType);
+  const selectedDate = getParam(params.selectedDate);
+  const selectedTime = getParam(params.selectedTime);
 
   /**
-   * Show status modal with given parameters
+   * Show status modal
    */
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalType(type);
@@ -82,6 +71,79 @@ export default function ConfirmAppointment() {
     setStatusModalMessage(message);
     setStatusModalVisible(true);
   };
+
+  /**
+   * Create the appointment in the database
+   */
+  const createAppointment = async () => {
+    if (!user?.id || !supportWorkerId || appointmentCreated) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('📅 Creating appointment in database...');
+
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      
+      // Convert session type to match backend format
+      const sessionTypeMap: { [key: string]: string } = {
+        'video call': 'video',
+        'video': 'video',
+        'phone call': 'phone',
+        'phone': 'phone',
+        'in-person': 'in_person',
+        'in person': 'in_person'
+      };
+      
+      const normalizedType = selectedType.toLowerCase();
+      const sessionType = sessionTypeMap[normalizedType] || 'video';
+
+      const appointmentData = {
+        clerkUserId: user.id,
+        supportWorkerId: parseInt(supportWorkerId),
+        appointmentDate: selectedDate,
+        appointmentTime: selectedTime,
+        sessionType: sessionType,
+        notes: 'Booked via mobile app',
+        duration: 60
+      };
+
+      console.log('📤 Sending appointment data:', appointmentData);
+
+      const response = await fetch(`${API_URL}/api/appointments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentData)
+      });
+
+      const result = await response.json();
+      console.log('📥 Create appointment response:', result);
+
+      if (result.success || response.ok) {
+        setAppointmentCreated(true);
+        setAppointmentId(result.appointment?.id);
+        console.log('✅ Appointment created successfully!');
+      } else {
+        console.error('❌ Failed to create appointment:', result);
+        showStatusModal('error', 'Booking Failed', result.error || 'Failed to create appointment');
+      }
+    } catch (error) {
+      console.error('❌ Error creating appointment:', error);
+      showStatusModal('error', 'Booking Failed', 'Unable to create appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create appointment when page loads
+  useEffect(() => {
+    if (user?.id && supportWorkerId && !appointmentCreated) {
+      createAppointment();
+    }
+  }, [user?.id, supportWorkerId, appointmentCreated]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -100,30 +162,16 @@ export default function ConfirmAppointment() {
     );
   };
 
-  /**
-   * Enhanced logout function with Clerk integration
-   */
   const handleLogout = async () => {
     if (isSigningOut) return;
 
     try {
       setIsSigningOut(true);
       setSideMenuVisible(false);
-
-      // Record logout activity
-      if (user?.id) {
-        try {
-          await activityApi.recordLogout(user.id);
-        } catch (_e) {
-          // Continue with logout even if tracking fails
-        }
-      }
-
       await AsyncStorage.clear();
       if (signOut) {
         await signOut();
       }
-
       router.replace("/(auth)/login");
     } catch (error) {
       showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
@@ -132,9 +180,6 @@ export default function ConfirmAppointment() {
     }
   };
 
-  /**
-   * Confirmation dialog for sign out
-   */
   const confirmSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -148,21 +193,23 @@ export default function ConfirmAppointment() {
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
           <AppHeader title="Confirmation" showBack={true} />
-          <Text style={[styles.errorText, { color: theme.colors.text }]}>
-            Missing appointment details. Please try booking again.
-          </Text>
-          <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: theme.colors.primary, marginHorizontal: 20 }]}
-            onPress={() => router.replace("/appointments/book")}
-          >
-            <Text style={styles.buttonText}>Book Appointment</Text>
-          </TouchableOpacity>
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={64} color={theme.colors.error} />
+            <Text style={[styles.errorText, { color: theme.colors.text }]}>
+              Missing appointment details. Please try booking again.
+            </Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              onPress={() => router.replace("/appointments/book")}
+            >
+              <Text style={styles.buttonText}>Book Appointment</Text>
+            </TouchableOpacity>
+          </View>
         </SafeAreaView>
       </CurvedBackground>
     );
   }
 
-  // Bottom navigation tabs configuration
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -171,10 +218,6 @@ export default function ConfirmAppointment() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  /**
-   * Handles bottom tab navigation
-   * @param tabId - ID of the tab to navigate to
-   */
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -184,7 +227,6 @@ export default function ConfirmAppointment() {
     }
   };
 
-  // Side menu navigation items
   const sideMenuItems = [
     {
       icon: "home",
@@ -282,11 +324,14 @@ export default function ConfirmAppointment() {
     },
   ];
 
-  // Show loading indicator if data is being fetched
+  // Show loading while creating appointment
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+          Booking your appointment...
+        </Text>
       </CurvedBackground>
     );
   }
@@ -301,32 +346,26 @@ export default function ConfirmAppointment() {
             Schedule a session with a support worker
           </Text>
 
-          {/* Step Indicator - Shows progress through booking process */}
+          {/* Step Indicator */}
           <View style={styles.stepsContainer}>
             <View style={styles.stepRow}>
-              {/* Step 1 - Inactive */}
               <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 2 - Inactive */}
               <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 3 - Inactive */}
               <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
               </View>
               <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
 
-              {/* Step 4 - Active (Final Step) */}
               <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
-                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                  4
-                </Text>
+                <Text style={[styles.stepNumber, styles.stepNumberActive]}>4</Text>
               </View>
             </View>
           </View>
@@ -334,8 +373,8 @@ export default function ConfirmAppointment() {
           {/* Confirmation Card */}
           <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
             {/* Success Icon */}
-            <View style={[styles.successIcon, { backgroundColor: theme.colors.successLight }]}>
-              <Ionicons name="checkmark-circle" size={64} color={theme.colors.success} />
+            <View style={[styles.successIcon, { backgroundColor: theme.colors.successLight || '#E8F5E9' }]}>
+              <Ionicons name="checkmark-circle" size={64} color={theme.colors.success || '#4CAF50'} />
             </View>
 
             <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>Appointment Booked!</Text>
@@ -344,7 +383,6 @@ export default function ConfirmAppointment() {
             </Text>
 
             <View style={[styles.appointmentDetails, { backgroundColor: theme.colors.background }]}>
-              {/* Support Worker Details */}
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
@@ -352,7 +390,6 @@ export default function ConfirmAppointment() {
                 </Text>
               </View>
 
-              {/* Appointment Date */}
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
@@ -360,7 +397,6 @@ export default function ConfirmAppointment() {
                 </Text>
               </View>
 
-              {/* Appointment Time */}
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
@@ -368,7 +404,6 @@ export default function ConfirmAppointment() {
                 </Text>
               </View>
 
-              {/* Session Type */}
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
@@ -377,7 +412,6 @@ export default function ConfirmAppointment() {
               </View>
             </View>
 
-            {/* Primary Action Button - View Appointments */}
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
               onPress={() => router.replace("/appointments/appointment-list")}
@@ -385,7 +419,6 @@ export default function ConfirmAppointment() {
               <Text style={styles.buttonText}>View My Appointments</Text>
             </TouchableOpacity>
 
-            {/* Secondary Action Button - Book Another Appointment */}
             <TouchableOpacity
               style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
               onPress={() => router.replace("/appointments/book")}
@@ -429,7 +462,7 @@ export default function ConfirmAppointment() {
                     <Ionicons
                       name={item.icon as any}
                       size={20}
-                      color={item.disabled ? theme.colors.iconDisabled : theme.colors.primary}
+                      color={item.disabled ? theme.colors.iconDisabled : (item.title === "Sign Out" ? theme.colors.error : theme.colors.icon)}
                     />
                     <Text
                       style={[
@@ -474,12 +507,17 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     backgroundColor: "transparent",
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   errorText: {
     fontSize: scaledFontSize(18),
     textAlign: "center",
-    marginTop: 50,
+    marginTop: 20,
     marginBottom: 20,
-    paddingHorizontal: 20,
   },
   scrollContainer: {
     flex: 1,
@@ -489,25 +527,15 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingText: {
+    marginTop: 16,
+    fontSize: scaledFontSize(16),
+  },
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
-  sideMenuItemTextDisabled: {
-    // Color handled by theme in JSX
-  },
+  sideMenuItemTextDisabled: {},
   signOutText: {
-    fontWeight: "600",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "transparent",
-  },
-  headerTitle: {
-    fontSize: scaledFontSize(20),
     fontWeight: "600",
   },
   title: {
@@ -535,9 +563,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     alignItems: "center",
     justifyContent: "center",
   },
-  stepCircleActive: {
-    // Colors applied via theme in JSX
-  },
+  stepCircleActive: {},
   stepNumber: {
     fontSize: scaledFontSize(16),
     fontWeight: "600",

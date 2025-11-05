@@ -1,8 +1,7 @@
 /**
- * LLM Prompt: Add concise comments to this React Native component.
- * Reference: chat.deepseek.com
+ * DARK MODE COMPATIBLE VERSION - With Mock Data
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,43 +24,15 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 
-/**
- * AppointmentList Component
- *
- * Screen that displays a list of user's appointments, categorized as:
- * - Upcoming appointments (future scheduled sessions)
- * - Past appointments (completed sessions)
- * Allows users to view appointment details and schedule new appointments.
- * Features an elegant curved background and intuitive interface.
- */
-
-interface Appointment {
-  id: number;
-  supportWorker: string;
-  supportWorkerId: number;
-  date: string;
-  time: string;
-  duration: number;
-  type: string;
-  status: string;
-  meetingLink?: string;
-  notes?: string;
-  specialization?: string;
-  avatarUrl?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 export default function AppointmentList() {
   const { theme, scaledFontSize } = useTheme();
   
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [activeAppointmentsTab, setActiveAppointmentsTab] = useState<"upcoming" | "past">("upcoming");
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -73,135 +44,10 @@ export default function AppointmentList() {
   const { signOut } = useAuth();
   const { user } = useUser();
 
-  // Create dynamic styles with text size scaling
-  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+  // Create dynamic styles with theme colors
+  const styles = useMemo(() => createStyles(scaledFontSize, theme.colors), [scaledFontSize, theme.colors]);
 
-  /**
-   * Show status modal with given parameters
-   */
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setStatusModalType(type);
-    setStatusModalTitle(title);
-    setStatusModalMessage(message);
-    setStatusModalVisible(true);
-  };
-
-  /**
-   * Fetch appointments from API
-   */
-  const fetchAppointments = async () => {
-    if (!user?.id) {
-      console.log('No user ID available');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      console.log('📅 Fetching appointments for user:', user.id);
-      
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user.id}`);
-      const result = await response.json();
-
-      console.log('📅 Appointments API response:', result);
-
-      if (result.success) {
-        // Categorize appointments as upcoming or past based on date
-        const now = new Date();
-        const categorizedAppointments = result.appointments.map((apt: any) => {
-          const appointmentDate = new Date(apt.date);
-          const isUpcoming = appointmentDate >= now;
-          
-          return {
-            id: apt.id,
-            supportWorker: apt.supportWorker,
-            supportWorkerId: apt.supportWorkerId,
-            date: apt.date,
-            time: apt.time,
-            duration: apt.duration,
-            type: apt.type,
-            status: isUpcoming ? 'upcoming' : 'past',
-            meetingLink: apt.meetingLink,
-            notes: apt.notes,
-            specialization: apt.specialization,
-            avatarUrl: apt.avatarUrl,
-            createdAt: apt.createdAt,
-            updatedAt: apt.updatedAt,
-          };
-        });
-
-        setAppointments(categorizedAppointments);
-        console.log('✅ Loaded', categorizedAppointments.length, 'appointments');
-      } else {
-        console.log('❌ Failed to fetch appointments');
-        showStatusModal('error', 'Error', 'Failed to load appointments');
-      }
-    } catch (error) {
-      console.error('❌ Error fetching appointments:', error);
-      showStatusModal('error', 'Error', 'Unable to fetch appointments. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch appointments on mount
-  useEffect(() => {
-    if (user?.id) {
-      fetchAppointments();
-    }
-  }, [user?.id]);
-
-  /**
-   * Format date string to readable format
-   */
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-    } catch (error) {
-      return dateString;
-    }
-  };
-
-  /**
-   * Format time string to readable format
-   */
-  const formatTime = (timeString: string) => {
-    try {
-      // If already in format like "10:30 AM", return as is
-      if (timeString.includes('AM') || timeString.includes('PM')) {
-        return timeString;
-      }
-      
-      // Otherwise parse and format
-      const [hours, minutes] = timeString.split(':');
-      const hour = parseInt(hours);
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour % 12 || 12;
-      return `${displayHour}:${minutes} ${ampm}`;
-    } catch (error) {
-      return timeString;
-    }
-  };
-
-  /**
-   * Get icon name for session type
-   */
-  const getSessionIcon = (type: string): "videocam" | "call" | "person" | "calendar" => {
-    const lowerType = type.toLowerCase();
-    if (lowerType.includes('video')) return 'videocam';
-    if (lowerType.includes('phone')) return 'call';
-    if (lowerType.includes('person')) return 'person';
-    return 'calendar';
-  };
-
-  // Bottom navigation tabs configuration
+  // Bottom navigation tabs
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -210,10 +56,33 @@ export default function AppointmentList() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  /**
-   * Handles bottom tab navigation
-   * @param tabId - ID of the tab to navigate to
-   */
+  // Mock data for appointments
+  const appointments = [
+    {
+      id: 1,
+      supportWorker: "Eric Young",
+      date: "October 07, 2025",
+      time: "10:30 AM",
+      type: "Video",
+      status: "upcoming",
+    },
+    {
+      id: 2,
+      supportWorker: "Michael Chen",
+      date: "September 15, 2025",
+      time: "2:00 PM",
+      type: "Phone",
+      status: "past",
+    },
+  ];
+
+  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setStatusModalType(type);
+    setStatusModalTitle(title);
+    setStatusModalMessage(message);
+    setStatusModalVisible(true);
+  };
+
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -223,21 +92,16 @@ export default function AppointmentList() {
     }
   };
 
-  /**
-   * Enhanced logout function with Clerk integration
-   */
   const handleLogout = async () => {
     if (isSigningOut) return;
 
     try {
       setIsSigningOut(true);
       setSideMenuVisible(false);
-
       await AsyncStorage.clear();
       if (signOut) {
         await signOut();
       }
-
       router.replace("/(auth)/login");
     } catch (error) {
       showStatusModal('error', 'Logout Failed', 'Unable to sign out. Please try again.');
@@ -246,9 +110,6 @@ export default function AppointmentList() {
     }
   };
 
-  /**
-   * Confirmation dialog for sign out
-   */
   const confirmSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
@@ -256,108 +117,21 @@ export default function AppointmentList() {
     ]);
   };
 
-  // Side menu navigation items
   const sideMenuItems = [
-    {
-      icon: "home",
-      title: "Dashboard",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.replace("/(app)/(tabs)/home");
-      },
-    },
-    {
-      icon: "person",
-      title: "Profile",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/profile");
-      },
-    },
-    {
-      icon: "bar-chart",
-      title: "Self-Assessment",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/self-assessment");
-      },
-    },
-    {
-      icon: "happy",
-      title: "Mood Tracking",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/mood-tracking");
-      },
-    },
-    {
-      icon: "journal",
-      title: "Journaling",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/journal");
-      },
-    },
-    {
-      icon: "library",
-      title: "Resources",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/resources");
-      },
-    },
-    {
-      icon: "help-circle",
-      title: "Crisis Support",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/crisis-support");
-      },
-    },
-    {
-      icon: "chatbubble",
-      title: "Messages",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/messages");
-      },
-    },
-    {
-      icon: "calendar",
-      title: "Appointments",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/appointments");
-      },
-    },
-    {
-      icon: "people",
-      title: "Community Forum",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/(app)/(tabs)/community-forum");
-      },
-    },
-    {
-      icon: "videocam",
-      title: "Video Consultations",
-      onPress: () => {
-        setSideMenuVisible(false);
-        router.push("/video-consultations");
-      },
-    },
-    {
-      icon: "log-out",
-      title: "Sign Out",
-      onPress: confirmSignOut,
-      disabled: isSigningOut,
-    },
+    { icon: "home", title: "Dashboard", onPress: () => { setSideMenuVisible(false); router.replace("/(app)/(tabs)/home"); } },
+    { icon: "person", title: "Profile", onPress: () => { setSideMenuVisible(false); router.push("/(app)/(tabs)/profile"); } },
+    { icon: "bar-chart", title: "Self-Assessment", onPress: () => { setSideMenuVisible(false); router.push("/self-assessment"); } },
+    { icon: "happy", title: "Mood Tracking", onPress: () => { setSideMenuVisible(false); router.push("/mood-tracking"); } },
+    { icon: "journal", title: "Journaling", onPress: () => { setSideMenuVisible(false); router.push("/journal"); } },
+    { icon: "library", title: "Resources", onPress: () => { setSideMenuVisible(false); router.push("/resources"); } },
+    { icon: "help-circle", title: "Crisis Support", onPress: () => { setSideMenuVisible(false); router.push("/crisis-support"); } },
+    { icon: "chatbubble", title: "Messages", onPress: () => { setSideMenuVisible(false); router.push("/(app)/(tabs)/messages"); } },
+    { icon: "calendar", title: "Appointments", onPress: () => { setSideMenuVisible(false); router.push("/(app)/(tabs)/appointments"); } },
+    { icon: "people", title: "Community Forum", onPress: () => { setSideMenuVisible(false); router.push("/community-forum"); } },
+    { icon: "videocam", title: "Video Consultations", onPress: () => { setSideMenuVisible(false); router.push("/video-consultations"); } },
+    { icon: "log-out", title: "Sign Out", onPress: confirmSignOut, disabled: isSigningOut },
   ];
 
-  /**
-   * Gets display name from available user data
-   * @returns String with user's display name or fallback
-   */
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
     if (user?.fullName) return user.fullName.split(" ")[0];
@@ -375,53 +149,36 @@ export default function AppointmentList() {
     );
   };
 
-  /**
-   * Handles navigation to appointment details screen
-   * @param appointmentId - ID of the selected appointment
-   */
   const handleAppointmentPress = (appointmentId: number) => {
-    router.push(
-      `/(app)/(tabs)/appointments/${appointmentId}/appointment-detail`
-    );
+    router.push(`/(app)/(tabs)/appointments/${appointmentId}/appointment-detail`);
   };
 
-  // Show loading indicator if data is being fetched
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-          Loading appointments...
-        </Text>
       </CurvedBackground>
     );
   }
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={styles.container}>
         <AppHeader title="My Appointments" showBack={true} />
 
-        {/* Appointments Tabs - Switch between Upcoming and Past appointments */}
-        <View style={[styles.appointmentsTabs, { borderBottomColor: theme.colors.border }]}>
+        {/* Appointments Tabs */}
+        <View style={styles.appointmentsTabs}>
           <TouchableOpacity
             style={[
               styles.tab,
-              activeAppointmentsTab === "upcoming" && [
-                styles.activeTab,
-                { borderBottomColor: theme.colors.primary }
-              ],
+              activeAppointmentsTab === "upcoming" && styles.activeTab,
             ]}
             onPress={() => setActiveAppointmentsTab("upcoming")}
           >
             <Text
               style={[
                 styles.tabText,
-                { color: theme.colors.textSecondary },
-                activeAppointmentsTab === "upcoming" && [
-                  styles.activeTabText,
-                  { color: theme.colors.primary }
-                ],
+                activeAppointmentsTab === "upcoming" && styles.activeTabText,
               ]}
             >
               Upcoming ({appointments.filter((a) => a.status === "upcoming").length})
@@ -430,21 +187,14 @@ export default function AppointmentList() {
           <TouchableOpacity
             style={[
               styles.tab,
-              activeAppointmentsTab === "past" && [
-                styles.activeTab,
-                { borderBottomColor: theme.colors.primary }
-              ],
+              activeAppointmentsTab === "past" && styles.activeTab,
             ]}
             onPress={() => setActiveAppointmentsTab("past")}
           >
             <Text
               style={[
                 styles.tabText,
-                { color: theme.colors.textSecondary },
-                activeAppointmentsTab === "past" && [
-                  styles.activeTabText,
-                  { color: theme.colors.primary }
-                ],
+                activeAppointmentsTab === "past" && styles.activeTabText,
               ]}
             >
               Past ({appointments.filter((a) => a.status === "past").length})
@@ -461,53 +211,32 @@ export default function AppointmentList() {
                 .map((appointment) => (
                   <TouchableOpacity
                     key={appointment.id}
-                    style={[styles.appointmentCard, { backgroundColor: theme.colors.surface, borderLeftColor: theme.colors.primary }]}
+                    style={styles.appointmentCard}
                     onPress={() => handleAppointmentPress(appointment.id)}
                   >
-                    <Text style={[styles.supportWorker, { color: theme.colors.text }]}>
+                    <Text style={styles.supportWorker}>
                       {appointment.supportWorker}
                     </Text>
                     <View style={styles.appointmentDetails}>
                       <View style={styles.detailRow}>
-                        <Ionicons
-                          name="calendar-outline"
-                          size={16}
-                          color={theme.colors.icon}
-                        />
-                        <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                          {formatDate(appointment.date)}
-                        </Text>
+                        <Ionicons name="calendar-outline" size={16} color={theme.colors.icon} />
+                        <Text style={styles.detailText}>{appointment.date}</Text>
                       </View>
                       <View style={styles.detailRow}>
                         <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
-                        <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                          {formatTime(appointment.time)}
-                        </Text>
+                        <Text style={styles.detailText}>{appointment.time}</Text>
                       </View>
                     </View>
-                    <View style={[styles.sessionType, { backgroundColor: theme.colors.primary + '20' }]}>
-                      <Ionicons name={getSessionIcon(appointment.type)} size={14} color={theme.colors.primary} />
-                      <Text style={[styles.sessionTypeText, { color: theme.colors.primary }]}>
-                        {appointment.type} Session
-                      </Text>
+                    <View style={styles.sessionType}>
+                      <Ionicons name="videocam" size={14} color={theme.colors.primary} />
+                      <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
                     </View>
                   </TouchableOpacity>
                 ))
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
-                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                  No upcoming appointments
-                </Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                  Schedule your first appointment with a support worker
-                </Text>
-                <TouchableOpacity
-                  style={[styles.emptyStateButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => router.push("/appointments/book")}
-                >
-                  <Text style={styles.emptyStateButtonText}>Book Appointment</Text>
-                </TouchableOpacity>
+                <Text style={styles.emptyStateText}>No upcoming appointments</Text>
               </View>
             )
           ) : appointments.filter((a) => a.status === "past").length > 0 ? (
@@ -516,52 +245,44 @@ export default function AppointmentList() {
               .map((appointment) => (
                 <TouchableOpacity
                   key={appointment.id}
-                  style={[styles.appointmentCard, { backgroundColor: theme.colors.surface, borderLeftColor: theme.colors.primary }]}
+                  style={styles.appointmentCard}
                   onPress={() => handleAppointmentPress(appointment.id)}
                 >
-                  <Text style={[styles.supportWorker, { color: theme.colors.text }]}>
+                  <Text style={styles.supportWorker}>
                     {appointment.supportWorker}
                   </Text>
                   <View style={styles.appointmentDetails}>
                     <View style={styles.detailRow}>
-                      <Ionicons
-                        name="calendar-outline"
-                        size={16}
-                        color={theme.colors.icon}
-                      />
-                      <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{formatDate(appointment.date)}</Text>
+                      <Ionicons name="calendar-outline" size={16} color={theme.colors.icon} />
+                      <Text style={styles.detailText}>{appointment.date}</Text>
                     </View>
                     <View style={styles.detailRow}>
                       <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
-                      <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{formatTime(appointment.time)}</Text>
+                      <Text style={styles.detailText}>{appointment.time}</Text>
                     </View>
                   </View>
-                  <View style={[styles.sessionType, { backgroundColor: theme.colors.primary + '20' }]}>
-                    <Ionicons name={getSessionIcon(appointment.type)} size={14} color={theme.colors.primary} />
-                    <Text style={[styles.sessionTypeText, { color: theme.colors.primary }]}>
-                      {appointment.type} Session
-                    </Text>
+                  <View style={styles.sessionType}>
+                    <Ionicons name="videocam" size={14} color={theme.colors.primary} />
+                    <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
                   </View>
                 </TouchableOpacity>
               ))
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
-              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>No past appointments</Text>
+              <Text style={styles.emptyStateText}>No past appointments</Text>
             </View>
           )}
         </ScrollView>
 
         {/* Schedule New Appointment Button */}
-        <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
+        <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.scheduleButton, { backgroundColor: theme.colors.primary }]}
+            style={styles.scheduleButton}
             onPress={() => router.push("/appointments/book")}
           >
             <Ionicons name="add" size={24} color="#FFFFFF" />
-            <Text style={styles.scheduleButtonText}>
-              Schedule New Appointment
-            </Text>
+            <Text style={styles.scheduleButtonText}>Schedule New Appointment</Text>
           </TouchableOpacity>
         </View>
 
@@ -577,10 +298,10 @@ export default function AppointmentList() {
               style={styles.modalOverlay}
               onPress={() => setSideMenuVisible(false)}
             />
-            <View style={[styles.sideMenu, { backgroundColor: theme.colors.surface }]}>
-              <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
-                <Text style={[styles.profileName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
-                <Text style={[styles.profileEmail, { color: theme.colors.textSecondary }]}>{getUserEmail()}</Text>
+            <View style={styles.sideMenu}>
+              <View style={styles.sideMenuHeader}>
+                <Text style={styles.profileName}>{getDisplayName()}</Text>
+                <Text style={styles.profileEmail}>{getUserEmail()}</Text>
               </View>
               <ScrollView style={styles.sideMenuContent}>
                 {sideMenuItems.map((item, index) => (
@@ -588,7 +309,6 @@ export default function AppointmentList() {
                     key={index}
                     style={[
                       styles.sideMenuItem,
-                      { borderBottomColor: theme.colors.borderLight },
                       item.disabled && styles.sideMenuItemDisabled,
                     ]}
                     onPress={item.onPress}
@@ -602,9 +322,8 @@ export default function AppointmentList() {
                     <Text
                       style={[
                         styles.sideMenuItemText,
-                        { color: theme.colors.text },
                         item.disabled && styles.sideMenuItemTextDisabled,
-                        item.title === "Sign Out" && { color: theme.colors.error },
+                        item.title === "Sign Out" && styles.signOutText,
                       ]}
                     >
                       {item.title}
@@ -637,41 +356,15 @@ export default function AppointmentList() {
   );
 }
 
-const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number, colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "transparent",
-  },
-  scrollContainer: {
-    flex: 1,
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  loadingText: {
-    fontSize: scaledFontSize(16),
-    marginTop: 16,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: "transparent",
-  },
-  headerTitle: {
-    fontSize: scaledFontSize(20),
-    fontWeight: "600",
-  },
-  title: {
-    fontSize: scaledFontSize(15),
-    fontWeight: "600",
-    marginBottom: 5,
-    textAlign: "center",
-    marginTop: 16,
   },
   modalContainer: {
     flex: 1,
@@ -683,20 +376,24 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   sideMenu: {
     width: "75%",
+    backgroundColor: colors.surface,
     height: "100%",
   },
   sideMenuHeader: {
     padding: 20,
     borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
     alignItems: "center",
   },
   profileName: {
     fontSize: scaledFontSize(18),
     fontWeight: "600",
+    color: colors.text,
     marginBottom: 4,
   },
   profileEmail: {
     fontSize: scaledFontSize(14),
+    color: colors.textSecondary,
   },
   sideMenuContent: {
     padding: 10,
@@ -707,29 +404,27 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingVertical: 15,
     paddingHorizontal: 15,
     borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
   sideMenuItemText: {
     fontSize: scaledFontSize(16),
+    color: colors.text,
     marginLeft: 15,
   },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    margin: 15,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
+  sideMenuItemDisabled: {
+    opacity: 0.5,
   },
-  searchIcon: {
-    marginRight: 8,
+  sideMenuItemTextDisabled: {
+    color: colors.textDisabled,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: scaledFontSize(16),
+  signOutText: {
+    color: colors.error,
+    fontWeight: "600",
   },
   appointmentsTabs: {
     flexDirection: "row",
     borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   tab: {
     flex: 1,
@@ -738,11 +433,14 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   activeTab: {
     borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
   },
   tabText: {
     fontSize: scaledFontSize(16),
+    color: colors.textSecondary,
   },
   activeTabText: {
+    color: colors.primary,
     fontWeight: "600",
   },
   appointmentsContainer: {
@@ -750,6 +448,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     padding: 16,
   },
   appointmentCard: {
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -759,10 +458,12 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowRadius: 4,
     elevation: 3,
     borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
   },
   supportWorker: {
     fontSize: scaledFontSize(18),
     fontWeight: "600",
+    color: colors.text,
     marginBottom: 12,
   },
   appointmentDetails: {
@@ -775,11 +476,13 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   detailText: {
     fontSize: scaledFontSize(14),
+    color: colors.textSecondary,
     marginLeft: 8,
   },
   sessionType: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: colors.primary + '20', // 20% opacity
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -787,7 +490,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   sessionTypeText: {
     fontSize: scaledFontSize(14),
+    color: colors.primary,
     marginLeft: 6,
+    fontWeight: "500",
   },
   emptyState: {
     alignItems: "center",
@@ -796,51 +501,27 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   emptyStateText: {
     fontSize: scaledFontSize(16),
+    color: colors.text,
     marginTop: 16,
-    fontWeight: "600",
-  },
-  emptyStateSubtext: {
-    fontSize: scaledFontSize(14),
-    marginTop: 8,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  emptyStateButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  emptyStateButtonText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(14),
-    fontWeight: "600",
   },
   footer: {
     padding: 16,
     borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   scheduleButton: {
+    backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     padding: 15,
     borderRadius: 30,
-    marginRight: 25,
-    marginLeft: 25,
+    marginHorizontal: 25,
   },
   scheduleButtonText: {
     color: "#FFFFFF",
     fontSize: scaledFontSize(15),
     fontWeight: "600",
     marginLeft: 8,
-  },
-  sideMenuItemDisabled: {
-    opacity: 0.5,
-  },
-  sideMenuItemTextDisabled: {
-    // Color handled in JSX
-  },
-  signOutText: {
-    fontWeight: "600",
   },
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -16,11 +16,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import SendBirdCallService from "../../../lib/sendbird-service";
+import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 
 const { width, height } = Dimensions.get("window");
-
-
 
 // Mock chat messages
 const initialMessages = [
@@ -33,12 +31,16 @@ const initialMessages = [
 const emojiOptions = ["👍", "❤️", "😊", "😮", "😢", "🙏", "👏", "🔥"];
 
 export default function VideoCallScreen() {
-  const [isDemoMode] = useState(true); 
+  const [isDemoMode] = useState(true);
   const { user } = useUser();
   const params = useLocalSearchParams();
-  const supportWorkerId = params.supportWorkerId as string;
-  const supportWorkerName = params.supportWorkerName as string || "Support Worker";
+  const supportWorkerName = (params.supportWorkerName as string) || "Support Worker";
 
+  // Camera permissions
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<CameraType>("front");
+
+  // Call states
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -57,6 +59,7 @@ export default function VideoCallScreen() {
 
   useEffect(() => {
     initializeCall();
+    checkCameraPermissions();
 
     return () => {
       endCall();
@@ -66,70 +69,33 @@ export default function VideoCallScreen() {
     };
   }, []);
 
-  // Initialize SendBird and start call
-  const initializeCall = async () => {
-    // Demo mode - simulate successful connection
-    if (isDemoMode) {
-      setCallStatus("Connecting...");
-      
-      // Simulate connection delay
-      setTimeout(() => {
-        setCallStatus("Connected (Demo)");
-        setIsCallConnected(true);
-        startCallTimer();
-      }, 2000); // 2 second delay to simulate real connection
-      
+  // Check and request camera permissions
+  const checkCameraPermissions = async () => {
+    if (!permission) {
       return;
     }
 
-    // Real SendBird code (only runs if isDemoMode is false)
-    try {
-      await SendBirdCallService.initialize();
-      const userId = user?.id || `user_${Date.now()}`;
-      await SendBirdCallService.authenticate(userId);
-      const call = await SendBirdCallService.createCall(
-        `support_worker_${supportWorkerId}`,
-        true
-      );
-      setupCallListeners(call);
-      setCallStatus("Ringing...");
-    } catch (error) {
-      console.error("Failed to initialize call:", error);
-      Alert.alert(
-        "Call Failed",
-        "Unable to start video call. Please try again.",
-        [{ text: "OK", onPress: () => router.back() }]
-      );
+    if (!permission.granted) {
+      const { granted } = await requestPermission();
+      if (!granted) {
+        Alert.alert(
+          "Camera Permission Required",
+          "Please enable camera access to use video calling.",
+          [{ text: "OK" }]
+        );
+      }
     }
   };
 
-  // Set up call event listeners
-  const setupCallListeners = (call: any) => {
-    call.onEstablished = () => {
-      setCallStatus("Connected");
+  // Initialize call (demo mode)
+  const initializeCall = async () => {
+    setCallStatus("Connecting...");
+    
+    setTimeout(() => {
+      setCallStatus("Connected (Demo)");
       setIsCallConnected(true);
       startCallTimer();
-    };
-
-    call.onConnected = () => {
-      console.log("Call connected");
-    };
-
-    call.onEnded = () => {
-      setCallStatus("Call Ended");
-      setIsCallConnected(false);
-      setTimeout(() => {
-        router.back();
-      }, 2000);
-    };
-
-    call.onRemoteAudioSettingsChanged = () => {
-      console.log("Remote audio settings changed");
-    };
-
-    call.onRemoteVideoSettingsChanged = () => {
-      console.log("Remote video settings changed");
-    };
+    }, 2000);
   };
 
   // Start call duration timer
@@ -162,44 +128,22 @@ export default function VideoCallScreen() {
   };
 
   const endCall = async () => {
-    // Demo mode - just go back
-    if (isDemoMode) {
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
-      }
-      router.back();
-      return;
+    if (callDurationInterval.current) {
+      clearInterval(callDurationInterval.current);
     }
-
-    // Real SendBird code
-    try {
-      await SendBirdCallService.endCall();
-      if (callDurationInterval.current) {
-        clearInterval(callDurationInterval.current);
-      }
-      router.back();
-    } catch (error) {
-      console.error("Error ending call:", error);
-      router.back();
-    }
+    router.back();
   };
 
   const handleToggleCamera = () => {
-    const newState = !isCameraOn;
-    setIsCameraOn(newState);
-    
-    if (!isDemoMode) {
-      SendBirdCallService.toggleVideo(newState);
-    }
+    setIsCameraOn(!isCameraOn);
+  };
+
+  const handleFlipCamera = () => {
+    setFacing(current => (current === "back" ? "front" : "back"));
   };
 
   const handleToggleMic = () => {
-    const newState = !isMicOn;
-    setIsMicOn(newState);
-    
-    if (!isDemoMode) {
-      SendBirdCallService.toggleAudio(newState);
-    }
+    setIsMicOn(!isMicOn);
   };
 
   const handleToggleChat = () => {
@@ -266,11 +210,20 @@ export default function VideoCallScreen() {
     setIsEmojiPanelOpen(false);
   };
 
+  // Show loading if permissions not loaded
+  if (!permission) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.permissionText}>Loading camera...</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Main Video Content */}
       <View style={styles.videoContainer}>
-        {/* Video Placeholder - Replace with actual SendBird native video views */}
+        {/* Remote Video Placeholder */}
         <View style={styles.participantVideo}>
           <View style={styles.videoPlaceholder}>
             <Ionicons name="person-circle" size={100} color="#FFFFFF" />
@@ -285,16 +238,26 @@ export default function VideoCallScreen() {
           </View>
         </View>
 
-        {/* Local Video Preview */}
+        {/* Local Video Preview with REAL CAMERA */}
         <View style={styles.selfVideoPreview}>
-          {isCameraOn ? (
-            <View style={styles.videoPlaceholderSmall}>
-              <Ionicons name="person-circle" size={40} color="#FFFFFF" />
-              <Text style={styles.placeholderTextSmall}>You</Text>
-            </View>
+          {isCameraOn && permission?.granted ? (
+            <>
+              <CameraView 
+                style={styles.camera}
+                facing={facing}
+              />
+              {/* Flip Camera Button */}
+              <TouchableOpacity 
+                style={styles.flipCameraButton}
+                onPress={handleFlipCamera}
+              >
+                <Ionicons name="camera-reverse" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </>
           ) : (
             <View style={styles.cameraOffOverlay}>
               <Ionicons name="videocam-off" size={24} color="#FFFFFF" />
+              <Text style={styles.cameraOffText}>Camera Off</Text>
             </View>
           )}
         </View>
@@ -311,7 +274,7 @@ export default function VideoCallScreen() {
           <View style={styles.connectionBanner}>
             <Ionicons name="information-circle" size={20} color="#FFF" />
             <Text style={styles.connectionText}>
-              Video calling with SendBird requires native setup. This is a demo mode.
+              Demo mode - Your camera is working! 📹
             </Text>
           </View>
         )}
@@ -492,6 +455,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#1A1A1A",
   },
+  permissionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    textAlign: "center",
+    marginTop: 20,
+  },
   videoContainer: {
     flex: 1,
     backgroundColor: "#000000",
@@ -552,27 +521,29 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
     backgroundColor: "#333",
   },
-  videoPlaceholderSmall: {
+  camera: {
     width: "100%",
     height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#2a2a2a",
   },
-  placeholderTextSmall: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    marginTop: 5,
+  flipCameraButton: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 20,
+    padding: 8,
   },
   cameraOffOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    width: "100%",
+    height: "100%",
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  cameraOffText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    marginTop: 8,
   },
   callStatus: {
     position: "absolute",
@@ -594,7 +565,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 152, 0, 0.9)",
+    backgroundColor: "rgba(76, 175, 80, 0.9)",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -667,10 +638,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -711,10 +679,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,

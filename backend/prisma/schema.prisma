@@ -198,6 +198,7 @@ model User {
   date_came_to_canada        DateTime?
 
   // Relations
+  appointments  Appointment[]
   clients                   Client[]
   assessments               Assessment[]
   mood_entries              MoodEntry[]
@@ -607,5 +608,35 @@ model SupportWorker {
   created_at           DateTime  @default(now())
   updated_at           DateTime  @updatedAt
 
+  appointments  Appointment[]
+
+
   @@map("support_workers")
 }
+
+// =============================================
+// NEW MODEL: Appointments
+// =============================================
+   model Appointment {
+     id                   Int       @id @default(autoincrement())
+     user_id              Int
+     support_worker_id    Int
+     appointment_date     DateTime  @db.Date
+     appointment_time     String    @db.VarChar(10)
+     duration_minutes     Int       @default(60)
+     session_type         String    @db.VarChar(20)
+     status               String    @default("scheduled") @db.VarChar(20)
+     meeting_link         String?   @db.Text
+     notes                String?   @db.Text
+     cancellation_reason  String?   @db.Text
+     created_at           DateTime  @default(now())
+     updated_at           DateTime  @updatedAt
+
+     user            User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+     support_worker  SupportWorker @relation(fields: [support_worker_id], references: [id])
+
+     @@index([user_id])
+     @@index([support_worker_id])
+     @@index([appointment_date])
+     @@map("appointments")
+   }
