@@ -32,7 +32,8 @@
           "cameraPermission": "Allow SafeSpace to access your camera for video consultations with support workers."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-av"
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"

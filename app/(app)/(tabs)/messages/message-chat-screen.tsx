@@ -53,13 +53,15 @@ import {
   Keyboard,
   Animated,
 } from "react-native";
+import { PermissionsAndroid } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { useAudioRecorder, useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer, RecordingOptions } from 'expo-audio';
+import { Audio } from 'expo-av';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
@@ -130,6 +132,7 @@ export default function ChatScreen() {
   const scrollIdleTimerRef = useRef<any>(null);
   const messagesListRef = useRef<FlatList<ExtendedMessage>>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingRef = useRef<any>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,27 +151,8 @@ export default function ChatScreen() {
     actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
 
-  // Audio recording hook - using default recording options
-  const audioRecorder = useAudioRecorder(
-    {
-      extension: '.m4a',
-      sampleRate: 44100,
-      numberOfChannels: 2,
-      bitRate: 128000,
-      android: {
-        extension: '.m4a',
-        outputFormat: 'mpeg4' as any,
-        audioEncoder: 'aac' as any,
-      },
-      ios: {
-        extension: '.m4a',
-        audioQuality: 127, // MAX
-      },
-      web: {
-        mimeType: 'audio/webm',
-      },
-    }
-  );
+  // Don't use the broken useAudioRecorder hook - use AudioModule directly
+  const audioRecorderRef = useRef<any>(null);
 
   // Get safe area insets for proper spacing
   const insets = useSafeAreaInsets();
@@ -181,6 +165,48 @@ export default function ChatScreen() {
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setStatusModalData({ type, title, message, confirm: undefined, actions: undefined });
     setStatusModalVisible(true);
+  };
+
+  // Try to normalize URI from various recorder stop() shapes and hook fields
+  const resolveRecorderUri = (stopResult: any): string | null => {
+    const recorder = audioRecorderRef.current;
+    const candidates = [
+      stopResult?.uri,
+      stopResult?.file?.uri,
+      stopResult?.path,
+      stopResult?.url,
+      recorder?.uri,
+      recorder?.recordingUri,
+      recorder?.recording?.uri,
+      recorder?.recording?.getURI?.(),
+      recorder?._recording?.uri,
+      recorder?._recording?.getURI?.(),
+      typeof recorder?.getURI === 'function' ? recorder?.getURI() : undefined,
+      typeof recorder?.recording?.getURI === 'function' ? recorder?.recording?.getURI() : undefined,
+    ].filter(Boolean).filter((u: any) => u && u.length > 0);
+    return (candidates.length > 0 ? String(candidates[0]) : null);
+  };
+
+  // Ensure microphone permission (Android requires runtime grant)
+  const ensureMicPermission = async (): Promise<boolean> => {
+    try {
+      if (Platform.OS !== 'android') return true; // iOS/Web prompt automatically on first access
+      const already = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      if (already) return true;
+      const res = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        {
+          title: 'Microphone permission',
+          message: 'SafeSpace needs access to your microphone to record voice messages.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Deny',
+          buttonNeutral: 'Ask Me Later',
+        }
+      );
+      return res === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (_e) {
+      return false;
+    }
   };
 
   const showConfirm = (
@@ -770,24 +796,47 @@ export default function ChatScreen() {
     setEmojiPickerVisible(false);
   };
 
-  // Handle voice recording (start/stop)
+  // Handle voice recording (start/stop) - using expo-av Audio.Recording
   const handleMicPress = async () => {
     try {
-      if (audioRecorder.isRecording) {
+      // Ensure microphone permission before attempting to record
+      const hasPerm = await ensureMicPermission();
+      if (!hasPerm) {
+        showStatusModal('error', 'Permission required', 'Please allow microphone access to record voice messages.');
+        return;
+      }
+      if (isRecording) {
         // Stop recording
         console.log('🎤 Stopping recording...');
-        await audioRecorder.stop();
-        
-        const uri = audioRecorder.uri;
-        if (uri) {
-          console.log('🎤 Recording saved:', uri);
-          const info = await FileSystem.getInfoAsync(uri);
-          if (info.exists) {
-            setPendingRecordingUri(uri);
-            setPendingRecordingDuration(recordingDuration);
-          }
+        const recorder = audioRecorderRef.current;
+        if (!recorder) {
+          console.log('❌ No recorder instance');
+          showStatusModal('error', 'Recording Error', 'Recording not initialized.');
+          setIsRecording(false);
+          return;
         }
+        
+        try {
+          await recorder.stopAndUnloadAsync();
+          const uri = recorder.getURI();
+          console.log('🎤 Recording URI:', uri);
+          
+          if (uri && uri.length > 0) {
+            console.log('🎤 Recording saved:', uri);
+            setPendingRecordingUri(uri);
+            setPendingRecordingDuration(Math.max(1, recordingDuration));
+            audioRecorderRef.current = null;
+          } else {
+            console.log('❌ No URI from recording');
+            showStatusModal('error', 'Recording Error', 'Could not save the recording. Please try again.');
+          }
+        } catch (stopError: any) {
+          console.error('❌ Error stopping:', stopError);
+          showStatusModal('error', 'Recording Error', stopError.message || 'Failed to stop recording');
+        }
+        
         setIsRecording(false);
+        isRecordingRef.current = false;
         
         if (recordingTimerRef.current) {
           clearInterval(recordingTimerRef.current);
@@ -796,18 +845,39 @@ export default function ChatScreen() {
       } else {
         // Start recording
         console.log('🎤 Starting recording...');
-        await audioRecorder.record();
-        setIsRecording(true);
-        setRecordingDuration(0);
         
-        // Update duration every second
-        recordingTimerRef.current = setInterval(() => {
-          setRecordingDuration(prev => prev + 1);
-        }, 1000);
+        try {
+          // Request permissions
+          await Audio.requestPermissionsAsync();
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+          });
+          
+          const { recording } = await Audio.Recording.createAsync(
+            Audio.RecordingOptionsPresets.HIGH_QUALITY
+          );
+          
+          audioRecorderRef.current = recording;
+          console.log('🎤 Recording started successfully');
+          
+          setIsRecording(true);
+          isRecordingRef.current = true;
+          setRecordingDuration(0);
+          
+          // Update duration every second
+          recordingTimerRef.current = setInterval(() => {
+            setRecordingDuration(prev => prev + 1);
+          }, 1000);
+        } catch (startError: any) {
+          console.error('❌ Error starting recording:', startError);
+          showStatusModal('error', 'Recording Error', startError.message || 'Failed to start recording');
+        }
       }
     } catch (error: any) {
       console.error('❌ Audio recording error:', error);
       setIsRecording(false);
+      isRecordingRef.current = false;
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
@@ -816,12 +886,20 @@ export default function ChatScreen() {
     }
   };
 
+
   // Cancel/remove pending recording (or abort active recording)
   const cancelPendingRecording = async () => {
     try {
-      if (audioRecorder.isRecording) {
-        await audioRecorder.stop();
+      if (isRecording) {
+        try { 
+          const recorder = audioRecorderRef.current;
+          if (recorder) {
+            await recorder.stopAndUnloadAsync();
+          }
+          audioRecorderRef.current = null;
+        } catch { /* noop */ }
         setIsRecording(false);
+        isRecordingRef.current = false;
       }
       if (recordingTimerRef.current) { 
         clearInterval(recordingTimerRef.current); 
@@ -837,11 +915,25 @@ export default function ChatScreen() {
     }
   };
 
+  // Cleanup on unmount: stop any active recording and clear timers
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (isRecordingRef.current && audioRecorderRef.current) {
+        try { audioRecorderRef.current.stopAndUnloadAsync(); } catch { /* noop */ }
+      }
+    };
+  }, []);
+
   // Send the prepared recording
   const sendPendingRecording = async () => {
     if (!pendingRecordingUri) return;
     try {
       setUploading(true);
+      // Use m4a extension for all platforms
       const fileName = `voice_${Date.now()}.m4a`;
       console.log('🎤 Sending voice message:', { fileName, uri: pendingRecordingUri });
       await uploadAttachment(pendingRecordingUri, 'file', fileName);
@@ -861,6 +953,10 @@ export default function ChatScreen() {
   const handleMainSend = async () => {
     if (sending || uploading) return;
     try {
+      // If there's a pending voice recording, send it first
+      if (pendingRecordingUri) {
+        await sendPendingRecording();
+      }
       // Send files first
       if (pendingFiles.length > 0) {
         setUploading(true);
@@ -1855,7 +1951,7 @@ export default function ChatScreen() {
               <Ionicons name="happy-outline" size={28} color={theme.colors.primary} />
             </TouchableOpacity>
 
-            {(newMessage.trim() !== "" || pendingFiles.length > 0) && (
+            {(newMessage.trim() !== "" || pendingFiles.length > 0 || !!pendingRecordingUri) && (
               <TouchableOpacity
                 style={styles.iconButton}
                 onPress={handleMainSend}
