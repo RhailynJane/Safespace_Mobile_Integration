@@ -19,7 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { assessmentTracker } from "../utils/assessmentTracker";
+import assessmentsApi from "../utils/assessmentsApi";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import activityApi from "../utils/activityApi";
@@ -71,8 +71,8 @@ export const AppHeader = ({
     const checkAssessment = async () => {
       if (user?.id) {
         try {
-          const isDue = await assessmentTracker.isAssessmentDue(user.id);
-          setIsAssessmentDue(isDue);
+          const result = await assessmentsApi.isAssessmentDue(user.id);
+          setIsAssessmentDue(result.isDue);
         } catch (error) {
           console.error("Error checking assessment status:", error);
         } finally {

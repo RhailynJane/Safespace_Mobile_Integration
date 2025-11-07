@@ -20,7 +20,9 @@ import { useUser } from "@clerk/clerk-expo";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
+import { ConvexReactClient } from "convex/react";
 import SendBirdCallService from "../../../lib/sendbird-service";
+import { useConvexVideoSession } from "../../../utils/hooks/useConvexVideoSession";
 
 const { width, height } = Dimensions.get("window");
 
@@ -40,6 +42,29 @@ export default function VideoCallScreen() {
   const params = useLocalSearchParams();
   const supportWorkerId = params.supportWorkerId as string;
   const supportWorkerName = params.supportWorkerName as string || "Support Worker";
+  const sessionIdParam = params.sessionId as string || '';
+
+  // Convex client for session tracking
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+
+  // Initialize Convex client
+  useEffect(() => {
+    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
+    if (!convexUrl) {
+      setConvexClient(null);
+      return;
+    }
+
+    const client = new ConvexReactClient(convexUrl);
+    setConvexClient(client);
+
+    return () => {
+      setConvexClient(null);
+    };
+  }, []);
+
+  // Video session tracking hook
+  const { markConnected, endSession, updateSettings, isUsingConvex } = useConvexVideoSession(convexClient);
 
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
@@ -88,6 +113,18 @@ export default function VideoCallScreen() {
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
   }, []);
 
+  // Start call duration timer (defined early for use in callbacks)
+  const startCallTimer = useCallback(() => {
+    // Mark session as connected in Convex
+    if (isUsingConvex && sessionIdParam) {
+      markConnected(sessionIdParam);
+    }
+
+    callDurationInterval.current = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
+  }, [isUsingConvex, sessionIdParam, markConnected]);
+
   // Set up call event listeners (defined before initializeCall for hook deps ordering)
   const setupCallListeners = useCallback((call: any) => {
     call.onEstablished = () => {
@@ -115,7 +152,7 @@ export default function VideoCallScreen() {
     call.onRemoteVideoSettingsChanged = () => {
       console.log("Remote video settings changed");
     };
-  }, []);
+  }, [startCallTimer]);
 
   // Initialize SendBird and start call
   const initializeCall = useCallback(async () => {
@@ -152,14 +189,7 @@ export default function VideoCallScreen() {
         [{ text: "OK", onPress: () => router.back() }]
       );
     }
-  }, [isDemoMode, supportWorkerId, user?.id, setupCallListeners]);
-
-  // Start call duration timer
-  const startCallTimer = () => {
-    callDurationInterval.current = setInterval(() => {
-      setCallDuration((prev) => prev + 1);
-    }, 1000);
-  };
+  }, [isDemoMode, supportWorkerId, user?.id, setupCallListeners, startCallTimer]);
 
   // Format call duration
   const formatDuration = (seconds: number) => {
@@ -184,6 +214,14 @@ export default function VideoCallScreen() {
   };
 
   const endCall = useCallback(async () => {
+    // End session in Convex first
+    if (isUsingConvex && sessionIdParam) {
+      await endSession({
+        sessionIdToEnd: sessionIdParam,
+        endReason: 'user_left',
+      });
+    }
+
     // Demo mode - just go back
     if (isDemoMode) {
       if (callDurationInterval.current) {
@@ -204,7 +242,7 @@ export default function VideoCallScreen() {
       console.error("Error ending call:", error);
       router.back();
     }
-  }, [isDemoMode]);
+  }, [isDemoMode, isUsingConvex, sessionIdParam, endSession]);
 
   useEffect(() => {
     initializeCall();
@@ -250,6 +288,11 @@ export default function VideoCallScreen() {
       setCameraReady(false);
     }
     
+    // Update session settings in Convex
+    if (isUsingConvex && sessionIdParam) {
+      updateSettings({ cameraEnabled: newState });
+    }
+    
     if (!isDemoMode) {
       SendBirdCallService.toggleVideo(newState);
     }
@@ -258,6 +301,11 @@ export default function VideoCallScreen() {
   const handleToggleMic = () => {
     const newState = !isMicOn;
     setIsMicOn(newState);
+    
+    // Update session settings in Convex
+    if (isUsingConvex && sessionIdParam) {
+      updateSettings({ micEnabled: newState });
+    }
     
     if (!isDemoMode) {
       SendBirdCallService.toggleAudio(newState);

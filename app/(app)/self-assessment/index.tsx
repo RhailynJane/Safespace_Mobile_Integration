@@ -20,7 +20,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { BlurView } from "expo-blur";
-import { assessmentTracker } from "../../../utils/assessmentTracker";
+import assessmentsApi from "../../../utils/assessmentsApi";
 import { useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../contexts/ThemeContext";
 const { width } = Dimensions.get("window");
@@ -111,9 +111,16 @@ export default function PreSurveyScreen() {
 
     try {
       if (user?.id) {
-        await assessmentTracker.submitAssessment(
+        // Transform responses to array format for API
+        const responseArray = surveyQuestions.map((q) => ({
+          question: q.text,
+          answer: responses[q.id]!, // Safe: isComplete() already validated all responses exist
+        }));
+
+        await assessmentsApi.submitAssessment(
           user.id,
-          responses,
+          'SWEMWBS', // Short Warwick-Edinburgh Mental Wellbeing Scale
+          responseArray,
           totalScore
         );
         setShowSuccessModal(true);

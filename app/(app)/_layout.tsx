@@ -3,30 +3,52 @@ import { Stack, Redirect, router } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import { ActivityIndicator, View, AppState, Text, TouchableOpacity } from "react-native";
 import { useEffect, useRef, useState } from "react";
-import activityApi from "../../utils/activityApi";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getApiBaseUrl } from "../../utils/apiBaseUrl";
 import { registerForPushNotifications, addNotificationListeners } from "../../utils/pushNotifications";
-import settingsAPI from "../../utils/settingsApi";
 import { scheduleFromSettings } from "../../utils/reminderScheduler";
+import { ConvexReactClient, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useConvexActivity } from "../../utils/hooks/useConvexActivity";
+import { useConvexSettings } from "../../utils/hooks/useConvexSettings";
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn, userId } = useAuth();
   const appState = useRef(AppState.currentState);
   const [banner, setBanner] = useState<{visible:boolean; title:string; body:string}>({visible:false, title:'', body:''});
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const pushSubsRef = useRef<{ remove: () => void } | null>(null);
-  const baseURL = getApiBaseUrl();
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  const lastNotificationIdRef = useRef<string | null>(null);
 
   console.log('📱 AppLayout - Auth State:', { isLoaded, isSignedIn });
 
-  // On sign-in or app foreground, record login once (no heartbeat/polling)
+  // Initialize Convex client
+  useEffect(() => {
+    const initConvex = async () => {
+      try {
+        const url = await AsyncStorage.getItem('convexUrl');
+        if (url) {
+          const client = new ConvexReactClient(url);
+          setConvexClient(client);
+          console.log('� Convex client initialized in AppLayout');
+        }
+      } catch (error) {
+        console.error('❌ Failed to initialize Convex client:', error);
+      }
+    };
+    initConvex();
+  }, []);
+
+  // Initialize activity and settings hooks
+  const { recordLogin } = useConvexActivity(convexClient);
+  const { loadSettings } = useConvexSettings(convexClient);
+
+  // On sign-in or app foreground, record login with Convex
   useEffect(() => {
     if (!isSignedIn || !userId) return;
 
     const record = async () => {
       try {
-        await activityApi.recordLogin(userId);
+        await recordLogin(userId);
         console.log('✅ Presence: recorded login for user:', userId);
       } catch (error) {
         console.error('❌ recordLogin failed:', error);
@@ -36,7 +58,7 @@ export default function AppLayout() {
     // Initial record when layout mounts for a signed-in user
     record();
 
-    // Record again when app returns to foreground (no interval)
+    // Record again when app returns to foreground
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (
         appState.current.match(/inactive|background/) &&
@@ -51,67 +73,115 @@ export default function AppLayout() {
     return () => {
       subscription.remove();
     };
-  }, [isSignedIn, userId]);
+  }, [isSignedIn, userId, recordLogin]);
 
-  // Simple in-app banner (foreground) by polling notifications API
+  // Load settings from Convex and schedule reminders
   useEffect(() => {
-    if (!isSignedIn || !userId) {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-      pollingRef.current = null;
-      // cleanup push listeners if any
-      if (pushSubsRef.current) {
-        try { pushSubsRef.current.remove(); } catch (_e) { /* no-op */ }
-        pushSubsRef.current = null;
-      }
-      return;
-    }
+    if (!isSignedIn || !userId || !convexClient) return;
 
-    let isMounted = true;
-    const key = `lastSeenNotificationId:${userId}`;
-
-    const checkNotifications = async () => {
+    const loadUserSettings = async () => {
       try {
-        const res = await fetch(`${baseURL}/api/notifications/${userId}`);
-        if (!res.ok) return;
-        const json = await res.json();
-  const rows: Array<{id:number; type:string; title:string; message:string; is_read:boolean; created_at:string}> = json.data || [];
-  if (!rows || rows.length === 0) return;
-
-        const lastSeenStr = await AsyncStorage.getItem(key);
-        const lastSeenId = lastSeenStr ? parseInt(lastSeenStr, 10) : 0;
-        const newest = rows[0]; // ordered desc by backend
-  if (newest && newest.id > lastSeenId) {
-          // Find first unread newer than last seen
-          // Ignore local reminder types for in-app banner; they still count for the bell
-          const isRemType = (t?: string) => t === 'mood' || t === 'journaling';
-          const firstNew = rows.find(r => r.id > lastSeenId && !r.is_read && !isRemType(r.type))
-                           || rows.find(r => r.id > lastSeenId && !isRemType(r.type));
-          if (firstNew && isMounted) {
-            setBanner({visible:true, title: firstNew.title || 'Notification', body: firstNew.message || ''});
-            // update last seen to newest id to avoid repeated banners
-            if (newest) await AsyncStorage.setItem(key, String(newest.id));
-            // auto-hide after 3.5s
-            setTimeout(() => setBanner(b => ({...b, visible:false})), 3500);
-          } else {
-            if (newest) await AsyncStorage.setItem(key, String(newest.id));
-          }
+        await loadSettings(userId);
+        
+        // Load settings from Convex to schedule reminders
+        const convexSettings = await convexClient.query(api.settings.getUserSettings, { userId });
+        if (convexSettings) {
+          // Map to UserSettings format for scheduler
+          const mappedSettings = {
+            darkMode: convexSettings.darkMode,
+            textSize: convexSettings.textSize,
+            notificationsEnabled: convexSettings.notificationsEnabled,
+            notifMoodTracking: convexSettings.notifMoodTracking,
+            notifJournaling: convexSettings.notifJournaling,
+            notifMessages: convexSettings.notifMessages,
+            notifPostReactions: convexSettings.notifPostReactions,
+            notifAppointments: convexSettings.notifAppointments,
+            notifSelfAssessment: convexSettings.notifSelfAssessment,
+            reminderFrequency: convexSettings.reminderFrequency,
+            moodReminderEnabled: convexSettings.moodReminderEnabled,
+            moodReminderTime: convexSettings.moodReminderTime,
+            moodReminderFrequency: convexSettings.moodReminderFrequency,
+            moodReminderCustomSchedule: convexSettings.moodReminderCustomSchedule || {},
+            journalReminderEnabled: convexSettings.journalReminderEnabled,
+            journalReminderTime: convexSettings.journalReminderTime,
+            journalReminderFrequency: convexSettings.journalReminderFrequency,
+            journalReminderCustomSchedule: convexSettings.journalReminderCustomSchedule || {},
+            appointmentReminderEnabled: convexSettings.appointmentReminderEnabled,
+            appointmentReminderAdvanceMinutes: convexSettings.appointmentReminderAdvanceMinutes,
+          };
+          
+          await scheduleFromSettings(mappedSettings);
+          console.log('⚙️ Settings loaded and reminders scheduled');
         }
-      } catch (e) {
-        // ignore
+      } catch (error) {
+        console.error('❌ Failed to load settings:', error);
       }
     };
 
-    // kick once and then interval
-    checkNotifications();
-  const id = setInterval(checkNotifications, 15000);
-  pollingRef.current = id;
+    loadUserSettings();
+  }, [isSignedIn, userId, convexClient, loadSettings]);
+
+  // Real-time notifications using Convex polling
+  const [notificationsList, setNotificationsList] = useState<any[]>([]);
+  
+  useEffect(() => {
+    if (!convexClient || !userId) return;
+
+    let mounted = true;
+    
+    const fetchNotifications = async () => {
+      try {
+        const result = await convexClient.query(
+          api.notifications.getNotifications,
+          { userId, limit: 10 }
+        );
+
+        if (mounted && result?.notifications) {
+          setNotificationsList(result.notifications);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching notifications:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchNotifications();
+
+    // Poll every 10 seconds for new notifications
+    const interval = setInterval(fetchNotifications, 10000);
 
     return () => {
-      isMounted = false;
-  clearInterval(id);
-  pollingRef.current = null;
+      mounted = false;
+      clearInterval(interval);
     };
-  }, [isSignedIn, userId, baseURL]);
+  }, [convexClient, userId]);
+
+  // Show banner for new notifications
+  useEffect(() => {
+    if (notificationsList.length === 0) return;
+
+    const latestNotification = notificationsList[0];
+    
+    // Check if this is a new notification we haven't seen
+    if (lastNotificationIdRef.current !== latestNotification.id) {
+      const isRemType = (t?: string) => t === 'mood' || t === 'journaling';
+      
+      // Only show banner for non-reminder notifications
+      if (!isRemType(latestNotification.type) && !latestNotification.isRead) {
+        setBanner({
+          visible: true,
+          title: latestNotification.title || 'Notification',
+          body: latestNotification.message || ''
+        });
+
+        // Auto-hide after 3.5s
+        setTimeout(() => setBanner(b => ({ ...b, visible: false })), 3500);
+      }
+
+      // Update last seen notification ID
+      lastNotificationIdRef.current = latestNotification.id;
+    }
+  }, [notificationsList]);
 
   // Register for push and attach listeners to show instant banners
   useEffect(() => {
@@ -133,14 +203,6 @@ export default function AppLayout() {
         });
       } catch (_e) {
         // ignore if module not available
-      }
-
-      // Proactively (re)schedule local reminders on app start based on saved settings
-      try {
-        const settings = await settingsAPI.fetchSettings(userId);
-        await scheduleFromSettings(settings);
-      } catch (e) {
-        console.log('🔔 Scheduling reminders on app start failed:', e);
       }
 
       try {

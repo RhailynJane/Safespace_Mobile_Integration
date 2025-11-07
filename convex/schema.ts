@@ -55,12 +55,14 @@ export default defineSchema({
 		authorId: v.string(),
 		title: v.string(),
 		content: v.string(),
+		category: v.optional(v.string()), // Post category (Stress, Support, Stories, etc.)
 		isDraft: v.boolean(),
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	})
 		.index("by_author", ["authorId"]) 
-		.index("by_createdAt", ["createdAt"]),
+		.index("by_createdAt", ["createdAt"])
+		.index("by_category", ["category", "createdAt"]),
 	postReactions: defineTable({
 		postId: v.id("communityPosts"),
 		userId: v.string(),
@@ -68,7 +70,16 @@ export default defineSchema({
 		createdAt: v.number(),
 	})
 		.index("by_post", ["postId"]) 
-		.index("by_user", ["userId"]),
+		.index("by_user", ["userId"])
+		.index("by_user_and_post", ["userId", "postId"]),
+	postBookmarks: defineTable({
+		postId: v.id("communityPosts"),
+		userId: v.string(),
+		createdAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_post", ["postId"])
+		.index("by_user_and_post", ["userId", "postId"]),
 	
 	// Mood tracking
 	moods: defineTable({
@@ -110,6 +121,32 @@ export default defineSchema({
 		.index("by_user_and_date", ["userId", "date"])
 		.index("by_status", ["status"])
 		.index("by_user_and_status", ["userId", "status"]),
+	
+	// Video Call Sessions (track call history and analytics)
+	videoCallSessions: defineTable({
+		appointmentId: v.optional(v.id("appointments")), // Link to appointment if scheduled
+		userId: v.string(), // Clerk user ID of the client
+		supportWorkerName: v.string(), // Support worker name
+		supportWorkerId: v.optional(v.string()), // Support worker ID
+		sessionStatus: v.string(), // 'connecting' | 'connected' | 'ended' | 'failed'
+		joinedAt: v.number(), // When user joined the pre-call screen
+		connectedAt: v.optional(v.number()), // When call actually connected
+		endedAt: v.optional(v.number()), // When call ended
+		duration: v.optional(v.number()), // Call duration in seconds
+		audioOption: v.optional(v.string()), // 'phone' | 'none'
+		cameraEnabled: v.optional(v.boolean()),
+		micEnabled: v.optional(v.boolean()),
+		qualityIssues: v.optional(v.array(v.string())), // Track any reported issues
+		endReason: v.optional(v.string()), // 'user_left' | 'error' | 'completed'
+		metadata: v.optional(v.any()), // Additional session data
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_appointment", ["appointmentId"])
+		.index("by_status", ["sessionStatus"])
+		.index("by_user_and_date", ["userId", "createdAt"])
+		.index("by_support_worker", ["supportWorkerId"]),
 	
 	// User profiles (extended)
 	profiles: defineTable({
@@ -269,4 +306,53 @@ export default defineSchema({
 		.index("by_type", ["type"])
 		.index("by_active", ["active"])
 		.index("by_sort", ["sortOrder"]),
+
+	// Self-Assessments (Mental Wellbeing Scale)
+	assessments: defineTable({
+		userId: v.string(), // Clerk user ID
+		assessmentType: v.string(), // 'pre-survey' | 'short-warwick-edinburgh' | etc
+		responses: v.any(), // JSON object of question_id: answer_value
+		totalScore: v.number(), // Calculated total score
+		completedAt: v.number(), // Timestamp when completed
+		nextDueDate: v.optional(v.number()), // When next assessment is due (6 months later)
+		notes: v.optional(v.string()), // Optional notes or interpretation
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_user_and_completed", ["userId", "completedAt"])
+		.index("by_next_due", ["nextDueDate"]),
+
+	// User Settings (Display, Notifications, Reminders)
+	settings: defineTable({
+		userId: v.string(), // Clerk user ID
+		// Display & Accessibility
+		darkMode: v.boolean(),
+		textSize: v.string(), // 'Small' | 'Medium' | 'Large' | 'Extra Large'
+		// Notifications
+		notificationsEnabled: v.boolean(),
+		notifMoodTracking: v.boolean(),
+		notifJournaling: v.boolean(),
+		notifMessages: v.boolean(),
+		notifPostReactions: v.boolean(),
+		notifAppointments: v.boolean(),
+		notifSelfAssessment: v.boolean(),
+		reminderFrequency: v.string(), // 'Daily' | 'Weekly' | 'Custom'
+		// Mood Reminders
+		moodReminderEnabled: v.boolean(),
+		moodReminderTime: v.string(), // HH:mm format
+		moodReminderFrequency: v.string(), // 'Daily' | 'Custom'
+		moodReminderCustomSchedule: v.any(), // JSON object { monday: "09:00", ... }
+		// Journal Reminders
+		journalReminderEnabled: v.boolean(),
+		journalReminderTime: v.string(), // HH:mm format
+		journalReminderFrequency: v.string(), // 'Daily' | 'Custom'
+		journalReminderCustomSchedule: v.any(), // JSON object { monday: "20:00", ... }
+		// Appointment Reminders
+		appointmentReminderEnabled: v.boolean(),
+		appointmentReminderAdvanceMinutes: v.number(), // Minutes before appointment
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_user", ["userId"]),
 });

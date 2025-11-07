@@ -1,7 +1,7 @@
 /**
  * LLM Prompt: Add concise inline comments to this React Native component.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Dimensions,
   SafeAreaView,
@@ -15,11 +15,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
+import { ConvexReactClient } from "convex/react";
 
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useConvexVideoSession } from "../../../utils/hooks/useConvexVideoSession";
 
 const { width } = Dimensions.get("window");
 
@@ -39,6 +41,28 @@ export default function VideoCallScreen() {
   const [activeTab, setActiveTab] = useState<string>("home");
   const [confirmVisible, setConfirmVisible] = useState(false);
 
+  // Convex client for session tracking
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+
+  // Initialize Convex client
+  useEffect(() => {
+    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
+    if (!convexUrl) {
+      setConvexClient(null);
+      return;
+    }
+
+    const client = new ConvexReactClient(convexUrl);
+    setConvexClient(client);
+
+    return () => {
+      setConvexClient(null);
+    };
+  }, []);
+
+  // Video session tracking hook
+  const { startSession, sessionId } = useConvexVideoSession(convexClient);
+
   // Styles with dynamic text scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
@@ -53,19 +77,35 @@ export default function VideoCallScreen() {
   };
 
   // Start meeting: navigate to the in-call screen, forward context
-  const handleStartMeeting = () => {
+  const handleStartMeeting = async () => {
     // If appointment is in the future (MST), show confirmation modal
     if (shouldConfirmFutureJoin(date, time)) {
       setConfirmVisible(true);
       return;
     }
-    pushToMeeting();
+    await pushToMeeting();
   };
 
-  const pushToMeeting = () => {
+  const pushToMeeting = async () => {
+    // Start session tracking in Convex
+    const newSessionId = await startSession({
+      appointmentId: appointmentId || undefined,
+      supportWorkerName,
+      supportWorkerId: undefined, // Could be extracted from params if needed
+      audioOption,
+    });
+
     router.push({
       pathname: "/(app)/video-consultations/video-call-meeting",
-      params: { supportWorkerName, appointmentId, audioOption, meetingLink, date, time },
+      params: { 
+        supportWorkerName, 
+        appointmentId, 
+        audioOption, 
+        meetingLink, 
+        date, 
+        time,
+        sessionId: newSessionId || '', // Pass session ID to meeting screen
+      },
     });
   };
 
@@ -266,7 +306,7 @@ export default function VideoCallScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalPrimaryButton, { backgroundColor: theme.colors.primary }]}
-                  onPress={() => { setConfirmVisible(false); pushToMeeting(); }}
+                  onPress={async () => { setConfirmVisible(false); await pushToMeeting(); }}
                 >
                   <Text style={styles.modalPrimaryText}>Join now</Text>
                 </TouchableOpacity>

@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as activities from "../activities.js";
 import type * as appointments from "../appointments.js";
+import type * as assessments from "../assessments.js";
 import type * as auth from "../auth.js";
 import type * as conversations from "../conversations.js";
 import type * as crisis from "../crisis.js";
@@ -21,7 +23,9 @@ import type * as posts from "../posts.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
 import type * as resources from "../resources.js";
+import type * as settings from "../settings.js";
 import type * as storage from "../storage.js";
+import type * as videoCallSessions from "../videoCallSessions.js";
 
 import type {
   ApiFromModules,
@@ -38,7 +42,9 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  activities: typeof activities;
   appointments: typeof appointments;
+  assessments: typeof assessments;
   auth: typeof auth;
   conversations: typeof conversations;
   crisis: typeof crisis;
@@ -51,7 +57,9 @@ declare const fullApi: ApiFromModules<{
   presence: typeof presence;
   profiles: typeof profiles;
   resources: typeof resources;
+  settings: typeof settings;
   storage: typeof storage;
+  videoCallSessions: typeof videoCallSessions;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

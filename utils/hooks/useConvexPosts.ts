@@ -230,7 +230,25 @@ export function useConvexPosts(userId: string | undefined, convexClient: ConvexR
     if (!userId) throw new Error('User ID required');
 
     try {
-      // Note: Convex delete function not in posts.ts yet, will use REST
+      // Use Convex for deletion
+      if (isConvexEnabled && convexClient) {
+        try {
+          // @ts-ignore
+          const { api } = await import('../../convex/_generated/api');
+          await convexClient.mutation(api.posts.deletePost, { postId: postId as any });
+          
+          console.log('✅ Convex post deleted');
+          
+          // Refresh posts after deleting
+          await loadPosts();
+          await loadMyPosts();
+          return { success: true };
+        } catch (convexError) {
+          console.warn('Convex delete mutation failed, falling back to REST:', convexError);
+        }
+      }
+      
+      // Fallback to REST API
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/community/posts/${postId}?clerkUserId=${userId}`, {
         method: 'DELETE',
@@ -246,7 +264,7 @@ export function useConvexPosts(userId: string | undefined, convexClient: ConvexR
       console.error('Error deleting post:', err);
       throw err;
     }
-  }, [userId, loadPosts, loadMyPosts]);
+  }, [userId, isConvexEnabled, convexClient, loadPosts, loadMyPosts]);
 
   /**
    * Update a post
@@ -260,7 +278,28 @@ export function useConvexPosts(userId: string | undefined, convexClient: ConvexR
     if (!userId) throw new Error('User ID required');
 
     try {
-      // Note: Convex update function not in posts.ts yet, will use REST
+      // Use Convex for update
+      if (isConvexEnabled && convexClient) {
+        try {
+          // @ts-ignore
+          const { api } = await import('../../convex/_generated/api');
+          await convexClient.mutation(api.posts.update, {
+            postId: postId as any,
+            ...postData,
+          });
+          
+          console.log('✅ Convex post updated');
+          
+          // Refresh posts after updating
+          await loadPosts();
+          await loadMyPosts();
+          return { success: true };
+        } catch (convexError) {
+          console.warn('Convex update mutation failed, falling back to REST:', convexError);
+        }
+      }
+      
+      // Fallback to REST API
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/community/posts/${postId}`, {
         method: 'PATCH',
@@ -281,7 +320,48 @@ export function useConvexPosts(userId: string | undefined, convexClient: ConvexR
       console.error('Error updating post:', err);
       throw err;
     }
-  }, [userId, loadPosts, loadMyPosts]);
+  }, [userId, isConvexEnabled, convexClient, loadPosts, loadMyPosts]);
+
+  /**
+   * Toggle bookmark on a post
+   */
+  const toggleBookmark = useCallback(async (postId: string) => {
+    if (!userId) throw new Error('User ID required');
+
+    try {
+      // Use Convex for bookmarking
+      if (isConvexEnabled && convexClient) {
+        try {
+          // @ts-ignore
+          const { api } = await import('../../convex/_generated/api');
+          const result = await convexClient.mutation(api.posts.toggleBookmark, {
+            postId: postId as any,
+          });
+          
+          console.log('✅ Convex bookmark toggled:', result.bookmarked);
+          return { bookmarked: result.bookmarked };
+        } catch (convexError) {
+          console.warn('Convex bookmark mutation failed, falling back to REST:', convexError);
+        }
+      }
+      
+      // Fallback to REST API
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/community/posts/${postId}/bookmark`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clerkUserId: userId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to toggle bookmark');
+      
+      const result = await response.json();
+      return { bookmarked: result.bookmarked };
+    } catch (err) {
+      console.error('Error toggling bookmark:', err);
+      throw err;
+    }
+  }, [userId, isConvexEnabled, convexClient]);
 
   // Load initial data
   useEffect(() => {
@@ -301,6 +381,7 @@ export function useConvexPosts(userId: string | undefined, convexClient: ConvexR
     reactToPost,
     deletePost,
     updatePost,
+    toggleBookmark,
     isUsingConvex: isConvexEnabled,
   };
 }

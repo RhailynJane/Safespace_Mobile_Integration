@@ -23,13 +23,15 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUser } from "@clerk/clerk-expo";
+import { useConvexAppointments } from "../../../utils/hooks/useConvexAppointments";
+import { ConvexReactClient } from "convex/react";
 
 const { width } = Dimensions.get("window");
 
 type Appointment = {
-  id: number;
+  id: string;
   supportWorker: string;
-  date: string; // formatted
+  date: string;
   time: string;
   type: string;
   status: "upcoming" | "past" | "cancelled";
@@ -48,9 +50,34 @@ export default function VideoScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("video");
   const [upcoming, setUpcoming] = useState<Appointment | null>(null);
+
+  // Local Convex client instance
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+
+  // Initialize Convex client with Clerk auth
+  useEffect(() => {
+    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
+    if (!convexUrl) {
+      setConvexClient(null);
+      return;
+    }
+
+    const client = new ConvexReactClient(convexUrl);
+    setConvexClient(client);
+
+    return () => {
+      setConvexClient(null);
+    };
+  }, []);
+
+  // Use the appointments hook for data management
+  const { 
+    appointments: convexAppointments, 
+    loading, 
+    isUsingConvex 
+  } = useConvexAppointments(user?.id, convexClient);
 
   /**
    * Create styles dynamically based on text size scaling
@@ -80,47 +107,55 @@ export default function VideoScreen() {
     }
   };
 
-  // Fetch next upcoming appointment (MST-aware) and show it on this screen
-  const fetchUpcoming = useCallback(async () => {
-    try {
-      setLoading(true);
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
-      const result = await response.json();
+  // Process appointments to find next upcoming video appointment
+  useEffect(() => {
+    if (!convexAppointments || convexAppointments.length === 0) {
+      setUpcoming(null);
+      return;
+    }
 
-      if (result.success && Array.isArray(result.appointments)) {
-        const transformed: Appointment[] = result.appointments.map((apt: any) => {
-          // Format readable date (keeps user-friendly display)
+    try {
+      // Build MST numeric for current time
+      const mstFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Denver', 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit', 
+        minute: '2-digit', 
+        hour12: false,
+      });
+      const nowParts = mstFormatter.formatToParts(new Date());
+      const nowYear = parseInt(nowParts.find(p => p.type === 'year')?.value || '0');
+      const nowMonth = parseInt(nowParts.find(p => p.type === 'month')?.value || '0');
+      const nowDay = parseInt(nowParts.find(p => p.type === 'day')?.value || '0');
+      const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
+      const nowMinute = parseInt(nowParts.find(p => p.type === 'minute')?.value || '0');
+      const nowNumeric = nowYear * 100000000 + nowMonth * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
+
+      // Transform and filter upcoming appointments
+      const transformed: Appointment[] = convexAppointments
+        .filter(apt => apt.status !== 'cancelled')
+        .map((apt) => {
+          // Format readable date
           const appointmentDate = new Date(apt.date);
           const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric'
           });
 
-          // Build MST numeric for ordering
-          const utcDate = new Date(apt.date);
-          const year = utcDate.getUTCFullYear();
-          const month = utcDate.getUTCMonth();
-          const day = utcDate.getUTCDate();
-
-          const mstFormatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Denver', year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', hour12: false,
-          });
-          const nowParts = mstFormatter.formatToParts(new Date());
-          const nowYear = parseInt(nowParts.find(p => p.type === 'year')?.value || '0');
-          const nowMonth = (parseInt(nowParts.find(p => p.type === 'month')?.value || '0')) - 1;
-          const nowDay = parseInt(nowParts.find(p => p.type === 'day')?.value || '0');
-          const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
-          const nowMinute = parseInt(nowParts.find(p => p.type === 'minute')?.value || '0');
-          const nowNumeric = nowYear * 100000000 + (nowMonth + 1) * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
+          // Calculate numeric timestamp for comparison
+          const year = appointmentDate.getUTCFullYear();
+          const month = appointmentDate.getUTCMonth() + 1;
+          const day = appointmentDate.getUTCDate();
 
           const timeStr: string = apt.time || '00:00:00';
           const [hStr, mStr] = timeStr.split(':');
           const aptHour = parseInt(hStr || '0', 10);
           const aptMinute = parseInt(mStr || '0', 10);
-          const aptNumeric = year * 100000000 + (month + 1) * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
-
-          const isUpcoming = aptNumeric > nowNumeric;
+          const aptNumeric = year * 100000000 + month * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
 
           return {
             id: apt.id,
@@ -128,35 +163,25 @@ export default function VideoScreen() {
             date: formattedDate,
             time: apt.time || '',
             type: apt.type || 'Video',
-            status: apt.status === 'cancelled' ? 'cancelled' : (isUpcoming ? 'upcoming' : 'past'),
+            status: aptNumeric > nowNumeric ? 'upcoming' : 'past',
             mstNumeric: aptNumeric,
-            meetingLink: apt.meetingLink || apt.meeting_link,
+            meetingLink: (apt as any).meetingLink,
           } as Appointment;
         });
 
-        // Choose next upcoming by smallest mstNumeric
-        const upcomingList = transformed.filter(a => a.status === 'upcoming');
-        if (upcomingList.length > 0) {
-          const sorted = [...upcomingList].sort((a, b) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
-          const first = sorted[0];
-          setUpcoming(first ?? null);
-        } else {
-          setUpcoming(null);
-        }
+      // Find next upcoming appointment
+      const upcomingList = transformed.filter(a => a.status === 'upcoming');
+      if (upcomingList.length > 0) {
+        const sorted = [...upcomingList].sort((a, b) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
+        setUpcoming(sorted[0] ?? null);
       } else {
         setUpcoming(null);
       }
     } catch (e) {
-      console.error('Error fetching upcoming appointment for video screen:', e);
+      console.error('Error processing appointments for video screen:', e);
       setUpcoming(null);
-    } finally {
-      setLoading(false);
     }
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (user?.id) fetchUpcoming();
-  }, [user?.id, fetchUpcoming]);
+  }, [convexAppointments]);
 
   // Join meeting: route to pre-join with real params
   const handleJoinMeeting = () => {

@@ -18,16 +18,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import { syncUserWithDatabase } from "../../../../utils/userSync";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
-import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
 import { ConvexReactClient } from "convex/react";
 import { useConvexProfile } from "../../../../utils/hooks/useConvexProfile";
 
-const API_URL = getApiBaseUrl();
+const IS_TEST_ENV = process.env.NODE_ENV === 'test';
 
 interface ProfileData {
   firstName: string;
@@ -115,162 +113,7 @@ export default function ProfileScreen() {
     setModalVisible(false);
   };
 
-  // Use the existing sync function from userSync.ts
-  const syncUserWithBackend = useCallback(async (): Promise<boolean> => {
-    if (!user) {
-      console.log("❌ No user available for sync");
-      return false;
-    }
-
-    try {
-      console.log("🔄 Using userSync.ts to sync user...");
-      await syncUserWithDatabase(user);
-      console.log("✅ User synced successfully via userSync.ts");
-      return true;
-    } catch (error) {
-      console.error("❌ Error syncing user via userSync.ts:", error);
-      showModal('error', 'Sync Failed', 'Unable to sync user data. Some features may not work properly.');
-      return false;
-    }
-  }, [user]);
-
-  // Simple function to fetch client profile directly
-  const fetchClientProfile = async (clerkUserId: string): Promise<any> => {
-    try {
-      console.log("📋 Fetching client profile for:", clerkUserId);
-
-      const response = await fetch(
-        `${API_URL}/api/client-profile/${clerkUserId}`
-      );
-
-      console.log("Profile response status:", response.status);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.log("Profile not found, might be new user");
-          return null;
-        }
-        throw new Error(`Failed to fetch profile: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        return result.data;
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      console.error("Error fetching client profile:", error);
-      return null;
-    }
-  };
-
-  // Fetch profile data from backend
-  const fetchProfileData = useCallback(async () => {
-    if (!user?.id) {
-      console.log("❌ No user available");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      console.log("📋 Starting profile data fetch...");
-
-      // First try to sync user (but don't block if it fails)
-      const syncSuccess = await syncUserWithBackend();
-      console.log("Sync success:", syncSuccess);
-
-      // ✅ Load profile image from AsyncStorage FIRST (highest priority)
-      let localProfileImage: string | undefined;
-      try {
-        const savedImage = await AsyncStorage.getItem("profileImage");
-        if (savedImage) {
-          localProfileImage = savedImage;
-          console.log("📸 Found local profile image");
-        }
-      } catch (storageError) {
-        console.error(
-          "Error loading profile image from storage:",
-          storageError
-        );
-      }
-
-      // Try to load from backend API using direct function call
-      try {
-        const backendProfile = await fetchClientProfile(user.id);
-
-        if (backendProfile) {
-          setProfileData((prev) => ({
-            ...prev,
-            firstName: backendProfile.firstName || user.firstName || "User",
-            lastName: backendProfile.lastName || user.lastName || "",
-            email:
-              backendProfile.email ||
-              user.emailAddresses[0]?.emailAddress ||
-              "",
-            phoneNumber:
-              backendProfile.phoneNumber || user.phoneNumbers[0]?.phoneNumber,
-            // ✅ Priority: Local > Backend > Clerk
-            profileImageUrl:
-              localProfileImage ||
-              backendProfile.profileImage ||
-              user.imageUrl ||
-              prev.profileImageUrl,
-          }));
-        } else {
-          // Fallback to Clerk data
-          console.log("Using Clerk data as fallback");
-          setProfileData((prev) => ({
-            ...prev,
-            firstName: user.firstName || prev.firstName || "User",
-            lastName: user.lastName || prev.lastName || "",
-            email: user.emailAddresses[0]?.emailAddress || prev.email || "",
-            phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
-            // ✅ Priority: Local > Clerk
-            profileImageUrl:
-              localProfileImage || user.imageUrl || prev.profileImageUrl,
-          }));
-        }
-      } catch (apiError) {
-        console.error("❌ API error, using Clerk data:", apiError);
-        // Use Clerk data as final fallback
-        setProfileData((prev) => ({
-          ...prev,
-          firstName: user.firstName || prev.firstName || "User",
-          lastName: user.lastName || prev.lastName || "",
-          email: user.emailAddresses[0]?.emailAddress || prev.email || "",
-          phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber,
-          // ✅ Priority: Local > Clerk
-          profileImageUrl:
-            localProfileImage || user.imageUrl || prev.profileImageUrl,
-        }));
-      }
-
-      // Load local storage data for other fields
-      try {
-        const savedProfileData = await AsyncStorage.getItem("profileData");
-        if (savedProfileData) {
-          const parsedData = JSON.parse(savedProfileData);
-          setProfileData((prev) => ({
-            ...prev,
-            ...parsedData,
-            // ✅ Keep the profile image we already set (don't overwrite)
-            profileImageUrl: prev.profileImageUrl,
-          }));
-        }
-      } catch (storageError) {
-        console.error("Error loading local storage:", storageError);
-      }
-    } catch (error) {
-      console.error("❌ Error in fetchProfileData:", error);
-      showModal('error', 'Load Failed', 'Unable to load profile data. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [user, syncUserWithBackend]);
-
+  // Sync profile data when component mounts or user changes
   useEffect(() => {
     // In tests, avoid async network/storage work and hydrate from Clerk mock
     if (IS_TEST_ENV) {
@@ -287,23 +130,101 @@ export default function ProfileScreen() {
       return;
     }
     
-    // Use Convex profile if available
+    // ✅ Primary: Use Convex profile with real-time updates
     if (isUsingConvex && convexProfile) {
-      console.log('✅ Using Convex profile data');
+      console.log('✅ Using Convex profile data (real-time)');
       setProfileData({
         firstName: user?.firstName || 'User',
         lastName: user?.lastName || '',
         email: user?.emailAddresses?.[0]?.emailAddress || '',
-        phoneNumber: convexProfile.phoneNumber,
-        location: convexProfile.location,
-        profileImageUrl: convexProfile.profileImageUrl || user?.imageUrl,
+        phoneNumber: convexProfile.phoneNumber || '',
+        location: convexProfile.location || '',
+        profileImageUrl: convexProfile.profileImageUrl || user?.imageUrl || '',
       });
       setLoading(false);
       return;
     }
     
-    fetchProfileData();
-  }, [IS_TEST_ENV, fetchProfileData, user, isUsingConvex, convexProfile]);
+    // ✅ Fallback: Use Convex loading state
+    if (isUsingConvex && convexLoading) {
+      setLoading(true);
+      return;
+    }
+    
+    // ✅ Final fallback: Load from AsyncStorage and sync with Convex
+    const loadProfileData = async () => {
+      if (!user?.id) {
+        console.log("❌ No user available");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log("📋 Loading profile data...");
+
+        // Try to sync with Convex
+        if (syncConvexProfile && user?.id) {
+          try {
+            console.log("🔄 Syncing profile with Convex...");
+            await syncConvexProfile({
+              clerkId: user.id,
+              phoneNumber: user.phoneNumbers?.[0]?.phoneNumber,
+              profileImageUrl: user.imageUrl,
+            });
+          } catch (syncError) {
+            console.error("⚠️ Convex sync failed, using local data:", syncError);
+          }
+        }
+
+        // Load from AsyncStorage as fallback
+        try {
+          const savedProfileData = await AsyncStorage.getItem("profileData");
+          const savedImage = await AsyncStorage.getItem("profileImage");
+          
+          if (savedProfileData) {
+            const parsedData = JSON.parse(savedProfileData);
+            setProfileData({
+              firstName: user.firstName || parsedData.firstName || "User",
+              lastName: user.lastName || parsedData.lastName || "",
+              email: user.emailAddresses[0]?.emailAddress || parsedData.email || "",
+              phoneNumber: parsedData.phoneNumber || "",
+              location: parsedData.location || "",
+              profileImageUrl: savedImage || parsedData.profileImageUrl || user.imageUrl || "",
+            });
+          } else {
+            // No local data, use Clerk data
+            setProfileData({
+              firstName: user.firstName || "User",
+              lastName: user.lastName || "",
+              email: user.emailAddresses[0]?.emailAddress || "",
+              phoneNumber: user.phoneNumbers?.[0]?.phoneNumber || "",
+              location: "",
+              profileImageUrl: user.imageUrl || "",
+            });
+          }
+        } catch (storageError) {
+          console.error("Error loading from AsyncStorage:", storageError);
+          // Final fallback: Clerk data only
+          setProfileData({
+            firstName: user.firstName || "User",
+            lastName: user.lastName || "",
+            email: user.emailAddresses[0]?.emailAddress || "",
+            phoneNumber: user.phoneNumbers?.[0]?.phoneNumber || "",
+            location: "",
+            profileImageUrl: user.imageUrl || "",
+          });
+        }
+      } catch (error) {
+        console.error("❌ Error loading profile:", error);
+        showModal('error', 'Load Failed', 'Unable to load profile data. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfileData();
+  }, [IS_TEST_ENV, user, isUsingConvex, convexProfile, convexLoading, syncConvexProfile]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

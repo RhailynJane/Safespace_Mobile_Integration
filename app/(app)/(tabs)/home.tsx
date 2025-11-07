@@ -18,7 +18,7 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { AppHeader } from "../../../components/AppHeader";
-import { assessmentTracker } from "../../../utils/assessmentTracker";
+import assessmentsApi from "../../../utils/assessmentsApi";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { 
   Resource, 
@@ -171,9 +171,9 @@ export default function HomeScreen() {
   const checkAssessmentStatus = useCallback(async () => {
     try {
       if (user?.id) {
-        const isDue = await assessmentTracker.isAssessmentDue(user.id);
-        setIsAssessmentDue(isDue);
-        console.log("Assessment due status:", isDue);
+        const result = await assessmentsApi.isAssessmentDue(user.id);
+        setIsAssessmentDue(result.isDue);
+        console.log("Assessment due status:", result);
       }
     } catch (error) {
       console.error("Error checking assessment status:", error);
@@ -547,7 +547,7 @@ const fetchProfileImage = useCallback(async () => {
                                       {getEmojiForMood(mood)} {getLabelForMood(mood)}
                                     </Text>
                                     <Text style={[styles.distributionCount, { color: theme.colors.textSecondary }]}>
-                                      {count}×
+                                      {String(count)}×
                                     </Text>
                                   </View>
                                 ))}

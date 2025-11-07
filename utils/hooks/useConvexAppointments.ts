@@ -145,7 +145,7 @@ export function useConvexAppointments(userId: string | undefined, convexClient: 
           await convexClient.mutation(api.appointments.createAppointment, {
             userId,
             ...appointmentData,
-            status: 'upcoming',
+            // status is automatically set to 'scheduled' in the mutation
           });
 
           // Refresh appointments after creating
