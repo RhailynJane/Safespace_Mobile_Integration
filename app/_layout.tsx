@@ -5,9 +5,8 @@ import "react-native-url-polyfill/auto";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "../utils/cache";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { ConvexReactClient, useConvex } from "convex/react";
-import { useEffect, useState } from "react";
+import { ConvexProvider, ConvexReactClient, useConvex } from "convex/react";
+import { useEffect, useState, useRef } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,6 +14,11 @@ import { ThemeProvider } from "../contexts/ThemeContext";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+
+// Global flags to prevent duplicate operations across remounts
+let convexUserSyncCompleted = false;
+let convexHeartbeatStarted = false;
+let onboardingStatusCached: boolean | null = null;
 
 function isAbsoluteHttpUrl(url?: string | null): boolean {
   if (!url) return false;
@@ -36,50 +40,36 @@ if (!publishableKey) {
 function UserSyncHandler() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
-  // Note: Don't call useConvex here unless Convex provider is definitely present.
+  const [hasPerformedSync, setHasPerformedSync] = useState(false);
 
   useEffect(() => {
-    async function handleUserSync() {
-      if (isLoaded && isSignedIn && user) {
-        try {
-          const token = await getToken();
-          if (token) {
-            console.log('🔄 Starting user sync...');
-            // Sync with Postgres/Prisma in background - don't block UI
-            syncUserWithDatabase(user, token).then(() => {
-              console.log("✅ User synced successfully");
-            }).catch((error) => {
-              console.error("❌ Failed to sync user (non-blocking):", error);
-            });
+    // Only sync once per session
+    if (!isLoaded || !isSignedIn || !user || hasPerformedSync) return;
 
-            // Also sync to Convex (if configured & generated code exists)
-            try {
-              const convexEnabled = !!process.env.EXPO_PUBLIC_CONVEX_URL;
-              if (convexEnabled) {
-                // Dynamic import avoids compile-time issues before `convex dev`
-                const { api } = await import("../convex/_generated/api");
-                // We can't access useConvex() here safely, so schedule a custom event for ConvexHeartbeat to consume if needed.
-                // Instead, trigger a one-off sync using a lightweight fetch to Convex action once added.
-                // For now, we do nothing here; ConvexUserSync below will handle syncing reliably.
-              }
-            } catch (e) {
-              // Silently ignore if Convex not initialized
-            }
-          } else {
-            console.warn("⚠️ Token is null, skipping user sync.");
-          }
-          // Mark onboarding as completed
-          await AsyncStorage.setItem("hasCompletedOnboarding", "true");
-        } catch (error) {
-          console.error("❌ Failed to handle user sync:", error);
-          // Don't block the app if sync fails - user might already exist
-          await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+    async function handleUserSync() {
+      try {
+        const token = await getToken();
+        if (token && user) {
+          console.log('🔄 Starting user sync...');
+          // Sync with Postgres/Prisma in background - don't block UI
+          syncUserWithDatabase(user, token).then(() => {
+            console.log("✅ User synced successfully");
+          }).catch((error) => {
+            console.error("❌ Failed to sync user (non-blocking):", error);
+          });
+        } else {
+          console.warn("⚠️ Token is null, skipping user sync.");
         }
+        setHasPerformedSync(true);
+      } catch (error) {
+        console.error("❌ Failed to handle user sync:", error);
+        setHasPerformedSync(true);
       }
     }
 
     handleUserSync();
-  }, [isLoaded, isSignedIn, user, getToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn, user?.id, hasPerformedSync]);
 
   return null;
 }
@@ -89,7 +79,10 @@ function RootLayoutNav() {
   const { user } = useUser();
   const segments = useSegments();
   const router = useRouter();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  
+  // Use cached value to prevent state flipping
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(onboardingStatusCached);
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(onboardingStatusCached === null);
   
   console.log("🔐 RootLayoutNav - Auth State:", { 
     isLoaded, 
@@ -102,20 +95,54 @@ function RootLayoutNav() {
   // The ConvexHeartbeat component below handles presence tracking via Convex
   // No REST API heartbeat needed
 
-  // Check onboarding status on mount
+  // Check onboarding status ONLY if not already cached
   useEffect(() => {
+    // If already cached, don't recheck
+    if (onboardingStatusCached !== null) {
+      setHasCompletedOnboarding(onboardingStatusCached);
+      setIsCheckingOnboarding(false);
+      return;
+    }
+    
+    let isMounted = true;
+    
     const checkOnboarding = async () => {
-      const completed = await AsyncStorage.getItem("hasCompletedOnboarding");
-      setHasCompletedOnboarding(completed === "true");
+      try {
+        const completed = await AsyncStorage.getItem("hasCompletedOnboarding");
+        const completedBool = completed === "true";
+        
+        // Cache the value globally to prevent future reads
+        onboardingStatusCached = completedBool;
+        
+        if (isMounted) {
+          setHasCompletedOnboarding(completedBool);
+          setIsCheckingOnboarding(false);
+        }
+      } catch (error) {
+        console.error("Failed to check onboarding status:", error);
+        
+        // Cache false as default
+        onboardingStatusCached = false;
+        
+        if (isMounted) {
+          setHasCompletedOnboarding(false);
+          setIsCheckingOnboarding(false);
+        }
+      }
     };
+    
     checkOnboarding();
-  }, []);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   // Prefer declarative redirects over imperative router.replace to avoid remount loops
   const inAuthGroup = segments[0] === "(auth)";
   const inAppGroup = segments[0] === "(app)";
 
-  if (!isLoaded || hasCompletedOnboarding === null) {
+  if (!isLoaded || isCheckingOnboarding) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#7BB8A8" />
@@ -176,20 +203,36 @@ export default function RootLayout() {
     const { user } = useUser();
 
     useEffect(() => {
-      if (!isLoaded || !isSignedIn || !user?.id) return;
+      // Use global flag to prevent multiple heartbeat intervals
+      if (!isLoaded || !isSignedIn || !user?.id || convexHeartbeatStarted) return;
 
       const send = async () => {
         try {
           // @ts-ignore generated at runtime by `npx convex dev`
           const { api } = await import("../convex/_generated/api");
+          // Pre-flight whoami to avoid unauthenticated heartbeat spam
+          try {
+            const who = await convex.query(api.auth.whoami, {} as any);
+            if (!who) {
+              console.log("⏸️ Skipping heartbeat — no Convex identity yet (awaiting Clerk JWT template).");
+              return;
+            }
+          } catch (err:any) {
+            console.log("⏸️ Skipping heartbeat — whoami failed:", err?.message);
+            return;
+          }
           await convex.mutation(api.presence.heartbeat, { status: "online" });
+          console.log("💓 Heartbeat sent");
         } catch (e: any) {
           // Convex not initialized yet or generated files missing — skip silently
           console.log("Convex heartbeat skipped:", e?.message ?? e);
         }
       };
 
-      // initial
+      // Mark heartbeat as started globally
+      convexHeartbeatStarted = true;
+      
+      // initial heartbeat
       send();
       // every 5 minutes
       const id = setInterval(send, 5 * 60 * 1000);
@@ -206,33 +249,73 @@ export default function RootLayout() {
     const { user } = useUser();
 
     useEffect(() => {
-      if (!isLoaded || !isSignedIn || !user?.id) return;
+      // Use global flag to prevent duplicate sync across all remounts
+      if (!isLoaded || !isSignedIn || !user?.id || convexUserSyncCompleted) return;
 
       const run = async () => {
         try {
           // @ts-ignore generated at runtime by `npx convex dev`
           const { api } = await import("../convex/_generated/api");
-          await convex.mutation(api.auth.syncUser, {
+          
+          // Pre-flight whoami check to ensure we have authentication
+          let who;
+          try {
+            who = await convex.query(api.auth.whoami, {} as any);
+            if (!who) {
+              console.warn("🔎 Convex whoami returned null — skipping syncUser until token is available.");
+              return;
+            }
+          } catch (e:any) {
+            console.warn("🔎 whoami query failed:", e?.message);
+            return;
+          }
+          
+          // Perform the sync with retry logic
+          const userData = {
             email: user.primaryEmailAddress?.emailAddress ?? undefined,
             firstName: user.firstName ?? undefined,
             lastName: user.lastName ?? undefined,
             imageUrl: user.imageUrl ?? undefined,
+          };
+          
+          console.log("✅ User sync handled by Convex (ConvexUserSync in _layout.tsx):", {
+            clerkId: user.id,
+            email: userData.email,
+            name: `${userData.firstName} ${userData.lastName}`.trim()
           });
+          
+          // Retry up to 3 times with exponential backoff if authentication fails
+          let retries = 0;
+          const maxRetries = 3;
+          
+          while (retries <= maxRetries) {
+            try {
+              await convex.mutation(api.auth.syncUser, userData);
+              // Mark as completed globally to prevent duplicate syncs
+              convexUserSyncCompleted = true;
+              console.log("✅ Convex user sync successful");
+              break;
+            } catch (syncError: any) {
+              if (syncError?.message?.includes("Unauthenticated") && retries < maxRetries) {
+                retries++;
+                const delay = Math.pow(2, retries) * 200; // 400ms, 800ms, 1600ms
+                console.log(`⏳ Auth not ready, retrying syncUser in ${delay}ms (attempt ${retries}/${maxRetries})...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              } else {
+                throw syncError; // Re-throw if not auth error or max retries reached
+              }
+            }
+          }
         } catch (e: any) {
           console.log("Convex user sync skipped:", e?.message ?? e);
         }
       };
-      run();
+      
+      // Debounce to prevent race conditions
+      const timer = setTimeout(run, 500);
+      return () => clearTimeout(timer);
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-      isLoaded,
-      isSignedIn,
-      user?.id,
-      user?.firstName,
-      user?.lastName,
-      user?.imageUrl,
-      user?.primaryEmailAddress?.emailAddress,
-    ]);
+    }, [isLoaded, isSignedIn, user?.id]);
 
     return null;
   }
@@ -246,8 +329,30 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 
-  // Wrapper to use Clerk's useAuth inside ClerkProvider
+  // Wrapper to use Clerk's useAuth inside ClerkProvider and explicitly provide a token fetcher
   function ConvexClerkWrapper({ children }: { children: React.ReactNode }) {
+    // Fallback to original helper since ConvexProvider does not accept "auth" prop directly in this version.
+    // Use ConvexProviderWithClerk for automatic token wiring, but add pre-flight token diagnostic.
+    const { getToken, isSignedIn } = useAuth();
+    useEffect(() => {
+      const check = async () => {
+        if (!isSignedIn) return;
+        try {
+          const t = await getToken({ template: "convex" });
+          if (t) {
+            console.log("🔑 Clerk convex template token present (first 30 chars):", t.substring(0,30) + "...");
+          } else {
+            console.warn("🔑 No token from getToken({template:'convex'}) - ensure JWT template 'convex' exists and is enabled for this instance.");
+          }
+        } catch (e:any) {
+          console.warn("🔑 Token fetch error:", e?.message);
+        }
+      };
+      check();
+    }, [getToken, isSignedIn]);
+
+    // Dynamically require ConvexProviderWithClerk to avoid earlier import swap issues.
+    const { ConvexProviderWithClerk } = require("convex/react-clerk");
     return (
       <ConvexProviderWithClerk client={convexClient!} useAuth={useAuth}>
         <ConvexUserSync />

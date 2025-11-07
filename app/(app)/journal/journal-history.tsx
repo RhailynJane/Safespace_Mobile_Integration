@@ -18,8 +18,8 @@ import { Colors, Spacing, Typography } from "../../../constants/theme";
 import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
-import { journalApi, JournalEntry } from "../../../utils/journalApi";
 import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -34,6 +34,19 @@ const tabs = [
   { id: "messages", name: "Messages", icon: "chatbubbles" },
   { id: "profile", name: "Profile", icon: "person" },
 ];
+
+interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  emoji?: string;
+  emotion_type?: string;
+  template_id?: number;
+  share_with_support_worker: boolean;
+  tags?: string[];
+}
 
 export default function JournalHistoryScreen() {
   const { theme, scaledFontSize } = useTheme();
@@ -109,25 +122,10 @@ export default function JournalHistoryScreen() {
   }, [activeFilter, customStartDate, customEndDate]);
 
   const fetchEntries = React.useCallback(async () => {
+    // Live data handled below in LiveHistory subscription
     if (!user?.id) return;
-
-    try {
-      setLoading(true);
-      const filters = getDateFilters();
-      console.log('Fetching entries with filters:', filters);
-      
-      const response = await journalApi.getHistory(user.id, filters);
-      console.log('API response:', response.entries?.length, 'entries');
-      
-      setEntries(response.entries || []);
-      setFilteredEntries(response.entries || []);
-    } catch (error) {
-      console.error("Error fetching journal entries:", error);
-      showStatusModal('error', 'Load Failed', 'Unable to load journal history. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, getDateFilters]);
+    setLoading(true);
+  }, [user?.id]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -137,25 +135,7 @@ export default function JournalHistoryScreen() {
     }, [user?.id, fetchEntries])
   );
 
-  // Live history using Convex when available. We render the live child only when the generated API is present.
-  const [convexApi, setConvexApi] = useState<any | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const mod = await import("../../../convex/_generated/api");
-        if (mounted) setConvexApi(mod.api);
-      } catch (_) {
-        // Convex not generated or disabled; ignore
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const LiveHistory = ({ api, userId, startDate, endDate, onData }: {
-    api: any;
+  const LiveHistory = ({ userId, startDate, endDate, onData }: {
     userId: string;
     startDate?: string;
     endDate?: string;
@@ -169,6 +149,7 @@ export default function JournalHistoryScreen() {
     useEffect(() => {
       if (res && Array.isArray(res.entries)) {
         onData(res.entries as unknown as JournalEntry[]);
+        setLoading(false);
       }
     }, [res, onData]);
     return null;
@@ -371,9 +352,8 @@ export default function JournalHistoryScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entries" showBack={true} showMenu={true} />
         <ScrollView style={styles.content}>
-          {user?.id && convexApi ? (
+          {user?.id ? (
             <LiveHistory
-              api={convexApi}
               userId={user.id}
               startDate={getDateFilters().startDate}
               endDate={getDateFilters().endDate}

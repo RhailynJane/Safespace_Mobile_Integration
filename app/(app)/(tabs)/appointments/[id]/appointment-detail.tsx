@@ -18,6 +18,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Linking from 'expo-linking';
+import { mapAppointmentStatus } from "../../../../../utils/appointmentStatus";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
@@ -25,12 +26,12 @@ import { AppHeader } from "../../../../../components/AppHeader";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexAppointments } from "../../../../../utils/hooks/useConvexAppointments";
+import { useConvex } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 
 
 interface Appointment {
-  id: number;
+  id: string;
   supportWorker: string;
   supportWorkerId?: number;
   date: string;
@@ -74,40 +75,10 @@ export default function AppointmentList() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn, getToken } = useAuth();
+  const { signOut } = useAuth();
   const { user } = useUser();
-
-  // Initialize Convex client with Clerk auth
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
-        unsavedChangesWarning: false,
-      });
-
-      const fetchToken = async () => {
-        if (getToken) {
-          const token = await getToken({ template: 'convex' });
-          return token ?? undefined;
-        }
-        return undefined;
-      };
-      
-      client.setAuth(fetchToken);
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  // Convex appointments hook
-  const {
-    appointments: convexAppointments,
-    loading: convexLoading,
-    loadAppointments,
-    updateAppointmentStatus,
-    deleteAppointment,
-    isUsingConvex,
-  } = useConvexAppointments(user?.id, convexClient);
+  // Shared Convex instance
+  const convex = useConvex();
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -125,95 +96,59 @@ const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: 
   setStatusModalVisible(true);
 }, []);
 
-const fetchAppointments = useCallback(async () => {
+const fetchAppointment = useCallback(async () => {
+  if (!id) return;
   try {
     setLoading(true);
-    console.log('📅 Fetching appointment detail for ID:', id, 'User:', user?.id);
-    
-    // Use Convex data if available
-    if (isUsingConvex && convexAppointments.length > 0) {
-      console.log('✅ Using Convex appointments data');
-      const foundAppointment = convexAppointments.find((apt: any) => apt.id.toString() === id);
-      if (foundAppointment) {
-        setAppointment(foundAppointment as any);
-      } else {
-        showStatusModal('error', 'Not Found', 'Appointment not found.');
-      }
-      setLoading(false);
+    console.log('📅 Fetching single appointment via Convex. ID:', id);
+    const result = await convex.query(api.appointments.getAppointment, { appointmentId: id as any });
+    if (!result) {
+      showStatusModal('error', 'Not Found', 'Appointment not found.');
+      setAppointment(null);
       return;
     }
-    
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
-    const result = await response.json();
-
-    console.log('📥 Appointments response:', result);
-
-      if (result.success && result.appointments) {
-        // Transform backend data to frontend format
-        const transformedAppointments = result.appointments.map((apt: any) => {
-          const appointmentDate = new Date(apt.date);
-          const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          });
-
-          const now = new Date();
-          const isUpcoming = appointmentDate >= now;
-
-          return {
-            id: apt.id,
-            supportWorker: apt.supportWorker || 'Support Worker',
-            supportWorkerId: apt.supportWorkerId || apt.support_worker_id,
-            date: formattedDate,
-            time: apt.time || '',
-            type: apt.type || 'Video',
-            meetingLink: apt.meetingLink || apt.meeting_link, // Handle both formats
-            notes: apt.notes,
-            status: apt.status === 'cancelled' ? 'Cancelled' :
-                    apt.status === 'completed' ? 'Completed' :
-                    isUpcoming ? 'Upcoming' : 'Past'
-          };
-        });
-
-        const foundAppointment = transformedAppointments.find(
-          (apt: Appointment) => apt.id === parseInt(id as string)
-        );
-        
-        if (foundAppointment) {
-          setAppointment(foundAppointment);
-          console.log('✅ Appointment found:', foundAppointment);
-        } else {
-          console.warn('⚠️ Appointment with ID', id, 'not found');
-          setAppointment(null);
-          showStatusModal('error', 'Not Found', 'Appointment not found');
-        }
-      } else {
-        console.warn('⚠️ No appointments found or error:', result);
-        setAppointment(null);
+    // Ensure support worker name is populated; enrich from supportWorkers if missing
+    let supportWorkerName: string = result.supportWorker || '';
+    if (!supportWorkerName && result.supportWorkerId) {
+      try {
+        const worker = await convex.query(api.supportWorkers.getSupportWorker, { workerId: String(result.supportWorkerId) });
+        if (worker?.name) supportWorkerName = worker.name;
+      } catch (e) {
+        // ignore enrichment errors and fall back to default placeholder
       }
-    } catch (error) {
-      console.error('❌ Error fetching appointment:', error);
-      showStatusModal('error', 'Error', 'Unable to fetch appointment. Please try again.');
-      setAppointment(null);
-    } finally {
-      setLoading(false);
     }
-  }, [id, user?.id, showStatusModal, isUsingConvex, convexAppointments]);
+    // Adapt status labels via utility
+    const mappedStatus = mapAppointmentStatus(result.status as any, result.date, result.time);
+    const readableDate = new Date(result.date).toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    setAppointment({
+      id: result.id as any,
+      supportWorker: supportWorkerName || 'Support Worker',
+      supportWorkerId: result.supportWorkerId,
+      date: readableDate,
+      time: result.time || '',
+      type: result.type || 'Video',
+      meetingLink: result.meetingLink,
+      notes: result.notes,
+      status: mappedStatus,
+      cancellationReason: result.cancellationReason,
+    });
+  } catch (e) {
+    console.error('❌ Error fetching appointment:', e);
+    showStatusModal('error', 'Error', 'Unable to fetch appointment. Please try again.');
+    setAppointment(null);
+  } finally {
+    setLoading(false);
+  }
+}, [id, convex, showStatusModal]);
 
   // Find the appointment based on the ID from the URL
   useEffect(() => {
     if (user?.id && id) {
-      // Refresh Convex data if using Convex
-      if (isUsingConvex) {
-        loadAppointments();
-      } else {
-        fetchAppointments();
-      }
+      fetchAppointment();
     }
-  }, [user?.id, id, isUsingConvex, loadAppointments, fetchAppointments]);
+  }, [user?.id, id, fetchAppointment]);
   /**
    * Show status modal with given parameters
    */
@@ -336,41 +271,22 @@ const fetchAppointments = useCallback(async () => {
     const previousAppointment = { ...appointment };
     
     try {
-      // Optimistic update: immediately show cancelled state
+      // Optimistic update
       setAppointment({ ...appointment, status: 'cancelled', cancellationReason: 'Cancelled by user' });
       setCancelModalVisible(false);
       setLoading(true);
-      
-      // Try Convex first if available
-      if (isUsingConvex && deleteAppointment) {
-        try {
-          await deleteAppointment(id as string);
-          showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
-          setTimeout(() => router.back(), 1200);
-          return;
-        } catch (convexError) {
-          console.warn('Convex cancel failed, falling back to REST:', convexError);
-        }
-      }
-      
-      // Fallback to REST API
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/appointments/${id}/cancel`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cancellationReason: 'Cancelled by user' }),
-      });
-      
-      const result = await response.json();
-      
-      if (response.ok && result.success) {
+      try {
+        await convex.mutation(api.appointments.cancelAppointment, {
+          appointmentId: id as any,
+          cancellationReason: 'Cancelled by user',
+        });
         showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
         setTimeout(() => router.back(), 1200);
-      } else {
-        // Rollback on error
+      } catch (convexErr: any) {
+        console.error('Cancel error (Convex):', convexErr);
         setAppointment(previousAppointment);
         setCancelModalVisible(true);
-        showStatusModal('error', 'Cancel Failed', result.error || 'Unable to cancel appointment.');
+        showStatusModal('error', 'Cancel Failed', convexErr?.message || 'Unable to cancel appointment.');
       }
     } catch (error) {
       console.error('Cancel error:', error);

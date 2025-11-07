@@ -27,7 +27,9 @@ export const syncUser = mutation({
   },
   handler: async (ctx: any, args: { email?: string; firstName?: string; lastName?: string; imageUrl?: string }) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthenticated");
+    if (!identity) {
+      throw new Error("Unauthenticated");
+    }
 
     const clerkId = identity.subject as string;
     const now = Date.now();

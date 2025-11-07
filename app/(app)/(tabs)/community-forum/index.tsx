@@ -55,15 +55,14 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { communityApi } from "../../../../utils/communityForumApi";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexPosts } from "../../../../utils/hooks/useConvexPosts";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 const { width, height } = Dimensions.get("window");
 
@@ -262,48 +261,12 @@ function CommunityMainScreenLogic() {
 export default function CommunityMainScreen() {
   const { theme, scaledFontSize } = useTheme();
   
-  // Get auth and user info directly (not through state hook)
-  const { signOut, isSignedIn, getToken } = useAuth();
+  // Get auth and user info
+  const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
-
-  // Local Convex client instance (used when Convex is configured). We don't rely on the provider here
-  // so this screen can still run if Convex is disabled.
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-
-  const isAbsoluteHttpUrl = (url?: string | null) => {
-    if (!url) return false;
-    try {
-      const u = new URL(url);
-      return u.protocol === 'https:' || u.protocol === 'http:';
-    } catch {
-      return false;
-    }
-  };
-
-  // Initialize a local Convex client if a valid Convex URL is configured. Attach Clerk auth.
-  useEffect(() => {
-    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
-    if (!isAbsoluteHttpUrl(convexUrl)) {
-      setConvexClient(null);
-      return;
-    }
-
-    const client = new ConvexReactClient(convexUrl!);
-    // Attach auth dynamically from Clerk; this works both when signed in and when not
-    client.setAuth(async () => {
-      try {
-        const token = await (getToken?.() ?? Promise.resolve(undefined));
-        return token ?? undefined;
-      } catch {
-        return undefined;
-      }
-    });
-    setConvexClient(client);
-
-    return () => {
-      setConvexClient(null);
-    };
-  }, [isSignedIn]);
+  
+  // Use Convex client from provider
+  const convex = useConvex();
   
   const {
     selectedCategory,
@@ -351,21 +314,6 @@ export default function CommunityMainScreen() {
     setConfirmCallback,
   } = useCommunityMainScreenState();
 
-  // Use Convex posts hook directly in main component
-  const {
-    posts: convexPosts,
-    myPosts: convexMyPosts,
-    loading: convexLoading,
-    loadPosts: loadConvexPosts,
-    loadMyPosts: loadConvexMyPosts,
-    createPost: createConvexPost,
-    reactToPost: reactToConvexPost,
-    deletePost: deleteConvexPost,
-    updatePost: updateConvexPost,
-    toggleBookmark: toggleConvexBookmark,
-    isUsingConvex,
-  } = useConvexPosts(user?.id, convexClient);
-
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
@@ -405,7 +353,7 @@ export default function CommunityMainScreen() {
       } else {
         loadMyPosts();
       }
-    }, [activeView, selectedCategory, isUsingConvex])
+      }, [activeView, selectedCategory])
   );
 
   /**
@@ -524,13 +472,13 @@ export default function CommunityMainScreen() {
   };
 
   /**
-   * Fetch available categories from API
+   * Fetch available categories from Convex
    * Used for post categorization and filtering
    */
   const loadCategories = async () => {
     try {
-      const response = await communityApi.getCategories();
-      setCategories(response.categories);
+      const categoriesData = await convex.query(api.categories.list);
+      setCategories(categoriesData);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -538,7 +486,7 @@ export default function CommunityMainScreen() {
 
   /**
    * Load posts based on current category selection
-   * Uses Convex with automatic real-time updates
+   * Uses Convex for all data fetching
    */
   const loadPosts = async () => {
     try {
@@ -549,78 +497,63 @@ export default function CommunityMainScreen() {
         if (!user?.id) {
           showError("Sign In Required", "Please sign in to view bookmarked posts");
           setPosts([]);
+          setLoading(false);
+          setRefreshing(false);
           return;
         }
         
-        // Use Convex for bookmarks
-        if (isUsingConvex) {
-          try {
-            console.log('📤 Loading bookmarked posts via Convex...');
-            const bookmarked = await loadConvexPosts(20);
-            setPosts(bookmarked || []);
-            console.log('✅ Convex bookmarks loaded:', bookmarked?.length || 0);
-            setLoading(false);
-            setRefreshing(false);
-            return;
-          } catch (convexError) {
-            console.warn('⚠️ Convex bookmarks failed, falling back to REST:', convexError);
-          }
-        }
+        console.log('📤 Loading bookmarked posts via Convex...');
+        const bookmarked = await convex.query(api.posts.bookmarkedPosts, { limit: 20 });
         
-        // REST fallback for bookmarks
-        const response = await communityApi.getBookmarkedPosts(user.id);
-        setPosts(response.bookmarks || []);
+        // Map to UI format
+        const mapped = (bookmarked || []).map((p: any) => ({
+          id: p._id,
+          title: p.title,
+          content: p.content,
+          category: p.category,
+          is_draft: !!p.isDraft,
+          author_id: p.authorId,
+          author_name: "Community Member",
+          created_at: new Date(p.createdAt).toISOString(),
+          reactions: {},
+        }));
+        
+        setPosts(mapped);
+        console.log('✅ Convex bookmarks loaded:', mapped.length);
         setLoading(false);
         setRefreshing(false);
         return;
       }
       
-      // Use Convex for regular posts
-      if (isUsingConvex) {
-        try {
-          console.log('📤 Loading posts via Convex...', { category: selectedCategory });
-          const category = selectedCategory === "Trending" ? undefined : selectedCategory;
-          const convexPostsData = await loadConvexPosts(20);
-          
-          // Map to UI format
-          const mapped = (convexPostsData || []).map((p: any) => ({
-            id: p.id || p._id,
-            title: p.title,
-            content: p.content,
-            category: p.category,
-            is_draft: !!p.isDraft,
-            author_name: "Community Member",
-            created_at: p.createdAt || new Date(p.createdAt).toISOString(),
-            reactions: p.reactions || {},
-          }));
-          
-          setPosts(mapped);
-          console.log('✅ Convex posts loaded:', mapped.length);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        } catch (convexError) {
-          console.warn('⚠️ Convex posts loading failed, falling back to REST:', convexError);
-        }
-      }
-      
-      // REST API fallback
-      const response = await communityApi.getPosts({
-        category: selectedCategory === "Trending" ? undefined : selectedCategory,
-        limit: 20,
+      // Load regular posts from Convex
+      console.log('📤 Loading posts via Convex...', { category: selectedCategory });
+      const category = selectedCategory === "Trending" ? undefined : selectedCategory;
+      const convexPostsData = await convex.query(api.posts.list, { 
+        category: category as any,
+        limit: 20 
       });
-
-      const normalizedPosts: any[] = Array.isArray(response)
-        ? response
-        : (response?.posts || response?.data || []);
-
-      setPosts(normalizedPosts);
+      
+      // Map to UI format
+      const mapped = (convexPostsData || []).map((p: any) => ({
+        id: p._id,
+        title: p.title,
+        content: p.content,
+        category: p.category,
+        is_draft: !!p.isDraft,
+        author_id: p.authorId,
+        author_name: "Community Member",
+        created_at: new Date(p.createdAt).toISOString(),
+        reactions: {},
+      }));
+      
+      setPosts(mapped);
+      console.log('✅ Convex posts loaded:', mapped.length);
 
       // Load user-specific data if authenticated
       if (user?.id && selectedCategory !== "Bookmark") {
         await Promise.all([
           loadUserBookmarks(user.id),
-          loadUserReactions(user.id, normalizedPosts),
+          loadUserReactions(user.id, mapped),
         ]);
       }
     } catch (error) {
@@ -635,7 +568,7 @@ export default function CommunityMainScreen() {
 
   /**
    * Load user's personal posts including drafts
-   * Uses Convex with real-time updates
+   * Uses Convex for data fetching
    */
   const loadMyPosts = async () => {
     if (!user?.id) {
@@ -648,36 +581,26 @@ export default function CommunityMainScreen() {
     try {
       setLoading(true);
       
-      // Use Convex for my posts
-      if (isUsingConvex) {
-        try {
-          console.log('📤 Loading my posts via Convex...');
-          const convexMyPostsData = await loadConvexMyPosts(true); // Include drafts
-          
-          // Map to UI format
-          const mapped = (convexMyPostsData || []).map((p: any) => ({
-            id: p.id || p._id,
-            title: p.title,
-            content: p.content,
-            category: p.category,
-            is_draft: !!p.isDraft,
-            author_name: "You",
-            created_at: p.createdAt || new Date(p.createdAt).toISOString(),
-          }));
-          
-          setMyPosts(mapped);
-          console.log('✅ Convex my posts loaded:', mapped.length);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        } catch (convexError) {
-          console.warn('⚠️ Convex my posts failed, falling back to REST:', convexError);
-        }
-      }
+      console.log('📤 Loading my posts via Convex...');
+      const convexMyPostsData = await convex.query(api.posts.myPosts, { 
+        includeDrafts: true,
+        limit: 50 
+      });
       
-      // REST fallback
-      const response = await communityApi.getUserPosts(user.id, true);
-      setMyPosts(response.posts || []);
+      // Map to UI format
+      const mapped = (convexMyPostsData || []).map((p: any) => ({
+        id: p._id,
+        title: p.title,
+        content: p.content,
+        category: p.category,
+        is_draft: !!p.isDraft,
+        author_id: p.authorId,
+        author_name: "You",
+        created_at: new Date(p.createdAt).toISOString(),
+      }));
+      
+      setMyPosts(mapped);
+      console.log('✅ Convex my posts loaded:', mapped.length);
     } catch (error) {
       console.error("Error loading user posts:", error);
       showError("Error", "Failed to load your posts");
@@ -693,11 +616,13 @@ export default function CommunityMainScreen() {
    */
   const loadUserReactions = async (clerkUserId: string, posts: any[]) => {
     try {
-      const userReactions: { [postId: number]: string } = {};
+      const userReactions: { [postId: string]: string } = {};
       for (const post of posts) {
-        const response = await communityApi.getUserReaction(post.id, clerkUserId);
-        if (response.userReaction) {
-          userReactions[post.id] = response.userReaction;
+        const reaction = await convex.query(api.posts.getUserReaction, { 
+          postId: post.id 
+        });
+        if (reaction) {
+          userReactions[post.id] = reaction;
         }
       }
       return userReactions;
@@ -712,11 +637,11 @@ export default function CommunityMainScreen() {
    */
   const loadUserBookmarks = async (clerkUserId: string) => {
     try {
-      const response = await communityApi.getBookmarkedPosts(clerkUserId);
-      const bookmarkedIds = new Set<number>(
-        response.bookmarks?.map((post: any) => post.id as number) || []
+      const bookmarked = await convex.query(api.posts.bookmarkedPosts, { limit: 100 });
+      const bookmarkedIds = new Set<string>(
+        (bookmarked || []).map((post: any) => post._id)
       );
-      setBookmarkedPosts(bookmarkedIds);
+      setBookmarkedPosts(bookmarkedIds as any);
     } catch (error) {
       console.error("Error loading bookmarks:", error);
     }
@@ -737,7 +662,7 @@ export default function CommunityMainScreen() {
 
   /**
    * Handle emoji reaction to a post
-   * Uses Convex with optimistic updates
+   * Uses Convex for reactions
    */
   const handleReactionPress = async (postId: any, emoji: string) => {
     if (!user?.id) {
@@ -746,46 +671,20 @@ export default function CommunityMainScreen() {
     }
 
     try {
-      // Use Convex for reactions
-      if (isUsingConvex && reactToConvexPost) {
-        try {
-          console.log('📤 Reacting to post via Convex...', { postId, emoji });
-          await reactToConvexPost(postId, emoji);
-          
-          // Refresh to get updated reactions
-          if (activeView === "newsfeed") {
-            await loadPosts();
-          } else {
-            await loadMyPosts();
-          }
-          
-          console.log('✅ Convex reaction successful');
-          return;
-        } catch (convexError) {
-          console.warn('⚠️ Convex reaction failed, falling back to REST:', convexError);
-        }
+      console.log('📤 Reacting to post via Convex...', { postId, emoji });
+      await convex.mutation(api.posts.react, { 
+        postId: postId,
+        emoji 
+      });
+      
+      // Refresh to get updated reactions
+      if (activeView === "newsfeed") {
+        await loadPosts();
+      } else {
+        await loadMyPosts();
       }
       
-      // REST fallback
-      const response = await communityApi.reactToPost(postId as number, user.id, emoji);
-
-      // Update posts based on current view for immediate UI feedback
-      const updater = (prevPosts: any[]) =>
-        prevPosts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                reactions: response.reactions,
-                reaction_count: (post.reaction_count || 0) + response.reactionChange,
-              }
-            : post
-        );
-
-      if (activeView === "newsfeed") {
-        setPosts(updater);
-      } else {
-        setMyPosts(updater);
-      }
+      console.log('✅ Convex reaction successful');
     } catch (error) {
       console.error("Error reacting to post:", error);
       showError("Error", "Failed to update reaction");
@@ -794,7 +693,7 @@ export default function CommunityMainScreen() {
 
   /**
    * Toggle bookmark status for a post
-   * Uses Convex with real-time updates
+     * Uses Convex for bookmarks
    */
   const handleBookmarkPress = async (postId: any) => {
     if (!user?.id) {
@@ -803,37 +702,19 @@ export default function CommunityMainScreen() {
     }
 
     try {
-      // Use Convex for bookmarks
-      if (isUsingConvex) {
-        try {
-          console.log('📤 Toggling bookmark via Convex...', { postId });
-          await toggleConvexBookmark(postId);
-          
-          // Update local state
-          const newBookmarkedPosts = new Set(bookmarkedPosts);
-          if (newBookmarkedPosts.has(postId)) {
-            newBookmarkedPosts.delete(postId);
-          } else {
-            newBookmarkedPosts.add(postId);
-          }
-          setBookmarkedPosts(newBookmarkedPosts);
-          
-          console.log('✅ Convex bookmark toggled successfully');
-          return;
-        } catch (convexError) {
-          console.warn('⚠️ Convex bookmark failed, using REST:', convexError);
-        }
-      }
+        console.log('📤 Toggling bookmark via Convex...', { postId });
+        const result = await convex.mutation(api.posts.toggleBookmark, { postId });
       
-      // REST fallback
-      const response = await communityApi.toggleBookmark(postId, user.id);
+        // Update local state
       const newBookmarkedPosts = new Set(bookmarkedPosts);
-      if (response.bookmarked) {
+        if (result.bookmarked) {
         newBookmarkedPosts.add(postId);
       } else {
         newBookmarkedPosts.delete(postId);
       }
       setBookmarkedPosts(newBookmarkedPosts);
+      
+        console.log('✅ Convex bookmark toggled successfully');
 
       // Refresh posts if currently in bookmark view
       if (selectedCategory === "Bookmark" && activeView === "newsfeed") {
@@ -871,24 +752,14 @@ export default function CommunityMainScreen() {
     if (!user?.id) return;
 
     try {
-      // Try Convex first, fallback to REST
-      if (isUsingConvex) {
-        try {
-          console.log('📤 Publishing draft via Convex...', { postId });
-          await updateConvexPost(String(postId), { isDraft: false });
-          showSuccess("Post published successfully!");
-          loadMyPosts();
-          console.log('✅ Draft published via Convex');
-          return;
-        } catch (convexError) {
-          console.warn('⚠️ Convex publish failed, using REST:', convexError);
-        }
-      }
-
-      // REST fallback
-      await communityApi.updatePost(postId, { isDraft: false });
+        console.log('📤 Publishing draft via Convex...', { postId });
+        await convex.mutation(api.posts.update, { 
+          postId: postId as any,
+          isDraft: false 
+        });
       showSuccess("Post published successfully!");
       loadMyPosts();
+        console.log('✅ Draft published via Convex');
     } catch (error) {
       console.error("Error publishing draft:", error);
       showError("Error", "Failed to publish post");
@@ -902,28 +773,8 @@ export default function CommunityMainScreen() {
   const handleDeletePost = async (postId: number) => {
     showConfirmation("Delete Post", "Are you sure you want to delete this post? This action cannot be undone.", async () => {
       try {
-        // Try Convex first, fallback to REST
-        if (isUsingConvex) {
-          try {
-            console.log('📤 Deleting post via Convex...', { postId });
-            await deleteConvexPost(String(postId));
-            showSuccess("Post deleted successfully!");
-
-            // Update the UI immediately for better UX
-            if (activeView === "my-posts") {
-              setMyPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-            } else {
-              setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-            }
-            console.log('✅ Post deleted via Convex');
-            return;
-          } catch (convexError) {
-            console.warn('⚠️ Convex delete failed, using REST:', convexError);
-          }
-        }
-
-        // REST fallback
-        await communityApi.deletePost(postId);
+          console.log('📤 Deleting post via Convex...', { postId });
+          await convex.mutation(api.posts.deletePost, { postId: postId as any });
         showSuccess("Post deleted successfully!");
 
         // Update the UI immediately for better UX
@@ -932,6 +783,7 @@ export default function CommunityMainScreen() {
         } else {
           setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
         }
+          console.log('✅ Post deleted via Convex');
       } catch (error) {
         console.error("Error deleting post:", error);
         showError("Error", "Failed to delete post");
@@ -1031,7 +883,7 @@ export default function CommunityMainScreen() {
    */
   const handlePostPress = (postId: number) => {
     router.push({
-      pathname: "/community-forum/post-detail",
+  pathname: "/(app)/(tabs)/community-forum/post-detail",
       params: { id: postId },
     });
   };
@@ -1148,7 +1000,7 @@ export default function CommunityMainScreen() {
       title: "Community Forum",
       onPress: () => {
         hideSideMenu();
-        router.push("/community-forum");
+  router.push("/(app)/(tabs)/community-forum");
       },
     },
     {
@@ -1241,7 +1093,7 @@ export default function CommunityMainScreen() {
               <TouchableOpacity
                 testID="create-post-button"
                 style={styles.addPostButton}
-                onPress={() => router.push("/community-forum/create")}
+                onPress={() => router.push("/(app)/(tabs)/community-forum/create")}
               >
                 <Ionicons name="add" size={scaledFontSize(16)} color="#FFFFFF" />
                 <Text style={styles.addPostButtonText}>Add Post</Text>
@@ -1293,7 +1145,7 @@ export default function CommunityMainScreen() {
               </View>
               <TouchableOpacity
                 style={styles.addPostButton}
-                onPress={() => router.push("/community-forum/create")}
+                onPress={() => router.push("/(app)/(tabs)/community-forum/create")}
               >
                 <Ionicons name="add" size={scaledFontSize(16)} color="#FFFFFF" />
                 <Text style={styles.addPostButtonText}>New Post</Text>
@@ -1344,7 +1196,7 @@ export default function CommunityMainScreen() {
                 {activeView === "my-posts" && (
                   <TouchableOpacity
                     style={styles.createFirstPostButton}
-                    onPress={() => router.push("/community-forum/create")}
+                    onPress={() => router.push("/(app)/(tabs)/community-forum/create")}
                   >
                     <Text style={styles.createFirstPostButtonText}>
                       Create Your First Post

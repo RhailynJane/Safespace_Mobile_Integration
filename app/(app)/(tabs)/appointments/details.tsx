@@ -26,8 +26,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 /**
  * BookAppointment Component
@@ -41,7 +41,7 @@ import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointm
  */
 
 interface SupportWorker {
-  id: number;
+  id: string | number;
   name: string;
   title: string;
   avatar: string;
@@ -72,30 +72,8 @@ export default function BookAppointment() {
   const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
 
-  // Initialize Convex client with Clerk auth
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
-        unsavedChangesWarning: false,
-      });
-
-      const fetchToken = async () => {
-        if (getToken) {
-          const token = await getToken({ template: 'convex' });
-          return token ?? undefined;
-        }
-        return undefined;
-      };
-      
-      client.setAuth(fetchToken);
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  // Convex appointments hook (for potential future use)
-  const { isUsingConvex } = useConvexAppointments(user?.id, convexClient);
+  // Use shared Convex client from provider
+  const convex = useConvex();
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -172,53 +150,40 @@ export default function BookAppointment() {
   }, []);
 
   /**
-   * Fetch support worker details from API
+   * Fetch support worker details from Convex
    */
   const fetchSupportWorker = useCallback(async () => {
+    if (!supportWorkerId) return;
     try {
       setLoading(true);
-      
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/support-workers/${supportWorkerId}`);
-      const result = await response.json();
-
-      if (result.success) {
-        // Transform the data and keep possible FK-friendly identifiers
-        const worker = result.data;
-        const backendWorkerId: number | undefined =
-          (typeof worker.worker_id === 'number' && worker.worker_id) ||
-          (typeof worker.user_id === 'number' && worker.user_id) ||
-          (typeof worker.id === 'number' && worker.id) ||
-          undefined;
-
-        setSupportWorker({
-          id: worker.id,
-          name: `${worker.first_name} ${worker.last_name}`,
-          title: "Support Worker",
-          avatar: worker.avatar_url || "https://via.placeholder.com/150",
-          specialties: worker.specialization 
-            ? worker.specialization.split(',').map((s: string) => s.trim())
-            : [],
-          backendWorkerId,
-          email: worker.email,
-        });
-      } else {
-        showStatusModal('error', 'Error', 'Failed to load support worker details');
+      const worker = await convex.query(api.supportWorkers.getSupportWorker, { workerId: String(supportWorkerId) });
+      if (!worker) {
+        showStatusModal('error', 'Not found', 'Support worker not found');
+        setSupportWorker(null);
+        return;
       }
+      setSupportWorker({
+        id: worker.id,
+        name: worker.name,
+        title: worker.title,
+        avatar: worker.avatar,
+        specialties: worker.specialties || [],
+        backendWorkerId: typeof worker.id === 'number' ? worker.id : undefined,
+        // Email not present in derived worker doc currently
+        email: undefined,
+      });
     } catch (error) {
-      console.error('Error fetching support worker:', error);
+      console.error('Error fetching support worker from Convex:', error);
       showStatusModal('error', 'Error', 'Unable to fetch support worker. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [supportWorkerId, showStatusModal]);
+  }, [supportWorkerId, convex, showStatusModal]);
 
   // Fetch support worker on mount and when id changes
   useEffect(() => {
-    if (supportWorkerId) {
-      fetchSupportWorker();
-    }
-  }, [supportWorkerId, fetchSupportWorker]);
+    fetchSupportWorker();
+  }, [fetchSupportWorker]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;

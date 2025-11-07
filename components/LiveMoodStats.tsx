@@ -40,10 +40,40 @@ export function LiveMoodStats({ userId, days = 7, onStatsUpdate, renderStats }: 
     };
   }, []);
 
-  // Subscribe to live stats
+  if (error) {
+    return null; // Silently fail if Convex unavailable
+  }
+
+  if (!convexApi) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color="#4CAF50" />
+      </View>
+    );
+  }
+
+  // Render the actual component only when API is loaded
+  return <LiveMoodStatsInner 
+    userId={userId} 
+    days={days} 
+    convexApi={convexApi}
+    onStatsUpdate={onStatsUpdate}
+    renderStats={renderStats}
+  />;
+}
+
+// Internal component that actually uses the query
+function LiveMoodStatsInner({ 
+  userId, 
+  days, 
+  convexApi, 
+  onStatsUpdate, 
+  renderStats 
+}: LiveMoodStatsProps & { convexApi: any }) {
+  // Now we can safely call useQuery because convexApi is guaranteed to be loaded
   const stats = useQuery(
-    convexApi?.moods.getMoodStats,
-    convexApi ? { userId, days } : 'skip'
+    convexApi.moods.getMoodStats,
+    { userId, days }
   ) as { totalEntries: number; distribution: Record<string, number>; averageMood: number } | undefined;
 
   // Notify parent on update
@@ -53,11 +83,7 @@ export function LiveMoodStats({ userId, days = 7, onStatsUpdate, renderStats }: 
     }
   }, [stats, onStatsUpdate]);
 
-  if (error) {
-    return null; // Silently fail if Convex unavailable
-  }
-
-  if (!convexApi || stats === undefined) {
+  if (stats === undefined) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color="#4CAF50" />

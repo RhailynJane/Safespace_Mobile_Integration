@@ -82,6 +82,16 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
   }, [sessionId, isConvexEnabled, convexClient]);
 
   /**
+   * Attach an existing session ID (e.g., received via navigation params)
+   * Useful when the session was started on a previous screen.
+   */
+  const attachExistingSession = useCallback((existingSessionId: string | null | undefined) => {
+    if (existingSessionId) {
+      setSessionId(existingSessionId);
+    }
+  }, []);
+
+  /**
    * End the current session
    */
   const endSession = useCallback(async (params?: {
@@ -187,6 +197,7 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     endSession,
     updateSettings,
     reportQualityIssue,
+    attachExistingSession,
     isUsingConvex: isConvexEnabled,
   };
 }

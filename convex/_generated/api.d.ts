@@ -12,6 +12,7 @@ import type * as activities from "../activities.js";
 import type * as appointments from "../appointments.js";
 import type * as assessments from "../assessments.js";
 import type * as auth from "../auth.js";
+import type * as categories from "../categories.js";
 import type * as conversations from "../conversations.js";
 import type * as crisis from "../crisis.js";
 import type * as hello from "../hello.js";
@@ -25,6 +26,7 @@ import type * as profiles from "../profiles.js";
 import type * as resources from "../resources.js";
 import type * as settings from "../settings.js";
 import type * as storage from "../storage.js";
+import type * as supportWorkers from "../supportWorkers.js";
 import type * as videoCallSessions from "../videoCallSessions.js";
 
 import type {
@@ -46,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   appointments: typeof appointments;
   assessments: typeof assessments;
   auth: typeof auth;
+  categories: typeof categories;
   conversations: typeof conversations;
   crisis: typeof crisis;
   hello: typeof hello;
@@ -59,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   resources: typeof resources;
   settings: typeof settings;
   storage: typeof storage;
+  supportWorkers: typeof supportWorkers;
   videoCallSessions: typeof videoCallSessions;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

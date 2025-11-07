@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+/* */
 // app/(app)/(tabs)/profile/edit.tsx
 /**
  * LLM Prompt: Add concise comments to this React Native component. 
@@ -27,14 +27,13 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
-import profileAPI, { ClientProfileData } from "../../../../utils/profileApi";
 import avatarEvents from "../../../../utils/avatarEvents";
 import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import OptimizedImage from "../../../../components/OptimizedImage";
-import { ConvexReactClient } from "convex/react";
-import { useConvexProfile } from "../../../../utils/hooks/useConvexProfile";
+import { useConvex, useAction, useMutation, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 // Gender options for the form
 const GENDER_OPTIONS = [
@@ -214,31 +213,80 @@ export default function EditProfileScreen() {
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Initialize Convex client with Clerk auth for profile sync
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
-      client.setAuth(async () => {
-        try {
-          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
-          return token ?? undefined;
-        } catch {
-          return undefined;
-        }
-      });
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  const { updateProfileImage: convexUpdateProfileImage, syncProfile: convexSyncProfile, isUsingConvex } = useConvexProfile(user?.id, convexClient);
+  // Convex hooks
+  const convex = useConvex();
+  const fullProfile = useQuery(
+    api.profiles.getFullProfile as any,
+    user?.id ? { clerkId: user.id } : (undefined as any)
+  ) as any;
+  const syncUser = useMutation(api.auth.syncUser);
+  const updateExtendedProfile = useMutation(api.profiles.updateExtendedProfile);
+  const updateProfileImageFromStorage = useMutation(api.profiles.updateProfileImageFromStorage);
+  const generateUploadUrl = useAction(api.storage.generateUploadUrl);
 
   // Load existing profile data when screen loads
   useEffect(() => {
-    if (user?.id) {
-      loadProfileData();
+    if (!user?.id) return;
+    // Hydrate from Convex full profile when available
+    if (fullProfile) {
+      setFormData((prev) => ({
+        ...prev,
+        firstName: user.firstName || fullProfile.firstName || prev.firstName || "",
+        lastName: user.lastName || fullProfile.lastName || prev.lastName || "",
+        email: user.emailAddresses?.[0]?.emailAddress || fullProfile.email || prev.email || "",
+        phoneNumber: fullProfile.phoneNumber || prev.phoneNumber || "",
+        location: fullProfile.location || prev.location || "",
+        // Extended fields
+        dateOfBirth: fullProfile.dateOfBirth || prev.dateOfBirth || "",
+        gender: fullProfile.gender || prev.gender || "",
+        pronouns: fullProfile.pronouns || prev.pronouns || "",
+        isLGBTQ: fullProfile.isLGBTQ || prev.isLGBTQ || "",
+        primaryLanguage: fullProfile.primaryLanguage || prev.primaryLanguage || "",
+        mentalHealthConcerns: fullProfile.mentalHealthConcerns || prev.mentalHealthConcerns || "",
+        supportNeeded: fullProfile.supportNeeded || prev.supportNeeded || "",
+        ethnoculturalBackground: fullProfile.ethnoculturalBackground || prev.ethnoculturalBackground || "",
+        canadaStatus: fullProfile.canadaStatus || prev.canadaStatus || "",
+        dateCameToCanada: fullProfile.dateCameToCanada || prev.dateCameToCanada || "",
+        // Address
+        streetAddress: fullProfile.address || prev.streetAddress || "",
+        city: fullProfile.city || prev.city || "",
+        postalCode: fullProfile.postalCode || prev.postalCode || "",
+      }));
+
+      // Set display dates
+      if (fullProfile.dateOfBirth) {
+        const raw: string | undefined = fullProfile.dateOfBirth as any;
+        if (raw) {
+          const ds = raw.includes("T") ? raw.split("T")[0] : raw;
+          if (ds) {
+            const parts = ds.split("-");
+            const y = parts[0];
+            const m = parts[1];
+            const d = parts[2];
+            if (y && m && d) setDateDisplay(`${m}/${d}/${y}`);
+          }
+        }
+      }
+      if (fullProfile.dateCameToCanada) {
+        const raw: string | undefined = fullProfile.dateCameToCanada as any;
+        if (raw) {
+          const cs = raw.includes("T") ? raw.split("T")[0] : raw;
+          if (cs) {
+            const parts = cs.split("-");
+            const y = parts[0];
+            const m = parts[1];
+            const d = parts[2];
+            if (y && m && d) setCanadaDateDisplay(`${m}/${d}/${y}`);
+          }
+        }
+      }
+
+      const img = fullProfile.profileImageUrl || user.imageUrl || null;
+      if (img) setProfileImage(img);
+      if (fullProfile.location) setLocationQuery(fullProfile.location);
+      setLoading(false);
     }
-  }, [user]);
+  }, [fullProfile, user]);
 
   /**
    * Opens the Canada date picker and initializes with existing date
@@ -296,152 +344,28 @@ export default function EditProfileScreen() {
 
     try {
       setLoading(true);
-
+      // Prefer Convex data already handled via fullProfile effect
+      // Fallback to Clerk + AsyncStorage for offline cases
       setFormData((prev) => ({
         ...prev,
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        email: user.emailAddresses[0]?.emailAddress || "",
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber || "",
+        firstName: user.firstName || prev.firstName || "",
+        lastName: user.lastName || prev.lastName || "",
+        email: user.emailAddresses[0]?.emailAddress || prev.email || "",
+        phoneNumber: user.phoneNumbers[0]?.phoneNumber || prev.phoneNumber || "",
       }));
 
-      const profileData = await profileAPI.getClientProfile(user.id);
-
-      // Handle Date of Birth
-      if (profileData?.dateOfBirth) {
-        let dateString: string = profileData.dateOfBirth;
-        if (dateString.includes("T")) {
-          const splitResult = dateString.split("T")[0];
-          dateString = splitResult || dateString;
-        }
-
-        const dateParts = dateString.split("-");
-        const year: string = dateParts[0] || "";
-        const month: string = dateParts[1] || "";
-        const day: string = dateParts[2] || "";
-        const displayDate = `${month}/${day}/${year}`;
-        setDateDisplay(displayDate);
-
-        setFormData((prev) => ({
-          ...prev,
-          dateOfBirth: dateString,
-        }));
-      }
-
-      if (user.imageUrl) {
-        setProfileImage(user.imageUrl);
-      }
-
       const savedImage = await AsyncStorage.getItem("profileImage");
-      if (savedImage) {
-        setProfileImage(savedImage);
-      }
-
+      if (!profileImage && savedImage) setProfileImage(savedImage);
       const savedProfileData = await AsyncStorage.getItem("profileData");
       if (savedProfileData) {
         const parsedData = JSON.parse(savedProfileData);
-        setFormData((prev) => ({
-          ...prev,
-          ...parsedData,
-        }));
-
-        if (parsedData.location) {
-          setLocationQuery(parsedData.location);
-        }
+        setFormData((prev) => ({ ...prev, ...parsedData }));
+        if (parsedData.location) setLocationQuery(parsedData.location);
       }
-
       const savedCmhaData = await AsyncStorage.getItem("cmhaProfileData");
       if (savedCmhaData) {
         const cmhaData = JSON.parse(savedCmhaData);
-        setFormData((prev) => ({
-          ...prev,
-          ...cmhaData,
-        }));
-      }
-
-      try {
-        const profileData = await profileAPI.getClientProfile(user.id);
-
-        if (profileData) {
-          setFormData((prev) => ({
-            ...prev,
-            firstName:
-              profileData.firstName || user.firstName || prev.firstName || "",
-            lastName:
-              profileData.lastName || user.lastName || prev.lastName || "",
-            email:
-              profileData.email ||
-              user.emailAddresses[0]?.emailAddress ||
-              prev.email ||
-              "",
-            phoneNumber: profileData.phoneNumber || prev.phoneNumber || "",
-            location: profileData.city || prev.location || "",
-            dateOfBirth: profileData.dateOfBirth || prev.dateOfBirth || "",
-            gender: profileData.gender || prev.gender || "",
-            streetAddress: profileData.address || prev.streetAddress || "",
-            postalCode: profileData.postalCode || prev.postalCode || "",
-            emergencyContactName:
-              profileData.emergencyContactName ||
-              prev.emergencyContactName ||
-              "",
-            emergencyContactNumber:
-              profileData.emergencyContactPhone ||
-              prev.emergencyContactNumber ||
-              "",
-            emergencyContactRelationship:
-              profileData.emergencyContactRelationship ||
-              prev.emergencyContactRelationship ||
-              "",
-            pronouns: profileData.pronouns || prev.pronouns || "",
-            isLGBTQ: profileData.isLGBTQ || prev.isLGBTQ || "",
-            primaryLanguage:
-              profileData.primaryLanguage || prev.primaryLanguage || "",
-            mentalHealthConcerns:
-              profileData.mentalHealthConcerns ||
-              prev.mentalHealthConcerns ||
-              "",
-            supportNeeded:
-              profileData.supportNeeded || prev.supportNeeded || "",
-            ethnoculturalBackground:
-              profileData.ethnoculturalBackground ||
-              prev.ethnoculturalBackground ||
-              "",
-            canadaStatus: profileData.canadaStatus || prev.canadaStatus || "",
-            dateCameToCanada:
-              profileData.dateCameToCanada || prev.dateCameToCanada || "",
-          }));
-
-          if (profileData.city) {
-            setLocationQuery(profileData.city);
-          }
-
-          // ✅ Handle Date Came to Canada display
-          if (profileData.dateCameToCanada) {
-            let dateString: string = profileData.dateCameToCanada;
-            if (dateString.includes("T")) {
-              const splitResult = dateString.split("T")[0];
-              dateString = splitResult || dateString;
-            }
-
-            const dateParts = dateString.split("-");
-            const year: string = dateParts[0] || "";
-            const month: string = dateParts[1] || "";
-            const day: string = dateParts[2] || "";
-
-            if (year && month && day) {
-              const displayDate = `${month}/${day}/${year}`;
-              setCanadaDateDisplay(displayDate);
-            }
-          }
-
-          if (profileData.profileImage) {
-            setProfileImage(profileData.profileImage);
-            // Also save to local storage for offline access
-            await AsyncStorage.setItem("profileImage", profileData.profileImage);
-          }
-        }
-      } catch (apiError) {
-        console.log("API fetch failed, using local/Clerk data:", apiError);
+        setFormData((prev) => ({ ...prev, ...cmhaData }));
       }
     } catch (error) {
       console.log("Error loading profile data:", error);
@@ -702,24 +626,30 @@ export default function EditProfileScreen() {
         const imageUri = result.assets[0].uri;
 
         try {
-          // Upload image to backend (returns URL, not base64)
-          const imageUrl = await profileAPI.uploadProfileImage(user.id, imageUri);
-          console.log('📸 Profile edit: Uploaded image URL:', imageUrl);
-          
-          // ✅ FIX: Store URL instead of base64 to prevent memory issues
-          // Base64 images can be 66MB+ causing OOM errors
-          await AsyncStorage.setItem("profileImage", imageUrl);
-          setProfileImage(imageUrl);
-          // Notify app header and other listeners immediately
-          console.log('📸 Profile edit: Emitting avatar event with URL:', imageUrl);
-          avatarEvents.emit(imageUrl);
+          // 1) Get a one-time upload URL from Convex
+          const { uploadUrl } = await generateUploadUrl({});
 
-          // Best-effort Convex profile image update
-          try {
-            if (isUsingConvex && imageUrl) {
-              await convexUpdateProfileImage(imageUrl);
-            }
-          } catch (_e) { /* ignore convex image sync errors */ }
+          // 2) Fetch the file and upload via PUT
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          const contentType = (result.assets[0] as any).mimeType || "image/jpeg";
+          const putRes = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": contentType },
+            body: blob,
+          });
+          const json = await putRes.json();
+          const storageId = json.storageId as string;
+
+          if (!storageId) throw new Error("No storageId returned from upload");
+
+          // 3) Update profile image in Convex to point to storage URL
+          await updateProfileImageFromStorage({ clerkId: user.id, storageId: json.storageId });
+
+          // Optimistically show selected image and store locally
+          setProfileImage(imageUri);
+          await AsyncStorage.setItem("profileImage", imageUri);
+          avatarEvents.emit(imageUri);
 
           setSuccessMessage("Profile picture updated!");
           setShowSuccessModal(true);
@@ -848,155 +778,70 @@ export default function EditProfileScreen() {
         return;
       }
 
-      // Prepare data for backend API - FIXED VERSION
-      const profileData: Partial<ClientProfileData> = {
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email.trim(),
+      // Prepare data and persist via Convex
+      const baseFirst = formData.firstName.trim();
+      const baseLast = formData.lastName.trim();
+      const baseEmail = formData.email.trim();
+      // 1) Upsert users row with base identity
+      await syncUser({
+        email: baseEmail,
+        firstName: baseFirst,
+        lastName: baseLast,
+        imageUrl: profileImage || undefined,
+      });
+
+      // 2) Upsert extended profile
+      await updateExtendedProfile({
+        clerkId: user.id,
         phoneNumber: formData.phoneNumber?.trim() || undefined,
+        location: formData.location?.trim() || undefined,
+        profileImageUrl: profileImage || undefined,
+        // Extended
         dateOfBirth: formData.dateOfBirth?.trim() || undefined,
         gender: formData.gender?.trim() || undefined,
+        pronouns: formData.pronouns?.trim() || undefined,
+        isLGBTQ: formData.isLGBTQ?.trim() || undefined,
+        primaryLanguage: formData.primaryLanguage?.trim() || undefined,
+        mentalHealthConcerns: formData.mentalHealthConcerns?.trim() || undefined,
+        supportNeeded: formData.supportNeeded?.trim() || undefined,
+        ethnoculturalBackground: formData.ethnoculturalBackground?.trim() || undefined,
+        canadaStatus: formData.canadaStatus?.trim() || undefined,
+        dateCameToCanada: formData.dateCameToCanada?.trim() || undefined,
+        // Address
         address: formData.streetAddress?.trim() || undefined,
         city: formData.location?.trim() || undefined,
         postalCode: formData.postalCode?.trim() || undefined,
         country: "Canada",
-        emergencyContactName:
-          formData.emergencyContactName?.trim() || undefined,
-        emergencyContactPhone:
-          formData.emergencyContactNumber?.trim() || undefined,
-        emergencyContactRelationship:
-          formData.emergencyContactRelationship?.trim() || undefined,
+        // Emergency contact
+        emergencyContactName: formData.emergencyContactName?.trim() || undefined,
+        emergencyContactPhone: formData.emergencyContactNumber?.trim() || undefined,
+        emergencyContactRelationship: formData.emergencyContactRelationship?.trim() || undefined,
+      });
 
-        // CMHA Demographics
-        pronouns: formData.pronouns?.trim() || undefined,
-        isLGBTQ: formData.isLGBTQ?.trim() || undefined,
-        primaryLanguage: formData.primaryLanguage?.trim() || undefined,
-        mentalHealthConcerns:
-          formData.mentalHealthConcerns?.trim() || undefined,
-        supportNeeded: formData.supportNeeded?.trim() || undefined,
-        ethnoculturalBackground:
-          formData.ethnoculturalBackground?.trim() || undefined,
-        canadaStatus: formData.canadaStatus?.trim() || undefined,
-        dateCameToCanada: formData.dateCameToCanada?.trim() || undefined,
-      };
-
-      console.log("🎯 Prepared profile data for API:", profileData);
-
-      // Save to backend API
+      // Save to local storage as backup and notify listeners
+      await saveProfileDataToStorage();
+      await saveCmhaDataToStorage();
       try {
-        const result = await profileAPI.updateClientProfile(
-          user.id,
-          profileData
-        );
-
-        if (result.success) {
-          // Save to local storage as backup
-          await saveProfileDataToStorage();
-          await saveCmhaDataToStorage();
-
-          try {
-            const currentProfileData =
-              await AsyncStorage.getItem("profileData");
-            const parsedProfileData = currentProfileData
-              ? JSON.parse(currentProfileData)
-              : {};
-
-            const updatedProfileData = {
-              ...parsedProfileData,
-              firstName: formData.firstName,
-              lastName: formData.lastName,
-              email: formData.email,
-              phoneNumber: formData.phoneNumber,
-              location: formData.location,
-              profileImageUrl: profileImage, // ✅ Include the image URL
-            };
-
-            await AsyncStorage.setItem(
-              "profileData",
-              JSON.stringify(updatedProfileData)
-            );
-            console.log("✅ Updated profileData in AsyncStorage");
-            // Emit again to ensure any subscribers update
-            avatarEvents.emit(profileImage);
-          } catch (syncError) {
-            console.error("Error syncing profileData:", syncError);
-          }
-          // ✅ END OF NEW CODE
-
-          // Best-effort Convex sync (subset of fields)
-          try {
-            if (isUsingConvex) {
-              await convexSyncProfile({
-                phoneNumber: formData.phoneNumber?.trim(),
-                location: formData.location?.trim(),
-                profileImageUrl: profileImage || undefined,
-              });
-            }
-          } catch (_e) { /* ignore convex sync errors */ }
-
-          setSuccessMessage("Profile updated successfully!");
-          setShowSuccessModal(true);
-          
-          // Navigate back after a short delay
-          setTimeout(() => {
-            router.back();
-          }, 1500);
-        } else {
-          throw new Error(result.message);
-        }
-      } catch (apiError) {
-        console.log("API update failed, saving locally:", apiError);
-  // If API fails, save to local storage only
-        await saveProfileDataToStorage();
-        await saveCmhaDataToStorage();
-
-        try {
-          const currentProfileData = await AsyncStorage.getItem("profileData");
-          const parsedProfileData = currentProfileData
-            ? JSON.parse(currentProfileData)
-            : {};
-
-          const updatedProfileData = {
-            ...parsedProfileData,
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            phoneNumber: formData.phoneNumber,
-            location: formData.location,
-            profileImageUrl: profileImage,
-          };
-
-          await AsyncStorage.setItem(
-            "profileData",
-            JSON.stringify(updatedProfileData)
-          );
-          console.log(
-            "✅ Updated profileData in AsyncStorage (local fallback)"
-          );
-        } catch (syncError) {
-          console.error("Error syncing profileData:", syncError);
-        }
-        // ✅ END OF NEW CODE
-
-        // Best-effort Convex sync even if REST failed
-        try {
-          if (isUsingConvex) {
-            await convexSyncProfile({
-              phoneNumber: formData.phoneNumber?.trim(),
-              location: formData.location?.trim(),
-              profileImageUrl: profileImage || undefined,
-            });
-          }
-        } catch (_e) { /* ignore */ }
-
-        setSuccessMessage("Profile updated locally!");
-        setShowSuccessModal(true);
-        
-        // Navigate back after a short delay
-        setTimeout(() => {
-          router.back();
-        }, 1500);
+        const currentProfileData = await AsyncStorage.getItem("profileData");
+        const parsedProfileData = currentProfileData ? JSON.parse(currentProfileData) : {};
+        const updatedProfileData = {
+          ...parsedProfileData,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phoneNumber: formData.phoneNumber,
+          location: formData.location,
+          profileImageUrl: profileImage,
+        };
+        await AsyncStorage.setItem("profileData", JSON.stringify(updatedProfileData));
+        avatarEvents.emit(profileImage);
+      } catch (syncError) {
+        console.error("Error syncing profileData:", syncError);
       }
+
+      setSuccessMessage("Profile updated successfully!");
+      setShowSuccessModal(true);
+      setTimeout(() => router.back(), 1200);
     } catch (error) {
       console.error("Error in handleSaveChanges:", error);
       setErrorTitle("Error");

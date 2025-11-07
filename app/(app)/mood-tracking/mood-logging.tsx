@@ -24,9 +24,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
-import { moodApi } from "../../../utils/moodApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 const { width } = Dimensions.get("window");
 
@@ -143,6 +144,8 @@ export default function MoodLoggingScreen() {
     }, [])
   );
 
+  const recordMood = useMutation(api.moods.recordMood);
+
   // Handle form submission with API call
   const handleSubmit = async () => {
     if (!user?.id) {
@@ -153,13 +156,14 @@ export default function MoodLoggingScreen() {
     setIsSubmitting(true);
 
     try {
-      // Create mood entry via API
-      await moodApi.createMood({
-        clerkUserId: user.id,
+      // Create mood entry via Convex
+      await recordMood({
+        userId: user.id,
         moodType: moodData.type,
         intensity: moodData.intensity,
         notes: moodData.notes,
         factors: moodData.factors,
+        shareWithSupportWorker: moodData.shareWithSupportWorker,
       });
 
       // Set success message based on sharing status

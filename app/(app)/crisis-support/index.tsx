@@ -17,7 +17,24 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
-import { fetchCrisisResources, trackCrisisAction, CrisisResource } from "../../../utils/crisisService";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+
+interface CrisisResource {
+  id: string;
+  slug: string;
+  title?: string;
+  subtitle?: string;
+  type: 'phone' | 'website';
+  value: string;
+  icon?: string;
+  color?: string;
+  region?: string;
+  country?: string;
+  priority?: string;
+  sort_order?: number;
+  active?: boolean;
+}
 
 const { width } = Dimensions.get("window");
 
@@ -66,21 +83,14 @@ export default function CrisisScreen() {
     setModalVisible(false);
   };
 
-  // Load crisis resources from Convex (with fallback)
+  // Live crisis resources from Convex
+  const liveResources = useQuery(api.crisis.listResources, { country: 'CA', activeOnly: true });
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await fetchCrisisResources({ country: 'CA' });
-        if (mounted && Array.isArray(res)) setResources(res);
-      } catch (e) {
-        // resources service already falls back; no-op
-      } finally {
-        if (mounted) setInitialLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+    if (Array.isArray(liveResources)) {
+      setResources(liveResources as CrisisResource[]);
+      setInitialLoading(false);
+    }
+  }, [liveResources]);
 
   /**
    * Handles bottom tab navigation
@@ -94,6 +104,8 @@ export default function CrisisScreen() {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  const trackAction = useMutation(api.crisis.trackAction);
 
   /**
    * Handles emergency call actions - opens phone dialer with number
@@ -109,7 +121,8 @@ export default function CrisisScreen() {
         await Linking.openURL(phoneNumber);
         showModal('success', 'Call Initiated', `Opening ${serviceName}. If the call doesn't start automatically, please dial ${number} manually.`);
         // best-effort tracking
-        await trackCrisisAction({ resourceId: resource?.id, slug: resource?.slug, action: 'call' });
+        // Track action best-effort (mutation defined outside handler)
+        try { await trackAction({ resourceId: resource?.id as any, action: 'call' }); } catch (e) { /* ignore */ }
       } else {
         showModal('error', 'Call Not Supported', `Your device doesn't support phone calls. Please dial ${number} manually.`);
       }
@@ -132,7 +145,7 @@ export default function CrisisScreen() {
       if (supported) {
         await Linking.openURL(url);
         showModal('success', 'Website Opened', 'Opening Distress Centre website in your browser...');
-        await trackCrisisAction({ resourceId: resource?.id, slug: resource?.slug, action: 'visit' });
+        try { await trackAction({ resourceId: resource?.id as any, action: 'visit' }); } catch (e) { /* ignore */ }
       } else {
         showModal('error', 'Browser Not Available', 'Cannot open website. Please check your browser app.');
       }

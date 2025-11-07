@@ -22,11 +22,22 @@ import { Colors, Spacing, Typography } from "../../../constants/theme";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
-import { moodApi, MoodEntry } from "../../../utils/moodApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import StatusModal from "../../../components/StatusModal";
 import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+
+interface MoodEntry {
+  id: string;
+  mood_type: string;
+  intensity: number;
+  notes?: string;
+  created_at: string;
+  mood_emoji: string;
+  mood_label: string;
+  mood_factors: Array<{ factor: string }>;
+}
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -130,51 +141,14 @@ const MoodTrackingScreen = () => {
     },
   ]).current;
 
-  // Load recent moods from API - limited to 5 entries
-  const loadRecentMoods = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      setLoading(true);
-      const data = await moodApi.getRecentMoods(user.id, 5); // Limit to 5 entries
-      setRecentEntries(data.moods || []);
-    } catch (error) {
-      console.error("Error loading recent moods:", error);
-      showStatusModal('error', 'Load Failed', 'Unable to load recent moods. Please try again.');
-      setRecentEntries([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
-
-  // Load recent moods when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadRecentMoods();
-    }, [loadRecentMoods])
-  );
-
-  // Live recent moods via Convex when available
-  const [convexApi, setConvexApi] = useState<any | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const mod = await import("../../../convex/_generated/api");
-        if (mounted) setConvexApi(mod.api);
-      } catch (_) {
-        // Convex not generated/enabled
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const LiveRecent = ({ api, userId, onData }: { api: any; userId: string; onData: (e: MoodEntry[]) => void }) => {
+  // Live subscription for recent moods (child component to avoid conditional hook)
+  const LiveRecentMoods = ({ userId, onData }: { userId: string; onData: (e: MoodEntry[]) => void }) => {
     const live = useQuery(api.moods.getRecentMoods, { userId, limit: 5 }) as any[] | undefined;
     useEffect(() => {
-      if (Array.isArray(live)) onData(live as unknown as MoodEntry[]);
+      if (Array.isArray(live)) {
+        onData(live as unknown as MoodEntry[]);
+        setLoading(false);
+      }
     }, [live, onData]);
     return null;
   };
@@ -263,8 +237,8 @@ const MoodTrackingScreen = () => {
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          {user?.id && convexApi ? (
-            <LiveRecent api={convexApi} userId={user.id} onData={setRecentEntries} />
+          {user?.id ? (
+            <LiveRecentMoods userId={user.id} onData={setRecentEntries} />
           ) : null}
           {/* Mood selection section */}
           <View style={styles.section}>

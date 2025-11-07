@@ -22,11 +22,12 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
+// Removed legacy Convex client + hybrid hook; using direct Convex queries
 
 const { width } = Dimensions.get("window");
 
@@ -69,40 +70,7 @@ export default function AppointmentsScreen() {
   const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
 
-  // Initialize Convex client with Clerk auth
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
-        unsavedChangesWarning: false,
-      });
-
-      // Set up auth with Clerk JWT
-      const fetchToken = async () => {
-        if (getToken) {
-          const token = await getToken({ template: 'convex' });
-          return token ?? undefined;
-        }
-        return undefined;
-      };
-      
-      client.setAuth(fetchToken);
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  // Convex appointments hook
-  const {
-    appointments: convexAppointments,
-    upcomingCount: convexUpcomingCount,
-    completedCount: convexCompletedCount,
-    nextAppointment: convexNextAppointment,
-    loading: convexLoading,
-    error: convexError,
-    loadAppointments,
-    isUsingConvex,
-  } = useConvexAppointments(user?.id, convexClient);
+  const convex = useConvex();
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -124,127 +92,25 @@ export default function AppointmentsScreen() {
   const fetchAppointments = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('📅 Fetching appointments for dashboard...');
-      
-      // Use Convex data if available
-      if (isUsingConvex && convexAppointments.length > 0) {
-        console.log('✅ Using Convex appointments data');
-        setAppointments(convexAppointments as any);
-        setUpcomingCount(convexUpcomingCount);
-        setCompletedCount(convexCompletedCount);
-        setNextAppointment(convexNextAppointment as any);
-        return;
-      }
-      
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
-      const result = await response.json();
-
-      console.log('📥 Dashboard appointments response:', result);
-
-      if (result.success && result.appointments) {
-        // Transform backend data using MST-aware date+time comparison to align with appointment list
-        const transformedAppointments = result.appointments.map((apt: any) => {
-          // Format readable date
-          const appointmentDate = new Date(apt.date);
-          const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          });
-
-          // Extract UTC components from stored date (treat as calendar day)
-          const utcDate = new Date(apt.date);
-          const year = utcDate.getUTCFullYear();
-          const month = utcDate.getUTCMonth();
-          const day = utcDate.getUTCDate();
-
-          // Current date/time in MST (America/Denver)
-          const mstFormatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Denver',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          });
-          const nowParts = mstFormatter.formatToParts(new Date());
-          const nowYear = parseInt(nowParts.find(p => p.type === 'year')?.value || '0');
-          const nowMonth = (parseInt(nowParts.find(p => p.type === 'month')?.value || '0')) - 1; // zero-based
-          const nowDay = parseInt(nowParts.find(p => p.type === 'day')?.value || '0');
-          const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
-          const nowMinute = parseInt(nowParts.find(p => p.type === 'minute')?.value || '0');
-
-          // Parse stored appointment time (HH:mm or HH:mm:ss)
-          const timeStr: string = apt.time || '00:00:00';
-          const [hStr, mStr] = timeStr.split(':');
-          const aptHour = parseInt(hStr || '0', 10);
-          const aptMinute = parseInt(mStr || '0', 10);
-
-          // Numeric comparison YYYYMMDDHHMM in MST to classify
-          const nowNumeric = nowYear * 100000000 + (nowMonth + 1) * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
-          const aptNumeric = year * 100000000 + (month + 1) * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
-          const isUpcoming = aptNumeric > nowNumeric;
-
-          return {
-            id: apt.id,
-            supportWorker: apt.supportWorker || 'Support Worker',
-            date: formattedDate,
-            time: apt.time || '',
-            type: apt.type || 'Video',
-            status: apt.status === 'cancelled' ? 'cancelled' :
-                    apt.status === 'completed' ? 'past' :
-                    (isUpcoming ? 'upcoming' : 'past'),
-            // Keep numeric marker for sorting "next" without relying on timezone-shifted Date objects
-            mstNumeric: aptNumeric,
-          };
-        });
-
-        setAppointments(transformedAppointments);
-
-        // Calculate upcoming and completed counts using unified MST logic
-        const upcoming = transformedAppointments.filter((a: any) => a.status === 'upcoming');
-        const completed = transformedAppointments.filter((a: any) => a.status === 'past');
-        setUpcomingCount(upcoming.length);
-        setCompletedCount(completed.length);
-
-        // Determine the next appointment: the one with the smallest mstNumeric among upcoming
-        if (upcoming.length > 0) {
-          const sorted = [...upcoming].sort((a: any, b: any) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
-          setNextAppointment(sorted[0]);
-        } else {
-          setNextAppointment(null);
-        }
-
-        console.log('✅ Stats calculated (MST unified):', { upcoming: upcoming.length, completed: completed.length });
-      } else {
-        console.warn('⚠️ No appointments found');
-        setAppointments([]);
-        setUpcomingCount(0);
-        setCompletedCount(0);
-        setNextAppointment(null);
-      }
+      console.log('📅 Fetching Convex appointment stats...');
+      const stats = await convex.query(api.appointments.getAppointmentStats, { userId: user?.id as string });
+      setUpcomingCount(stats.upcomingCount);
+      setCompletedCount(stats.completedCount);
+      setNextAppointment(stats.nextAppointment as any);
     } catch (error) {
       console.error('❌ Error fetching appointments:', error);
       showStatusModal('error', 'Error', 'Unable to fetch appointments. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [user?.id, showStatusModal, isUsingConvex, convexAppointments, convexUpcomingCount, convexCompletedCount, convexNextAppointment]);
+  }, [user?.id, showStatusModal, convex]);
 
   // Run fetch on mount and when dependencies change
   useEffect(() => {
     if (user?.id) {
-      // Refresh Convex data if using Convex
-      if (isUsingConvex) {
-        loadAppointments();
-      } else {
-        fetchAppointments();
-      }
+      fetchAppointments();
     }
-  }, [user?.id, isUsingConvex, loadAppointments, fetchAppointments]);
+  }, [user?.id, fetchAppointments]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -420,14 +286,14 @@ export default function AppointmentsScreen() {
    * Handles navigation to book appointment screen
    */
   const handleBookAppointment = () => {
-    router.push("../appointments/book");
+    router.push("/(app)/(tabs)/appointments/book");
   };
 
   /**
    * Handles navigation to view scheduled appointments
    */
   const handleViewScheduled = () => {
-    router.push("../appointments/appointment-list");
+    router.push("/(app)/(tabs)/appointments/appointment-list");
   };
 
   // Show loading indicator if data is being fetched

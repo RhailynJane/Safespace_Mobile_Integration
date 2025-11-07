@@ -27,8 +27,8 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import TimePickerModal from "../../../../components/TimePickerModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexProfile } from "../../../../utils/hooks/useConvexProfile";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 // (Optional) expo-notifications was used for debug "Test" buttons; removed to avoid accidental fires on Save
 
 /**
@@ -102,24 +102,12 @@ export default function SettingsScreen() {
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Initialize Convex client for storing lightweight preferences
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
-      client.setAuth(async () => {
-        try {
-          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
-          return token ?? undefined;
-        } catch {
-          return undefined;
-        }
-      });
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  const { updatePreferences: convexUpdatePreferences, isUsingConvex } = useConvexProfile(user?.id, convexClient);
+  // Convex preferences
+  const convexProfile = useQuery(
+    api.profiles.getFullProfile as any,
+    user?.id ? { clerkId: user.id } : (undefined as any)
+  ) as any;
+  const updatePreferencesMutation = useMutation(api.profiles.updatePreferences);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -175,10 +163,13 @@ export default function SettingsScreen() {
         try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
         // Best-effort: also reflect preferences in Convex profile (theme/notifications)
         try {
-          if (isUsingConvex) {
-            await convexUpdatePreferences({
-              theme: isDarkMode ? 'dark' : 'light',
-              notifications: notificationsEnabled,
+          if (user?.id) {
+            await updatePreferencesMutation({
+              clerkId: user.id,
+              preferences: {
+                theme: isDarkMode ? 'dark' : 'light',
+                notifications: notificationsEnabled,
+              },
             });
           }
         } catch (_e) { /* ignore convex preference sync errors */ }
@@ -277,10 +268,13 @@ export default function SettingsScreen() {
       }
       // Also try to persist minimal preferences to Convex
       try {
-        if (isUsingConvex) {
-          await convexUpdatePreferences({
-            theme: isDarkMode ? 'dark' : 'light',
-            notifications: notificationsEnabled,
+        if (user?.id) {
+          await updatePreferencesMutation({
+            clerkId: user.id,
+            preferences: {
+              theme: isDarkMode ? 'dark' : 'light',
+              notifications: notificationsEnabled,
+            },
           });
         }
       } catch (_e) { /* ignore */ }

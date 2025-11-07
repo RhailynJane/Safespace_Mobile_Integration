@@ -22,8 +22,8 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexProfile } from "../../../../utils/hooks/useConvexProfile";
+import { useConvex, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 const IS_TEST_ENV = process.env.NODE_ENV === 'test';
 
@@ -61,37 +61,12 @@ export default function ProfileScreen() {
   const { user } = useUser();
   const { theme, scaledFontSize } = useTheme();
 
-  // Initialize Convex client with Clerk auth
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
-        unsavedChangesWarning: false,
-      });
-
-      // Set up auth with Clerk JWT
-      const fetchToken = async () => {
-        if (getToken) {
-          const token = await getToken({ template: 'convex' });
-          return token ?? undefined;
-        }
-        return undefined;
-      };
-      
-      client.setAuth(fetchToken);
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  // Convex profile hook
-  const {
-    profile: convexProfile,
-    loading: convexLoading,
-    error: convexError,
-    syncProfile: syncConvexProfile,
-    isUsingConvex,
-  } = useConvexProfile(user?.id, convexClient);
+  // Convex client
+  const convex = useConvex();
+  const convexProfile = useQuery(
+    api.profiles.getFullProfile as any,
+    user?.id ? { clerkId: user.id } : (undefined as any)
+  ) as any;
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -131,23 +106,17 @@ export default function ProfileScreen() {
     }
     
     // ✅ Primary: Use Convex profile with real-time updates
-    if (isUsingConvex && convexProfile) {
+    if (convexProfile && user) {
       console.log('✅ Using Convex profile data (real-time)');
       setProfileData({
-        firstName: user?.firstName || 'User',
-        lastName: user?.lastName || '',
-        email: user?.emailAddresses?.[0]?.emailAddress || '',
+        firstName: user.firstName || convexProfile.firstName || 'User',
+        lastName: user.lastName || convexProfile.lastName || '',
+        email: user.emailAddresses?.[0]?.emailAddress || convexProfile.email || '',
         phoneNumber: convexProfile.phoneNumber || '',
         location: convexProfile.location || '',
-        profileImageUrl: convexProfile.profileImageUrl || user?.imageUrl || '',
+        profileImageUrl: convexProfile.profileImageUrl || user.imageUrl || '',
       });
       setLoading(false);
-      return;
-    }
-    
-    // ✅ Fallback: Use Convex loading state
-    if (isUsingConvex && convexLoading) {
-      setLoading(true);
       return;
     }
     
@@ -163,14 +132,14 @@ export default function ProfileScreen() {
         setLoading(true);
         console.log("📋 Loading profile data...");
 
-        // Try to sync with Convex
-        if (syncConvexProfile && user?.id) {
+        // Try to upsert base user row in Convex users table
+        if (user?.id) {
           try {
-            console.log("🔄 Syncing profile with Convex...");
-            await syncConvexProfile({
-              clerkId: user.id,
-              phoneNumber: user.phoneNumbers?.[0]?.phoneNumber,
-              profileImageUrl: user.imageUrl,
+            await convex.mutation(api.auth.syncUser, {
+              email: user.emailAddresses?.[0]?.emailAddress,
+              firstName: user.firstName || undefined,
+              lastName: user.lastName || undefined,
+              imageUrl: user.imageUrl || undefined,
             });
           } catch (syncError) {
             console.error("⚠️ Convex sync failed, using local data:", syncError);
@@ -224,7 +193,7 @@ export default function ProfileScreen() {
     };
 
     loadProfileData();
-  }, [IS_TEST_ENV, user, isUsingConvex, convexProfile, convexLoading, syncConvexProfile]);
+  }, [IS_TEST_ENV, user, convexProfile, convex]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

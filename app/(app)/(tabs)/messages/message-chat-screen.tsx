@@ -64,8 +64,8 @@ import { useAudioPlayer, RecordingOptions } from 'expo-audio';
 import { Audio } from 'expo-av';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import OptimizedImage from "../../../../components/OptimizedImage";
-import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
-import activityApi from "../../../../utils/activityApi";
+import { Participant, messagingService } from "../../../../utils/sendbirdService";
+// activityApi removed; using Convex presence queries
 import * as FileSystem from "expo-file-system";
 import * as FSLegacy from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
@@ -76,16 +76,27 @@ import * as MediaLibrary from "expo-media-library";
 import Constants from "expo-constants";
 import { useIsFocused } from "@react-navigation/native";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
-import { ConvexReactClient } from "convex/react";
-import { useConvexMessages, useConvexLiveMessages } from "../../../../utils/hooks/useConvexMessages";
+import { useConvex, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Extended Message type to include attachment properties
-interface ExtendedMessage extends Message {
+interface ExtendedMessage {
+  id: string;
+  message_text: string;
+  message_type: 'text' | 'image' | 'file' | 'audio';
+  created_at: string;
+  updated_at?: string;
   attachment_url?: string;
   file_name?: string;
   file_size?: number;
+  sender: {
+    clerk_user_id: string;
+    first_name: string;
+    last_name: string;
+    profile_image_url?: string;
+  };
 }
 
 export default function ChatScreen() {
@@ -103,6 +114,11 @@ export default function ChatScreen() {
   const profileImageUrlParam = (params.profileImageUrl as string) || "";
   const API_BASE_URL = getApiBaseUrl();
 
+  // Live subscription with sender metadata (profiles + users)
+  const rawMessages = useQuery(
+    api.conversations.listMessagesWithProfiles as any,
+    conversationId ? { conversationId: conversationId as any, limit: 200 } : (undefined as any)
+  ) as any[] | undefined;
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const lastMessageIdRef = useRef<string | null>(null);
   const lastMarkedAtRef = useRef<number>(0);
@@ -153,27 +169,8 @@ export default function ChatScreen() {
     actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
 
-  // Convex client + hook for Convex-first messaging operations
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
-      client.setAuth(async () => {
-        try {
-          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
-          return token ?? undefined;
-        } catch {
-          return undefined;
-        }
-      });
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  const { sendMessage: sendConvexMessage, markAsRead: convexMarkAsRead, loadMessages: loadConvexMessages, isUsingConvex } = useConvexMessages(userId || undefined, convexClient);
-
-  // If Convex is enabled, subscribe to live messages to reduce polling
-  const { messages: liveMessages, isLiveReady } = useConvexLiveMessages(isUsingConvex ? String(conversationId) : undefined, 200);
+  // Shared Convex client from provider
+  const convex = useConvex();
 
   // Don't use the broken useAudioRecorder hook - use AudioModule directly
   const audioRecorderRef = useRef<any>(null);
@@ -307,19 +304,15 @@ export default function ChatScreen() {
     })();
   }, []);
 
-  // Update user activity
+  // Update user activity via Convex (touch presence)
   const updateUserActivity = useCallback(async () => {
     if (!userId) return;
-
     try {
-      await fetch(`${API_BASE_URL}/api/users/${userId}/activity`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      await convex.mutation(api.conversations.touchActivity, { status: 'online' });
     } catch (error) {
-      console.error("Error updating user activity:", error);
+      console.error('Error updating user activity (Convex):', error);
     }
-  }, [userId, API_BASE_URL]);
+  }, [userId, convex]);
 
   // Get last seen text with persistent online status
   const getLastSeenText = useCallback(
@@ -343,219 +336,46 @@ export default function ChatScreen() {
     []
   );
 
-  // Load messages
-  const loadMessages = useCallback(async () => {
-    if (!conversationId || !userId) {
-      console.log("Missing conversationId or userId");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      console.log(`[${Date.now()}] Loading messages for conversation ${conversationId}`)
-      // Start all non-blocking operations in parallel
-      const startTime = Date.now();
-      
-      // Fire and forget: update activity in background (don't await)
-      updateUserActivity().catch(() => {});
-
-      // Load messages (Convex-first, then REST fallback)
-      let loaded: ExtendedMessage[] = [];
-      let usedConvex = false;
-      try {
-        if (isUsingConvex && loadConvexMessages) {
-          const convexMsgs = await loadConvexMessages(String(conversationId));
-          if (Array.isArray(convexMsgs) && convexMsgs.length >= 0) {
-            loaded = convexMsgs as ExtendedMessage[];
-            usedConvex = true;
-          }
-        }
-      } catch (_e) {
-        usedConvex = false;
-      }
-
-      if (!usedConvex) {
-        const response = await fetch(
-          `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&t=${Date.now()}`
-        );
-        if (response.ok) {
-          const result = await response.json();
-          loaded = result.data || [];
-        } else {
-          console.error("Failed to load messages:", response.status);
-          showStatusModal('error', 'Load Error', 'Failed to load messages. Please try again.');
-          setLoading(false);
-          return;
-        }
-      }
-
-      const loadTime = Date.now() - startTime;
-      console.log(`[${Date.now()}] Loaded ${loaded.length} messages in ${loadTime}ms`);
-      setMessages(loaded);
-
-        // Detect new last message and mark as read when appropriate
-        const latest = loaded[loaded.length - 1];
-        const latestId = latest ? String(latest.id) : null;
-        const prevId = lastMessageIdRef.current;
-        const nowTs = Date.now();
-        const shouldMark =
-          latestId && latestId !== prevId &&
-          // Do not mark if the latest is mine
-          !(latest && (latest as any).sender && (latest as any).sender.clerk_user_id === userId) &&
-          // Throttle mark-as-read to avoid spamming
-          nowTs - lastMarkedAtRef.current > 2000;
-
-        if (shouldMark) {
-          lastMessageIdRef.current = latestId;
-          lastMarkedAtRef.current = nowTs;
-          // Fire-and-forget: mark as read both in SendBird (if enabled) and backend
-          (async () => {
-            try {
-              if (channelUrl && messagingService.isSendBirdEnabled()) {
-                await messagingService.markAsRead(channelUrl);
-              }
-            } catch (_e) { /* ignore SendBird mark-as-read errors */ }
-            try {
-              // Convex-first mark as read
-              if (isUsingConvex && conversationId) {
-                await convexMarkAsRead(String(conversationId));
-              }
-            } catch (_e) { /* ignore */ }
-            try {
-              await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clerkUserId: userId })
-              });
-            } catch (_e) { /* ignore backend mark-read errors */ }
-          })();
-        }
-
-        // Fire and forget: mark as read in background (don't block UI)
-        Promise.all([
-          // SendBird mark as read
-          (async () => {
-            try {
-              if (!didMarkReadRef.current && channelUrl && messagingService.isSendBirdEnabled()) {
-                await messagingService.markAsRead(channelUrl);
-                didMarkReadRef.current = true;
-              }
-            } catch (_e) {
-              // ignore SB errors
-            }
-          })(),
-          // Backend mark as read
-          (async () => {
-            try {
-              if (userId && conversationId) {
-                console.log(`📭 Calling mark-read API for conversation ${conversationId}`);
-                const markResponse = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ clerkUserId: userId })
-                });
-                console.log(`✅ Mark-read API responded:`, markResponse.status, markResponse.ok);
-              } else {
-                console.log(`⚠️ Skip mark-read: userId=${userId}, conversationId=${conversationId}`);
-              }
-            } catch (e) {
-              console.log(`❌ Mark-read API failed:`, e);
-            }
-          })()
-        ]).catch(() => {}); // Don't block on mark-read failures
-
-        // Initialize contact from route params if not already set
-        if (!contact && otherClerkIdParam) {
-          const fallbackContact = {
-            id: otherClerkIdParam,
-            clerk_user_id: otherClerkIdParam,
-            first_name: conversationTitle?.split(" ")[0] || "User",
-            last_name: conversationTitle?.split(" ").slice(1).join(" ") || "",
-            email: "",
-            profile_image_url: profileImageUrlParam || undefined,
-            online: initialOnlineParam === "0" ? false : true,
-            last_active_at: initialLastActiveParam || null,
-          };
-          setContact(fallbackContact);
-        }
-    } catch (error) {
-      console.error("Error loading messages:", error);
-      showStatusModal('error', 'Connection Error', 'Failed to load messages. Please check your connection.');
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    conversationId,
-    userId,
-    conversationTitle,
-    API_BASE_URL,
-    channelUrl,
-    initialOnlineParam,
-    initialLastActiveParam,
-    otherClerkIdParam,
-    profileImageUrlParam,
-    contact,
-    updateUserActivity,
-    isUsingConvex,
-    loadConvexMessages,
-    convexMarkAsRead,
-  ]);
-
-  // Load messages with fast polling while in the chat screen, unless live subscription is active
+  // Derive live messages when rawMessages changes
   useEffect(() => {
-    if (!isFocused || !conversationId || !userId) return;
-    if (isLiveReady) return; // Skip polling when live data is available
+    if (!rawMessages) return;
+    const loaded: ExtendedMessage[] = rawMessages.map((m: any) => ({
+      id: m._id,
+      message_type: m.messageType || 'text',
+      message_text: m.body || '',
+      created_at: m.createdAt ? new Date(m.createdAt).toISOString() : new Date().toISOString(),
+      updated_at: m.updatedAt ? new Date(m.updatedAt).toISOString() : undefined,
+      attachment_url: m.attachmentUrl,
+      file_name: m.fileName,
+      file_size: m.fileSize,
+      sender: {
+        clerk_user_id: m.senderId || 'unknown',
+        first_name: m.senderFirstName || '',
+        last_name: m.senderLastName || '',
+        profile_image_url: m.senderProfileImageUrl || undefined,
+      },
+    }));
+    setMessages(loaded);
+    setLoading(false);
 
-    loadMessages(); // Load immediately
-
-    // Poll faster when the user is near the bottom (actively viewing latest)
-    const intervalMs = userNearBottom ? 4000 : 8000; // 4s vs 8s
-    const pollInterval = setInterval(() => {
-      loadMessages();
-    }, intervalMs);
-
-    return () => clearInterval(pollInterval);
-  }, [isFocused, conversationId, userId, loadMessages, userNearBottom, isLiveReady]);
-
-  // When live messages are available, update UI and mark-as-read as needed
-  useEffect(() => {
-    if (!isLiveReady || !liveMessages) return;
-    setMessages(liveMessages as any);
-
-    const loaded = liveMessages as ExtendedMessage[];
+    // Auto mark read for newest incoming message (throttled)
     const latest = loaded[loaded.length - 1];
     const latestId = latest ? String(latest.id) : null;
     const prevId = lastMessageIdRef.current;
     const nowTs = Date.now();
-    const shouldMark =
-      !!latestId && latestId !== prevId &&
-      !(latest && (latest as any).sender && (latest as any).sender.clerk_user_id === userId) &&
-      nowTs - lastMarkedAtRef.current > 2000;
-
+    const shouldMark = latestId && latestId !== prevId && !(latest && latest.sender.clerk_user_id === userId) && nowTs - lastMarkedAtRef.current > 2000;
     if (shouldMark) {
       lastMessageIdRef.current = latestId;
       lastMarkedAtRef.current = nowTs;
-      (async () => {
-        try {
-          if (channelUrl && messagingService.isSendBirdEnabled()) {
-            await messagingService.markAsRead(channelUrl);
-          }
-        } catch { /* ignore */ }
-        try {
-          if (isUsingConvex && conversationId) {
-            await convexMarkAsRead(String(conversationId));
-          }
-        } catch { /* ignore */ }
-        try {
-          await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clerkUserId: userId })
-          });
-        } catch { /* ignore */ }
-      })();
+      convex.mutation(api.conversations.markRead, { conversationId: conversationId as any }).catch(() => {});
     }
-  }, [isLiveReady, liveMessages, userId, channelUrl, isUsingConvex, conversationId, API_BASE_URL, convexMarkAsRead]);
+  }, [rawMessages, userId, convex, conversationId]);
+
+  // Load messages with fast polling while in the chat screen, unless live subscription is active
+  // Removed polling; live subscription provides updates
+
+  // When live messages are available, update UI and mark-as-read as needed
+  // Live subscription removed (could be reintroduced with a Convex subscription hook later)
 
   // One-time status refresh after mount (no polling)
   useEffect(() => {
@@ -563,22 +383,17 @@ export default function ChatScreen() {
 
     const updateOnlineStatus = async () => {
       try {
-        const status = await activityApi.status(contact.clerk_user_id);
-        if (status) {
-          const newOnline = !!status.online;
-          const newPresence = (status as any).presence as 'online' | 'away' | 'offline' | undefined;
-          setIsOnline(newOnline);
-          
-          if (newPresence) {
-            setPresence(newPresence);
-          } else {
-            setPresence(newOnline ? 'online' : 'offline');
+        const row = await convex.query(api.conversations.presenceForUser, { userId: contact.clerk_user_id });
+        if (row) {
+          const status = (row.status as 'online' | 'away' | 'offline' | undefined) ?? 'online';
+          const lastSeen = row.lastSeen as number | undefined;
+          setIsOnline(status === 'online');
+          setPresence(status);
+          if (lastSeen) {
+            setContact((prev) => prev ? { ...prev, online: status === 'online', last_active_at: new Date(lastSeen).toISOString() } : prev);
           }
-          setContact((prev) => prev ? { ...prev, online: newOnline, last_active_at: status.last_active_at } : prev);
         }
-      } catch (_e) {
-        // ignore
-      }
+      } catch { /* ignore */ }
     };
 
     const initialTimeout = setTimeout(updateOnlineStatus, 1500);
@@ -771,53 +586,36 @@ export default function ChatScreen() {
         // Ignore size check failures; we'll let the server enforce limits
       }
 
-      // Build multipart form data
-      const form = new FormData();
-      form.append("conversationId", String(conversationId));
-      form.append("clerkUserId", String(userId));
-      form.append("messageType", fileType);
+      // Convex direct storage upload
       const finalFileName = `${finalNameBase}.${finalExt}`;
-      form.append(
-        "file",
-        {
-          uri: uploadUri,
-          name: finalFileName,
-          type: finalMime,
-        } as any
-      );
-
-      const res = await fetch(`${API_BASE_URL}/api/messages/upload-attachment`, {
-        method: "POST",
-        // Let React Native set the Content-Type with boundary
-        body: form as any,
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("ðŸ“ Upload failed:", errText);
-        setFileErrorMessage("Failed to upload attachment. Please try again.");
-        setFileErrorModalVisible(true);
-        return;
-      }
-
-      const json = await res.json();
-      console.log('📦 Backend upload response:', json);
-      if (json?.data) {
-        // Optimistically add the new message returned by server
-        console.log('📎 Upload successful, adding message:', { 
-          id: json.data.id, 
-          type: json.data.message_type, 
-          fileName: json.data.file_name,
-          attachmentUrl: json.data.attachment_url 
+      try {
+        const { uploadUrl } = await convex.action(api.storage.generateUploadUrl, {});
+        // Fetch file data as blob
+        const fileResponse = await fetch(uploadUri);
+        const fileBlob = await fileResponse.blob();
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': finalMime },
+          body: fileBlob,
         });
-        setMessages((prev) => {
-          console.log(`📝 Current messages count: ${prev.length}, adding uploaded attachment`);
-          return [...prev, json.data];
+        if (!uploadRes.ok) {
+          console.error('📎 Storage upload failed:', uploadRes.status);
+          showStatusModal('error', 'Upload failed', 'Could not upload file.');
+          return;
+        }
+        const { storageId } = await uploadRes.json();
+        // Create attachment message referencing storage
+        await convex.mutation(api.conversations.sendAttachmentFromStorage, {
+          conversationId: conversationId as any,
+            storageId: storageId,
+            fileName: finalFileName,
+            fileSize: undefined,
+            messageType: fileType === 'image' ? 'image' : 'file',
         });
-        // Optionally refresh to sync ordering/unread states
-        setTimeout(() => loadMessages(), 800);
-      } else {
-        console.warn('⚠️ Upload response missing data:', json);
+  // Live subscription will refresh messages automatically
+      } catch (convexErr) {
+        console.error('📎 Convex upload error:', convexErr);
+        showStatusModal('error', 'Upload failed', 'Unable to upload attachment.');
       }
     } catch (error) {
       console.error("ðŸ“ Upload error:", error);
@@ -840,42 +638,13 @@ export default function ChatScreen() {
       // Update activity when sending message
       await updateUserActivity();
 
-      let sent = false;
-      // Convex-first
-      try {
-        if (isUsingConvex) {
-          await sendConvexMessage(String(conversationId), newMessage.trim());
-          sent = true;
-        }
-      } catch (_e) {
-        sent = false;
-      }
-
-      if (!sent) {
-        // REST fallback
-        const response = await fetch(
-          `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              clerkUserId: userId,
-              messageText: newMessage,
-              messageType: "text",
-            }),
-          }
-        );
-        if (!response.ok) {
-          console.error("Failed to send message:", response.status);
-          showStatusModal('error', 'Send Error', 'Failed to send message');
-          return;
-        }
-      }
+      // Convex send only
+  await convex.mutation(api.conversations.sendMessage, { conversationId: conversationId as any, body: newMessage.trim(), messageType: 'text' });
 
       // Optimistic UI: clear input and refresh messages
       setNewMessage("");
       setIsTyping(false);
-      setTimeout(() => loadMessages(), 400);
+  // No manual reload needed; subscription updates list
     } catch (error) {
       console.error("Error sending message:", error);
       showStatusModal('error', 'Send Error', 'Failed to send message');
@@ -894,93 +663,49 @@ export default function ChatScreen() {
     setEmojiPickerVisible(false);
   };
 
-  // Handle voice recording (start/stop) - using expo-av Audio.Recording
+  // Handle voice recording (start/stop) - simplified and fixed structure
   const handleMicPress = async () => {
     try {
-      // Ensure microphone permission before attempting to record
       const hasPerm = await ensureMicPermission();
       if (!hasPerm) {
         showStatusModal('error', 'Permission required', 'Please allow microphone access to record voice messages.');
         return;
       }
-      if (isRecording) {
+      if (!isRecording) {
+        // Start recording
+        await Audio.requestPermissionsAsync();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        const recording = new Audio.Recording();
+        await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        await recording.startAsync();
+        audioRecorderRef.current = recording;
+        setIsRecording(true);
+        isRecordingRef.current = true;
+        setRecordingDuration(0);
+        recordingTimerRef.current = setInterval(() => setRecordingDuration(prev => prev + 1), 1000);
+        console.log('🎤 Recording started');
+      } else {
         // Stop recording
-        console.log('🎤 Stopping recording...');
         const recorder = audioRecorderRef.current;
-        if (!recorder) {
-          console.log('❌ No recorder instance');
-          showStatusModal('error', 'Recording Error', 'Recording not initialized.');
-          setIsRecording(false);
-          return;
-        }
-        
-        try {
+        if (recorder) {
           await recorder.stopAndUnloadAsync();
           const uri = recorder.getURI();
-          console.log('🎤 Recording URI:', uri);
-          
-          if (uri && uri.length > 0) {
-            console.log('🎤 Recording saved:', uri);
+          if (uri) {
             setPendingRecordingUri(uri);
-            setPendingRecordingDuration(Math.max(1, recordingDuration));
-            audioRecorderRef.current = null;
-          } else {
-            console.log('❌ No URI from recording');
-            showStatusModal('error', 'Recording Error', 'Could not save the recording. Please try again.');
+            setPendingRecordingDuration(recordingDuration);
+            console.log('🎤 Recording saved:', uri);
           }
-        } catch (stopError: any) {
-          console.error('❌ Error stopping:', stopError);
-          showStatusModal('error', 'Recording Error', stopError.message || 'Failed to stop recording');
         }
-        
         setIsRecording(false);
         isRecordingRef.current = false;
-        
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-      } else {
-        // Start recording
-        console.log('🎤 Starting recording...');
-        
-        try {
-          // Request permissions
-          await Audio.requestPermissionsAsync();
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-          });
-          
-          const { recording } = await Audio.Recording.createAsync(
-            Audio.RecordingOptionsPresets.HIGH_QUALITY
-          );
-          
-          audioRecorderRef.current = recording;
-          console.log('🎤 Recording started successfully');
-          
-          setIsRecording(true);
-          isRecordingRef.current = true;
-          setRecordingDuration(0);
-          
-          // Update duration every second
-          recordingTimerRef.current = setInterval(() => {
-            setRecordingDuration(prev => prev + 1);
-          }, 1000);
-        } catch (startError: any) {
-          console.error('❌ Error starting recording:', startError);
-          showStatusModal('error', 'Recording Error', startError.message || 'Failed to start recording');
-        }
+        if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
       }
-    } catch (error: any) {
-      console.error('❌ Audio recording error:', error);
+    } catch (e: any) {
+      console.error('❌ Audio recording error:', e);
+      showStatusModal('error', 'Recording Error', e.message || 'Failed to record audio');
       setIsRecording(false);
       isRecordingRef.current = false;
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      showStatusModal('error', 'Recording Error', error.message || 'Failed to record audio');
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     }
   };
 
@@ -1739,17 +1464,13 @@ export default function ChatScreen() {
                     if (!conversationId || !userId) return;
                     showConfirm(
                       'Delete conversation',
-                      'This will remove the conversation from your inbox. Continue?',
+                      'This will remove the conversation and all messages. Continue?',
                       async () => {
                         try {
-                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                          if (res.ok) {
-                            router.back();
-                          } else {
-                            showStatusModal('error', 'Delete failed', 'Unable to delete this conversation.');
-                          }
+                          await convex.mutation(api.conversations.deleteConversation, { conversationId: conversationId as any });
+                          router.back();
                         } catch (_e) {
-                          showStatusModal('error', 'Network error', 'Please check your connection and try again.');
+                          showStatusModal('error', 'Delete failed', 'Please try again.');
                         }
                       },
                       { confirmText: 'Delete', cancelText: 'Cancel' }
@@ -1819,14 +1540,10 @@ export default function ChatScreen() {
                         'Are you sure you want to delete this message?',
                         async () => {
                           try {
-                            const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${encodeURIComponent(String(conversationId))}/messages/${encodeURIComponent(String(item.id))}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                            if (res.ok) {
-                              setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
-                            } else {
-                              showStatusModal('error', 'Delete failed', 'Could not delete this message.');
-                            }
+                            await convex.mutation(api.conversations.deleteMessage, { messageId: item.id as any });
+                            setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
                           } catch (_e) {
-                            showStatusModal('error', 'Network error', 'Please try again.');
+                            showStatusModal('error', 'Delete failed', 'Please try again.');
                           }
                         },
                         { confirmText: 'Delete', cancelText: 'Cancel' }

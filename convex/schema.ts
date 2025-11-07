@@ -155,6 +155,26 @@ export default defineSchema({
 		location: v.optional(v.string()),
 		bio: v.optional(v.string()),
 		profileImageUrl: v.optional(v.string()),
+		// Extended profile fields for pure Convex profile management
+		dateOfBirth: v.optional(v.string()), // YYYY-MM-DD
+		gender: v.optional(v.string()),
+		pronouns: v.optional(v.string()),
+		isLGBTQ: v.optional(v.string()),
+		primaryLanguage: v.optional(v.string()),
+		mentalHealthConcerns: v.optional(v.string()),
+		supportNeeded: v.optional(v.string()),
+		ethnoculturalBackground: v.optional(v.string()),
+		canadaStatus: v.optional(v.string()),
+		dateCameToCanada: v.optional(v.string()), // YYYY-MM-DD
+		// Address
+		address: v.optional(v.string()),
+		city: v.optional(v.string()),
+		postalCode: v.optional(v.string()),
+		country: v.optional(v.string()),
+		// Emergency contact
+		emergencyContactName: v.optional(v.string()),
+		emergencyContactPhone: v.optional(v.string()),
+		emergencyContactRelationship: v.optional(v.string()),
 		preferences: v.optional(v.object({
 			theme: v.optional(v.string()),
 			notifications: v.optional(v.boolean()),
@@ -306,6 +326,16 @@ export default defineSchema({
 		.index("by_type", ["type"])
 		.index("by_active", ["active"])
 		.index("by_sort", ["sortOrder"]),
+
+	// Resource bookmarks (favorites)
+	resourceBookmarks: defineTable({
+		userId: v.string(), // Clerk user ID
+		resourceId: v.id("resources"),
+		createdAt: v.number(),
+	})
+		.index("by_user", ["userId"]) // list all favorites for a user
+		.index("by_resource", ["resourceId"]) // (optional) reverse lookup
+		.index("by_user_and_resource", ["userId", "resourceId"]), // ensure uniqueness
 
 	// Self-Assessments (Mental Wellbeing Scale)
 	assessments: defineTable({

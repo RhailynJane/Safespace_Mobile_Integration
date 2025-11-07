@@ -81,6 +81,76 @@ export const listMessages = query({
   },
 });
 
+/**
+ * listMessagesWithProfiles
+ * Returns the latest messages for a conversation enriched with sender profile metadata.
+ * Adds: senderFirstName, senderLastName, senderProfileImageUrl for each message.
+ * This avoids extra client round trips to fetch user/profile documents.
+ */
+export const listMessagesWithProfiles = query({
+  args: { conversationId: v.id("conversations"), limit: v.optional(v.number()) },
+  handler: async (ctx: any, args: { conversationId: string; limit?: number }) => {
+    const limit = args.limit ?? 50;
+
+    // Fetch messages (newest first) then reverse to chronological order
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q: any) => q.eq("conversationId", args.conversationId))
+      .order("desc")
+      .take(limit);
+
+    // Collect distinct senderIds
+    const distinctSenderIds = Array.from(new Set(messages.map((m: any) => m.senderId).filter(Boolean)));
+
+    // Load user base rows (firstName/lastName/imageUrl) from `users` table
+    const userRows = await Promise.all(
+      distinctSenderIds.map(async (sid) => {
+        const row = await ctx.db
+          .query("users")
+          .withIndex("by_clerkId", (q: any) => q.eq("clerkId", sid))
+          .first();
+        return row ? { clerkId: sid, firstName: row.firstName, lastName: row.lastName, imageUrl: row.imageUrl } : { clerkId: sid };
+      })
+    );
+  const userMap: Record<string, { firstName?: string; lastName?: string; imageUrl?: string }> = {};
+  userRows.forEach((u: any) => { userMap[String(u.clerkId)] = { firstName: u.firstName, lastName: u.lastName, imageUrl: u.imageUrl }; });
+
+    // Load extended profile overrides (profileImageUrl, maybe updated naming) from `profiles` table
+    const profileRows = await Promise.all(
+      distinctSenderIds.map(async (sid) => {
+        const row = await ctx.db
+          .query("profiles")
+          .withIndex("by_clerkId", (q: any) => q.eq("clerkId", sid))
+          .first();
+        return row ? { clerkId: sid, profileImageUrl: row.profileImageUrl } : null;
+      })
+    );
+  const profileMap: Record<string, { profileImageUrl?: string }> = {};
+  profileRows.filter(Boolean).forEach((p: any) => { profileMap[String(p.clerkId)] = { profileImageUrl: p.profileImageUrl }; });
+
+    // Resolve storage URLs for any messages whose attachment URL isn't already set
+    const enriched = await Promise.all(messages.map(async (m: any) => {
+      let attachmentUrl = m.attachmentUrl;
+      if (m.storageId && !attachmentUrl) {
+        try {
+          attachmentUrl = await ctx.storage.getUrl(m.storageId);
+        } catch { /* ignore */ }
+      }
+      const base = userMap[m.senderId] || {};
+      const prof = profileMap[m.senderId] || {};
+      return {
+        ...m,
+        attachmentUrl,
+        senderFirstName: base.firstName || '',
+        senderLastName: base.lastName || '',
+        senderProfileImageUrl: prof.profileImageUrl || base.imageUrl || undefined,
+      };
+    }));
+
+    return enriched.reverse();
+  },
+});
+
 export const sendMessage = mutation({
   args: { conversationId: v.id("conversations"), body: v.string(), messageType: v.optional(v.string()) },
   handler: async (ctx: any, args: { conversationId: string; body: string; messageType?: string }) => {
@@ -120,6 +190,49 @@ export const markRead = mutation({
       await ctx.db.patch(membership._id, { lastReadAt: now });
     }
     return { ok: true } as const;
+  },
+});
+
+// Lightweight presence/activity upsert (stores lastSeen + status)
+export const touchActivity = mutation({
+  args: { status: v.optional(v.string()) },
+  handler: async (ctx: any, args: { status?: string }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject as string;
+    const now = Date.now();
+
+    // Find existing presence row
+    const existing = await ctx.db
+      .query("presence")
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        lastSeen: now,
+        status: args.status ?? existing.status,
+      });
+    } else {
+      await ctx.db.insert("presence", {
+        userId,
+        status: args.status ?? "online",
+        lastSeen: now,
+      });
+    }
+    return { ok: true } as const;
+  },
+});
+
+// Query presence for a specific user (for status in chat header)
+export const presenceForUser = query({
+  args: { userId: v.string() },
+  handler: async (ctx: any, args: { userId: string }) => {
+    const row = await ctx.db
+      .query("presence")
+      .withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
+      .first();
+    return row ?? null;
   },
 });
 
@@ -183,4 +296,200 @@ export const sendAttachmentFromStorage = mutation({
     await ctx.db.patch(args.conversationId, { updatedAt: now });
     return { messageId: msgId } as const;
   }
+});
+
+// Delete a message if the current user is the sender or a participant of the conversation
+export const deleteMessage = mutation({
+  args: { messageId: v.id("messages") },
+  handler: async (ctx: any, args: { messageId: string }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject as string;
+
+    const msg = await ctx.db.get(args.messageId);
+    if (!msg) throw new Error("Message not found");
+
+    // Verify membership in the conversation
+    const membership = await ctx.db
+      .query("conversationParticipants")
+      .withIndex("by_conversation", (q: any) => q.eq("conversationId", msg.conversationId))
+      .filter((q: any) => q.eq(q.field("userId"), userId))
+      .first();
+
+    if (!membership && msg.senderId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    await ctx.db.delete(args.messageId);
+    return { ok: true } as const;
+  },
+});
+
+// Delete a whole conversation with cascading deletes (messages, participants) if authorized
+export const deleteConversation = mutation({
+  args: { conversationId: v.id("conversations") },
+  handler: async (ctx: any, args: { conversationId: string }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject as string;
+
+    const convo = await ctx.db.get(args.conversationId);
+    if (!convo) throw new Error("Conversation not found");
+
+    // Ensure user is a participant
+    const membership = await ctx.db
+      .query("conversationParticipants")
+      .withIndex("by_conversation", (q: any) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .filter((q: any) => q.eq(q.field("userId"), userId))
+      .first();
+
+    if (!membership && convo.createdBy !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // Delete messages
+    const msgs = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q: any) => q.eq("conversationId", args.conversationId))
+      .collect();
+    for (const m of msgs) {
+      await ctx.db.delete(m._id);
+    }
+
+    // Delete participants
+    const parts = await ctx.db
+      .query("conversationParticipants")
+      .withIndex("by_conversation", (q: any) => q.eq("conversationId", args.conversationId))
+      .collect();
+    for (const p of parts) {
+      await ctx.db.delete(p._id);
+    }
+
+    // Delete conversation itself
+    await ctx.db.delete(args.conversationId);
+
+    return { ok: true } as const;
+  },
+});
+
+/**
+ * participantsForConversation
+ * Returns the participant list for a conversation with basic user and profile metadata
+ */
+export const participantsForConversation = query({
+  args: { conversationId: v.id("conversations") },
+  handler: async (ctx: any, args: { conversationId: string }) => {
+    const parts = await ctx.db
+      .query("conversationParticipants")
+      .withIndex("by_conversation", (q: any) => q.eq("conversationId", args.conversationId))
+      .collect();
+
+    const users = await Promise.all(parts.map(async (p: any) => {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerkId", (q: any) => q.eq("clerkId", p.userId))
+        .first();
+      const prof = await ctx.db
+        .query("profiles")
+        .withIndex("by_clerkId", (q: any) => q.eq("clerkId", p.userId))
+        .first();
+      return {
+        userId: p.userId,
+        role: p.role,
+        joinedAt: p.joinedAt,
+        lastReadAt: p.lastReadAt,
+        firstName: user?.firstName || '',
+        lastName: user?.lastName || '',
+        imageUrl: prof?.profileImageUrl || user?.imageUrl,
+      };
+    }));
+
+    return users;
+  },
+});
+
+/**
+ * listForUserEnriched
+ * List conversations for the current user, including participants metadata,
+ * lastMessage preview, and unreadCount based on lastReadAt.
+ */
+export const listForUserEnriched = query({
+  args: {},
+  handler: async (ctx: any) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject as string;
+
+    const memberships = await ctx.db
+      .query("conversationParticipants")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .collect();
+
+    const convIds = memberships.map((m: any) => m.conversationId);
+    const conversations = (await Promise.all(convIds.map((id: string) => ctx.db.get(id)))).filter(Boolean);
+
+    const results = await Promise.all(conversations.map(async (c: any) => {
+      // participants (excluding current user)
+      const participants = await ctx.db
+        .query("conversationParticipants")
+        .withIndex("by_conversation", (q: any) => q.eq("conversationId", c._id))
+        .collect();
+
+      const others = participants.filter((p: any) => p.userId !== userId);
+      const enrichedOthers = await Promise.all(others.map(async (p: any) => {
+        const user = await ctx.db
+          .query("users")
+          .withIndex("by_clerkId", (q: any) => q.eq("clerkId", p.userId))
+          .first();
+        const prof = await ctx.db
+          .query("profiles")
+          .withIndex("by_clerkId", (q: any) => q.eq("clerkId", p.userId))
+          .first();
+        return {
+          userId: p.userId,
+          role: p.role,
+          lastReadAt: p.lastReadAt,
+          firstName: user?.firstName || '',
+          lastName: user?.lastName || '',
+          imageUrl: prof?.profileImageUrl || user?.imageUrl,
+        };
+      }));
+
+      // last message
+      const lastMsg = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation", (q: any) => q.eq("conversationId", c._id))
+        .order("desc")
+        .first();
+
+      // unread count based on my lastReadAt
+      const mine = participants.find((p: any) => p.userId === userId);
+      const lastReadAt = mine?.lastReadAt || 0;
+      const unread = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation", (q: any) => q.eq("conversationId", c._id))
+        .filter((q: any) => q.gt(q.field("createdAt"), lastReadAt))
+        .collect();
+
+      return {
+        ...c,
+        participants: enrichedOthers,
+        lastMessage: lastMsg ? {
+          _id: lastMsg._id,
+          body: lastMsg.body,
+          messageType: lastMsg.messageType,
+          attachmentUrl: lastMsg.attachmentUrl,
+          createdAt: lastMsg.createdAt,
+          senderId: lastMsg.senderId,
+        } : null,
+        unreadCount: unread.length,
+      };
+    }));
+
+    // Sort by updatedAt desc
+    results.sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return results;
+  },
 });

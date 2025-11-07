@@ -20,9 +20,10 @@ import { Colors, Spacing, Typography } from "../../../constants/theme";
 import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
-import { journalApi, JournalTemplate } from "../../../utils/journalApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 type CreateStep = "create" | "success";
@@ -65,6 +66,7 @@ export default function JournalCreateScreen() {
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
+  interface JournalTemplate { id: number; name: string; description: string; prompts: string[]; icon: string; }
   const [templates, setTemplates] = useState<JournalTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [journalData, setJournalData] = useState<JournalData>({
@@ -100,22 +102,16 @@ export default function JournalCreateScreen() {
     setModalVisible(false);
   };
 
+  // Live templates from Convex
+  const liveTemplates = useQuery(api.journal.listTemplates, {});
   useEffect(() => {
-    const fetchTemplates = async () => {
-      try {
-        setLoadingTemplates(true);
-        const response = await journalApi.getTemplates();
-        setTemplates(response.templates || []);
-      } catch (error) {
-        console.error("Error fetching templates:", error);
-        showStatusModal('error', 'Load Failed', 'Unable to load journal templates. Please try again.');
-      } finally {
-        setLoadingTemplates(false);
-      }
-    };
-    
-    fetchTemplates();
-  }, []);
+    if (Array.isArray(liveTemplates)) {
+      setTemplates(liveTemplates as JournalTemplate[]);
+      setLoadingTemplates(false);
+    } else {
+      setLoadingTemplates(true);
+    }
+  }, [liveTemplates]);
 
   const handleTitleChange = (text: string) => {
     setJournalData((prev) => ({ ...prev, title: text }));
@@ -165,6 +161,8 @@ export default function JournalCreateScreen() {
     }
   };
 
+  const createEntry = useMutation(api.journal.createEntry);
+
   const handleSave = async () => {
     if (
       !journalData.title.trim() ||
@@ -183,17 +181,17 @@ export default function JournalCreateScreen() {
     setLoading(true);
 
     try {
-      const response = await journalApi.createEntry({
+      const response = await createEntry({
         clerkUserId: user.id,
         title: journalData.title.trim(),
         content: journalData.content.trim(),
-        emotionType: journalData.emotion,
+        emotionType: journalData.emotion || undefined,
         emoji: journalData.emoji,
         templateId: journalData.templateId || undefined,
         shareWithSupportWorker: journalData.shareWithSupportWorker,
       });
 
-      if (response.success) {
+      if (response?.success) {
         setSavedEntryId(response.entry.id);
         
         // Set success message based on sharing status

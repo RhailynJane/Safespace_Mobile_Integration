@@ -23,7 +23,8 @@ import StatusModal from "../../../components/StatusModal";
 import { APP_TIME_ZONE } from '../../../utils/timezone';
 import notificationEvents from '../../../utils/notificationEvents';
 import { useQuery } from 'convex/react';
-import { notificationsApi } from '../../../utils/notificationsApi';
+import { useConvex } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 
 // Type definition for a Notification object.
 interface Notification {
@@ -83,27 +84,29 @@ export default function NotificationsScreen() {
     setModalVisible(false);
   };
 
+  const convex = useConvex();
   const loadNotifications = useCallback(async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const { data } = await notificationsApi.getNotifications(user.id);
-      const mapped: Notification[] = data.map(r => ({
+      // Direct Convex query (returns array of notification documents)
+      const result = await convex.query(api.notifications.getNotifications, { userId: user.id });
+      const mapped: Notification[] = (result.notifications || []).map((r: any) => ({
         id: String(r.id),
         title: r.title,
         message: r.message,
         time: r.time,
-        isRead: r.isRead || r.is_read || false,
+        isRead: !!r.isRead,
         type: (r.type as Notification['type']) || 'system',
       }));
       setNotifications(mapped);
     } catch (e) {
-      console.log('Error loading notifications:', e);
-      showStatusModal('error', 'Connection Error', 'Unable to connect to server. Please check your internet connection.');
+      console.log('Error loading notifications via Convex:', e);
+      showStatusModal('error', 'Connection Error', 'Unable to load notifications.');
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, convex]);
 
   useEffect(() => {
     // Only load via REST if Convex is not available
@@ -153,7 +156,7 @@ export default function NotificationsScreen() {
     );
 
     try {
-      await notificationsApi.markAsRead(id);
+  await convex.mutation(api.notifications.markAsRead, { notificationId: id as any });
       // Show success feedback for the action
       showStatusModal('success', 'Notification Read', 'Notification marked as read.');
     } catch (e) {
@@ -178,7 +181,7 @@ export default function NotificationsScreen() {
     setNotifications([]);
 
     try {
-      await notificationsApi.clearAllNotifications(user.id);
+      await convex.mutation(api.notifications.clearAll, { userId: user.id });
       showStatusModal('success', 'Notifications Cleared', 'All notifications have been deleted.');
     } catch (e) {
       console.log('Failed to clear notifications:', e);
@@ -207,7 +210,7 @@ export default function NotificationsScreen() {
     );
 
     try {
-      await notificationsApi.markAllAsRead(user.id);
+      await convex.mutation(api.notifications.markAllAsRead, { userId: user.id });
       showStatusModal('success', 'All Notifications Read', 'All notifications have been marked as read.');
     } catch (e) {
       console.log('Failed to mark all as read:', e);

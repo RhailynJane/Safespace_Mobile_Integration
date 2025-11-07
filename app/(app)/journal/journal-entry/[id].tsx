@@ -14,10 +14,11 @@ import { Colors, Spacing, Typography } from "../../../../constants/theme";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { journalApi, JournalEntry } from "../../../../utils/journalApi";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -26,6 +27,18 @@ const tabs = [
   { id: "messages", name: "Messages", icon: "chatbubbles" },
   { id: "profile", name: "Profile", icon: "person" },
 ];
+
+interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  emoji?: string;
+  emotion_type?: string;
+  share_with_support_worker: boolean;
+  tags?: string[];
+}
 
 export default function JournalEntryScreen() {
   const { theme, scaledFontSize } = useTheme();
@@ -53,44 +66,18 @@ export default function JournalEntryScreen() {
     setModalVisible(false);
   };
 
+  // Live single entry direct query
+  const liveEntry = useQuery(api.journal.getEntry, { id: id as any }) as { entry: JournalEntry } | null | undefined;
   useEffect(() => {
-    const fetchEntry = async () => {
-      try {
-        setLoading(true);
-        const response = await journalApi.getEntry(id as string);
-        setEntry(response.entry);
-      } catch (error) {
-        console.error("Error fetching journal entry:", error);
-        showStatusModal('error', 'Load Failed', 'Unable to load journal entry. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchEntry();
+    if (liveEntry && liveEntry.entry) {
+      setEntry(liveEntry.entry);
+      setLoading(false);
+    } else if (liveEntry === undefined) {
+      setLoading(true);
     }
-  }, [id]);
+  }, [liveEntry]);
 
-  // Ensure the entry refreshes when returning to this screen (e.g., after edit)
-  useFocusEffect(
-    React.useCallback(() => {
-      let isActive = true;
-      const refetch = async () => {
-        if (!id) return;
-        try {
-          const response = await journalApi.getEntry(id as string);
-          if (isActive) setEntry(response.entry);
-        } catch (e) {
-          // non-fatal; leave last known state
-        }
-      };
-      refetch();
-      return () => {
-        isActive = false;
-      };
-    }, [id])
-  );
+  // Live refresh handled by subscription component; focus effect no longer needed
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -101,16 +88,16 @@ export default function JournalEntryScreen() {
     }
   };
 
+  const deleteEntry = useMutation(api.journal.deleteEntry);
+
   const handleDelete = async () => {
     showStatusModal('info', 'Delete Entry', 
       'Are you sure you want to delete this journal entry? This action cannot be undone.'
     );
     
-    // Note: For confirmation dialog functionality, consider implementing a separate 
-    // confirmation modal component that allows custom button handling
     setDeleting(true);
     try {
-      await journalApi.deleteEntry(id as string);
+      await deleteEntry({ id: id as any });
       showStatusModal('success', 'Entry Deleted', 'Journal entry deleted successfully.');
       setTimeout(() => {
         router.replace("/(app)/journal");

@@ -11,21 +11,23 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Image,
   Animated,
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 export default function PostSuccessScreen() {
+  // Retrieve newly created post id (passed from create screen) so we can deep-link to its detail view
+  const params = useLocalSearchParams();
+  const postId = params.postId as string | undefined; // Convex id (string) or undefined if not provided
   const { theme, scaledFontSize } = useTheme();
   const [activeTab, setActiveTab] = useState("community-forum");
   const [scaleAnim] = useState(new Animated.Value(0.8));
@@ -59,14 +61,24 @@ export default function PostSuccessScreen() {
    * Handles navigation to view the newly created post
    */
   const handleViewPost = () => {
-    router.replace("/(app)/(tabs)/community-forum");
+    if (postId) {
+      // Navigate directly to the post detail screen with the id parameter
+      router.replace({
+        pathname: "/(app)/(tabs)/community-forum/post-detail",
+        params: { id: postId },
+      });
+    } else {
+      // Fallback: go to forum list if we somehow lost the id
+      router.replace("/(app)/(tabs)/community-forum");
+    }
   };
 
   /**
    * Handles navigation to create another post
    */
   const handleCreateAnother = () => {
-    router.push("/community-forum/create");
+    // Route back to the category selection screen using grouped path convention
+    router.replace("/(app)/(tabs)/community-forum/create");
   };
 
   /**

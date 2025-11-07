@@ -23,8 +23,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from 'convex/react';
-import { useConvexAppointments } from '../../../../utils/hooks/useConvexAppointments';
+import { useConvex } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
 
 export default function ConfirmAppointment() {
   const { theme, scaledFontSize } = useTheme();
@@ -47,39 +47,8 @@ export default function ConfirmAppointment() {
   const { signOut } = useAuth();
   const { user } = useUser();
 
-  // Initialize Convex client
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  useEffect(() => {
-    const initConvex = async () => {
-      const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
-      if (!convexUrl) {
-        console.warn('⚠️ EXPO_PUBLIC_CONVEX_URL not set, Convex features disabled');
-        return;
-      }
-      try {
-        const client = new ConvexReactClient(convexUrl, {
-          unsavedChangesWarning: false,
-        });
-        // @ts-ignore - Clerk type issue, getToken exists at runtime
-        const token = await user?.getToken?.({ template: 'convex' });
-        if (token) {
-          client.setAuth(token);
-        }
-        setConvexClient(client);
-      } catch (error) {
-        console.error('Failed to initialize Convex:', error);
-      }
-    };
-    if (user) {
-      initConvex();
-    }
-  }, [user]);
-
-  // Use Convex appointments hook
-  const {
-    createAppointment: createConvexAppointment,
-    isUsingConvex,
-  } = useConvexAppointments(user?.id, convexClient);
+  // Shared Convex instance
+  const convex = useConvex();
 
   // Create dynamic styles
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -133,64 +102,21 @@ export default function ConfirmAppointment() {
       const normalizedType = selectedType.toLowerCase();
       const sessionType = sessionTypeMap[normalizedType] || 'video';
 
-      // Convex-first: Try to create appointment via Convex
-      if (isUsingConvex && createConvexAppointment) {
-        try {
-          console.log('📤 Creating appointment via Convex...');
-          
-          const convexAppointmentData = {
-            supportWorker: supportWorkerName,
-            date: selectedDate,
-            time: selectedTime,
-            type: sessionType,
-            notes: 'Booked via mobile app',
-          };
-
-          const result = await createConvexAppointment(convexAppointmentData);
-          console.log('✅ Convex appointment created:', result);
-          
-          setAppointmentCreated(true);
-          
-          return; // Success - exit early
-        } catch (convexError) {
-          console.warn('⚠️ Convex appointment creation failed, falling back to REST:', convexError);
-          // Continue to REST API fallback
-        }
-      }
-
-      // REST API fallback
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-
-      const appointmentData = {
-        clerkUserId: user.id,
-        supportWorkerId: parseInt(supportWorkerId),
-        appointmentDate: selectedDate,
-        appointmentTime: selectedTime,
-        sessionType: sessionType,
-        notes: 'Booked via mobile app',
-        duration: 60
-      };
-
-      console.log('📤 Sending appointment data:', appointmentData);
-
-      const response = await fetch(`${API_URL}/api/appointments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(appointmentData)
-      });
-
-      const result = await response.json();
-      console.log('📥 Create appointment response:', result);
-
-      if (result.success || response.ok) {
+      // Create appointment via Convex
+      try {
+        await convex.mutation(api.appointments.createAppointment, {
+          userId: user.id,
+          supportWorker: supportWorkerName,
+          supportWorkerId: parseInt(supportWorkerId) || undefined,
+          date: selectedDate,
+          time: selectedTime,
+          type: sessionType,
+          notes: 'Booked via mobile app',
+        });
         setAppointmentCreated(true);
-        setAppointmentId(result.appointment?.id);
-        console.log('✅ Appointment created successfully!');
-      } else {
-        console.error('❌ Failed to create appointment:', result);
-        showStatusModal('error', 'Booking Failed', result.error || 'Failed to create appointment');
+      } catch (convexError: any) {
+        console.error('❌ Convex appointment creation failed:', convexError);
+        showStatusModal('error', 'Booking Failed', convexError?.message || 'Failed to create appointment');
       }
     } catch (error) {
       console.error('❌ Error creating appointment:', error);
@@ -198,7 +124,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, supportWorkerId, supportWorkerName, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, isUsingConvex, createConvexAppointment]);
+  }, [user?.id, supportWorkerId, supportWorkerName, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, convex]);
 
   // Create appointment when page loads
   useEffect(() => {

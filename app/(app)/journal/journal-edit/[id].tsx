@@ -19,9 +19,10 @@ import { Colors, Spacing, Typography } from "../../../../constants/theme";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { journalApi, JournalEntry } from "../../../../utils/journalApi";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
 
@@ -84,27 +85,28 @@ export default function JournalEditScreen() {
     setModalVisible(false);
   };
 
+  const liveEntry = useQuery(api.journal.getEntry, { id: id as any }) as { entry: any } | null | undefined;
   const fetchEntry = React.useCallback(async () => {
     try {
       setLoading(true);
-      const response = await journalApi.getEntry(id as string);
-      const entry = response.entry;
-      
-      setJournalData({
-        title: entry.title,
-        content: entry.content,
-        emotion: entry.emotion_type as EmotionType,
-        emoji: entry.emoji || "",
-        shareWithSupportWorker: entry.share_with_support_worker,
-      });
-      setCharacterCount(entry.content.length);
+      if (liveEntry && liveEntry.entry) {
+        const entry = liveEntry.entry;
+        setJournalData({
+          title: entry.title,
+          content: entry.content,
+          emotion: entry.emotion_type as EmotionType,
+          emoji: entry.emoji || "",
+          shareWithSupportWorker: entry.share_with_support_worker,
+        });
+        setCharacterCount(entry.content.length);
+      }
     } catch (error) {
       console.error("Error fetching journal entry:", error);
       showStatusModal('error', 'Load Failed', 'Unable to load journal entry. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [liveEntry]);
 
   useEffect(() => {
     if (id) {
@@ -156,6 +158,8 @@ export default function JournalEditScreen() {
     }));
   };
 
+  const updateEntry = useMutation(api.journal.updateEntry);
+
   const handleSave = async () => {
     if (
       !journalData.title.trim() ||
@@ -169,7 +173,8 @@ export default function JournalEditScreen() {
     setSaving(true);
 
     try {
-      await journalApi.updateEntry(id as string, {
+      const response = await updateEntry({
+        id: id as any,
         title: journalData.title.trim(),
         content: journalData.content.trim(),
         emotionType: journalData.emotion || undefined,

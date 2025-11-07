@@ -46,9 +46,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useUser } from "@clerk/clerk-expo";
 
 /**
  * ResourceDetailScreen Component
@@ -56,9 +59,22 @@ import { useTheme } from "../../../contexts/ThemeContext";
  * Provides an immersive reading experience for individual mental health resources
  * with enhanced visual presentation and user engagement features
  */
+// Client-side resource shape
+interface ClientResource {
+  id: string;
+  title: string;
+  content: string;
+  author?: string;
+  type: string;
+  category: string;
+  imageEmoji: string;
+  backgroundColor: string;
+}
+
 export default function ResourceDetailScreen() {
   const { theme, scaledFontSize } = useTheme();
   const params = useLocalSearchParams();
+  const { user } = useUser();
   
   const [loading, setLoading] = useState(false); // Loading state for future enhancements
 
@@ -72,15 +88,58 @@ export default function ResourceDetailScreen() {
    * Extract and structure resource data from navigation parameters
    * Provides type safety for resource properties
    */
-  const resource = {
-    id: params.id as string,
-    title: params.title as string,
-    content: params.content as string,
-    author: params.author as string,
-    type: params.type as string,
-    category: params.category as string,
-    imageEmoji: params.imageEmoji as string,
-    backgroundColor: params.backgroundColor as string,
+  // Determine if we received full data via navigation params
+  const paramHasContent = !!params.content && !!params.title;
+  const passedId = params.id as string | undefined;
+
+  // Only attempt Convex fetch if we did NOT receive full content AND the id looks like a Convex id
+  // (Convex Ids are opaque strings; we'll just ensure we have something non-empty and no 'external-' prefix)
+  const shouldFetchFromConvex = !paramHasContent && !!passedId && !passedId.startsWith("external-");
+
+  // Always pass the function, conditionally pass args using "skip" to avoid runtime errors
+  const convexResource = useQuery(
+    api.resources.getResource,
+    shouldFetchFromConvex ? { resourceId: passedId as any } : "skip"
+  ) as (any | null | undefined);
+
+  // Merge navigation params with Convex result (Convex overrides if present)
+  const resource: ClientResource = {
+    id: passedId || convexResource?.id || "unknown",
+    title: (convexResource?.title || (params.title as string) || "Untitled") as string,
+    content: (convexResource?.content || (params.content as string) || "No content available.") as string,
+    author: (convexResource?.author || (params.author as string) || "") || undefined,
+    type: (convexResource?.type || (params.type as string) || "Resource") as string,
+    category: (convexResource?.category || (params.category as string) || "motivation") as string,
+    // Convex returns image_emoji; params may provide imageEmoji
+    imageEmoji: (convexResource?.image_emoji || convexResource?.imageEmoji || (params.imageEmoji as string) || "📄") as string,
+    backgroundColor: (convexResource?.backgroundColor || (params.backgroundColor as string) || "#FFFFFF") as string,
+  };
+
+  // Show a loading indicator while attempting to fetch from Convex if we lack initial content
+  const isLoadingFromConvex = shouldFetchFromConvex && convexResource === undefined;
+
+  // Favorites (bookmark) integration
+  const userId = user?.id;
+  const bookmarkResult = useQuery(
+    api.resources.listBookmarkedIds,
+    userId ? { userId } : 'skip'
+  ) as { ids: string[] } | undefined;
+  const addBookmark = useMutation(api.resources.addBookmark);
+  const removeBookmark = useMutation(api.resources.removeBookmark);
+  const canBookmark = !!userId && !resource.id.startsWith('external-') && resource.id !== 'unknown';
+  const isFavorited = canBookmark && bookmarkResult?.ids?.includes(resource.id) === true;
+
+  const handleToggleFavorite = async () => {
+    if (!canBookmark || !userId) return;
+    try {
+      if (isFavorited) {
+        await removeBookmark({ userId, resourceId: resource.id as any });
+      } else {
+        await addBookmark({ userId, resourceId: resource.id as any });
+      }
+    } catch (err) {
+      console.error('Favorite toggle failed', err);
+    }
   };
 
   /**
@@ -116,7 +175,7 @@ export default function ResourceDetailScreen() {
   };
 
   // Loading state UI - Currently minimal as data comes from params
-  if (loading) {
+  if (loading || isLoadingFromConvex) {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -186,6 +245,15 @@ export default function ResourceDetailScreen() {
             backgroundColor: theme.colors.borderLight,
             borderColor: theme.colors.border 
           }]}>
+            {canBookmark && (
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: theme.colors.surface }]} 
+                onPress={handleToggleFavorite}
+              >
+                <Ionicons name={isFavorited ? 'star' : 'star-outline'} size={24} color={isFavorited ? '#FFC107' : theme.colors.textSecondary} />
+                <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>{isFavorited ? 'Favorited' : 'Favorite'}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity 
               style={[styles.actionButton, { backgroundColor: theme.colors.surface }]} 
               onPress={handleShare}

@@ -6,16 +6,19 @@ export const heartbeat = mutation({
   args: { status: v.optional(v.string()) },
   handler: async (ctx: any, args: { status?: string }) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthenticated");
+    if (!identity) {
+      throw new Error("Unauthenticated");
+    }
 
     const userId = identity.subject; // Clerk user id
     const now = Date.now();
     const status = args.status ?? "online";
 
+    // Use get + patch for atomic operation to avoid OCC errors
     const existing = await ctx.db
       .query("presence")
       .withIndex("by_userId", (q: any) => q.eq("userId", userId))
-      .first();
+      .unique();
 
     if (existing) {
       await ctx.db.patch(existing._id, { status, lastSeen: now });

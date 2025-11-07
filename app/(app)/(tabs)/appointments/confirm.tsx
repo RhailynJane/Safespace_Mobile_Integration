@@ -23,10 +23,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import settingsAPI from "../../../../utils/settingsApi";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import Constants from 'expo-constants';
-import { ConvexReactClient } from "convex/react";
-import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
+// Removed legacy ConvexReactClient and custom hook usage
 
 // Check if running in Expo Go
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -62,37 +62,11 @@ export default function ConfirmAppointment() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, getToken } = useAuth();
+  const { signOut } = useAuth();
   const { user } = useUser();
 
-  // Initialize Convex client with Clerk auth
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
-        unsavedChangesWarning: false,
-      });
-
-      const fetchToken = async () => {
-        if (getToken) {
-          const token = await getToken({ template: 'convex' });
-          return token ?? undefined;
-        }
-        return undefined;
-      };
-      
-      client.setAuth(fetchToken);
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  // Convex appointments hook
-  const {
-    createAppointment: createConvexAppointment,
-    updateAppointmentStatus,
-    isUsingConvex,
-  } = useConvexAppointments(user?.id, convexClient);
+  // Shared Convex client from provider
+  const convex = useConvex();
 
   // Create dynamic styles
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -182,7 +156,7 @@ export default function ConfirmAppointment() {
    */
   const scheduleAppointmentReminder = useCallback(async (
     appointmentDate: string,
-    appointmentTime: string,
+    appointmentTimeLabel: string,
     workerName: string
   ) => {
     // Skip in Expo Go
@@ -195,7 +169,11 @@ export default function ConfirmAppointment() {
     if (!user?.id) return;
     
     try {
-      const settings = await settingsAPI.fetchSettings(user.id);
+      const settings = await convex.query(api.settings.getUserSettings, { userId: user.id });
+      if (!settings) {
+        console.log('⚠️ No settings found; skipping reminder scheduling');
+        return;
+      }
       if (!settings.appointmentReminderEnabled) {
         console.log('📅 Appointment reminders are disabled in settings');
         return;
@@ -204,7 +182,7 @@ export default function ConfirmAppointment() {
       const advanceMinutes = settings.appointmentReminderAdvanceMinutes || 60;
       
       // Parse appointment datetime
-      const { hour, minute } = parseTimeTo24h(appointmentTime);
+  const { hour, minute } = parseTimeTo24h(appointmentTimeLabel);
         const dateParts = appointmentDate.split('-').map(Number);
         const year = dateParts[0];
         const month = dateParts[1];
@@ -239,7 +217,7 @@ export default function ConfirmAppointment() {
           data: {
             type: 'appointment',
             appointmentDate,
-            appointmentTime,
+            appointmentTime: appointmentTimeLabel,
             workerName,
           },
         },
@@ -251,7 +229,7 @@ export default function ConfirmAppointment() {
       console.error('❌ Failed to schedule appointment reminder:', error);
       throw error;
     }
-    }, [user?.id, parseTimeTo24h]);
+  }, [user?.id, parseTimeTo24h, convex]);
 
   /**
    * Show status modal
@@ -275,7 +253,7 @@ export default function ConfirmAppointment() {
       setLoading(true);
       console.log('📅 Creating appointment in database...');
 
-      // Convert session type to match backend format
+      // Map UI session type labels to backend type values
       const sessionTypeMap: { [key: string]: string } = {
         'video call': 'video',
         'video': 'video',
@@ -288,114 +266,30 @@ export default function ConfirmAppointment() {
       const normalizedType = selectedType.toLowerCase();
       const sessionType = sessionTypeMap[normalizedType] || 'video';
 
-      // Normalize time to HH:MM:SS for DB compatibility
-      const normalizedTime = toHHMMSS(selectedTime);
-
-      // Convex-first: Try to create appointment via Convex
-      if (isUsingConvex && createConvexAppointment) {
-        try {
-          console.log('📤 Creating appointment via Convex...');
-          const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
-          const workerIdInt = parseInt(chosenIdRaw);
-          if (!Number.isFinite(workerIdInt)) {
-            throw new Error(`Invalid support worker id: ${chosenIdRaw}`);
-          }
-          
-          // Format data to match hook's expected parameter structure
-          const convexAppointmentData = {
-            supportWorker: supportWorkerName,
-            date: selectedDate,
-            time: normalizedTime,
-            type: sessionType,
-            notes: 'Booked via mobile app',
-          };
-
-          const result = await createConvexAppointment(convexAppointmentData);
-          console.log('✅ Convex appointment created:', result);
-          
-          setAppointmentCreated(true);
-          // For Convex, we don't get back an ID immediately, but the appointment is created
-          
-          // Schedule appointment reminder notification 1 hour before
-          try {
-            await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
-          } catch (reminderError) {
-            console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
-          }
-          
-          return; // Success - exit early
-        } catch (convexError) {
-          console.warn('⚠️ Convex appointment creation failed, falling back to REST:', convexError);
-          // Continue to REST API fallback
-        }
-      }
-
-      // REST API fallback
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-
-      // Be backward-compatible with different backend schemas
       const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
       const workerIdInt = parseInt(chosenIdRaw);
-      if (!Number.isFinite(workerIdInt)) {
-        throw new Error(`Invalid support worker id: ${chosenIdRaw}`);
-      }
-      const appointmentData: any = {
-        clerkUserId: user.id,
-        supportWorkerId: workerIdInt,                    // camelCase
-        support_worker_id: workerIdInt,                  // snake_case (Prisma schema)
-        workerId: workerIdInt,                           // legacy schema
-        worker_id: workerIdInt,                          // legacy snake_case
-        supportWorkerName, // helpful on older DBs without support_worker_id column
-        supportWorkerEmail: supportWorkerEmail || undefined,
-        support_worker_email: supportWorkerEmail || undefined,
-        appointmentDate: selectedDate,
-        appointment_date: selectedDate,                  // snake_case alternative
-        appointmentTime: normalizedTime,
-        appointment_time: normalizedTime,                // snake_case alternative
-        time: normalizedTime,                            // some backends expect 'time'
-        sessionType: sessionType,
-        session_type: sessionType,                       // snake_case alternative
-        notes: 'Booked via mobile app',
-        duration: 60
-      };
-
-      console.log('📤 Sending appointment data:', appointmentData);
-
-      const response = await fetch(`${API_URL}/api/appointments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(appointmentData)
-      });
-
-      const result = await response.json();
-      console.log('📥 Create appointment response:', result);
-
-      if (result.success || response.ok) {
+      const normalizedTime = toHHMMSS(selectedTime); // HH:MM:SS
+      try {
+        const result = await convex.mutation(api.appointments.createAppointment, {
+          userId: user.id,
+          supportWorker: supportWorkerName,
+          supportWorkerId: Number.isFinite(workerIdInt) ? workerIdInt : undefined,
+          date: selectedDate,
+          time: normalizedTime.slice(0,5), // HH:MM
+          type: sessionType,
+          notes: 'Booked via mobile app',
+        });
+        console.log('✅ Convex appointment created:', result);
         setAppointmentCreated(true);
-        setAppointmentId(result.appointment?.id);
-        console.log('✅ Appointment created successfully!');
-        
-        // Schedule appointment reminder notification 1 hour before
+        setAppointmentId(workerIdInt);
         try {
           await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
         } catch (reminderError) {
           console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
-          // Don't fail the whole appointment if reminder scheduling fails
         }
-      } else {
-        console.error('❌ Failed to create appointment:', result);
-        const details = (result && result.details) ? String(result.details) : '';
-        if (details.includes('appointments_worker_id_fkey')) {
-          showStatusModal(
-            'error',
-            'Support worker unavailable',
-            'This support worker isn\'t configured on the server yet (missing worker record). Please select a different support worker for now.'
-          );
-        } else {
-          showStatusModal('error', 'Booking Failed', result.error || 'Failed to create appointment');
-        }
+      } catch (convexError: any) {
+        console.error('❌ Convex appointment creation failed:', convexError);
+        showStatusModal('error', 'Booking Failed', convexError?.message || 'Failed to create appointment');
       }
     } catch (error) {
       console.error('❌ Error creating appointment:', error);
@@ -403,7 +297,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, isUsingConvex, createConvexAppointment]);
+    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, convex]);
 
     /**
      * Reschedule an existing appointment
@@ -412,30 +306,23 @@ export default function ConfirmAppointment() {
       if (!user?.id || !rescheduleAppointmentId) return;
       try {
         setLoading(true);
-        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
         const normalizedTime = toHHMMSS(selectedTime);
-        const payload = {
-          newDate: selectedDate,
-          newTime: normalizedTime,
-          reason: `Rescheduled via app by user ${user.id}`,
-        };
-        const response = await fetch(`${API_URL}/api/appointments/${rescheduleAppointmentId}/reschedule`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const result = await response.json();
-        if (response.ok && result.success) {
+        try {
+          await convex.mutation(api.appointments.rescheduleAppointment, {
+            appointmentId: rescheduleAppointmentId as any,
+            newDate: selectedDate,
+            newTime: normalizedTime.slice(0,5),
+            reason: `Rescheduled via app by user ${user.id}`,
+          });
           setAppointmentCreated(true);
-          setAppointmentId(result.appointment?.id || Number(rescheduleAppointmentId));
-          // Re-schedule reminder for the new time
+          setAppointmentId(parseInt(rescheduleAppointmentId));
           try {
             await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
           } catch (e) {
             console.warn('⚠️ Failed to schedule reminder after reschedule:', e);
           }
-        } else {
-          showStatusModal('error', 'Reschedule Failed', result.error || 'Unable to reschedule appointment.');
+        } catch (err: any) {
+          showStatusModal('error', 'Reschedule Failed', err?.message || 'Unable to reschedule appointment.');
         }
       } catch (e) {
         console.error('Reschedule error:', e);
@@ -443,7 +330,7 @@ export default function ConfirmAppointment() {
       } finally {
         setLoading(false);
       }
-    }, [user?.id, rescheduleAppointmentId, selectedDate, selectedTime, toHHMMSS, scheduleAppointmentReminder, supportWorkerName, showStatusModal]);
+    }, [user?.id, rescheduleAppointmentId, selectedDate, selectedTime, toHHMMSS, scheduleAppointmentReminder, supportWorkerName, showStatusModal, convex]);
 
   // Create appointment when page loads
   useEffect(() => {
@@ -745,7 +632,7 @@ export default function ConfirmAppointment() {
 
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => router.replace("/appointments/appointment-list")}
+              onPress={() => router.replace("/(app)/(tabs)/appointments/appointment-list")}
             >
               <Text style={styles.buttonText}>View My Appointments</Text>
             </TouchableOpacity>

@@ -15,8 +15,8 @@ import { Colors, Spacing, Typography } from "../../../constants/theme";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
-import { journalApi, JournalEntry } from "../../../utils/journalApi";
 import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
@@ -28,6 +28,20 @@ const tabs = [
   { id: "messages", name: "Messages", icon: "chatbubbles" },
   { id: "profile", name: "Profile", icon: "person" },
 ];
+
+// Local type aligned to Convex journal toClient shape
+interface JournalEntry {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  emoji?: string;
+  emotion_type?: string;
+  template_id?: number;
+  share_with_support_worker: boolean;
+  tags?: string[];
+}
 
 export default function JournalScreen() {
   const { theme, scaledFontSize } = useTheme();
@@ -55,19 +69,8 @@ export default function JournalScreen() {
   };
 
   const fetchRecentEntries = React.useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      setLoading(true);
-      const response = await journalApi.getRecentEntries(user.id, 2);
-      setJournalEntries(response.entries || []);
-    } catch (error) {
-      console.error("Error fetching journal entries:", error);
-      showModal('error', 'Load Failed', 'Unable to load journal entries. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+    // Live Convex subscription (useQuery) handles data; no manual fetch needed here
+  }, []);
 
   // Add useFocusEffect to fetch data when screen comes into focus
   useFocusEffect(
@@ -78,29 +81,13 @@ export default function JournalScreen() {
     }, [user?.id, fetchRecentEntries])
   );
 
-  // Live recent entries using Convex when available.
-  // We dynamically import the generated API and only render the live child when available.
-  const [convexApi, setConvexApi] = useState<any | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const mod = await import("../../../convex/_generated/api");
-        if (mounted) setConvexApi(mod.api);
-      } catch (_) {
-        // Convex not generated or not enabled; ignore silently
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const LiveRecent = ({ api, userId, onData }: { api: any; userId: string; onData: (e: JournalEntry[]) => void }) => {
+  // Live recent entries from Convex
+  const LiveRecent = ({ userId, onData }: { userId: string; onData: (e: JournalEntry[]) => void }) => {
     const live = useQuery(api.journal.listRecent, { clerkUserId: userId, limit: 2 }) as any[] | undefined;
     useEffect(() => {
       if (Array.isArray(live)) {
         onData(live as unknown as JournalEntry[]);
+        setLoading(false);
       }
     }, [live, onData]);
     return null;
@@ -144,8 +131,8 @@ export default function JournalScreen() {
         <AppHeader title="Journal" showBack={true} showMenu={true} />
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {user?.id && convexApi ? (
-            <LiveRecent api={convexApi} userId={user.id} onData={setJournalEntries} />
+          {user?.id ? (
+            <LiveRecent userId={user.id} onData={setJournalEntries} />
           ) : null}
           <View style={styles.content}>
             <Text style={[styles.subText, { color: theme.colors.textSecondary }]}>

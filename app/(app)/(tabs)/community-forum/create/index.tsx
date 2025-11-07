@@ -21,7 +21,7 @@ import CurvedBackground from "../../../../../components/CurvedBackground";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
 import { useAuth } from "@clerk/clerk-expo";
-import { ConvexReactClient } from "convex/react";
+// Removed local Convex client; use shared provider elsewhere when needed
 
 const CATEGORIES = [
   "Self Care",
@@ -65,7 +65,6 @@ export default function SelectCategoryScreen() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
   const { getToken, isSignedIn } = useAuth();
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
   
   // Modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -75,42 +74,12 @@ export default function SelectCategoryScreen() {
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Minimal Convex integration for this screen: initialize a local client with Clerk auth
-  useEffect(() => {
-    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
-    const isAbsoluteHttpUrl = (url?: string | null) => {
-      if (!url) return false;
-      try {
-        const u = new URL(url);
-        return u.protocol === 'https:' || u.protocol === 'http:';
-      } catch {
-        return false;
-      }
-    };
-
-    if (!isAbsoluteHttpUrl(convexUrl)) {
-      setConvexClient(null);
-      return;
-    }
-
-    const client = new ConvexReactClient(convexUrl!);
-    client.setAuth(async () => {
-      try {
-        const token = await (getToken?.() ?? Promise.resolve(undefined));
-        return token ?? undefined;
-      } catch {
-        return undefined;
-      }
-    });
-    setConvexClient(client);
-
-    return () => setConvexClient(null);
-  }, [isSignedIn, getToken]);
+  // No local Convex client needed on this selection screen
 
   const handleContinue = () => {
     if (selectedCategory) {
       router.push({
-        pathname: "/community-forum/create/content",
+        pathname: "/(app)/(tabs)/community-forum/create/content",
         params: { category: selectedCategory },
       });
     } else {

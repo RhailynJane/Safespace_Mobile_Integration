@@ -24,11 +24,12 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
+// Note: This screen only lists support workers (currently via REST). No Convex client needed here.
 
 /**
  * BookAppointment Component
@@ -42,7 +43,7 @@ import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointm
  */
 
 interface SupportWorker {
-  id: number;
+  id: string | number;
   name: string;
   title: string;
   avatar: string;
@@ -74,30 +75,7 @@ export default function BookAppointment() {
   const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
 
-  // Initialize Convex client with Clerk auth
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
-        unsavedChangesWarning: false,
-      });
-
-      const fetchToken = async () => {
-        if (getToken) {
-          const token = await getToken({ template: 'convex' });
-          return token ?? undefined;
-        }
-        return undefined;
-      };
-      
-      client.setAuth(fetchToken);
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  // Convex appointments hook (for potential future use - booking doesn't need to load all appointments)
-  const { isUsingConvex } = useConvexAppointments(user?.id, convexClient);
+  // No Convex client init required for this screen
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -116,7 +94,7 @@ export default function BookAppointment() {
    * Handles navigation to support worker details screen
    * @param supportWorkerId - ID of the selected support worker
    */
-  const handleSelectSupportWorker = (supportWorkerId: number) => {
+  const handleSelectSupportWorker = (supportWorkerId: string | number) => {
     router.push(`/appointments/details?supportWorkerId=${supportWorkerId}`);
   };
 
@@ -127,41 +105,31 @@ export default function BookAppointment() {
 /**
  * Fetch support workers from the API
  */
+const convex = useConvex();
+
 const fetchSupportWorkers = useCallback(async () => {
   try {
     setLoading(true);
-    
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${API_URL}/api/support-workers`);
-    const result = await response.json();
-
-    if (result.success) {
-      // Transform the data to match the component's expected format
-      const transformedData = result.data.map((worker: any) => ({
-        id: worker.id,
-        name: `${worker.first_name} ${worker.last_name}`,
-        title: "Support Worker",
-        avatar: worker.avatar_url || "https://via.placeholder.com/150",
-        specialties: worker.specialization 
-          ? worker.specialization.split(',').map((s: string) => s.trim())
-          : [],
-        bio: worker.bio,
-        yearsOfExperience: worker.years_of_experience,
-        hourlyRate: worker.hourly_rate,
-        languagesSpoken: worker.languages_spoken,
-      }));
-
-      setSupportWorkers(transformedData);
-    } else {
-      showStatusModal('error', 'Error', 'Failed to load support workers');
-    }
+    const res = await convex.query(api.supportWorkers.listSupportWorkers, { limit: 100 });
+    const workers = (res.workers || []).map((w: any) => ({
+      id: w.id,
+      name: w.name,
+      title: w.title,
+      avatar: w.avatar,
+      specialties: w.specialties || [],
+      bio: w.bio,
+      yearsOfExperience: w.yearsOfExperience,
+      hourlyRate: w.hourlyRate,
+      languagesSpoken: w.languagesSpoken,
+    }));
+    setSupportWorkers(workers);
   } catch (error) {
-    console.error('Error fetching support workers:', error);
+    console.error('Error loading support workers from Convex:', error);
     showStatusModal('error', 'Error', 'Unable to fetch support workers. Please try again.');
   } finally {
     setLoading(false);
   }
-}, [showStatusModal]);
+}, [convex, showStatusModal]);
 
 // Fetch support workers on mount
 useEffect(() => {

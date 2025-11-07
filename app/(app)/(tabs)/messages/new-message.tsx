@@ -23,12 +23,12 @@ import { router } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-import { messagingService, Contact } from "../../../../utils/sendbirdService";
+import { Contact } from "../../../../utils/sendbirdService"; // Keep types only; rely on Convex for actual messaging logic
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
-import { ConvexReactClient } from "convex/react";
-import { useConvexMessages } from "../../../../utils/hooks/useConvexMessages";
+import { useConvex, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 const { width } = Dimensions.get("window");
 
@@ -58,23 +58,8 @@ export default function NewMessagesScreen() {
     message: '',
   });
 
-  // Convex client and hook (Convex-first messaging operations)
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
-      client.setAuth(async () => {
-        try {
-          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
-          return token ?? undefined;
-        } catch {
-          return undefined;
-        }
-      });
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-  const { createConversation: createConvexConversation, isUsingConvex } = useConvexMessages(userId || undefined, convexClient);
+  // Shared Convex client
+  const convex = useConvex();
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -92,85 +77,39 @@ export default function NewMessagesScreen() {
     setStatusModalVisible(true);
   };
 
+  // Live conversations via Convex subscription (enriched)
+  const liveConversations = useQuery(api.conversations.listForUserEnriched as any, {}) as any[] | undefined;
+
   useEffect(() => {
-    initializeMessaging();
-  }, [userId]);
+    if (liveConversations) {
+      const mapped = (liveConversations || []).map((c: any) => ({
+        id: c._id,
+        title: c.title || 'Conversation',
+        participants: (c.participants || []).map((p: any) => ({
+          clerk_user_id: p.userId,
+          first_name: p.firstName || '',
+          last_name: p.lastName || '',
+          profile_image_url: p.imageUrl || '',
+          online: undefined,
+          last_active_at: undefined,
+          presence: undefined,
+          email: undefined,
+        })),
+        last_message: c.lastMessage?.body || '',
+        last_message_time: c.lastMessage?.createdAt ? new Date(c.lastMessage.createdAt).toISOString() : (c.updatedAt ? new Date(c.updatedAt).toISOString() : ''),
+        unread_count: c.unreadCount || 0,
+      }));
+      setConversations(mapped);
+      setFilteredConversations(mapped);
+      setLoading(false);
+    }
+  }, [liveConversations]);
 
   useEffect(() => {
     filterConversations();
-  }, [searchQuery, conversations, userId]);
+  }, [searchQuery, liveConversations, userId]);
 
-  const initializeMessaging = async () => {
-    if (!userId) return;
-
-    try {
-      setLoading(true);
-      // Try to initialize SendBird (if configured); otherwise we'll use backend
-      try {
-        const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
-        const sbInitialized = await messagingService.initializeSendBird(
-          userId,
-          accessToken,
-          "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
-        );
-        console.log("💬 [NewMessages] SendBird initialized:", sbInitialized);
-      } catch (e) {
-        console.log("💬 [NewMessages] SendBird init skipped/fallback", e);
-      }
-      // Load from backend (or SendBird via wrapper if available)
-      console.log("💬 [NewMessages] initializeMessaging for user:", userId);
-      await loadConversationsAndContacts();
-    } catch (error) {
-      console.error("Failed to initialize messaging:", error);
-      showStatusModal('error', 'Load Error', 'Failed to load messages');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadConversationsAndContacts = async () => {
-    if (!userId) {
-      console.error("User ID is null or undefined");
-      return;
-    }
-    console.log("💬 [NewMessages] Loading conversations for:", userId);
-    const conversationsResult = await messagingService.getConversations(userId);
-    console.log("💬 [NewMessages] Conversations result:", {
-      success: conversationsResult.success,
-      count: conversationsResult.data?.length || 0,
-      sample: conversationsResult.data?.[0] ? {
-        id: conversationsResult.data[0].id,
-        participants: conversationsResult.data[0].participants?.map(p => p.clerk_user_id)
-      } : null
-    });
-    if (conversationsResult.success) {
-      let convs = conversationsResult.data || [];
-      // Fallback: if empty, try direct backend fetch (cache-busted) just in case
-      if (convs.length === 0) {
-        try {
-          const resp = await fetch(`${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`);
-          if (resp.ok) {
-            const json = await resp.json();
-            console.log("💬 [NewMessages] Fallback fetch conversations count:", json?.data?.length || 0);
-            convs = json?.data || [];
-          } else {
-            console.log("💬 [NewMessages] Fallback fetch failed with status:", resp.status);
-          }
-        } catch (e) {
-          console.log("💬 [NewMessages] Fallback fetch error:", e);
-        }
-      }
-      setConversations(convs);
-      setFilteredConversations(convs);
-    } else {
-      console.log("💬 [NewMessages] getConversations did not succeed");
-    }
-
-    const contactsResult = await messagingService.getContacts(userId);
-    if (contactsResult.success) {
-      setContacts(contactsResult.data);
-    }
-  };
+  // Remove legacy initializeMessaging/loadConversations; handled by live subscription above
 
   const filterConversations = () => {
     if (!searchQuery.trim()) {
@@ -214,22 +153,30 @@ export default function NewMessagesScreen() {
       setSearchResults([]);
       return;
     }
-
     try {
       setSearching(true);
-      const result = await messagingService.searchUsers(userId, query);
-      if (result.success) {
-        setSearchResults(result.data);
-      } else {
-        setSearchResults([]);
-      }
+      // Convex user search
+      const results = await convex.query(api.profiles.searchUsers, { term: query, limit: 20 });
+      const mapped: Contact[] = (results || []).map((r: any) => ({
+        id: r.clerkId,
+        clerk_user_id: r.clerkId,
+        first_name: r.firstName || '',
+        last_name: r.lastName || '',
+        email: r.email || '',
+        profile_image_url: r.imageUrl || '',
+        online: false,
+        last_active_at: '',
+        role: 'user',
+        has_existing_conversation: false,
+      }));
+      setSearchResults(mapped);
     } catch (error) {
-      console.error("Search failed:", error);
+      console.error('Search failed (Convex):', error);
       setSearchResults([]);
     } finally {
       setSearching(false);
     }
-  }, [userId]);
+  }, [userId, convex]);
 
   /**
    * Debounced search for modal
@@ -369,72 +316,34 @@ export default function NewMessagesScreen() {
 
     try {
       setLoading(true);
-      // Attempt Convex-first creation (best effort) so Convex clients see the conversation
-      try {
-        if (isUsingConvex) {
-          await createConvexConversation([contact.clerk_user_id], `${contact.first_name} ${contact.last_name}`.trim());
-        }
-      } catch (_e) { /* ignore and proceed to ensure backend conversation exists */ }
-
-      const result = await messagingService.createConversation(userId, {
-        participantIds: [contact.clerk_user_id], // Use actual participant ID
-        conversationType: 'direct',
-        title: `${contact.first_name} ${contact.last_name}`.trim()
+      const fullName = `${contact.first_name} ${contact.last_name}`.trim();
+      const online = contact.online ? "1" : "0";
+      // Create conversation via Convex and get id
+      const res = await convex.mutation(api.conversations.create, {
+        title: fullName || undefined,
+        participantIds: [contact.clerk_user_id],
       });
-
-      if (result.success) {
-        setNewMessageModalVisible(false);
-        setSearchQuery("");
-        setSearchResults([]);
-        
-        console.log("📝 Created conversation result:", result.data);
-        
-        // Compute a safe conversation id; fallback to lookup if non-numeric
-        const fullName = `${contact.first_name} ${contact.last_name}`.trim();
-        const online = contact.online ? "1" : "0";
-        let conversationId = result.data?.id || result.data;
-
-        const isNumericId = typeof conversationId === 'string' && /^\d+$/.test(conversationId);
-        if (!isNumericId) {
-          try {
-            console.log("🔎 Fallback: resolving numeric conversation id via list…");
-            const resp = await fetch(`${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`);
-            if (resp.ok) {
-              const json = await resp.json();
-              const conv = (json?.data || []).find((c: any) =>
-                Array.isArray(c.participants) && c.participants.some((p: any) => p.clerk_user_id === contact.clerk_user_id)
-              );
-              if (conv?.id) {
-                conversationId = conv.id;
-                console.log("✅ Resolved conversation id:", conversationId);
-              }
-            }
-          } catch (e) {
-            console.log("❌ Fallback resolution failed:", e);
-          }
-        }
-
-        if (!conversationId || !(typeof conversationId === 'string') || !/^\d+$/.test(conversationId)) {
-          showStatusModal('error', 'Create Error', 'Failed to create conversation. Please try again.');
-        } else {
-          console.log("🔗 Navigating to chat with ID:", conversationId);
-          router.push({
-            pathname: `../messages/message-chat-screen`,
-            params: {
-              id: conversationId,
-              title: fullName,
-              otherClerkId: contact.clerk_user_id,
-              initialOnline: online,
-              initialLastActive: contact.last_active_at || "",
-              profileImageUrl: contact.profile_image_url || "",
-            }
-          });
-          // Refresh conversations after navigation kickoff
-          initializeMessaging();
-        }
-      } else {
+      const conversationId = res?.conversationId as string | undefined;
+      if (!conversationId) {
         showStatusModal('error', 'Create Error', 'Failed to start conversation');
+        return;
       }
+
+      setNewMessageModalVisible(false);
+      setSearchQuery("");
+      setSearchResults([]);
+      router.push({
+        pathname: `/(app)/(tabs)/messages/message-chat-screen`,
+        params: {
+          id: String(conversationId),
+          title: fullName,
+          otherClerkId: contact.clerk_user_id,
+          initialOnline: online,
+          initialLastActive: contact.last_active_at || "",
+          profileImageUrl: contact.profile_image_url || "",
+        }
+      });
+      // No manual reload needed; live subscription will reflect new conversation
     } catch (error) {
       console.error("Failed to create conversation:", error);
       showStatusModal('error', 'Create Error', 'Failed to start conversation');

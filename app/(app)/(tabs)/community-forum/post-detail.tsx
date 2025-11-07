@@ -35,7 +35,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { useState, useEffect, useMemo } from "react";
-import { communityApi } from "../../../../utils/communityForumApi";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -44,8 +43,8 @@ import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexPosts } from "../../../../utils/hooks/useConvexPosts";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -57,9 +56,12 @@ export default function PostDetailScreen() {
   const { theme, scaledFontSize } = useTheme();
   // Extract post ID from navigation parameters
   const params = useLocalSearchParams();
-  const postId = parseInt(params.id as string, 10);
+  // Convex document ids are strings; do not parse as number
+  const postId = params.id as string;
   const { user } = useUser();
-    const { getToken } = useAuth();
+  
+  // Use Convex client from provider
+  const convex = useConvex();
   
   // State management for post data and UI interactions
   const [post, setPost] = useState<any>(null); // Current post data
@@ -70,27 +72,6 @@ export default function PostDetailScreen() {
   const [bookmarked, setBookmarked] = useState(false); // Bookmark status
   const [reacting, setReacting] = useState(false); // Reaction update in progress
   const [profileImage, setProfileImage] = useState<string | null>(null);
-
-    // Initialize Convex client
-    const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-    useEffect(() => {
-      const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
-      if (!convexUrl) return;
-    
-      const client = new ConvexReactClient(convexUrl, { unsavedChangesWarning: false });
-      client.setAuth(async () => {
-        try {
-          const token = await (getToken?.() ?? Promise.resolve(undefined));
-          return token ?? undefined;
-        } catch {
-          return undefined;
-        }
-      });
-      setConvexClient(client);
-    }, [user, getToken]);
-
-    // Use Convex posts hook
-    const { reactToPost: reactToConvexPost, isUsingConvex } = useConvexPosts(user?.id, convexClient);
 
   // Modal states
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -167,15 +148,34 @@ export default function PostDetailScreen() {
   const loadPostData = async () => {
     try {
       setLoading(true);
-      // Parallel API calls for better performance
-      const [postResponse, relatedResponse] = await Promise.all([
-        communityApi.getPostById(postId),
-        communityApi.getPosts({ limit: 3 })
-      ]);
       
-      setPost(postResponse.post);
-      // Filter out current post and limit to 2 related posts
-      setRelatedPosts(relatedResponse.posts.filter((p: any) => p.id !== postId).slice(0, 2));
+      // Load all posts via Convex
+      const allPosts = await convex.query(api.posts.list, { limit: 20 });
+      
+      // Find current post
+  const currentPost = allPosts.find((p: any) => p._id === postId);
+      if (currentPost) {
+        setPost({
+          id: currentPost._id,
+          title: currentPost.title,
+          content: currentPost.content,
+          category: currentPost.category,
+          author_name: "Community Member",
+          created_at: new Date(currentPost.createdAt).toISOString(),
+        });
+      }
+      
+      // Get related posts (exclude current, take 2)
+      const related = allPosts
+        .filter((p: any) => p._id !== postId)
+        .slice(0, 2)
+        .map((p: any) => ({
+          id: p._id,
+          title: p.title,
+          content: p.content,
+          category: p.category,
+        }));
+      setRelatedPosts(related);
       
       // Load user-specific data if authenticated
       if (user?.id) {
@@ -198,8 +198,10 @@ export default function PostDetailScreen() {
     if (!user?.id) return;
     
     try {
-      const response = await communityApi.getUserReaction(postId, user.id);
-      setUserReaction(response.userReaction);
+      const reaction = await convex.query(api.posts.getUserReaction, { 
+        postId: postId as any 
+      });
+      setUserReaction(reaction);
     } catch (error) {
       console.error('Error loading user reaction:', error);
     }
@@ -212,8 +214,9 @@ export default function PostDetailScreen() {
     if (!user?.id) return;
     
     try {
-      const response = await communityApi.getBookmarkedPosts(user.id);
-      const isBookmarked = response.bookmarks?.some((bookmark: any) => bookmark.id === postId);
+      const isBookmarked = await convex.query(api.posts.isBookmarked, { 
+        postId: postId as any 
+      });
       setBookmarked(isBookmarked);
     } catch (error) {
       console.error('Error checking bookmark:', error);
@@ -235,37 +238,16 @@ export default function PostDetailScreen() {
     try {
       setReacting(true);
       
-        // Convex-first: Try to react via Convex
-        if (isUsingConvex && reactToConvexPost) {
-          try {
-            console.log('📤 Reacting to post via Convex...');
-            await reactToConvexPost(postId.toString(), emoji);
-          
-            setUserReaction(emoji);
-            setReactionPickerVisible(false);
-            return;
-          } catch (convexError) {
-            console.warn('⚠️ Convex reaction failed, falling back to REST:', convexError);
-          }
-        }
+      console.log('📤 Reacting to post via Convex...');
+      await convex.mutation(api.posts.react, { 
+        postId: postId as any,
+        emoji 
+      });
       
-        // REST API fallback
-        const response = await communityApi.reactToPost(postId, user.id, emoji);
-      
-      // Update local state with new reaction data
-      if (post) {
-        setPost({
-          ...post,
-          reactions: response.reactions,
-          reaction_count: Math.max(0, (post.reaction_count || 0) + response.reactionChange)
-        });
-      }
-      
-      // Update user's current reaction state
-      setUserReaction(response.userReaction);
+      setUserReaction(emoji);
       
       setReactionPickerVisible(false);
-      showSuccess(`Reaction ${response.reactionChange > 0 ? 'added' : 'removed'} successfully!`);
+      showSuccess('Reaction updated successfully!');
     } catch (error) {
       console.error('Error updating reaction:', error);
       showError("Reaction Failed", "Failed to update reaction. Please try again.");
@@ -284,9 +266,11 @@ export default function PostDetailScreen() {
     }
 
     try {
-      const response = await communityApi.toggleBookmark(postId, user.id);
-      setBookmarked(response.bookmarked);
-      showSuccess(response.bookmarked ? "Post bookmarked!" : "Bookmark removed");
+      const result = await convex.mutation(api.posts.toggleBookmark, { 
+        postId: postId as any 
+      });
+      setBookmarked(result.bookmarked);
+      showSuccess(result.bookmarked ? "Post bookmarked!" : "Bookmark removed");
     } catch (error) {
       console.error('Error toggling bookmark:', error);
       showError("Bookmark Failed", "Failed to update bookmark. Please try again.");
@@ -549,7 +533,7 @@ export default function PostDetailScreen() {
                   style={[styles.relatedPost, { borderTopColor: theme.colors.borderLight }]}
                   onPress={() =>
                     router.push({
-                      pathname: "/community-forum/post-detail",
+                      pathname: "/(app)/(tabs)/community-forum/post-detail",
                       params: { id: relatedPost.id },
                     })
                   }

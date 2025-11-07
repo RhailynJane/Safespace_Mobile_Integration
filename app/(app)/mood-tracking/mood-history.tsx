@@ -20,11 +20,23 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
-import { moodApi, MoodEntry, MoodFilters } from "../../../utils/moodApi";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+
+// MoodEntry type for Convex
+interface MoodEntry {
+  id: string;
+  mood_type: string;
+  intensity: number;
+  notes?: string;
+  created_at: string;
+  mood_emoji: string;
+  mood_label: string;
+  mood_factors?: Array<{ factor: string }>;
+}
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -75,6 +87,9 @@ export default function MoodHistoryScreen() {
   const [hasMore, setHasMore] = useState(true);
   const LIMIT = 20;
 
+  // Convex mutations
+  const deleteMood = useMutation(api.moods.deleteMood);
+
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
@@ -87,152 +102,62 @@ export default function MoodHistoryScreen() {
     setModalVisible(false);
   };
 
-  // Load mood history with filters
-  const loadMoodHistory = useCallback(async (reset: boolean = false) => {
-    if (!user?.id) return;
+  // Live mood history component using Convex
+  const LiveHistory = ({ userId }: { userId: string }) => {
+    // Build filter parameters
+    const filterStartDate = startDate 
+      ? (() => {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          return start.toISOString();
+        })()
+      : undefined;
 
-    try {
-      setLoading(true);
-      const currentOffset = reset ? 0 : offset;
+    const filterEndDate = endDate 
+      ? (() => {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          return end.toISOString();
+        })()
+      : startDate && !endDate
+      ? (() => {
+          const end = new Date(startDate);
+          end.setHours(23, 59, 59, 999);
+          return end.toISOString();
+        })()
+      : undefined;
 
-      const filters: MoodFilters = {
-        limit: LIMIT,
-        offset: currentOffset,
-      };
-
-      if (selectedMoodType) filters.moodType = selectedMoodType;
-      
-      // Fix date filtering logic
-      if (startDate) {
-        // Set start date to beginning of day
-        const startOfDay = new Date(startDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        filters.startDate = startOfDay.toISOString();
-      }
-      
-      if (endDate) {
-        // Set end date to end of day
-        const endOfDay = new Date(endDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        filters.endDate = endOfDay.toISOString();
-      } else if (startDate && !endDate) {
-        // If only start date is selected, search for that single day
-        const endOfDay = new Date(startDate);
-        endOfDay.setHours(23, 59, 59, 999);
-        filters.endDate = endOfDay.toISOString();
-      }
-      
-      if (selectedFactors.length > 0) {
-        filters.factors = selectedFactors.join(",");
-      }
-
-      console.log('Loading mood history with filters:', {
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        moodType: filters.moodType,
-        factors: filters.factors
-      });
-
-      const data = await moodApi.getMoodHistory(user.id, filters);
-
-      if (reset) {
-        setMoodHistory(data.moods);
-        setOffset(LIMIT);
-      } else {
-        setMoodHistory((prev) => [...prev, ...data.moods]);
-        setOffset((prev) => prev + LIMIT);
-      }
-
-      setHasMore(data.moods.length === LIMIT);
-      
-      console.log('Loaded', data.moods.length, 'mood entries');
-    } catch (error) {
-      console.error("Failed to load mood history:", error);
-      if (reset && moodHistory.length === 0) {
-        // Only show alert on initial load if there's an error
-        showStatusModal('error', 'Load Failed', 'Unable to load mood history. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id, selectedMoodType, selectedFactors, startDate, endDate, offset, moodHistory.length]);
-
-  // Load available factors
-  const loadFactors = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      const data = await moodApi.getFactors(user.id);
-      setAllFactors(data.factors.map((f: any) => f.factor));
-    } catch (error) {
-      console.error("Error loading factors:", error);
-      showStatusModal('error', 'Load Failed', 'Unable to load mood factors. Please try again.');
-    }
-  }, [user?.id]);
-
-  // Dynamic import Convex API for live subscriptions
-  const [convexApi, setConvexApi] = useState<any | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const mod = await import("../../../convex/_generated/api");
-        if (mounted) setConvexApi(mod.api);
-      } catch (_) {
-        // Convex not generated/enabled
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
-
-  // Initial load (REST fallback until API ready)
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) {
-        if (!convexApi) {
-          loadMoodHistory(true);
-        }
-        loadFactors();
-      }
-    }, [user?.id, loadMoodHistory, loadFactors, convexApi])
-  );
-
-  // Live history component using Convex
-  const LiveHistory = ({
-    api,
-    userId,
-    limit,
-    offset,
-    moodType,
-    startDate,
-    endDate,
-    factors,
-    onData,
-  }: {
-    api: any;
-    userId: string;
-    limit: number;
-    offset: number;
-    moodType?: string;
-    startDate?: string;
-    endDate?: string;
-    factors?: string[];
-    onData: (page: MoodEntry[], o: number) => void;
-  }) => {
     const res = useQuery(api.moods.getMoodHistory, {
       userId,
-      limit,
+      limit: LIMIT,
       offset,
-      moodType: moodType || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-      factors,
+      moodType: selectedMoodType || undefined,
+      startDate: filterStartDate,
+      endDate: filterEndDate,
+      factors: selectedFactors.length > 0 ? selectedFactors : undefined,
     }) as { moods: any[] } | undefined;
+
     useEffect(() => {
       if (res && Array.isArray(res.moods)) {
-        onData(res.moods as unknown as MoodEntry[], offset);
+        setMoodHistory(res.moods as unknown as MoodEntry[]);
+        setHasMore(res.moods.length === LIMIT);
+        setLoading(false);
       }
-    }, [res, offset, onData]);
+    }, [res]);
+
+    return null;
+  };
+
+  // Live factors component using Convex
+  const LiveFactors = ({ userId }: { userId: string }) => {
+    const res = useQuery(api.moods.getFactors, { userId }) as { factors: Array<{ factor: string }> } | undefined;
+
+    useEffect(() => {
+      if (res && Array.isArray(res.factors)) {
+        setAllFactors(res.factors.map((f) => f.factor));
+      }
+    }, [res]);
+
     return null;
   };
 
@@ -240,9 +165,6 @@ export default function MoodHistoryScreen() {
   const applyFilters = () => {
     setFilterModalVisible(false);
     setOffset(0);
-    if (!convexApi) {
-      loadMoodHistory(true);
-    }
   };
 
   // Clear filters
@@ -253,9 +175,6 @@ export default function MoodHistoryScreen() {
     setEndDate(null);
     setSearchQuery("");
     setOffset(0);
-    if (!convexApi) {
-      loadMoodHistory(true);
-    }
   };
 
   // Toggle factor selection
@@ -325,7 +244,7 @@ export default function MoodHistoryScreen() {
     setMoodHistory((prev) => prev.filter((m) => m.id !== selectedMoodId));
     
     try {
-      await moodApi.deleteMood(selectedMoodId);
+      await deleteMood({ id: selectedMoodId as any });
       showStatusModal('success', 'Success', 'Mood entry deleted successfully.');
     } catch (error) {
       // Rollback on failure
@@ -411,6 +330,13 @@ export default function MoodHistoryScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        {user?.id && (
+          <>
+            <LiveHistory userId={user.id} />
+            <LiveFactors userId={user.id} />
+          </>
+        )}
+        
         <AppHeader title="Mood History" showBack={true} />
 
         {/* Search and Filter Bar */}
@@ -492,11 +418,7 @@ export default function MoodHistoryScreen() {
           contentContainerStyle={styles.listContent}
           onEndReached={() => {
             if (hasMore && !loading) {
-              if (convexApi) {
-                setOffset((prev) => prev + LIMIT);
-              } else {
-                loadMoodHistory(false);
-              }
+              setOffset((prev) => prev + LIMIT);
             }
           }}
           onEndReachedThreshold={0.5}

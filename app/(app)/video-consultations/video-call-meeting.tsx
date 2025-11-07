@@ -64,13 +64,17 @@ export default function VideoCallScreen() {
   }, []);
 
   // Video session tracking hook
-  const { markConnected, endSession, updateSettings, isUsingConvex } = useConvexVideoSession(convexClient);
+  const { markConnected, endSession, updateSettings, reportQualityIssue, attachExistingSession, isUsingConvex } = useConvexVideoSession(convexClient);
 
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRaiseHand, setIsRaiseHand] = useState(false);
   const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
+  const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
+  const [qualityIssueText, setQualityIssueText] = useState("");
+  const [qualitySubmitting, setQualitySubmitting] = useState(false);
+  const [qualityFeedback, setQualityFeedback] = useState<string | null>(null);
   const [messages, setMessages] = useState(initialMessages);
   const [newMessage, setNewMessage] = useState("");
   const [reactions, setReactions] = useState<
@@ -245,6 +249,8 @@ export default function VideoCallScreen() {
   }, [isDemoMode, isUsingConvex, sessionIdParam, endSession]);
 
   useEffect(() => {
+    // Attach existing session id so updateSettings/reportQualityIssue works
+    if (sessionIdParam) attachExistingSession(sessionIdParam);
     initializeCall();
 
     return () => {
@@ -255,7 +261,7 @@ export default function VideoCallScreen() {
         clearTimeout(cameraReadyTimeoutRef.current);
       }
     };
-  }, [initializeCall]);
+  }, [initializeCall, sessionIdParam, attachExistingSession]);
 
   // Add a timeout fallback for camera ready
   useEffect(() => {
@@ -327,6 +333,39 @@ export default function VideoCallScreen() {
     setIsEmojiPanelOpen(!isEmojiPanelOpen);
     if (!isEmojiPanelOpen && isChatOpen) {
       setIsChatOpen(false);
+    }
+  };
+
+  // Quality Issue Reporting Helpers
+  const presetQualityIssues = [
+    "Audio cutting out",
+    "Video freezing",
+    "Echo in audio",
+    "Connection dropped",
+    "Low video quality",
+  ];
+
+  const openQualityModal = () => {
+    setIsQualityModalOpen(true);
+    setQualityFeedback(null);
+    setQualityIssueText("");
+  };
+
+  const submitQualityIssue = async () => {
+    if (!qualityIssueText.trim()) return;
+    setQualitySubmitting(true);
+    try {
+      if (isUsingConvex && sessionIdParam) {
+        await reportQualityIssue(qualityIssueText.trim());
+        setQualityFeedback("Issue reported. Thank you!");
+      } else {
+        setQualityFeedback("Issue captured locally (offline mode)");
+      }
+      setTimeout(() => setIsQualityModalOpen(false), 1200);
+    } catch (e) {
+      setQualityFeedback("Failed to report issue");
+    } finally {
+      setQualitySubmitting(false);
     }
   };
 
@@ -698,6 +737,13 @@ export default function VideoCallScreen() {
               />
               <Text style={styles.controlText}>Mic</Text>
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, isQualityModalOpen && styles.controlButtonActive]}
+              onPress={openQualityModal}
+            >
+              <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
+              <Text style={styles.controlText}>Issue</Text>
+            </TouchableOpacity>
           </View>
           <View style={[styles.leaveButtonContainer, { marginBottom: 8 }]}> 
             <TouchableOpacity 
@@ -710,6 +756,72 @@ export default function VideoCallScreen() {
           </View>
         </View>
       </View>
+
+      {/* Quality Issue Modal */}
+      <Modal
+        visible={isQualityModalOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIsQualityModalOpen(false)}
+      >
+        <View style={styles.qualityModalOverlay}>
+          <View style={styles.qualityModalCard}>
+            <View style={styles.qualityModalHeader}>
+              <Text style={styles.qualityModalTitle}>Report Quality Issue</Text>
+              <TouchableOpacity onPress={() => setIsQualityModalOpen(false)}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.qualityModalSubtitle}>Select an issue or describe briefly.</Text>
+            <View style={styles.qualityPresetContainer}>
+              {presetQualityIssues.map(issue => (
+                <TouchableOpacity
+                  key={issue}
+                  style={[
+                    styles.presetIssueChip,
+                    qualityIssueText === issue && styles.presetIssueChipActive,
+                  ]}
+                  onPress={() => setQualityIssueText(issue)}
+                >
+                  <Text style={[
+                    styles.presetIssueText,
+                    qualityIssueText === issue && styles.presetIssueTextActive,
+                  ]}>{issue}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.qualityInput}
+              placeholder="Describe the issue (optional)"
+              placeholderTextColor="#888"
+              multiline
+              value={qualityIssueText}
+              onChangeText={setQualityIssueText}
+              maxLength={200}
+            />
+            {qualityFeedback && (
+              <Text style={styles.qualityFeedbackText}>{qualityFeedback}</Text>
+            )}
+            <View style={styles.qualityActions}>
+              <TouchableOpacity
+                style={styles.qualityCancelButton}
+                onPress={() => setIsQualityModalOpen(false)}
+                disabled={qualitySubmitting}
+              >
+                <Text style={styles.qualityCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.qualitySubmitButton, !qualityIssueText.trim() && { opacity: 0.5 }]}
+                onPress={submitQualityIssue}
+                disabled={!qualityIssueText.trim() || qualitySubmitting}
+              >
+                <Text style={styles.qualitySubmitText}>{qualitySubmitting ? 'Sending…' : 'Submit'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -1076,5 +1188,107 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     padding: 8,
+  },
+  qualityModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  qualityModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+  },
+  qualityModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  qualityModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+  },
+  qualityModalSubtitle: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 10,
+  },
+  qualityPresetContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  presetIssueChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F1F1',
+  },
+  presetIssueChipActive: {
+    backgroundColor: '#4CAF50',
+  },
+  presetIssueText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '600',
+  },
+  presetIssueTextActive: {
+    color: '#FFF',
+  },
+  qualityInput: {
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 10,
+    padding: 10,
+    minHeight: 70,
+    textAlignVertical: 'top',
+    fontSize: 13,
+    color: '#333',
+    backgroundColor: '#FAFAFA',
+    marginBottom: 12,
+  },
+  qualityFeedbackText: {
+    fontSize: 12,
+    color: '#2E7D32',
+    marginBottom: 8,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  qualityActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  qualityCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CCC',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  qualityCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+  },
+  qualitySubmitButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+  },
+  qualitySubmitText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
   },
 });

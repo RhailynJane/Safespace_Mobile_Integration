@@ -23,16 +23,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import { ConvexReactClient } from "convex/react";
-import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { mapAppointmentStatus } from "../../../../utils/appointmentStatus";
 
 interface Appointment {
-  id: number;
+  id: string;
   supportWorker: string;
+  supportWorkerId?: string | number;
   date: string;
   time: string;
   type: string;
-  status: string;
+  status: 'upcoming' | 'past' | 'cancelled';
   meetingLink?: string;
   notes?: string;
 }
@@ -58,35 +60,7 @@ export default function AppointmentList() {
   const { signOut, getToken } = useAuth();
   const { user } = useUser();
 
-  // Initialize Convex client with Clerk auth
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-  
-  useEffect(() => {
-    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
-      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
-        unsavedChangesWarning: false,
-      });
-
-      const fetchToken = async () => {
-        if (getToken) {
-          const token = await getToken({ template: 'convex' });
-          return token ?? undefined;
-        }
-        return undefined;
-      };
-      
-      client.setAuth(fetchToken);
-      setConvexClient(client);
-    }
-  }, [convexClient, getToken]);
-
-  // Convex appointments hook
-  const {
-    appointments: convexAppointments,
-    loading: convexLoading,
-    loadAppointments,
-    isUsingConvex,
-  } = useConvexAppointments(user?.id, convexClient);
+  const convex = useConvex();
 
   // Create dynamic styles with theme colors
   const styles = useMemo(() => createStyles(scaledFontSize, theme.colors), [scaledFontSize, theme.colors]);
@@ -112,88 +86,78 @@ const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: 
 }, []);
 
 const fetchAppointments = useCallback(async () => {
+  if (!user?.id) return;
   try {
     setLoading(true);
-    console.log('📅 Fetching appointments for user:', user?.id);
-    
-    // Use Convex data if available
-    if (isUsingConvex && convexAppointments.length > 0) {
-      console.log('✅ Using Convex appointments data');
-      setAppointments(convexAppointments as any);
-      setLoading(false);
-      return;
-    }
-    
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
-    const result = await response.json();
+    console.log('📅 Fetching appointments from Convex for user:', user.id);
+    const [upcoming, past] = await Promise.all([
+      convex.query(api.appointments.getUpcomingAppointments, { userId: user.id }),
+      convex.query(api.appointments.getPastAppointments, { userId: user.id }),
+    ]);
 
-    console.log('📥 Appointments response:', result);
+    // Build support worker enrichment map for items missing names
+    const collectIds = (list: any[]) =>
+      list
+        .filter((apt) => !apt.supportWorker && apt.supportWorkerId)
+        .map((apt) => String(apt.supportWorkerId));
 
-    if (result.success && result.appointments) {
-      // Transform backend data to frontend format
-      const transformedAppointments = result.appointments.map((apt: any) => {
-        const appointmentDate = new Date(apt.date);
-        const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        });
+    const idsToFetch = Array.from(new Set([
+      ...collectIds(upcoming as any[]),
+      ...collectIds(past as any[]),
+    ]));
 
-        // Determine if upcoming or past based on BOTH date AND time in MST
-        // Parse UTC date and extract date components (ignore timezone offset)
-        const utcDate = new Date(apt.date);
-        const year = utcDate.getUTCFullYear();
-        const month = utcDate.getUTCMonth();
-        const day = utcDate.getUTCDate();
-        
-        // Get current date/time in MST using Intl.DateTimeFormat
-        const mstFormatter = new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Denver',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
-        });
-        const mstParts = mstFormatter.formatToParts(new Date());
-        const nowMSTYear = parseInt(mstParts.find(p => p.type === 'year')?.value || '0');
-        const nowMSTMonth = parseInt(mstParts.find(p => p.type === 'month')?.value || '0') - 1;
-        const nowMSTDay = parseInt(mstParts.find(p => p.type === 'day')?.value || '0');
-        const nowMSTHour = parseInt(mstParts.find(p => p.type === 'hour')?.value || '0');
-        const nowMSTMinute = parseInt(mstParts.find(p => p.type === 'minute')?.value || '0');
-        
-        // Parse appointment time
-        const timeStr = apt.time || '00:00:00';
-        const [aptHours, aptMinutes] = timeStr.split(':').map(Number);
-        
-        // Compare as numeric values: YYYYMMDDHHMM
-        const nowMSTNumeric = nowMSTYear * 100000000 + (nowMSTMonth + 1) * 1000000 + nowMSTDay * 10000 + nowMSTHour * 100 + nowMSTMinute;
-        const aptMSTNumeric = year * 100000000 + (month + 1) * 1000000 + day * 10000 + aptHours * 100 + aptMinutes;
-        
-        const isUpcoming = aptMSTNumeric > nowMSTNumeric;
-
-        return {
-          id: apt.id,
-          supportWorker: apt.supportWorker || 'Support Worker',
-          date: formattedDate,
-          time: apt.time || '',
-          type: apt.type || 'Video',
-          // ⚡ KEY FIX: Transform status to "upcoming" or "past" based on date+time
-          status: apt.status === 'cancelled' ? 'cancelled' :
-                  apt.status === 'completed' ? 'past' :
-                  isUpcoming ? 'upcoming' : 'past'
-        };
+    const nameMap: Record<string, string> = {};
+    if (idsToFetch.length > 0) {
+      const results = await Promise.all(
+        idsToFetch.map(async (id) => {
+          try {
+            const worker = await convex.query(api.supportWorkers.getSupportWorker, { workerId: id });
+            return { id, name: worker?.name as string | undefined };
+          } catch (e) {
+            return { id, name: undefined };
+          }
+        })
+      );
+      results.forEach(({ id, name }) => {
+        if (name) nameMap[id] = name;
       });
-
-      setAppointments(transformedAppointments);
-      console.log('✅ Appointments loaded:', transformedAppointments.length);
-    } else {
-      console.warn('⚠️ No appointments found or error:', result);
-      setAppointments([]);
     }
+
+    // Map to UI type and format date neatly
+    const formatDate = (iso: string) => {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+    };
+
+    const mappedUpcoming: Appointment[] = (upcoming as any[]).map((apt: any) => ({
+      id: String(apt.id),
+      supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Support Worker',
+      supportWorkerId: apt.supportWorkerId,
+      date: formatDate(apt.date),
+      time: apt.time || '',
+      type: (apt.type || 'video').toString().replace('_', ' '),
+      status: 'upcoming',
+      meetingLink: apt.meetingLink,
+      notes: apt.notes,
+    }));
+
+    const mappedPast: Appointment[] = (past as any[]).map((apt: any) => ({
+      id: String(apt.id),
+      supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Support Worker',
+      supportWorkerId: apt.supportWorkerId,
+      date: formatDate(apt.date),
+      time: apt.time || '',
+      type: (apt.type || 'video').toString().replace('_', ' '),
+      status: mapAppointmentStatus(apt.status as any, apt.date, apt.time).toLowerCase() as 'upcoming' | 'past' | 'cancelled',
+      meetingLink: apt.meetingLink,
+      notes: apt.notes,
+    }));
+
+    const combined = [...mappedUpcoming, ...mappedPast];
+    setAppointments(combined);
+    console.log('✅ Appointments loaded:', combined.length);
   } catch (error) {
     console.error('❌ Error fetching appointments:', error);
     showStatusModal('error', 'Error', 'Unable to fetch appointments. Please try again.');
@@ -201,20 +165,15 @@ const fetchAppointments = useCallback(async () => {
   } finally {
     setLoading(false);
   }
-}, [user?.id, showStatusModal, isUsingConvex, convexAppointments]);
+}, [user?.id, convex, showStatusModal]);
   
 
 // Run fetch when user id is ready
 useEffect(() => {
   if (user?.id) {
-    // Refresh Convex data if using Convex
-    if (isUsingConvex) {
-      loadAppointments();
-    } else {
-      fetchAppointments();
-    }
+    fetchAppointments();
   }
-}, [user?.id, isUsingConvex, loadAppointments, fetchAppointments]);
+}, [user?.id, fetchAppointments]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -282,7 +241,7 @@ useEffect(() => {
     );
   };
 
-  const handleAppointmentPress = (appointmentId: number) => {
+  const handleAppointmentPress = (appointmentId: string) => {
     router.push(`/(app)/(tabs)/appointments/${appointmentId}/appointment-detail`);
   };
 

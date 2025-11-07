@@ -88,6 +88,27 @@ export const updateProfileImage = mutation({
 	},
 });
 
+	/**
+	 * Update profile image from a Convex Storage file id by generating a public URL.
+	 */
+	export const updateProfileImageFromStorage = mutation({
+		args: { clerkId: v.string(), storageId: v.id("_storage") },
+		handler: async (ctx, { clerkId, storageId }) => {
+			const rawUrl = await ctx.storage.getUrl(storageId);
+			const url = rawUrl ?? undefined; // normalize null to undefined for schema
+			const profile = await ctx.db
+				.query("profiles")
+				.withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+				.first();
+
+			if (profile) {
+						await ctx.db.patch(profile._id, { profileImageUrl: url, updatedAt: Date.now() });
+				return profile._id;
+			}
+					return await ctx.db.insert("profiles", { clerkId, profileImageUrl: url, updatedAt: Date.now() });
+		}
+	});
+
 /**
  * Update profile preferences
  */
@@ -118,5 +139,138 @@ export const updatePreferences = mutation({
 				updatedAt: Date.now(),
 			});
 		}
+	},
+});
+
+/**
+ * Simple user search across users/profiles by name or email substring.
+ * NOTE: For small datasets this full scan is acceptable; for production add lowercased fields + indexes.
+ */
+export const searchUsers = query({
+	args: { term: v.string(), limit: v.optional(v.number()) },
+	handler: async (ctx, { term, limit }) => {
+		const q = term.trim().toLowerCase();
+		const max = limit ?? 20;
+
+		// Load users and optionally augment with profile image
+		const allUsers = await ctx.db.query("users").collect();
+		const matches = allUsers.filter((u: any) => {
+			const name = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
+			const email = (u.email || '').toLowerCase();
+			return name.includes(q) || email.includes(q);
+		}).slice(0, max);
+
+		const enriched = await Promise.all(matches.map(async (u: any) => {
+			const prof = await ctx.db
+				.query("profiles")
+				.withIndex("by_clerkId", (q2) => q2.eq("clerkId", u.clerkId))
+				.first();
+			return {
+				clerkId: u.clerkId,
+				firstName: u.firstName || '',
+				lastName: u.lastName || '',
+				email: u.email || '',
+				imageUrl: prof?.profileImageUrl || u.imageUrl,
+			};
+		}));
+
+		return enriched;
+	},
+});
+
+/**
+ * Get a combined view of a user's base info and extended profile.
+ */
+export const getFullProfile = query({
+	args: { clerkId: v.string() },
+	handler: async (ctx, { clerkId }) => {
+		const user = await ctx.db
+			.query("users")
+			.withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+			.first();
+
+		const profile = await ctx.db
+			.query("profiles")
+			.withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+			.first();
+
+		return {
+			clerkId,
+			firstName: user?.firstName || undefined,
+			lastName: user?.lastName || undefined,
+			email: user?.email || undefined,
+			imageUrl: user?.imageUrl || undefined,
+			phoneNumber: profile?.phoneNumber || undefined,
+			location: profile?.location || profile?.city || undefined,
+			bio: profile?.bio || undefined,
+			profileImageUrl: profile?.profileImageUrl || user?.imageUrl || undefined,
+			dateOfBirth: profile?.dateOfBirth,
+			gender: profile?.gender,
+			pronouns: profile?.pronouns,
+			isLGBTQ: profile?.isLGBTQ,
+			primaryLanguage: profile?.primaryLanguage,
+			mentalHealthConcerns: profile?.mentalHealthConcerns,
+			supportNeeded: profile?.supportNeeded,
+			ethnoculturalBackground: profile?.ethnoculturalBackground,
+			canadaStatus: profile?.canadaStatus,
+			dateCameToCanada: profile?.dateCameToCanada,
+			address: profile?.address,
+			city: profile?.city,
+			postalCode: profile?.postalCode,
+			country: profile?.country,
+			emergencyContactName: profile?.emergencyContactName,
+			emergencyContactPhone: profile?.emergencyContactPhone,
+			emergencyContactRelationship: profile?.emergencyContactRelationship,
+			preferences: profile?.preferences,
+			updatedAt: profile?.updatedAt || user?.updatedAt || Date.now(),
+		};
+	},
+});
+
+/**
+ * Update extended profile fields for a user (upsert on profiles table).
+ */
+export const updateExtendedProfile = mutation({
+	args: {
+		clerkId: v.string(),
+		// Core
+		phoneNumber: v.optional(v.string()),
+		location: v.optional(v.string()),
+		profileImageUrl: v.optional(v.string()),
+		bio: v.optional(v.string()),
+		// Extended
+		dateOfBirth: v.optional(v.string()),
+		gender: v.optional(v.string()),
+		pronouns: v.optional(v.string()),
+		isLGBTQ: v.optional(v.string()),
+		primaryLanguage: v.optional(v.string()),
+		mentalHealthConcerns: v.optional(v.string()),
+		supportNeeded: v.optional(v.string()),
+		ethnoculturalBackground: v.optional(v.string()),
+		canadaStatus: v.optional(v.string()),
+		dateCameToCanada: v.optional(v.string()),
+		// Address
+		address: v.optional(v.string()),
+		city: v.optional(v.string()),
+		postalCode: v.optional(v.string()),
+		country: v.optional(v.string()),
+		// Emergency contact
+		emergencyContactName: v.optional(v.string()),
+		emergencyContactPhone: v.optional(v.string()),
+		emergencyContactRelationship: v.optional(v.string()),
+	},
+	handler: async (ctx, args) => {
+		const { clerkId, ...updates } = args;
+		const now = Date.now();
+		const existing = await ctx.db
+			.query("profiles")
+			.withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+			.first();
+
+		if (existing) {
+			await ctx.db.patch(existing._id, { ...updates, updatedAt: now });
+			return existing._id;
+		}
+		return await ctx.db.insert("profiles", { clerkId, ...updates, updatedAt: now });
 	},
 });

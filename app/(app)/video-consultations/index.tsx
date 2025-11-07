@@ -24,7 +24,8 @@ import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUser } from "@clerk/clerk-expo";
 import { useConvexAppointments } from "../../../utils/hooks/useConvexAppointments";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, useMutation, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 const { width } = Dimensions.get("window");
 
@@ -52,6 +53,10 @@ export default function VideoScreen() {
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [activeTab, setActiveTab] = useState("video");
   const [upcoming, setUpcoming] = useState<Appointment | null>(null);
+  const startSession = useMutation(api.videoCallSessions.startSession);
+  const endSession = useMutation(api.videoCallSessions.endSession);
+  const activeSession = useQuery(api.videoCallSessions.getActiveSession, {} as any) as any | null;
+  const callStats = useQuery(api.videoCallSessions.getCallStats, {} as any) as any | null;
 
   // Local Convex client instance
   const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
@@ -186,16 +191,39 @@ export default function VideoScreen() {
   // Join meeting: route to pre-join with real params
   const handleJoinMeeting = () => {
     if (!upcoming) return;
-    router.push({
-      pathname: "/(app)/video-consultations/video-call",
-      params: {
-        appointmentId: String(upcoming.id),
-        supportWorkerName: upcoming.supportWorker,
-        date: upcoming.date,
-        time: upcoming.time,
-        meetingLink: upcoming.meetingLink || '',
-      },
-    });
+    (async () => {
+      try {
+        // Start a Convex video call session (omit appointmentId to avoid Id type mismatch)
+        const result = await startSession({
+          supportWorkerName: upcoming.supportWorker,
+          audioOption: 'internet',
+        } as any);
+        const sessionId = result?.sessionId || '';
+        router.push({
+          pathname: "/(app)/video-consultations/video-call",
+          params: {
+            sessionId: String(sessionId),
+            appointmentId: String(upcoming.id),
+            supportWorkerName: upcoming.supportWorker,
+            date: upcoming.date,
+            time: upcoming.time,
+            meetingLink: upcoming.meetingLink || '',
+          },
+        });
+      } catch (e) {
+        console.error('Failed to start video session', e);
+        router.push({
+          pathname: "/(app)/video-consultations/video-call",
+          params: {
+            appointmentId: String(upcoming.id),
+            supportWorkerName: upcoming.supportWorker,
+            date: upcoming.date,
+            time: upcoming.time,
+            meetingLink: upcoming.meetingLink || '',
+          },
+        });
+      }
+    })();
   };
 
   // Show loading state while data is being fetched
@@ -220,6 +248,35 @@ export default function VideoScreen() {
         <ScrollView style={styles.scrollContent}>
           <View style={styles.content}>
             <View style={[styles.appointmentCard, { backgroundColor: theme.colors.surface }]}>
+              {/* Active session banner */}
+              {activeSession && (
+                <View style={{ marginBottom: 12, padding: 12, borderRadius: 10, backgroundColor: theme.isDark ? '#263238' : '#E3F2FD' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="videocam" size={18} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                      <Text style={{ color: theme.colors.text }}>Active call in progress</Text>
+                    </View>
+                    <TouchableOpacity onPress={async () => { try { await endSession({ sessionId: activeSession._id, endReason: 'user_left' }); } catch(e) { console.error('End session failed', e);} }}>
+                      <Ionicons name="close-circle" size={22} color="#D32F2F" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: 'row', marginTop: 8, gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.joinButton, { backgroundColor: theme.colors.primary, flex: 1 }]}
+                      onPress={() => router.push({ pathname: "/(app)/video-consultations/video-call", params: { sessionId: String(activeSession._id || '') } })}
+                    >
+                      <Ionicons name="enter" size={18} color="#FFFFFF" />
+                      <Text style={styles.joinButtonText}>Rejoin</Text>
+                    </TouchableOpacity>
+                    <View style={[styles.joinButton, { backgroundColor: theme.isDark ? '#37474F' : '#FFFFFF', flex: 1, flexDirection: 'column', alignItems: 'flex-start' }]}> 
+                      <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>Started</Text>
+                      <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 12 }}>{activeSession.joinedAt ? new Date(activeSession.joinedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.divider, { backgroundColor: theme.colors.border, marginTop: 10 }]} />
+                </View>
+              )}
+
               {/* Upcoming Meeting */}
               {upcoming ? (
                 <>
@@ -308,6 +365,20 @@ export default function VideoScreen() {
                 </Text>
               </View>
             </View>
+            {/* Call Stats Panel */}
+            {callStats && (
+              <View style={{ marginTop: 8, padding: 12, borderRadius: 12, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.borderLight }}>
+                <Text style={{ fontWeight: '600', marginBottom: 6, color: theme.colors.text }}>Your Call Stats</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  <View style={styles.statChip}><Ionicons name="swap-vertical" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Total: {callStats.totalSessions}</Text></View>
+                  <View style={styles.statChip}><Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Completed: {callStats.completedSessions}</Text></View>
+                  <View style={styles.statChip}><Ionicons name="alert" size={14} color="#D32F2F" /><Text style={styles.statChipText}>Failed: {callStats.failedSessions}</Text></View>
+                  <View style={styles.statChip}><Ionicons name="time" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Minutes: {Math.round((callStats.totalDuration || 0)/60)}</Text></View>
+                  <View style={styles.statChip}><Ionicons name="speedometer" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Avg (m): {Math.round((callStats.avgDuration || 0)/60)}</Text></View>
+                  <View style={styles.statChip}><Ionicons name="bug" size={14} color="#F57C00" /><Text style={styles.statChipText}>Issues: {callStats.qualityIssuesCount}</Text></View>
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
 
@@ -516,5 +587,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(16),
     flex: 1,
     lineHeight: 24,
+  },
+  statChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
+    marginBottom: 8,
+    gap: 6,
+  },
+  statChipText: {
+    fontSize: scaledFontSize(12),
   },
 });

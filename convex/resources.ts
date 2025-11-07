@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -325,5 +325,237 @@ export const deleteResource = mutation({
 		});
 
 		return { success: true };
+	},
+});
+
+/**
+ * List bookmarked resource ids for a user
+ */
+export const listBookmarkedIds = query({
+	args: { userId: v.string() },
+	handler: async (ctx, { userId }) => {
+		const bookmarks = await ctx.db
+			.query("resourceBookmarks")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.collect();
+		return { ids: bookmarks.map((b) => b.resourceId) };
+	},
+});
+
+/**
+ * Add a bookmark
+ */
+export const addBookmark = mutation({
+	args: {
+		userId: v.string(),
+		resourceId: v.id("resources"),
+	},
+	handler: async (ctx, { userId, resourceId }) => {
+		// Prevent duplicates
+		const existing = await ctx.db
+			.query("resourceBookmarks")
+			.withIndex("by_user_and_resource", (q) => q.eq("userId", userId).eq("resourceId", resourceId))
+			.take(1);
+		if (existing.length > 0) return { success: true };
+
+		await ctx.db.insert("resourceBookmarks", {
+			userId,
+			resourceId,
+			createdAt: Date.now(),
+		});
+		return { success: true };
+	},
+});
+
+/**
+ * Remove a bookmark
+ */
+export const removeBookmark = mutation({
+	args: {
+		userId: v.string(),
+		resourceId: v.id("resources"),
+	},
+	handler: async (ctx, { userId, resourceId }) => {
+		const existing = await ctx.db
+			.query("resourceBookmarks")
+			.withIndex("by_user_and_resource", (q) => q.eq("userId", userId).eq("resourceId", resourceId))
+			.take(1);
+		if (existing.length === 0) return { success: true };
+
+		await ctx.db.delete(existing[0]!._id);
+		return { success: true };
+	},
+});
+
+/**
+ * Fetch random quote from external ZenQuotes API
+ * Server-side action to avoid CORS issues
+ */
+export const fetchExternalQuote = action({
+	args: {},
+	handler: async () => {
+		try {
+			const response = await fetch('https://zenquotes.io/api/random');
+			const data = await response.json();
+			
+			if (data?.[0]) {
+				return {
+					quote: data[0].q as string,
+					author: data[0].a as string,
+				};
+			}
+			
+			// Fallback quote
+			return {
+				quote: "This moment is perfect as it is.",
+				author: "Mindfulness Proverb",
+			};
+		} catch (error) {
+			console.error("Error fetching external quote:", error);
+			// Fallback quote
+			return {
+				quote: "This moment is perfect as it is.",
+				author: "Mindfulness Proverb",
+			};
+		}
+	},
+});
+
+/**
+ * Fetch random affirmation from external Affirmations.dev API
+ * Server-side action to avoid CORS issues
+ */
+export const fetchExternalAffirmation = action({
+	args: {},
+	handler: async () => {
+		try {
+			const response = await fetch('https://www.affirmations.dev');
+			const data = await response.json();
+			
+			if (data?.affirmation) {
+				return {
+					affirmation: data.affirmation as string,
+				};
+			}
+			
+			// Fallback affirmation
+			return {
+				affirmation: "I am capable, I am strong, I am worthy of good things.",
+			};
+		} catch (error) {
+			console.error("Error fetching external affirmation:", error);
+			// Fallback affirmation
+			return {
+				affirmation: "I am capable, I am strong, I am worthy of good things.",
+			};
+		}
+	},
+});
+
+/**
+ * Get daily quote with external API integration
+ * Fetches quote directly from external API
+ */
+export const getDailyQuote = action({
+	args: {},
+	handler: async () => {
+		try {
+			// Fetch from external API
+			const response = await fetch('https://zenquotes.io/api/random');
+			const data = await response.json();
+			
+			let quote = "This moment is perfect as it is.";
+			let author = "Mindfulness Proverb";
+			
+			if (data?.[0]) {
+				quote = data[0].q as string;
+				author = data[0].a as string;
+			}
+			
+			// Create resource object
+			const resource = {
+				id: `external-quote-${Date.now()}`,
+				title: 'Daily Inspiration',
+				type: 'Quote' as ResourceType,
+				duration: '1 min',
+				category: 'motivation' as ResourceCategory,
+				content: quote,
+				author: author,
+				image_emoji: '💫',
+				backgroundColor: '#FFF9C4',
+				tags: ['daily', 'inspiration', 'motivation'],
+				isExternal: true,
+			};
+			
+			return resource;
+		} catch (error) {
+			console.error("Error getting daily quote:", error);
+			// Return fallback quote
+			return {
+				id: `external-quote-${Date.now()}`,
+				title: 'Daily Inspiration',
+				type: 'Quote' as ResourceType,
+				duration: '1 min',
+				category: 'motivation' as ResourceCategory,
+				content: "This moment is perfect as it is.",
+				author: "Mindfulness Proverb",
+				image_emoji: '💫',
+				backgroundColor: '#FFF9C4',
+				tags: ['daily', 'inspiration', 'motivation'],
+				isExternal: true,
+			};
+		}
+	},
+});
+
+/**
+ * Get daily affirmation with external API integration
+ * Fetches affirmation directly from external API
+ */
+export const getDailyAffirmationExternal = action({
+	args: {},
+	handler: async () => {
+		try {
+			// Fetch from external API
+			const response = await fetch('https://www.affirmations.dev');
+			const data = await response.json();
+			
+			let affirmationText = "I am capable, I am strong, I am worthy of good things.";
+			
+			if (data?.affirmation) {
+				affirmationText = data.affirmation as string;
+			}
+			
+			// Create resource object
+			const resource = {
+				id: `external-affirmation-${Date.now()}`,
+				title: 'Daily Affirmation',
+				type: 'Affirmation' as ResourceType,
+				duration: '2 mins',
+				category: 'motivation' as ResourceCategory,
+				content: affirmationText,
+				image_emoji: '🌟',
+				backgroundColor: '#E8F5E8',
+				tags: ['affirmation', 'daily', 'positivity'],
+				isExternal: true,
+			};
+			
+			return resource;
+		} catch (error) {
+			console.error("Error getting daily affirmation:", error);
+			// Return fallback affirmation
+			return {
+				id: `external-affirmation-${Date.now()}`,
+				title: 'Daily Affirmation',
+				type: 'Affirmation' as ResourceType,
+				duration: '2 mins',
+				category: 'motivation' as ResourceCategory,
+				content: "I am capable, I am strong, I am worthy of good things.",
+				image_emoji: '🌟',
+				backgroundColor: '#E8F5E8',
+				tags: ['affirmation', 'daily', 'positivity'],
+				isExternal: true,
+			};
+		}
 	},
 });

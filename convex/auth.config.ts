@@ -1,7 +1,11 @@
 // convex/auth.config.ts
-// This file configures Convex authentication with Clerk
+// Convex authentication configuration for Clerk.
+// NOTE: We wrap the configuration with authConfig to ensure Convex picks it up correctly.
+// If this was previously a plain object, Convex may have ignored it resulting in missing identities.
 
-export default {
+import type { AuthConfig } from "convex/server";
+
+const config: AuthConfig = {
   providers: [
     {
       domain: "https://causal-bream-60.clerk.accounts.dev",
@@ -9,3 +13,5 @@ export default {
     },
   ],
 };
+
+export default config;
