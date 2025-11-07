@@ -29,7 +29,10 @@ export function LiveMoodStats({ userId, days = 7, onStatsUpdate, renderStats }: 
         const mod = await import('../convex/_generated/api');
         if (mounted) setConvexApi(mod.api);
       } catch (err) {
-        if (mounted) setError('Convex not available');
+        if (mounted) {
+          console.log('LiveMoodStats: Convex API not available yet');
+          setError('Convex not available');
+        }
       }
     })();
     return () => {
@@ -39,7 +42,7 @@ export function LiveMoodStats({ userId, days = 7, onStatsUpdate, renderStats }: 
 
   // Subscribe to live stats
   const stats = useQuery(
-    convexApi?.moods?.getMoodStats,
+    convexApi?.moods.getMoodStats,
     convexApi ? { userId, days } : 'skip'
   ) as { totalEntries: number; distribution: Record<string, number>; averageMood: number } | undefined;
 

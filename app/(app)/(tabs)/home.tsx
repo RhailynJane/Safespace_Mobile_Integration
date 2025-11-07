@@ -26,7 +26,6 @@ import {
 import { useTheme } from "../../../contexts/ThemeContext";
 import OptimizedImage from "../../../components/OptimizedImage";
 import React from "react";
-import { ConvexReactClient } from "convex/react";
 import { useConvexMoods } from "../../../utils/hooks/useConvexMoods";
 import { LiveMoodStats } from "../../../components/LiveMoodStats";
 
@@ -45,6 +44,12 @@ type MoodEntry = {
  * and resource recommendations. Uses AppHeader for consistent navigation.
  */
 export default function HomeScreen() {
+  // Debug instrumentation to trace render & focus effect executions (remove once stable)
+  const renderCountRef = React.useRef(0);
+  renderCountRef.current += 1;
+  if (renderCountRef.current % 5 === 0) {
+    console.log(`[HomeScreen] Render count: ${renderCountRef.current}`);
+  }
   // In Jest, avoid running asynchronous data fetching to prevent act() warnings and leaks
   const IS_TEST_ENV =
     typeof process !== "undefined" &&
@@ -57,50 +62,24 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState("home");
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  // Temporarily disable local Convex client on this screen to stop render loops
+  // We'll rely on REST for moods here; Convex is provided at the app root if needed
+  const convexClient = null;
 
   const { user } = useUser();
   const { getToken, isSignedIn } = useAuth();
   const { theme, scaledFontSize } = useTheme();
   
-  // Initialize Convex client with Clerk auth
-  useEffect(() => {
-    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
-    const isAbsoluteHttpUrl = (url?: string) => {
-      if (!url) return false;
-      try {
-        const u = new URL(url);
-        return u.protocol === 'https:' || u.protocol === 'http:';
-      } catch {
-        return false;
-      }
-    };
-
-    if (!isAbsoluteHttpUrl(convexUrl)) {
-      setConvexClient(null);
-      return;
-    }
-
-    const client = new ConvexReactClient(convexUrl!);
-    client.setAuth(async () => {
-      try {
-        const token = await (getToken?.() ?? Promise.resolve(undefined));
-        return token ?? undefined;
-      } catch {
-        return undefined;
-      }
-    });
-    setConvexClient(client);
-
-    return () => {
-      setConvexClient(null);
-    };
-  }, [isSignedIn, getToken]);
+  // Note: Previously initialized a local Convex client here. Removed to prevent
+  // an infinite update loop traced to a useEffect in this file. We'll revisit
+  // Convex usage on this screen after stabilizing the render cycle.
 
   // Use Convex moods hook
+  // Convex moods hook – its loading state should NOT gate the entire screen to avoid loops.
   const {
     moods: convexMoods,
-    loading: moodsLoading,
+    // rename to avoid shadowing 'loading' and reduce confusion
+    loading: convexMoodsLoading,
     loadRecentMoods,
     isUsingConvex,
   } = useConvexMoods(user?.id, convexClient);
@@ -201,52 +180,7 @@ export default function HomeScreen() {
     }
   };
 
-  /**
- * Loads profile image from AsyncStorage and Clerk
- */
-const fetchProfileImage = useCallback(async () => {
-  try {
-    // Priority 1: Check AsyncStorage (set by edit screen)
-    const savedImage = await AsyncStorage.getItem('profileImage');
-    if (savedImage) {
-      console.log('📸 Found profile image in AsyncStorage');
-      
-      // ✅ FIX: If it's base64 (starts with data:image), it's too large - remove it
-      if (savedImage.startsWith('data:image')) {
-        console.warn("⚠️ Removing large base64 image from AsyncStorage to prevent OOM");
-        await AsyncStorage.removeItem("profileImage");
-        // Fall through to use Clerk image
-      } else {
-        setProfileImage(savedImage);
-        return;
-      }
-    }
 
-    // Priority 2: Check profileData in AsyncStorage
-    const savedProfileData = await AsyncStorage.getItem('profileData');
-    if (savedProfileData) {
-      const parsedData = JSON.parse(savedProfileData);
-      if (parsedData.profileImageUrl) {
-        console.log('📸 Found profile image in profileData');
-        setProfileImage(parsedData.profileImageUrl);
-        return;
-      }
-    }
-
-    // Priority 3: Use Clerk user image as fallback
-    if (user?.imageUrl) {
-      console.log('📸 Using Clerk profile image');
-      setProfileImage(user.imageUrl);
-      return;
-    }
-
-    console.log('📸 No profile image found');
-    setProfileImage(null);
-  } catch (error) {
-    console.error('Error loading profile image:', error);
-    setProfileImage(null);
-  }
-}, [user?.imageUrl]);
 
 
   /**
@@ -291,6 +225,7 @@ const fetchProfileImage = useCallback(async () => {
 
   /**
    * Loads mood data from backend or Convex
+   * Note: Removed convexMoods from dependencies to prevent infinite loop
    */
   const fetchRecentMoods = useCallback(async () => {
     // If using Convex hook, moods are already loaded
@@ -309,7 +244,8 @@ const fetchProfileImage = useCallback(async () => {
       console.log("Error loading mood data:", error);
       setRecentMoods([]);
     }
-  }, [user?.id, isUsingConvex, convexMoods]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isUsingConvex]);
 
   /**
    * Loads real resources from local API
@@ -336,37 +272,150 @@ const fetchProfileImage = useCallback(async () => {
     }
   }, []);
 
+  // NOTE: We intentionally do NOT copy Convex moods into component state to avoid
+  // triggering additional renders. Instead, derive a displayed list below.
+
   useFocusEffect(
     useCallback(() => {
+      console.log('[HomeScreen] useFocusEffect start');
       // In tests, short-circuit async work and render the base UI immediately
       if (IS_TEST_ENV) {
         setLoading(false);
         return () => {};
       }
 
+      let isMounted = true;
+
       const fetchData = async () => {
+        if (!isMounted) return;
         setLoading(true);
+        
         try {
-          // Reload Convex moods if using Convex
-          if (isUsingConvex && loadRecentMoods) {
-            await loadRecentMoods(3);
-          }
+          // Load profile image
+          const loadProfileImage = async () => {
+            try {
+              const savedImage = await AsyncStorage.getItem('profileImage');
+              if (!isMounted) return;
+              
+              if (savedImage) {
+                if (savedImage.startsWith('data:image')) {
+                  await AsyncStorage.removeItem("profileImage");
+                } else {
+                  if (isMounted) setProfileImage(savedImage);
+                  return;
+                }
+              }
+
+              const savedProfileData = await AsyncStorage.getItem('profileData');
+              if (!isMounted) return;
+              
+              if (savedProfileData) {
+                const parsedData = JSON.parse(savedProfileData);
+                if (parsedData.profileImageUrl) {
+                  if (isMounted) setProfileImage(parsedData.profileImageUrl);
+                  return;
+                }
+              }
+
+              if (user?.imageUrl) {
+                if (isMounted) setProfileImage(user.imageUrl);
+                return;
+              }
+
+              if (isMounted) setProfileImage(null);
+            } catch (error) {
+              console.error('Error loading profile image:', error);
+              if (isMounted) setProfileImage(null);
+            }
+          };
+
+          // Load moods - REST API only (Convex moods are derived directly, not stored)
+          const loadMoods = async () => {
+            if (!isMounted) return;
+            // Only fetch if NOT using Convex
+            if (!isUsingConvex) {
+              try {
+                if (user?.id) {
+                  const data = await moodApi.getRecentMoods(user.id, 3);
+                  if (isMounted) {
+                    setRecentMoods(data.moods);
+                  }
+                }
+              } catch (error) {
+                console.log("Error loading mood data:", error);
+                if (isMounted) {
+                  setRecentMoods([]);
+                }
+              }
+            }
+          };
+
+          // Load resources
+          const loadResources = async () => {
+            if (!isMounted) return;
+            
+            try {
+              const allResources = await fetchAllResourcesWithExternal();
+              if (!isMounted) return;
+              
+              const recommendedResources = allResources
+                .filter(resource => 
+                  resource.type === 'Exercise' || 
+                  resource.type === 'Affirmation' || 
+                  resource.type === 'Quote'
+                )
+                .sort(() => Math.random() - 0.5)
+                .slice(0, 3);
+              
+              if (isMounted) {
+                setResources(recommendedResources);
+              }
+            } catch (error) {
+              console.error("Error loading resources:", error);
+              if (isMounted) {
+                setResources([]);
+              }
+            }
+          };
+
+          // Check assessment status
+          const loadAssessmentStatus = async () => {
+            if (!isMounted) return;
+            
+            try {
+              if (user?.id) {
+                const result = await assessmentsApi.isAssessmentDue(user.id);
+                if (isMounted) {
+                  setIsAssessmentDue(result.isDue);
+                }
+                console.log("Assessment due status:", result);
+              }
+            } catch (error) {
+              console.error("Error checking assessment status:", error);
+              if (isMounted) {
+                setIsAssessmentDue(false);
+              }
+            }
+          };
           
           await Promise.all([
-            fetchRecentMoods(),
-            fetchResources(),
-            checkAssessmentStatus(),
-            fetchProfileImage(),
+            loadMoods(),
+            loadResources(),
+            loadAssessmentStatus(),
+            loadProfileImage(),
           ]);
         } finally {
-          setLoading(false);
+          if (isMounted) setLoading(false);
         }
       };
 
       fetchData();
-      // Provide a no-op cleanup function to satisfy the expected return type
-      return () => {};
-    }, [IS_TEST_ENV, fetchRecentMoods, fetchResources, checkAssessmentStatus, fetchProfileImage, isUsingConvex, loadRecentMoods])
+      
+      return () => {
+        isMounted = false;
+        console.log('[HomeScreen] useFocusEffect cleanup');
+      };
+    }, [IS_TEST_ENV, user?.id, user?.imageUrl, isUsingConvex])
   );
 
   /**
@@ -450,6 +499,16 @@ const fetchProfileImage = useCallback(async () => {
     }
   };
 
+  // Derive moods to display: Convex (real-time) has priority, else REST-fetched recentMoods
+  const displayedRecentMoods = isUsingConvex
+    ? convexMoods.slice(0, 3).map(m => ({
+        id: m._id as any as string, // ensure we have a string id
+        mood_type: m.moodType || m.mood_type || m.type || 'neutral',
+        created_at: m.createdAt || m.created_at || new Date().toISOString(),
+      }))
+    : recentMoods;
+
+  // Only show global loader for initial fetch; ignore convexMoodsLoading to prevent perpetual re-render gating
   if (loading) {
     return (
       <View testID="home-loading" style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
@@ -672,9 +731,9 @@ const fetchProfileImage = useCallback(async () => {
               >
                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Moods</Text>
               </TouchableOpacity>
-              {recentMoods.length > 0 ? (
+              {displayedRecentMoods.length > 0 ? (
                 <View style={[styles.recentMoods, { backgroundColor: theme.colors.surface }]}>
-                  {recentMoods.map((mood) => (
+                  {displayedRecentMoods.map((mood) => (
                     <View key={mood.id} style={[styles.moodItem, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
                       <Text style={styles.moodEmoji}>
                         {getEmojiForMood(mood.mood_type)}

@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments, Redirect } from "expo-router";
 // Polyfills required for some browser APIs in React Native
 import "react-native-get-random-values";
 import "react-native-url-polyfill/auto";
@@ -12,7 +12,6 @@ import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeProvider } from "../contexts/ThemeContext";
-import activityApi from "../utils/activityApi";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
@@ -99,24 +98,9 @@ function RootLayoutNav() {
     hasCompletedOnboarding
   });
 
-  // Send heartbeat every 5 minutes to keep status updated
-  useEffect(() => {
-    if (!isSignedIn || !user?.id) return;
-
-    // Send initial heartbeat
-    activityApi.heartbeat(user.id).catch(err => 
-      console.log('Heartbeat failed:', err)
-    );
-
-    // Send heartbeat every 5 minutes (300000ms)
-    const heartbeatInterval = setInterval(() => {
-      activityApi.heartbeat(user.id).catch(err => 
-        console.log('Heartbeat failed:', err)
-      );
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(heartbeatInterval);
-  }, [isSignedIn, user?.id]);
+  // Send heartbeat every 5 minutes to keep status updated (handled by Convex)
+  // The ConvexHeartbeat component below handles presence tracking via Convex
+  // No REST API heartbeat needed
 
   // Check onboarding status on mount
   useEffect(() => {
@@ -127,23 +111,9 @@ function RootLayoutNav() {
     checkOnboarding();
   }, []);
 
-  useEffect(() => {
-    if (!isLoaded || hasCompletedOnboarding === null) return;
-
-    const inAuthGroup = segments[0] === "(auth)";
-    const inAppGroup = segments[0] === "(app)";
-
-    if (isSignedIn && !inAppGroup) {
-      // User is signed in but not in the app group, redirect to home
-      router.replace("/(app)/home");
-    } else if (!isSignedIn && !inAuthGroup) {
-      // User is signed out but not in auth group
-      if (hasCompletedOnboarding) {
-        // User has an account, go to login
-        router.replace("/(auth)/login");
-      }
-    }
-  }, [isLoaded, isSignedIn, segments, hasCompletedOnboarding, router]);
+  // Prefer declarative redirects over imperative router.replace to avoid remount loops
+  const inAuthGroup = segments[0] === "(auth)";
+  const inAppGroup = segments[0] === "(app)";
 
   if (!isLoaded || hasCompletedOnboarding === null) {
     return (
@@ -151,6 +121,16 @@ function RootLayoutNav() {
         <ActivityIndicator size="large" color="#7BB8A8" />
       </View>
     );
+  }
+
+  // Guarded redirects
+  if (isLoaded && hasCompletedOnboarding !== null) {
+    if (isSignedIn && !inAppGroup) {
+      return <Redirect href="/(app)/(tabs)/home" />;
+    }
+    if (!isSignedIn && !inAuthGroup && hasCompletedOnboarding) {
+      return <Redirect href="/(auth)/login" />;
+    }
   }
 
   return (
@@ -214,12 +194,8 @@ export default function RootLayout() {
       // every 5 minutes
       const id = setInterval(send, 5 * 60 * 1000);
       return () => clearInterval(id);
-    }, [
-      isLoaded,
-      isSignedIn,
-      user?.id,
-      convex,
-    ]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoaded, isSignedIn, user?.id]);
 
     return null;
   }
@@ -247,6 +223,7 @@ export default function RootLayout() {
         }
       };
       run();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
       isLoaded,
       isSignedIn,
@@ -255,7 +232,6 @@ export default function RootLayout() {
       user?.lastName,
       user?.imageUrl,
       user?.primaryEmailAddress?.emailAddress,
-      convex,
     ]);
 
     return null;
@@ -270,17 +246,26 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 
+  // Wrapper to use Clerk's useAuth inside ClerkProvider
+  function ConvexClerkWrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <ConvexProviderWithClerk client={convexClient!} useAuth={useAuth}>
+        <ConvexUserSync />
+        <ConvexHeartbeat />
+        {children}
+      </ConvexProviderWithClerk>
+    );
+  }
+
   return (
     <ClerkProvider 
       publishableKey={publishableKey} 
       tokenCache={tokenCache}
     >
       {convexClient ? (
-        <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
-          <ConvexUserSync />
-          <ConvexHeartbeat />
+        <ConvexClerkWrapper>
           {AppTree}
-        </ConvexProviderWithClerk>
+        </ConvexClerkWrapper>
       ) : (
         AppTree
       )}

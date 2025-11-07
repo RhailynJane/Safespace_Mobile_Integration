@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { registerForPushNotifications, addNotificationListeners } from "../../utils/pushNotifications";
 import { scheduleFromSettings } from "../../utils/reminderScheduler";
-import { ConvexReactClient, useQuery } from "convex/react";
+import { ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useConvexActivity } from "../../utils/hooks/useConvexActivity";
 import { useConvexSettings } from "../../utils/hooks/useConvexSettings";
@@ -120,7 +120,8 @@ export default function AppLayout() {
     };
 
     loadUserSettings();
-  }, [isSignedIn, userId, convexClient, loadSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, userId, convexClient]);
 
   // Real-time notifications - now handled by NotificationsProvider
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
@@ -321,16 +322,8 @@ export default function AppLayout() {
         </View>
       )}
 
-      <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="crisis-support" />
-      <Stack.Screen name="journal" />
-      <Stack.Screen name="mood-tracking" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="resources" />
-      <Stack.Screen name="self-assessment" />
-      <Stack.Screen name="video-consultations" />
-      </Stack>
+      {/* Rely on file-based routing; no explicit screens needed here */}
+      <Stack screenOptions={{ headerShown: false }} />
     </NotificationsProvider>
   );
 }
