@@ -25,8 +25,10 @@ import settingsAPI, { UserSettings } from "../../../../utils/settingsApi";
 import { scheduleFromSettings } from "../../../../utils/reminderScheduler";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import { useUser } from '@clerk/clerk-expo';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import TimePickerModal from "../../../../components/TimePickerModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexProfile } from "../../../../utils/hooks/useConvexProfile";
 // (Optional) expo-notifications was used for debug "Test" buttons; removed to avoid accidental fires on Save
 
 /**
@@ -65,6 +67,7 @@ export default function SettingsScreen() {
   const [appointmentReminderAdvanceMinutes, setAppointmentReminderAdvanceMinutes] = useState(60);
   
   const { user } = useUser();
+  const { getToken } = useAuth();
   // Time picker modal visibility state
   const [moodTimePickerVisible, setMoodTimePickerVisible] = useState(false);
   const [journalTimePickerVisible, setJournalTimePickerVisible] = useState(false);
@@ -98,6 +101,25 @@ export default function SettingsScreen() {
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  // Initialize Convex client for storing lightweight preferences
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
+      client.setAuth(async () => {
+        try {
+          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
+          return token ?? undefined;
+        } catch {
+          return undefined;
+        }
+      });
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  const { updatePreferences: convexUpdatePreferences, isUsingConvex } = useConvexProfile(user?.id, convexClient);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -151,6 +173,15 @@ export default function SettingsScreen() {
         await settingsAPI.saveSettings(settings, user?.id);
         // Schedule local notifications based on updated settings
         try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
+        // Best-effort: also reflect preferences in Convex profile (theme/notifications)
+        try {
+          if (isUsingConvex) {
+            await convexUpdatePreferences({
+              theme: isDarkMode ? 'dark' : 'light',
+              notifications: notificationsEnabled,
+            });
+          }
+        } catch (_e) { /* ignore convex preference sync errors */ }
       } catch (error) {
         console.log('Auto-save notification settings failed:', error);
       }
@@ -244,6 +275,15 @@ export default function SettingsScreen() {
       } else {
         setStatusModal({visible:true, type:'success', title:'Saved', message:'Settings saved successfully'});
       }
+      // Also try to persist minimal preferences to Convex
+      try {
+        if (isUsingConvex) {
+          await convexUpdatePreferences({
+            theme: isDarkMode ? 'dark' : 'light',
+            notifications: notificationsEnabled,
+          });
+        }
+      } catch (_e) { /* ignore */ }
       
     } catch (error) {
       console.log('Error saving settings:', error);

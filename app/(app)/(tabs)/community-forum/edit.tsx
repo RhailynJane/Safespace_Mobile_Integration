@@ -50,13 +50,16 @@ import {
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useAuth } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../utils/communityForumApi";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexPosts } from "../../../../utils/hooks/useConvexPosts";
+import { useState as useReactState, useEffect } from "react";
 
 // Available categories for post organization and filtering
 const CATEGORIES = [
@@ -89,6 +92,7 @@ export default function EditPostScreen() {
   } = useLocalSearchParams();
   
   const { user } = useUser();
+    const { getToken } = useAuth();
 
   // Form state management
   const [title, setTitle] = useState((initialTitle as string) || ""); // Post title
@@ -97,6 +101,27 @@ export default function EditPostScreen() {
   const [isSaving, setIsSaving] = useState(false); // Save as draft loading state
   const [isPublishing, setIsPublishing] = useState(false); // Publish loading state
   const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
+
+    // Initialize Convex client
+    const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+    useEffect(() => {
+      const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+      if (!convexUrl) return;
+    
+      const client = new ConvexReactClient(convexUrl, { unsavedChangesWarning: false });
+      client.setAuth(async () => {
+        try {
+          const token = await (getToken?.() ?? Promise.resolve(undefined));
+          return token ?? undefined;
+        } catch {
+          return undefined;
+        }
+      });
+      setConvexClient(client);
+    }, [user, getToken]);
+
+    // Use Convex posts hook
+    const { updatePost: updateConvexPost, deletePost: deleteConvexPost, isUsingConvex } = useConvexPosts(user?.id, convexClient);
 
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -168,13 +193,35 @@ export default function EditPostScreen() {
         setIsSaving(true);
       }
 
-      // Update post via API (ensure category is persisted too)
-      await communityApi.updatePost(postId, {
-        title: title.trim(),
-        content: content.trim(),
-        category: (category || "Support").trim(),
-        isDraft: !publish, // Set draft status based on publish flag
-      });
+        // Convex-first: Try to update post via Convex
+        if (isUsingConvex && updateConvexPost) {
+          try {
+            console.log('📤 Updating post via Convex...');
+            await updateConvexPost(id as string, {
+              title: title.trim(),
+              content: content.trim(),
+              category: (category || "Support").trim(),
+              isDraft: !publish,
+            });
+          
+            if (publish) {
+              showSuccess("Post published successfully! It's now visible to the community.");
+            } else {
+              showSuccess("Post updated successfully! Your changes have been saved.");
+            }
+            return;
+          } catch (convexError) {
+            console.warn('⚠️ Convex post update failed, falling back to REST:', convexError);
+          }
+        }
+      
+        // REST API fallback
+        await communityApi.updatePost(postId, {
+          title: title.trim(),
+          content: content.trim(),
+          category: (category || "Support").trim(),
+          isDraft: !publish,
+        });
 
       // Show success message based on action
       if (publish) {
@@ -202,7 +249,23 @@ export default function EditPostScreen() {
       "Are you sure you want to delete this post? This action cannot be undone.",
       async () => {
         try {
-          await communityApi.deletePost(postId);
+            // Convex-first: Try to delete post via Convex
+            if (isUsingConvex && deleteConvexPost) {
+              try {
+                console.log('📤 Deleting post via Convex...');
+                await deleteConvexPost(id as string);
+                showSuccess("Post deleted successfully!");
+                setTimeout(() => {
+                  router.replace("/community-forum");
+                }, 1500);
+                return;
+              } catch (convexError) {
+                console.warn('⚠️ Convex post delete failed, falling back to REST:', convexError);
+              }
+            }
+          
+            // REST API fallback
+            await communityApi.deletePost(postId);
           showSuccess("Post deleted successfully!");
           // Navigate to community forum after successful deletion
           setTimeout(() => {

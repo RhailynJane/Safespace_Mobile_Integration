@@ -25,6 +25,8 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 import settingsAPI from "../../../../utils/settingsApi";
 import Constants from 'expo-constants';
+import { ConvexReactClient } from "convex/react";
+import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
 
 // Check if running in Expo Go
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -60,8 +62,37 @@ export default function ConfirmAppointment() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
   const { user } = useUser();
+
+  // Initialize Convex client with Clerk auth
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
+        unsavedChangesWarning: false,
+      });
+
+      const fetchToken = async () => {
+        if (getToken) {
+          const token = await getToken({ template: 'convex' });
+          return token ?? undefined;
+        }
+        return undefined;
+      };
+      
+      client.setAuth(fetchToken);
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  // Convex appointments hook
+  const {
+    createAppointment: createConvexAppointment,
+    updateAppointmentStatus,
+    isUsingConvex,
+  } = useConvexAppointments(user?.id, convexClient);
 
   // Create dynamic styles
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -244,8 +275,6 @@ export default function ConfirmAppointment() {
       setLoading(true);
       console.log('📅 Creating appointment in database...');
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      
       // Convert session type to match backend format
       const sessionTypeMap: { [key: string]: string } = {
         'video call': 'video',
@@ -261,6 +290,48 @@ export default function ConfirmAppointment() {
 
       // Normalize time to HH:MM:SS for DB compatibility
       const normalizedTime = toHHMMSS(selectedTime);
+
+      // Convex-first: Try to create appointment via Convex
+      if (isUsingConvex && createConvexAppointment) {
+        try {
+          console.log('📤 Creating appointment via Convex...');
+          const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
+          const workerIdInt = parseInt(chosenIdRaw);
+          if (!Number.isFinite(workerIdInt)) {
+            throw new Error(`Invalid support worker id: ${chosenIdRaw}`);
+          }
+          
+          // Format data to match hook's expected parameter structure
+          const convexAppointmentData = {
+            supportWorker: supportWorkerName,
+            date: selectedDate,
+            time: normalizedTime,
+            type: sessionType,
+            notes: 'Booked via mobile app',
+          };
+
+          const result = await createConvexAppointment(convexAppointmentData);
+          console.log('✅ Convex appointment created:', result);
+          
+          setAppointmentCreated(true);
+          // For Convex, we don't get back an ID immediately, but the appointment is created
+          
+          // Schedule appointment reminder notification 1 hour before
+          try {
+            await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
+          } catch (reminderError) {
+            console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
+          }
+          
+          return; // Success - exit early
+        } catch (convexError) {
+          console.warn('⚠️ Convex appointment creation failed, falling back to REST:', convexError);
+          // Continue to REST API fallback
+        }
+      }
+
+      // REST API fallback
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
 
       // Be backward-compatible with different backend schemas
       const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
@@ -332,7 +403,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder]);
+    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, isUsingConvex, createConvexAppointment]);
 
     /**
      * Reschedule an existing appointment

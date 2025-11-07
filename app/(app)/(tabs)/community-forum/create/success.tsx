@@ -73,7 +73,7 @@ export default function PostSuccessScreen() {
    * Handles navigation to community home
    */
   const handleBrowseCommunity = () => {
-    router.replace("/(app)/(tabs)/community-forum/main");
+    router.replace("/(app)/(tabs)/community-forum");
   };
 
   /**

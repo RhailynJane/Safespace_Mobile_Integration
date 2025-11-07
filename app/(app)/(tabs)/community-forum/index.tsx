@@ -33,7 +33,7 @@
  */
 
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -49,7 +49,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
@@ -62,6 +62,8 @@ import avatarEvents from "../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexPosts } from "../../../../utils/hooks/useConvexPosts";
 
 const { width, height } = Dimensions.get("window");
 
@@ -207,8 +209,61 @@ function CommunityMainScreenLogic() {
     setConfirmCallback,
   } = useCommunityMainScreenState();
 
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+
+  // Local Convex client instance (used when Convex is configured). We don't rely on the provider here
+  // so this screen can still run if Convex is disabled.
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+
+  const isAbsoluteHttpUrl = (url?: string | null) => {
+    if (!url) return false;
+    try {
+      const u = new URL(url);
+      return u.protocol === 'https:' || u.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  };
+
+  // Initialize a local Convex client if a valid Convex URL is configured. Attach Clerk auth.
+  useEffect(() => {
+    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
+    if (!isAbsoluteHttpUrl(convexUrl)) {
+      setConvexClient(null);
+      return;
+    }
+
+    const client = new ConvexReactClient(convexUrl!);
+    // Attach auth dynamically from Clerk; this works both when signed in and when not
+    client.setAuth(async () => {
+      try {
+        const token = await (getToken?.() ?? Promise.resolve(undefined));
+        return token ?? undefined;
+      } catch {
+        return undefined;
+      }
+    });
+    setConvexClient(client);
+
+    return () => {
+      setConvexClient(null);
+    };
+  }, [isSignedIn]);
+
+  // Use Convex posts hook
+  const {
+    posts: convexPosts,
+    myPosts: convexMyPosts,
+    loading: convexLoading,
+    loadPosts: loadConvexPosts,
+    loadMyPosts: loadConvexMyPosts,
+    createPost: createConvexPost,
+    reactToPost: reactToConvexPost,
+    deletePost: deleteConvexPost,
+    updatePost: updateConvexPost,
+    isUsingConvex,
+  } = useConvexPosts(user?.id, convexClient);
 
   return {
     selectedCategory,
@@ -239,6 +294,18 @@ function CommunityMainScreenLogic() {
     signOut,
     isSignedIn,
     user,
+    convexClient,
+    // Convex hook data and functions
+    convexPosts,
+    convexMyPosts,
+    convexLoading,
+    loadConvexPosts,
+    loadConvexMyPosts,
+    createConvexPost,
+    reactToConvexPost,
+    deleteConvexPost,
+    updateConvexPost,
+    isUsingConvex,
     showSuccessModal,
     setShowSuccessModal,
     successMessage,
@@ -291,6 +358,18 @@ export default function CommunityMainScreen() {
     signOut,
     isSignedIn,
     user,
+    convexClient,
+    // Convex hook data and functions
+    convexPosts,
+    convexMyPosts,
+    convexLoading,
+    loadConvexPosts,
+    loadConvexMyPosts,
+    createConvexPost,
+    reactToConvexPost,
+    deleteConvexPost,
+    updateConvexPost,
+    isUsingConvex,
     showSuccessModal,
     setShowSuccessModal,
     successMessage,
@@ -334,6 +413,24 @@ export default function CommunityMainScreen() {
       loadMyPosts();
     }
   }, [selectedCategory, activeView]);
+
+  // Lightweight onFocus refresh: when returning to this screen, reload the current view
+  const hasFocusedOnceRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      // Skip the very first focus to avoid double-loading with initial useEffect
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+
+      if (activeView === "newsfeed") {
+        loadPosts();
+      } else {
+        loadMyPosts();
+      }
+    }, [activeView, selectedCategory, isUsingConvex])
+  );
 
   /**
    * Load profile image on mount and subscribe to avatar events
@@ -482,13 +579,48 @@ export default function CommunityMainScreen() {
         }
         response = await communityApi.getBookmarkedPosts(user.id);
         response = { posts: response.bookmarks || [] };
-      } else {
-        // Regular category-based post loading
+      } else if (isUsingConvex && (selectedCategory === "Trending" || !selectedCategory)) {
+        // Use Convex hook for Trending feed when available
+        try {
+          console.log('📤 Loading posts via Convex...');
+          const convexPostsData = await loadConvexPosts(20);
+          
+          // Map to UI format
+          const mapped = convexPostsData.map((p: any) => ({
+            id: p.id,
+            title: p.title,
+            content: p.content,
+            is_draft: !!p.isDraft,
+            author_name: "Community Member",
+            created_at: p.createdAt,
+            reactions: p.reactions || {},
+          }));
+          
+          setPosts(mapped);
+          console.log('✅ Convex posts loaded:', mapped.length);
+          
+          // Load user-specific data if authenticated
+          if (user?.id) {
+            await Promise.all([
+              loadUserBookmarks(user.id),
+              loadUserReactions(user.id, mapped),
+            ]);
+          }
+          
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        } catch (convexError) {
+          console.warn('⚠️ Convex posts loading failed, falling back to REST:', convexError);
+          // Continue to REST API fallback
+        }
+      }
+      
+        // REST API fallback - Regular category-based post loading
         response = await communityApi.getPosts({
           category: selectedCategory === "Trending" ? undefined : selectedCategory,
           limit: 20,
         });
-      }
 
       // Normalize various possible API shapes to an array of posts
       // Supports { posts: [...] }, { data: [...] }, or an array directly (for test mocks)
@@ -531,8 +663,29 @@ export default function CommunityMainScreen() {
 
     try {
       setLoading(true);
-      const response = await communityApi.getUserPosts(user.id, true); // Include drafts
-      setMyPosts(response.posts || []);
+      if (convexClient) {
+        try {
+          // @ts-ignore generated at runtime by `npx convex dev`
+          const { api } = await import("../../../../convex/_generated/api");
+          const items = await convexClient.query(api.posts.myPosts, { includeDrafts: true, limit: 50 });
+          const mapped = (items || []).map((p: any) => ({
+            id: p._id,
+            title: p.title,
+            content: p.content,
+            is_draft: !!p.isDraft,
+            author_name: "You",
+            created_at: p.createdAt,
+          }));
+          setMyPosts(mapped);
+        } catch (e) {
+          console.log("Convex posts.myPosts failed; falling back to REST:", e);
+          const response = await communityApi.getUserPosts(user.id, true); // Include drafts
+          setMyPosts(response.posts || []);
+        }
+      } else {
+        const response = await communityApi.getUserPosts(user.id, true); // Include drafts
+        setMyPosts(response.posts || []);
+      }
     } catch (error) {
       console.error("Error loading user posts:", error);
       showError("Error", "Failed to load your posts");
@@ -594,40 +747,65 @@ export default function CommunityMainScreen() {
    * Handle emoji reaction to a post
    * Updates local state optimistically for better UX
    */
-  const handleReactionPress = async (postId: number, emoji: string) => {
+  const handleReactionPress = async (postId: any, emoji: string) => {
     if (!user?.id) {
       showError("Sign In Required", "Please sign in to react to posts");
       return;
     }
 
     try {
-      const response = await communityApi.reactToPost(postId, user.id, emoji);
+      if (convexClient && typeof postId !== 'number') {
+        // Use Convex when available and the post id is from Convex
+        // @ts-ignore generated at runtime by `npx convex dev`
+        const { api } = await import("../../../../convex/_generated/api");
+        await convexClient.mutation(api.posts.react, { postId, emoji });
+        const reactions = await convexClient.query(api.posts.listReactions, { postId });
+        const counts: Record<string, number> = {};
+        (reactions || []).forEach((r: any) => {
+          counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+        });
 
-      // Update posts based on current view for immediate UI feedback
-      if (activeView === "newsfeed") {
-        setPosts((prevPosts) =>
-          prevPosts.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  reactions: response.reactions,
-                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
-                }
-              : post
-          )
-        );
+        const updater = (arr: any[]) => arr.map((post) => post.id === postId ? {
+          ...post,
+          reactions: counts,
+          reaction_count: Object.values(counts).reduce((a: number, b: number) => a + (b as number), 0),
+        } : post);
+
+        if (activeView === "newsfeed") {
+          setPosts(updater);
+        } else {
+          setMyPosts(updater);
+        }
       } else {
-        setMyPosts((prevPosts) =>
-          prevPosts.map((post) =>
-            post.id === postId
-              ? {
-                  ...post,
-                  reactions: response.reactions,
-                  reaction_count: (post.reaction_count || 0) + response.reactionChange,
-                }
-              : post
-          )
-        );
+        // Fallback to REST backend
+        const response = await communityApi.reactToPost(postId as number, user.id, emoji);
+
+        // Update posts based on current view for immediate UI feedback
+        if (activeView === "newsfeed") {
+          setPosts((prevPosts) =>
+            prevPosts.map((post) =>
+              post.id === postId
+                ? {
+                    ...post,
+                    reactions: response.reactions,
+                    reaction_count: (post.reaction_count || 0) + response.reactionChange,
+                  }
+                : post
+            )
+          );
+        } else {
+          setMyPosts((prevPosts) =>
+            prevPosts.map((post) =>
+              post.id === postId
+                ? {
+                    ...post,
+                    reactions: response.reactions,
+                    reaction_count: (post.reaction_count || 0) + response.reactionChange,
+                  }
+                : post
+            )
+          );
+        }
       }
     } catch (error) {
       console.error("Error reacting to post:", error);

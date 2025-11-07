@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import {
   StatusBar,
   Modal,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 // import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
@@ -135,6 +135,13 @@ export default function MoodLoggingScreen() {
     setShowSuccessModal(false);
     router.replace("../mood-tracking/mood-history");
   };
+
+  // Reload on screen focus to refresh recent moods
+  useFocusEffect(
+    useCallback(() => {
+      // Optional: reload any data needed on return to this screen
+    }, [])
+  );
 
   // Handle form submission with API call
   const handleSubmit = async () => {

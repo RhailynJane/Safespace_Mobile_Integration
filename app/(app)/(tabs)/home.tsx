@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { moodApi } from "../../../utils/moodApi"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -14,7 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { useUser } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { AppHeader } from "../../../components/AppHeader";
@@ -26,6 +26,9 @@ import {
 import { useTheme } from "../../../contexts/ThemeContext";
 import OptimizedImage from "../../../components/OptimizedImage";
 import React from "react";
+import { ConvexReactClient } from "convex/react";
+import { useConvexMoods } from "../../../utils/hooks/useConvexMoods";
+import { LiveMoodStats } from "../../../components/LiveMoodStats";
 
 type MoodEntry = {
   id: string;
@@ -53,10 +56,54 @@ export default function HomeScreen() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
-const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
 
   const { user } = useUser();
+  const { getToken, isSignedIn } = useAuth();
   const { theme, scaledFontSize } = useTheme();
+  
+  // Initialize Convex client with Clerk auth
+  useEffect(() => {
+    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
+    const isAbsoluteHttpUrl = (url?: string) => {
+      if (!url) return false;
+      try {
+        const u = new URL(url);
+        return u.protocol === 'https:' || u.protocol === 'http:';
+      } catch {
+        return false;
+      }
+    };
+
+    if (!isAbsoluteHttpUrl(convexUrl)) {
+      setConvexClient(null);
+      return;
+    }
+
+    const client = new ConvexReactClient(convexUrl!);
+    client.setAuth(async () => {
+      try {
+        const token = await (getToken?.() ?? Promise.resolve(undefined));
+        return token ?? undefined;
+      } catch {
+        return undefined;
+      }
+    });
+    setConvexClient(client);
+
+    return () => {
+      setConvexClient(null);
+    };
+  }, [isSignedIn, getToken]);
+
+  // Use Convex moods hook
+  const {
+    moods: convexMoods,
+    loading: moodsLoading,
+    loadRecentMoods,
+    isUsingConvex,
+  } = useConvexMoods(user?.id, convexClient);
 
   // Create styles with scaled font sizes
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -243,9 +290,16 @@ const fetchProfileImage = useCallback(async () => {
   };
 
   /**
-   * Loads mood data from backend
+   * Loads mood data from backend or Convex
    */
   const fetchRecentMoods = useCallback(async () => {
+    // If using Convex hook, moods are already loaded
+    if (isUsingConvex) {
+      setRecentMoods(convexMoods.slice(0, 3));
+      return;
+    }
+    
+    // Fallback to REST API
     try {
       if (user?.id) {
         const data = await moodApi.getRecentMoods(user.id, 3);
@@ -255,7 +309,7 @@ const fetchProfileImage = useCallback(async () => {
       console.log("Error loading mood data:", error);
       setRecentMoods([]);
     }
-  }, [user?.id]);
+  }, [user?.id, isUsingConvex, convexMoods]);
 
   /**
    * Loads real resources from local API
@@ -293,6 +347,11 @@ const fetchProfileImage = useCallback(async () => {
       const fetchData = async () => {
         setLoading(true);
         try {
+          // Reload Convex moods if using Convex
+          if (isUsingConvex && loadRecentMoods) {
+            await loadRecentMoods(3);
+          }
+          
           await Promise.all([
             fetchRecentMoods(),
             fetchResources(),
@@ -307,7 +366,7 @@ const fetchProfileImage = useCallback(async () => {
       fetchData();
       // Provide a no-op cleanup function to satisfy the expected return type
       return () => {};
-    }, [IS_TEST_ENV, fetchRecentMoods, fetchResources, checkAssessmentStatus, fetchProfileImage])
+    }, [IS_TEST_ENV, fetchRecentMoods, fetchResources, checkAssessmentStatus, fetchProfileImage, isUsingConvex, loadRecentMoods])
   );
 
   /**
@@ -438,6 +497,78 @@ const fetchProfileImage = useCallback(async () => {
                 </View>
               </TouchableOpacity>
             </View>
+
+            {/* Live Mood Stats Section */}
+            {user?.id && (
+              <View style={styles.section}>
+                <LiveMoodStats 
+                  userId={user.id} 
+                  days={7}
+                  renderStats={(stats) => (
+                    <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
+                      <View style={styles.statsHeader}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                          Mood Trends (7 days)
+                        </Text>
+                        <TouchableOpacity onPress={() => router.push("/mood-history")}>
+                          <Text style={styles.viewAllText}>View All</Text>
+                        </TouchableOpacity>
+                      </View>
+                      
+                      {stats.totalEntries > 0 ? (
+                        <>
+                          <View style={styles.statsGrid}>
+                            <View style={styles.statBox}>
+                              <Text style={[styles.statValue, { color: theme.colors.primary }]}>
+                                {stats.totalEntries}
+                              </Text>
+                              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+                                Entries
+                              </Text>
+                            </View>
+                            <View style={styles.statBox}>
+                              <Text style={[styles.statValue, { color: theme.colors.primary }]}>
+                                {stats.averageMood.toFixed(1)}
+                              </Text>
+                              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+                                Avg Mood
+                              </Text>
+                            </View>
+                          </View>
+                          
+                          {Object.keys(stats.distribution).length > 0 && (
+                            <View style={styles.distributionList}>
+                              {Object.entries(stats.distribution)
+                                .sort(([, a], [, b]) => (b as number) - (a as number))
+                                .slice(0, 3)
+                                .map(([mood, count]) => (
+                                  <View key={mood} style={[styles.distributionItem, { borderColor: theme.colors.borderLight }]}>
+                                    <Text style={[styles.distributionMood, { color: theme.colors.text }]}>
+                                      {getEmojiForMood(mood)} {getLabelForMood(mood)}
+                                    </Text>
+                                    <Text style={[styles.distributionCount, { color: theme.colors.textSecondary }]}>
+                                      {count}×
+                                    </Text>
+                                  </View>
+                                ))}
+                            </View>
+                          )}
+                        </>
+                      ) : (
+                        <View style={[styles.noDataContainer, { backgroundColor: theme.colors.background }]}>
+                          <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>
+                            No mood data yet
+                          </Text>
+                          <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
+                            Track your mood to see trends
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                />
+              </View>
+            )}
 
             {/* Pending Assessment Task - Only show if due */}
             {isAssessmentDue && (
@@ -1023,5 +1154,56 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: 13,
     color: "#757575",
     fontWeight: "500",
+  },
+  statsCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  statsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  statsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 16,
+  },
+  statBox: {
+    alignItems: "center",
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: "700",
+  },
+  statLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  distributionList: {
+    marginTop: 8,
+  },
+  distributionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  distributionMood: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  distributionCount: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

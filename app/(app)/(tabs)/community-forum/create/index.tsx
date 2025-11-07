@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import Svg, { Path } from 'react-native-svg';
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
+import { useAuth } from "@clerk/clerk-expo";
+import { ConvexReactClient } from "convex/react";
 
 const CATEGORIES = [
   "Self Care",
@@ -62,6 +64,8 @@ export default function SelectCategoryScreen() {
   const { theme, scaledFontSize } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
+  const { getToken, isSignedIn } = useAuth();
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
   
   // Modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -70,6 +74,38 @@ export default function SelectCategoryScreen() {
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  // Minimal Convex integration for this screen: initialize a local client with Clerk auth
+  useEffect(() => {
+    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
+    const isAbsoluteHttpUrl = (url?: string | null) => {
+      if (!url) return false;
+      try {
+        const u = new URL(url);
+        return u.protocol === 'https:' || u.protocol === 'http:';
+      } catch {
+        return false;
+      }
+    };
+
+    if (!isAbsoluteHttpUrl(convexUrl)) {
+      setConvexClient(null);
+      return;
+    }
+
+    const client = new ConvexReactClient(convexUrl!);
+    client.setAuth(async () => {
+      try {
+        const token = await (getToken?.() ?? Promise.resolve(undefined));
+        return token ?? undefined;
+      } catch {
+        return undefined;
+      }
+    });
+    setConvexClient(client);
+
+    return () => setConvexClient(null);
+  }, [isSignedIn, getToken]);
 
   const handleContinue = () => {
     if (selectedCategory) {

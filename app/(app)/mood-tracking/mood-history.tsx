@@ -24,6 +24,7 @@ import { moodApi, MoodEntry, MoodFilters } from "../../../utils/moodApi";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
+import { useQuery } from "convex/react";
 
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
@@ -169,21 +170,79 @@ export default function MoodHistoryScreen() {
     }
   }, [user?.id]);
 
-  // Initial load
+  // Dynamic import Convex API for live subscriptions
+  const [convexApi, setConvexApi] = useState<any | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import("../../../convex/_generated/api");
+        if (mounted) setConvexApi(mod.api);
+      } catch (_) {
+        // Convex not generated/enabled
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Initial load (REST fallback until API ready)
   useFocusEffect(
     useCallback(() => {
       if (user?.id) {
-        loadMoodHistory(true);
+        if (!convexApi) {
+          loadMoodHistory(true);
+        }
         loadFactors();
       }
-    }, [user?.id, loadMoodHistory, loadFactors])
+    }, [user?.id, loadMoodHistory, loadFactors, convexApi])
   );
+
+  // Live history component using Convex
+  const LiveHistory = ({
+    api,
+    userId,
+    limit,
+    offset,
+    moodType,
+    startDate,
+    endDate,
+    factors,
+    onData,
+  }: {
+    api: any;
+    userId: string;
+    limit: number;
+    offset: number;
+    moodType?: string;
+    startDate?: string;
+    endDate?: string;
+    factors?: string[];
+    onData: (page: MoodEntry[], o: number) => void;
+  }) => {
+    const res = useQuery(api.moods.getMoodHistory, {
+      userId,
+      limit,
+      offset,
+      moodType: moodType || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      factors,
+    }) as { moods: any[] } | undefined;
+    useEffect(() => {
+      if (res && Array.isArray(res.moods)) {
+        onData(res.moods as unknown as MoodEntry[], offset);
+      }
+    }, [res, offset, onData]);
+    return null;
+  };
 
   // Apply filters
   const applyFilters = () => {
     setFilterModalVisible(false);
     setOffset(0);
-    loadMoodHistory(true);
+    if (!convexApi) {
+      loadMoodHistory(true);
+    }
   };
 
   // Clear filters
@@ -194,7 +253,9 @@ export default function MoodHistoryScreen() {
     setEndDate(null);
     setSearchQuery("");
     setOffset(0);
-    loadMoodHistory(true);
+    if (!convexApi) {
+      loadMoodHistory(true);
+    }
   };
 
   // Toggle factor selection
@@ -258,11 +319,24 @@ export default function MoodHistoryScreen() {
 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
+    
+    // Optimistic UI: remove immediately
+    const deletedEntry = moodHistory.find((m) => m.id === selectedMoodId);
+    setMoodHistory((prev) => prev.filter((m) => m.id !== selectedMoodId));
+    
     try {
       await moodApi.deleteMood(selectedMoodId);
-      setMoodHistory((prev) => prev.filter((m) => m.id !== selectedMoodId));
       showStatusModal('success', 'Success', 'Mood entry deleted successfully.');
     } catch (error) {
+      // Rollback on failure
+      if (deletedEntry) {
+        setMoodHistory((prev) => {
+          const restored = [...prev, deletedEntry].sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          return restored;
+        });
+      }
       showStatusModal('error', 'Delete Failed', 'Unable to delete mood entry. Please try again.');
     }
   };
@@ -418,7 +492,11 @@ export default function MoodHistoryScreen() {
           contentContainerStyle={styles.listContent}
           onEndReached={() => {
             if (hasMore && !loading) {
-              loadMoodHistory(false);
+              if (convexApi) {
+                setOffset((prev) => prev + LIMIT);
+              } else {
+                loadMoodHistory(false);
+              }
             }
           }}
           onEndReachedThreshold={0.5}

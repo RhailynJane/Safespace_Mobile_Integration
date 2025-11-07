@@ -76,6 +76,8 @@ import * as MediaLibrary from "expo-media-library";
 import Constants from "expo-constants";
 import { useIsFocused } from "@react-navigation/native";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
+import { ConvexReactClient } from "convex/react";
+import { useConvexMessages, useConvexLiveMessages } from "../../../../utils/hooks/useConvexMessages";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -89,7 +91,7 @@ interface ExtendedMessage extends Message {
 export default function ChatScreen() {
   const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
   const isFocused = useIsFocused();
-  const { userId } = useAuth();
+  const { userId, getToken } = useAuth();
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
@@ -150,6 +152,28 @@ export default function ChatScreen() {
     confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
     actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
+
+  // Convex client + hook for Convex-first messaging operations
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
+      client.setAuth(async () => {
+        try {
+          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
+          return token ?? undefined;
+        } catch {
+          return undefined;
+        }
+      });
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  const { sendMessage: sendConvexMessage, markAsRead: convexMarkAsRead, loadMessages: loadConvexMessages, isUsingConvex } = useConvexMessages(userId || undefined, convexClient);
+
+  // If Convex is enabled, subscribe to live messages to reduce polling
+  const { messages: liveMessages, isLiveReady } = useConvexLiveMessages(isUsingConvex ? String(conversationId) : undefined, 200);
 
   // Don't use the broken useAudioRecorder hook - use AudioModule directly
   const audioRecorderRef = useRef<any>(null);
@@ -335,26 +359,49 @@ export default function ChatScreen() {
       // Fire and forget: update activity in background (don't await)
       updateUserActivity().catch(() => {});
 
-      // Load messages (this is the critical path) - no limit to show all messages
-      const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&t=${Date.now()}`
-      );
+      // Load messages (Convex-first, then REST fallback)
+      let loaded: ExtendedMessage[] = [];
+      let usedConvex = false;
+      try {
+        if (isUsingConvex && loadConvexMessages) {
+          const convexMsgs = await loadConvexMessages(String(conversationId));
+          if (Array.isArray(convexMsgs) && convexMsgs.length >= 0) {
+            loaded = convexMsgs as ExtendedMessage[];
+            usedConvex = true;
+          }
+        }
+      } catch (_e) {
+        usedConvex = false;
+      }
 
-      if (response.ok) {
-        const result = await response.json();
-        const loadTime = Date.now() - startTime;
-        console.log(`[${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
-        setMessages(result.data);
+      if (!usedConvex) {
+        const response = await fetch(
+          `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&t=${Date.now()}`
+        );
+        if (response.ok) {
+          const result = await response.json();
+          loaded = result.data || [];
+        } else {
+          console.error("Failed to load messages:", response.status);
+          showStatusModal('error', 'Load Error', 'Failed to load messages. Please try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const loadTime = Date.now() - startTime;
+      console.log(`[${Date.now()}] Loaded ${loaded.length} messages in ${loadTime}ms`);
+      setMessages(loaded);
 
         // Detect new last message and mark as read when appropriate
-        const latest = result.data[result.data.length - 1];
+        const latest = loaded[loaded.length - 1];
         const latestId = latest ? String(latest.id) : null;
         const prevId = lastMessageIdRef.current;
         const nowTs = Date.now();
         const shouldMark =
           latestId && latestId !== prevId &&
           // Do not mark if the latest is mine
-          !(latest && latest.sender && latest.sender.clerk_user_id === userId) &&
+          !(latest && (latest as any).sender && (latest as any).sender.clerk_user_id === userId) &&
           // Throttle mark-as-read to avoid spamming
           nowTs - lastMarkedAtRef.current > 2000;
 
@@ -368,6 +415,12 @@ export default function ChatScreen() {
                 await messagingService.markAsRead(channelUrl);
               }
             } catch (_e) { /* ignore SendBird mark-as-read errors */ }
+            try {
+              // Convex-first mark as read
+              if (isUsingConvex && conversationId) {
+                await convexMarkAsRead(String(conversationId));
+              }
+            } catch (_e) { /* ignore */ }
             try {
               await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
                 method: 'POST',
@@ -425,10 +478,6 @@ export default function ChatScreen() {
           };
           setContact(fallbackContact);
         }
-      } else {
-        console.error("Failed to load messages:", response.status);
-        showStatusModal('error', 'Load Error', 'Failed to load messages. Please try again.');
-      }
     } catch (error) {
       console.error("Error loading messages:", error);
       showStatusModal('error', 'Connection Error', 'Failed to load messages. Please check your connection.');
@@ -447,11 +496,15 @@ export default function ChatScreen() {
     profileImageUrlParam,
     contact,
     updateUserActivity,
+    isUsingConvex,
+    loadConvexMessages,
+    convexMarkAsRead,
   ]);
 
-  // Load messages with fast polling while in the chat screen
+  // Load messages with fast polling while in the chat screen, unless live subscription is active
   useEffect(() => {
     if (!isFocused || !conversationId || !userId) return;
+    if (isLiveReady) return; // Skip polling when live data is available
 
     loadMessages(); // Load immediately
 
@@ -462,7 +515,47 @@ export default function ChatScreen() {
     }, intervalMs);
 
     return () => clearInterval(pollInterval);
-  }, [isFocused, conversationId, userId, loadMessages, userNearBottom]);
+  }, [isFocused, conversationId, userId, loadMessages, userNearBottom, isLiveReady]);
+
+  // When live messages are available, update UI and mark-as-read as needed
+  useEffect(() => {
+    if (!isLiveReady || !liveMessages) return;
+    setMessages(liveMessages as any);
+
+    const loaded = liveMessages as ExtendedMessage[];
+    const latest = loaded[loaded.length - 1];
+    const latestId = latest ? String(latest.id) : null;
+    const prevId = lastMessageIdRef.current;
+    const nowTs = Date.now();
+    const shouldMark =
+      !!latestId && latestId !== prevId &&
+      !(latest && (latest as any).sender && (latest as any).sender.clerk_user_id === userId) &&
+      nowTs - lastMarkedAtRef.current > 2000;
+
+    if (shouldMark) {
+      lastMessageIdRef.current = latestId;
+      lastMarkedAtRef.current = nowTs;
+      (async () => {
+        try {
+          if (channelUrl && messagingService.isSendBirdEnabled()) {
+            await messagingService.markAsRead(channelUrl);
+          }
+        } catch { /* ignore */ }
+        try {
+          if (isUsingConvex && conversationId) {
+            await convexMarkAsRead(String(conversationId));
+          }
+        } catch { /* ignore */ }
+        try {
+          await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clerkUserId: userId })
+          });
+        } catch { /* ignore */ }
+      })();
+    }
+  }, [isLiveReady, liveMessages, userId, channelUrl, isUsingConvex, conversationId, API_BASE_URL, convexMarkAsRead]);
 
   // One-time status refresh after mount (no polling)
   useEffect(() => {
@@ -747,37 +840,42 @@ export default function ChatScreen() {
       // Update activity when sending message
       await updateUserActivity();
 
-      // Use direct backend API instead of messagingService
-      const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clerkUserId: userId,
-            messageText: newMessage,
-            messageType: "text",
-          }),
+      let sent = false;
+      // Convex-first
+      try {
+        if (isUsingConvex) {
+          await sendConvexMessage(String(conversationId), newMessage.trim());
+          sent = true;
         }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        // console.log("Message sent successfully");
-        console.log('✅ Text message sent, adding to UI:', result.data);
-        setMessages((prev) => {
-          console.log(`📝 Current messages count: ${prev.length}, adding new message`);
-          return [...prev, result.data];
-        });
-        setNewMessage("");
-        setIsTyping(false); // Reset typing state after sending
-
-        // Reload messages to ensure both parties see the same
-        setTimeout(() => loadMessages(), 500);
-      } else {
-        console.error("Failed to send message:", response.status);
-        showStatusModal('error', 'Send Error', 'Failed to send message');
+      } catch (_e) {
+        sent = false;
       }
+
+      if (!sent) {
+        // REST fallback
+        const response = await fetch(
+          `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clerkUserId: userId,
+              messageText: newMessage,
+              messageType: "text",
+            }),
+          }
+        );
+        if (!response.ok) {
+          console.error("Failed to send message:", response.status);
+          showStatusModal('error', 'Send Error', 'Failed to send message');
+          return;
+        }
+      }
+
+      // Optimistic UI: clear input and refresh messages
+      setNewMessage("");
+      setIsTyping(false);
+      setTimeout(() => loadMessages(), 400);
     } catch (error) {
       console.error("Error sending message:", error);
       showStatusModal('error', 'Send Error', 'Failed to send message');

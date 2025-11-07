@@ -23,6 +23,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
 
 interface Appointment {
   id: number;
@@ -53,8 +55,38 @@ export default function AppointmentList() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
   const { user } = useUser();
+
+  // Initialize Convex client with Clerk auth
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
+        unsavedChangesWarning: false,
+      });
+
+      const fetchToken = async () => {
+        if (getToken) {
+          const token = await getToken({ template: 'convex' });
+          return token ?? undefined;
+        }
+        return undefined;
+      };
+      
+      client.setAuth(fetchToken);
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  // Convex appointments hook
+  const {
+    appointments: convexAppointments,
+    loading: convexLoading,
+    loadAppointments,
+    isUsingConvex,
+  } = useConvexAppointments(user?.id, convexClient);
 
   // Create dynamic styles with theme colors
   const styles = useMemo(() => createStyles(scaledFontSize, theme.colors), [scaledFontSize, theme.colors]);
@@ -83,6 +115,14 @@ const fetchAppointments = useCallback(async () => {
   try {
     setLoading(true);
     console.log('📅 Fetching appointments for user:', user?.id);
+    
+    // Use Convex data if available
+    if (isUsingConvex && convexAppointments.length > 0) {
+      console.log('✅ Using Convex appointments data');
+      setAppointments(convexAppointments as any);
+      setLoading(false);
+      return;
+    }
     
     const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
     const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
@@ -161,13 +201,20 @@ const fetchAppointments = useCallback(async () => {
   } finally {
     setLoading(false);
   }
-}, [user?.id, showStatusModal]);
+}, [user?.id, showStatusModal, isUsingConvex, convexAppointments]);
   
 
 // Run fetch when user id is ready
 useEffect(() => {
-  if (user?.id) fetchAppointments();
-  }, [user?.id, fetchAppointments]);
+  if (user?.id) {
+    // Refresh Convex data if using Convex
+    if (isUsingConvex) {
+      loadAppointments();
+    } else {
+      fetchAppointments();
+    }
+  }
+}, [user?.id, isUsingConvex, loadAppointments, fetchAppointments]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

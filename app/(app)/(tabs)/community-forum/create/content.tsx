@@ -25,13 +25,15 @@ import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useAuth } from "@clerk/clerk-expo";
 import { communityApi } from "../../../../../utils/communityForumApi";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import avatarEvents from "../../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../../utils/apiBaseUrl";
 import StatusModal from "../../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexPosts } from "../../../../../utils/hooks/useConvexPosts";
 
 const { width } = Dimensions.get("window");
 
@@ -39,6 +41,7 @@ export default function CreatePostScreen() {
   const { theme, scaledFontSize } = useTheme();
   const params = useLocalSearchParams();
   const { user } = useUser();
+  const { getToken } = useAuth();
   const selectedCategory = params.category as string;
   
   const [activeTab, setActiveTab] = useState("community-forum");
@@ -49,6 +52,27 @@ export default function CreatePostScreen() {
   const [loading, setLoading] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Initialize Convex client
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  useEffect(() => {
+    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+    if (!convexUrl) return;
+    
+    const client = new ConvexReactClient(convexUrl, { unsavedChangesWarning: false });
+    client.setAuth(async () => {
+      try {
+        const token = await (getToken?.() ?? Promise.resolve(undefined));
+        return token ?? undefined;
+      } catch {
+        return undefined;
+      }
+    });
+    setConvexClient(client);
+    }, [user, getToken]);
+
+  // Use Convex posts hook
+  const { createPost: createConvexPost, isUsingConvex } = useConvexPosts(user?.id, convexClient);
 
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -169,7 +193,28 @@ export default function CreatePostScreen() {
 
     setLoading(true);
     try {
-      await communityApi.createPost({
+        // Convex-first: Try to create draft via Convex
+        if (isUsingConvex && createConvexPost) {
+          try {
+            console.log('📤 Saving draft via Convex...');
+            await createConvexPost({
+              title: postTitle,
+              content: postContent,
+              category: selectedCategory,
+              isDraft: true,
+            });
+          
+            showSuccess("Your post has been saved as a draft. You can find it in your profile.", () => {
+              router.push("/community-forum");
+            });
+            return;
+          } catch (convexError) {
+            console.warn('⚠️ Convex draft save failed, falling back to REST:', convexError);
+          }
+        }
+      
+        // REST API fallback
+        await communityApi.createPost({
         clerkUserId: user.id,
         title: postTitle,
         content: postContent,
@@ -202,7 +247,26 @@ export default function CreatePostScreen() {
 
     setLoading(true);
     try {
-      await communityApi.createPost({
+        // Convex-first: Try to create post via Convex
+        if (isUsingConvex && createConvexPost) {
+          try {
+            console.log('📤 Publishing post via Convex...');
+            await createConvexPost({
+              title: postTitle,
+              content: postContent,
+              category: selectedCategory,
+              isDraft: false,
+            });
+          
+            router.push("/community-forum/create/success");
+            return;
+          } catch (convexError) {
+            console.warn('⚠️ Convex post publish failed, falling back to REST:', convexError);
+          }
+        }
+      
+        // REST API fallback
+        await communityApi.createPost({
         clerkUserId: user.id,
         title: postTitle,
         content: postContent,

@@ -24,6 +24,8 @@ import activityApi from "../../../../utils/activityApi";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexProfile } from "../../../../utils/hooks/useConvexProfile";
 
 const API_URL = getApiBaseUrl();
 
@@ -57,9 +59,41 @@ export default function ProfileScreen() {
     message: '',
   });
 
-  const { signOut } = useAuth();
+  const { signOut, getToken } = useAuth();
   const { user } = useUser();
   const { theme, scaledFontSize } = useTheme();
+
+  // Initialize Convex client with Clerk auth
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
+        unsavedChangesWarning: false,
+      });
+
+      // Set up auth with Clerk JWT
+      const fetchToken = async () => {
+        if (getToken) {
+          const token = await getToken({ template: 'convex' });
+          return token ?? undefined;
+        }
+        return undefined;
+      };
+      
+      client.setAuth(fetchToken);
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  // Convex profile hook
+  const {
+    profile: convexProfile,
+    loading: convexLoading,
+    error: convexError,
+    syncProfile: syncConvexProfile,
+    isUsingConvex,
+  } = useConvexProfile(user?.id, convexClient);
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -252,8 +286,24 @@ export default function ProfileScreen() {
       setLoading(false);
       return;
     }
+    
+    // Use Convex profile if available
+    if (isUsingConvex && convexProfile) {
+      console.log('✅ Using Convex profile data');
+      setProfileData({
+        firstName: user?.firstName || 'User',
+        lastName: user?.lastName || '',
+        email: user?.emailAddresses?.[0]?.emailAddress || '',
+        phoneNumber: convexProfile.phoneNumber,
+        location: convexProfile.location,
+        profileImageUrl: convexProfile.profileImageUrl || user?.imageUrl,
+      });
+      setLoading(false);
+      return;
+    }
+    
     fetchProfileData();
-  }, [IS_TEST_ENV, fetchProfileData, user]);
+  }, [IS_TEST_ENV, fetchProfileData, user, isUsingConvex, convexProfile]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

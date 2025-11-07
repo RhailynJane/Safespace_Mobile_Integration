@@ -26,6 +26,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
 
 /**
  * BookAppointment Component
@@ -67,8 +69,33 @@ export default function BookAppointment() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+
+  // Initialize Convex client with Clerk auth
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
+        unsavedChangesWarning: false,
+      });
+
+      const fetchToken = async () => {
+        if (getToken) {
+          const token = await getToken({ template: 'convex' });
+          return token ?? undefined;
+        }
+        return undefined;
+      };
+      
+      client.setAuth(fetchToken);
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  // Convex appointments hook (for potential future use)
+  const { isUsingConvex } = useConvexAppointments(user?.id, convexClient);
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);

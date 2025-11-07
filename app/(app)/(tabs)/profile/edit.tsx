@@ -23,7 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useUser } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
@@ -33,6 +33,8 @@ import { locationService } from "../../../../utils/locationService";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import OptimizedImage from "../../../../components/OptimizedImage";
+import { ConvexReactClient } from "convex/react";
+import { useConvexProfile } from "../../../../utils/hooks/useConvexProfile";
 
 // Gender options for the form
 const GENDER_OPTIONS = [
@@ -170,6 +172,7 @@ export default function EditProfileScreen() {
 
   // Get user data from Clerk
   const { user } = useUser();
+  const { getToken } = useAuth();
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -210,6 +213,25 @@ export default function EditProfileScreen() {
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  // Initialize Convex client with Clerk auth for profile sync
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
+      client.setAuth(async () => {
+        try {
+          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
+          return token ?? undefined;
+        } catch {
+          return undefined;
+        }
+      });
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  const { updateProfileImage: convexUpdateProfileImage, syncProfile: convexSyncProfile, isUsingConvex } = useConvexProfile(user?.id, convexClient);
 
   // Load existing profile data when screen loads
   useEffect(() => {
@@ -692,6 +714,13 @@ export default function EditProfileScreen() {
           console.log('📸 Profile edit: Emitting avatar event with URL:', imageUrl);
           avatarEvents.emit(imageUrl);
 
+          // Best-effort Convex profile image update
+          try {
+            if (isUsingConvex && imageUrl) {
+              await convexUpdateProfileImage(imageUrl);
+            }
+          } catch (_e) { /* ignore convex image sync errors */ }
+
           setSuccessMessage("Profile picture updated!");
           setShowSuccessModal(true);
         } catch (uploadError) {
@@ -894,6 +923,17 @@ export default function EditProfileScreen() {
           }
           // ✅ END OF NEW CODE
 
+          // Best-effort Convex sync (subset of fields)
+          try {
+            if (isUsingConvex) {
+              await convexSyncProfile({
+                phoneNumber: formData.phoneNumber?.trim(),
+                location: formData.location?.trim(),
+                profileImageUrl: profileImage || undefined,
+              });
+            }
+          } catch (_e) { /* ignore convex sync errors */ }
+
           setSuccessMessage("Profile updated successfully!");
           setShowSuccessModal(true);
           
@@ -906,7 +946,7 @@ export default function EditProfileScreen() {
         }
       } catch (apiError) {
         console.log("API update failed, saving locally:", apiError);
-        // If API fails, save to local storage only
+  // If API fails, save to local storage only
         await saveProfileDataToStorage();
         await saveCmhaDataToStorage();
 
@@ -937,6 +977,17 @@ export default function EditProfileScreen() {
           console.error("Error syncing profileData:", syncError);
         }
         // ✅ END OF NEW CODE
+
+        // Best-effort Convex sync even if REST failed
+        try {
+          if (isUsingConvex) {
+            await convexSyncProfile({
+              phoneNumber: formData.phoneNumber?.trim(),
+              location: formData.location?.trim(),
+              profileImageUrl: profileImage || undefined,
+            });
+          }
+        } catch (_e) { /* ignore */ }
 
         setSuccessMessage("Profile updated locally!");
         setShowSuccessModal(true);

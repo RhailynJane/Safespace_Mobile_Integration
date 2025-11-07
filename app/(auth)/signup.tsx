@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
-import { useSignUp } from "@clerk/clerk-expo";
+import { useSignUp, useAuth } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 import PersonalInfoStep from "../../components/PersonalInfoStep";
 import PasswordStep from "../../components/PasswordStep";
@@ -22,6 +22,7 @@ import StatusModal from "../../components/StatusModal";
 import { CaptchaHandler } from "../../utils/captcha-handler";
 import { apiService } from "../../utils/api";
 import { useTheme } from "../../contexts/ThemeContext";
+import { completeConvexAuthFlow } from "../../utils/convexAuthSync";
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -41,6 +42,7 @@ export default function SignupScreen() {
   const { theme } = useTheme();
   // Clerk signup hook
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { getToken } = useAuth();
   const [captchaReady, setCaptchaReady] = useState(false);
 
   // State management for signup process
@@ -289,6 +291,14 @@ export default function SignupScreen() {
               console.error("Failed to create client record:", clientError);
             }
           }
+
+          // Sync user to Convex after successful signup
+          await completeConvexAuthFlow(getToken, {
+            clerkUserId: signUpAttempt.createdUserId!,
+            email: signupData.email,
+            firstName: signupData.firstName,
+            lastName: signupData.lastName,
+          });
 
           setCurrentStep("success");
         } catch (syncError) {

@@ -19,6 +19,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { useQuery } from "convex/react";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -135,6 +136,43 @@ export default function JournalHistoryScreen() {
       }
     }, [user?.id, fetchEntries])
   );
+
+  // Live history using Convex when available. We render the live child only when the generated API is present.
+  const [convexApi, setConvexApi] = useState<any | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import("../../../convex/_generated/api");
+        if (mounted) setConvexApi(mod.api);
+      } catch (_) {
+        // Convex not generated or disabled; ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const LiveHistory = ({ api, userId, startDate, endDate, onData }: {
+    api: any;
+    userId: string;
+    startDate?: string;
+    endDate?: string;
+    onData: (e: JournalEntry[]) => void;
+  }) => {
+    const res = useQuery(api.journal.getHistory, {
+      clerkUserId: userId,
+      startDate,
+      endDate,
+    }) as { entries: any[] } | undefined;
+    useEffect(() => {
+      if (res && Array.isArray(res.entries)) {
+        onData(res.entries as unknown as JournalEntry[]);
+      }
+    }, [res, onData]);
+    return null;
+  };
 
   // Apply search filter whenever search query or entries change
   useEffect(() => {
@@ -333,6 +371,15 @@ export default function JournalHistoryScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entries" showBack={true} showMenu={true} />
         <ScrollView style={styles.content}>
+          {user?.id && convexApi ? (
+            <LiveHistory
+              api={convexApi}
+              userId={user.id}
+              startDate={getDateFilters().startDate}
+              endDate={getDateFilters().endDate}
+              onData={(e) => setEntries(e)}
+            />
+          ) : null}
           <Text style={[styles.pageTitle, { color: theme.colors.text }]}>My Journal Entries</Text>
 
           {/* Search Bar */}

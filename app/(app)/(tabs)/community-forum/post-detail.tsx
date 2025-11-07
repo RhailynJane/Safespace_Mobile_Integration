@@ -36,7 +36,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { useState, useEffect, useMemo } from "react";
 import { communityApi } from "../../../../utils/communityForumApi";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import avatarEvents from "../../../../utils/avatarEvents";
@@ -44,6 +44,8 @@ import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexPosts } from "../../../../utils/hooks/useConvexPosts";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -57,6 +59,7 @@ export default function PostDetailScreen() {
   const params = useLocalSearchParams();
   const postId = parseInt(params.id as string, 10);
   const { user } = useUser();
+    const { getToken } = useAuth();
   
   // State management for post data and UI interactions
   const [post, setPost] = useState<any>(null); // Current post data
@@ -67,6 +70,27 @@ export default function PostDetailScreen() {
   const [bookmarked, setBookmarked] = useState(false); // Bookmark status
   const [reacting, setReacting] = useState(false); // Reaction update in progress
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+    // Initialize Convex client
+    const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+    useEffect(() => {
+      const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+      if (!convexUrl) return;
+    
+      const client = new ConvexReactClient(convexUrl, { unsavedChangesWarning: false });
+      client.setAuth(async () => {
+        try {
+          const token = await (getToken?.() ?? Promise.resolve(undefined));
+          return token ?? undefined;
+        } catch {
+          return undefined;
+        }
+      });
+      setConvexClient(client);
+    }, [user, getToken]);
+
+    // Use Convex posts hook
+    const { reactToPost: reactToConvexPost, isUsingConvex } = useConvexPosts(user?.id, convexClient);
 
   // Modal states
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -211,8 +235,22 @@ export default function PostDetailScreen() {
     try {
       setReacting(true);
       
-      // Single API call handles both adding and removing reactions
-      const response = await communityApi.reactToPost(postId, user.id, emoji);
+        // Convex-first: Try to react via Convex
+        if (isUsingConvex && reactToConvexPost) {
+          try {
+            console.log('📤 Reacting to post via Convex...');
+            await reactToConvexPost(postId.toString(), emoji);
+          
+            setUserReaction(emoji);
+            setReactionPickerVisible(false);
+            return;
+          } catch (convexError) {
+            console.warn('⚠️ Convex reaction failed, falling back to REST:', convexError);
+          }
+        }
+      
+        // REST API fallback
+        const response = await communityApi.reactToPost(postId, user.id, emoji);
       
       // Update local state with new reaction data
       if (post) {

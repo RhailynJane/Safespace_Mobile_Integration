@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   Modal,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, Typography } from "../../../../constants/theme";
 import { AppHeader } from "../../../../components/AppHeader";
@@ -111,6 +111,15 @@ export default function JournalEditScreen() {
       fetchEntry();
     }
   }, [id, fetchEntry]);
+
+  // Refresh entry when returning to this screen (ensures latest Convex state)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (id) {
+        fetchEntry();
+      }
+    }, [id, fetchEntry])
+  );
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

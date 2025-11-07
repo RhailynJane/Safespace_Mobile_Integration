@@ -25,6 +25,8 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexAppointments } from "../../../../utils/hooks/useConvexAppointments";
 
 const { width } = Dimensions.get("window");
 
@@ -64,8 +66,43 @@ export default function AppointmentsScreen() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+
+  // Initialize Convex client with Clerk auth
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
+        unsavedChangesWarning: false,
+      });
+
+      // Set up auth with Clerk JWT
+      const fetchToken = async () => {
+        if (getToken) {
+          const token = await getToken({ template: 'convex' });
+          return token ?? undefined;
+        }
+        return undefined;
+      };
+      
+      client.setAuth(fetchToken);
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  // Convex appointments hook
+  const {
+    appointments: convexAppointments,
+    upcomingCount: convexUpcomingCount,
+    completedCount: convexCompletedCount,
+    nextAppointment: convexNextAppointment,
+    loading: convexLoading,
+    error: convexError,
+    loadAppointments,
+    isUsingConvex,
+  } = useConvexAppointments(user?.id, convexClient);
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -82,11 +119,22 @@ export default function AppointmentsScreen() {
 
   /**
    * Fetch appointments from API and calculate stats
+   * Now checks Convex first, falls back to REST if needed
    */
   const fetchAppointments = useCallback(async () => {
     try {
       setLoading(true);
       console.log('📅 Fetching appointments for dashboard...');
+      
+      // Use Convex data if available
+      if (isUsingConvex && convexAppointments.length > 0) {
+        console.log('✅ Using Convex appointments data');
+        setAppointments(convexAppointments as any);
+        setUpcomingCount(convexUpcomingCount);
+        setCompletedCount(convexCompletedCount);
+        setNextAppointment(convexNextAppointment as any);
+        return;
+      }
       
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
@@ -184,14 +232,19 @@ export default function AppointmentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, showStatusModal]);
+  }, [user?.id, showStatusModal, isUsingConvex, convexAppointments, convexUpcomingCount, convexCompletedCount, convexNextAppointment]);
 
   // Run fetch on mount and when dependencies change
   useEffect(() => {
     if (user?.id) {
-      fetchAppointments();
+      // Refresh Convex data if using Convex
+      if (isUsingConvex) {
+        loadAppointments();
+      } else {
+        fetchAppointments();
+      }
     }
-  }, [user?.id, fetchAppointments]);
+  }, [user?.id, isUsingConvex, loadAppointments, fetchAppointments]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;

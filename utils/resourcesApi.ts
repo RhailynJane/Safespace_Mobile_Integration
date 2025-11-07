@@ -1,5 +1,6 @@
 // utils/resourcesApi.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { convexEnabled, getConvexApi, createConvexClientNoAuth, safeQuery } from './convexClient';
 
 export interface Resource {
   id: string;
@@ -374,6 +375,22 @@ export async function fetchAllResources(): Promise<Resource[]> {
  * Fetch resources by category
  */
 export async function fetchResourcesByCategory(categoryId: string): Promise<Resource[]> {
+  // Try Convex first
+  if (convexEnabled()) {
+    try {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      const result = await safeQuery(client, api.resources.listByCategory, { category: categoryId, limit: 50 });
+      
+      if (result?.resources) {
+        return result.resources;
+      }
+    } catch (error) {
+      console.log('Convex fetchResourcesByCategory failed, falling back to local:', error);
+    }
+  }
+
+  // Fallback to local resources
   await delay(200);
   return ALL_RESOURCES.filter(resource => resource.category === categoryId);
 }
@@ -382,6 +399,22 @@ export async function fetchResourcesByCategory(categoryId: string): Promise<Reso
  * Search resources locally
  */
 export async function searchResources(query: string): Promise<Resource[]> {
+  // Try Convex first
+  if (convexEnabled()) {
+    try {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      const result = await safeQuery(client, api.resources.search, { query, limit: 50 });
+      
+      if (result?.resources) {
+        return result.resources;
+      }
+    } catch (error) {
+      console.log('Convex searchResources failed, falling back to local:', error);
+    }
+  }
+
+  // Fallback to local search
   await delay(150);
   const lowerQuery = query.toLowerCase();
   
@@ -533,6 +566,28 @@ export const externalApiService = new ExternalApiService();
 
 // Enhanced functions that combine local + external resources
 export async function fetchAllResourcesWithExternal(): Promise<Resource[]> {
+  // Try Convex first
+  if (convexEnabled()) {
+    try {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      const result = await safeQuery(client, api.resources.listResources, { limit: 100 });
+      
+      if (result?.resources) {
+        // Try to get external quote and prepend it
+        try {
+          const todaysQuote = await externalApiService.getTodaysQuote();
+          return [todaysQuote, ...result.resources];
+        } catch {
+          return result.resources;
+        }
+      }
+    } catch (error) {
+      console.log('Convex fetchAllResources failed, falling back to local:', error);
+    }
+  }
+
+  // Fallback to local resources
   await delay(300);
   
   try {
@@ -549,6 +604,22 @@ export async function fetchAllResourcesWithExternal(): Promise<Resource[]> {
 }
 
 export async function getDailyAffirmation(): Promise<Resource> {
+  // Try Convex first
+  if (convexEnabled()) {
+    try {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      const result = await safeQuery(client, api.resources.getDailyAffirmation, {});
+      
+      if (result) {
+        return result as Resource;
+      }
+    } catch (error) {
+      console.log('Convex getDailyAffirmation failed, falling back to external/local:', error);
+    }
+  }
+
+  // Try external API
   try {
     const affirmationText = await externalApiService.getRandomAffirmation();
     
@@ -581,6 +652,22 @@ export async function getDailyAffirmation(): Promise<Resource> {
 }
 
 export async function getRandomQuote(): Promise<Resource> {
+  // Try Convex first
+  if (convexEnabled()) {
+    try {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      const result = await safeQuery(client, api.resources.getRandomQuote, {});
+      
+      if (result) {
+        return result as Resource;
+      }
+    } catch (error) {
+      console.log('Convex getRandomQuote failed, falling back to external/local:', error);
+    }
+  }
+
+  // Try external API
   try {
     const quoteData = await externalApiService.getRandomQuote();
     

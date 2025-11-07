@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Linking } from "react-native";
 import {
   View,
@@ -17,6 +17,7 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
+import { fetchCrisisResources, trackCrisisAction, CrisisResource } from "../../../utils/crisisService";
 
 const { width } = Dimensions.get("window");
 
@@ -34,6 +35,8 @@ export default function CrisisScreen() {
   const { theme, scaledFontSize } = useTheme();
   // State management
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [resources, setResources] = useState<CrisisResource[]>([]);
   const [activeTab, setActiveTab] = useState("crisis");
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({
@@ -63,6 +66,22 @@ export default function CrisisScreen() {
     setModalVisible(false);
   };
 
+  // Load crisis resources from Convex (with fallback)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetchCrisisResources({ country: 'CA' });
+        if (mounted && Array.isArray(res)) setResources(res);
+      } catch (e) {
+        // resources service already falls back; no-op
+      } finally {
+        if (mounted) setInitialLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   /**
    * Handles bottom tab navigation
    * @param tabId - ID of the tab to navigate to
@@ -80,7 +99,7 @@ export default function CrisisScreen() {
    * Handles emergency call actions - opens phone dialer with number
    * @param number - The emergency number to call
    */
-  const handleEmergencyCall = async (number: string, serviceName: string) => {
+  const handleEmergencyCall = async (number: string, serviceName: string, resource?: CrisisResource) => {
     try {
       setLoading(true);
       const phoneNumber = `tel:${number}`;
@@ -89,6 +108,8 @@ export default function CrisisScreen() {
       if (supported) {
         await Linking.openURL(phoneNumber);
         showModal('success', 'Call Initiated', `Opening ${serviceName}. If the call doesn't start automatically, please dial ${number} manually.`);
+        // best-effort tracking
+        await trackCrisisAction({ resourceId: resource?.id, slug: resource?.slug, action: 'call' });
       } else {
         showModal('error', 'Call Not Supported', `Your device doesn't support phone calls. Please dial ${number} manually.`);
       }
@@ -103,15 +124,15 @@ export default function CrisisScreen() {
   /**
    * Handles distress center website navigation
    */
-  const handleDistressCenter = async () => {
+  const handleDistressCenter = async (url: string, resource?: CrisisResource) => {
     try {
       setLoading(true);
-      const url = "https://distresscentre.com";
       const supported = await Linking.canOpenURL(url);
       
       if (supported) {
         await Linking.openURL(url);
         showModal('success', 'Website Opened', 'Opening Distress Centre website in your browser...');
+        await trackCrisisAction({ resourceId: resource?.id, slug: resource?.slug, action: 'visit' });
       } else {
         showModal('error', 'Browser Not Available', 'Cannot open website. Please check your browser app.');
       }
@@ -124,12 +145,12 @@ export default function CrisisScreen() {
   };
 
   // Show loading indicator during operations
-  if (loading) {
+  if (loading || initialLoading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-          Connecting...
+          {initialLoading ? 'Loading resources...' : 'Connecting...'}
         </Text>
         
         <StatusModal
@@ -173,68 +194,51 @@ export default function CrisisScreen() {
 
           {/* Emergency Action Buttons */}
           <View style={styles.emergencyButtons}>
-            <TouchableOpacity
-              style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#C62828' : '#E53935' }]}
-              onPress={() => handleEmergencyCall("911", "Emergency Services")}
-            >
-              <View style={styles.buttonIconContainer}>
-                <Ionicons name="call" size={24} color="#FFFFFF" />
-              </View>
-              <View style={styles.buttonTextContainer}>
-                <Text style={styles.emergencyButtonMainText}>Call 911</Text>
-                <Text style={styles.emergencyButtonSubText}>Emergency Services</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.buttonArrow} />
-            </TouchableOpacity>
+            {resources.filter(r => r.type === 'phone' && r.active !== false).slice(0,3).map((r, idx) => (
+              <TouchableOpacity
+                key={r.slug}
+                style={[styles.emergencyButton, { backgroundColor: r.color || (idx === 0 ? (theme.isDark ? '#C62828' : '#E53935') : idx === 1 ? (theme.isDark ? '#388E3C' : '#4CAF50') : (theme.isDark ? '#1976D2' : '#2196F3')) }]}
+                onPress={() => handleEmergencyCall(r.value, r.title || 'Emergency', r)}
+              >
+                <View style={styles.buttonIconContainer}>
+                  <Ionicons name={(r.icon as any) || 'call'} size={24} color="#FFFFFF" />
+                </View>
+                <View style={styles.buttonTextContainer}>
+                  <Text style={styles.emergencyButtonMainText}>{r.title}</Text>
+                  {!!r.subtitle && <Text style={styles.emergencyButtonSubText}>{r.subtitle}</Text>}
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.buttonArrow} />
+              </TouchableOpacity>
+            ))}
 
-            <TouchableOpacity
-              style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#388E3C' : '#4CAF50' }]}
-              onPress={() => handleEmergencyCall("988", "Crisis Hotline")}
-            >
-              <View style={styles.buttonIconContainer}>
-                <Ionicons name="heart" size={24} color="#FFFFFF" />
-              </View>
-              <View style={styles.buttonTextContainer}>
-                <Text style={styles.emergencyButtonMainText}>Crisis Hotline</Text>
-                <Text style={styles.emergencyButtonSubText}>Call 988</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.buttonArrow} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.emergencyButton, { backgroundColor: theme.isDark ? '#1976D2' : '#2196F3' }]}
-              onPress={() => handleEmergencyCall("403-266-4357", "Distress Center")}
-            >
-              <View style={styles.buttonIconContainer}>
-                <Ionicons name="people" size={24} color="#FFFFFF" />
-              </View>
-              <View style={styles.buttonTextContainer}>
-                <Text style={styles.emergencyButtonMainText}>Distress Center</Text>
-                <Text style={styles.emergencyButtonSubText}>403-266-4357</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#FFFFFF" style={styles.buttonArrow} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.emergencyButton, styles.websiteButton, { 
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.primary 
-              }]}
-              onPress={handleDistressCenter}
-            >
-              <View style={[styles.buttonIconContainer, { backgroundColor: theme.isDark ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.1)' }]}>
-                <Ionicons name="globe" size={24} color={theme.colors.primary} />
-              </View>
-              <View style={styles.buttonTextContainer}>
-                <Text style={[styles.emergencyButtonMainText, { color: theme.colors.primary }]}>
-                  Visit Website
-                </Text>
-                <Text style={[styles.emergencyButtonSubText, { color: theme.colors.primary, opacity: 0.8 }]}>
-                  distresscentre.com
-                </Text>
-              </View>
-              <Ionicons name="open-outline" size={20} color={theme.colors.primary} style={styles.buttonArrow} />
-            </TouchableOpacity>
+            {resources.find(r => r.type === 'website' && r.active !== false) && (() => {
+              const w = resources.find(r => r.type === 'website' && r.active !== false)!;
+              return (
+                <TouchableOpacity
+                  key={w.slug}
+                  style={[styles.emergencyButton, styles.websiteButton, { 
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.primary 
+                  }]}
+                  onPress={() => handleDistressCenter(w.value, w)}
+                >
+                  <View style={[styles.buttonIconContainer, { backgroundColor: theme.isDark ? 'rgba(33, 150, 243, 0.2)' : 'rgba(33, 150, 243, 0.1)' }]}> 
+                    <Ionicons name={(w.icon as any) || 'globe'} size={24} color={theme.colors.primary} />
+                  </View>
+                  <View style={styles.buttonTextContainer}>
+                    <Text style={[styles.emergencyButtonMainText, { color: theme.colors.primary }]}> 
+                      {w.title || 'Visit Website'}
+                    </Text>
+                    {!!w.subtitle && (
+                      <Text style={[styles.emergencyButtonSubText, { color: theme.colors.primary, opacity: 0.8 }]}> 
+                        {w.subtitle}
+                      </Text>
+                    )}
+                  </View>
+                  <Ionicons name="open-outline" size={20} color={theme.colors.primary} style={styles.buttonArrow} />
+                </TouchableOpacity>
+              );
+            })()}
           </View>
 
           {/* Immediate Coping Strategies Section */}

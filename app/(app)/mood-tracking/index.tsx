@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { moodApi, MoodEntry } from "../../../utils/moodApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import StatusModal from "../../../components/StatusModal";
+import { useQuery } from "convex/react";
 
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
@@ -153,6 +154,31 @@ const MoodTrackingScreen = () => {
     }, [loadRecentMoods])
   );
 
+  // Live recent moods via Convex when available
+  const [convexApi, setConvexApi] = useState<any | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import("../../../convex/_generated/api");
+        if (mounted) setConvexApi(mod.api);
+      } catch (_) {
+        // Convex not generated/enabled
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const LiveRecent = ({ api, userId, onData }: { api: any; userId: string; onData: (e: MoodEntry[]) => void }) => {
+    const live = useQuery(api.moods.getRecentMoods, { userId, limit: 5 }) as any[] | undefined;
+    useEffect(() => {
+      if (Array.isArray(live)) onData(live as unknown as MoodEntry[]);
+    }, [live, onData]);
+    return null;
+  };
+
   // Handle emoji press animation for visual feedback
   const handleEmojiPressIn = (moodId: MoodType) => {
     setActiveEmoji(moodId);
@@ -237,6 +263,9 @@ const MoodTrackingScreen = () => {
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
+          {user?.id && convexApi ? (
+            <LiveRecent api={convexApi} userId={user.id} onData={setRecentEntries} />
+          ) : null}
           {/* Mood selection section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>

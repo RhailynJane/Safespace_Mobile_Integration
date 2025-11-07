@@ -8,7 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, Typography } from "../../../../constants/theme";
 import { AppHeader } from "../../../../components/AppHeader";
@@ -71,6 +71,26 @@ export default function JournalEntryScreen() {
       fetchEntry();
     }
   }, [id]);
+
+  // Ensure the entry refreshes when returning to this screen (e.g., after edit)
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+      const refetch = async () => {
+        if (!id) return;
+        try {
+          const response = await journalApi.getEntry(id as string);
+          if (isActive) setEntry(response.entry);
+        } catch (e) {
+          // non-fatal; leave last known state
+        }
+      };
+      refetch();
+      return () => {
+        isActive = false;
+      };
+    }, [id])
+  );
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

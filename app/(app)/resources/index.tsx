@@ -65,6 +65,7 @@ import {
   getRandomQuote,
 } from "../../../utils/resourcesApi";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useQuery } from 'convex/react';
 
 /**
  * Category interface defining the structure for resource categorization
@@ -143,12 +144,29 @@ export default function ResourcesScreen() {
     title: '',
     message: ''
   }); // Modal configuration
+  const [convexApi, setConvexApi] = useState<any | null>(null);
 
   /**
    * Create styles dynamically based on text size scaling
    * Uses useMemo for performance optimization
    */
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  // Dynamic import Convex API
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import('../../../convex/_generated/api');
+        if (mounted) setConvexApi(mod.api);
+      } catch (err) {
+        console.log('Convex API not available for resources');
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   /**
    * Bottom navigation tabs configuration
@@ -184,8 +202,32 @@ export default function ResourcesScreen() {
    * Fetches initial data and sets up featured content
    */
   useEffect(() => {
-    loadResources();
-  }, []);
+    // Only load via REST if Convex is not available
+    if (!convexApi) {
+      loadResources();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convexApi]);
+
+  // Live resources component using Convex subscriptions
+  const LiveResources = () => {
+    const liveResources = useQuery(
+      convexApi?.resources?.listResources,
+      convexApi ? { limit: 100 } : 'skip'
+    ) as { resources: Resource[] } | undefined;
+
+    useEffect(() => {
+      if (liveResources?.resources) {
+        setResources(liveResources.resources);
+        // Set first quote or affirmation as featured content
+        const featured = liveResources.resources.find(r => r.type === 'Quote' || r.type === 'Affirmation');
+        setFeaturedResource(featured || null);
+        setLoading(false);
+      }
+    }, [liveResources]);
+
+    return null;
+  };
 
   /**
    * Load all resources including external content
@@ -278,13 +320,15 @@ export default function ResourcesScreen() {
       }, 500);
 
       return () => clearTimeout(timeoutId);
-    } else if (searchQuery.length === 0 && selectedCategory === "") {
+    } else if (searchQuery.length === 0 && selectedCategory === "" && !convexApi) {
       // Reset to all resources when search is cleared and no category selected
+      // Only reload if not using Convex (live subscription handles it)
       loadResources();
     }
 
     return undefined;
-  }, [searchQuery, selectedCategory]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedCategory, convexApi]);
 
   /**
    * Handle bottom navigation tab press
@@ -361,6 +405,9 @@ export default function ResourcesScreen() {
 
   return (
     <CurvedBackground>
+      {/* Live resources subscription (only renders when Convex available) */}
+      {convexApi && <LiveResources />}
+      
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Resources" showBack={true} />
 

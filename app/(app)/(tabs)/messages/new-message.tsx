@@ -27,6 +27,8 @@ import { messagingService, Contact } from "../../../../utils/sendbirdService";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
+import { ConvexReactClient } from "convex/react";
+import { useConvexMessages } from "../../../../utils/hooks/useConvexMessages";
 
 const { width } = Dimensions.get("window");
 
@@ -38,7 +40,7 @@ const { width } = Dimensions.get("window");
  */
 export default function NewMessagesScreen() {
   const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
-  const { userId } = useAuth();
+  const { userId, getToken } = useAuth();
   const API_BASE_URL = getApiBaseUrl();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("messages");
@@ -55,6 +57,24 @@ export default function NewMessagesScreen() {
     title: '',
     message: '',
   });
+
+  // Convex client and hook (Convex-first messaging operations)
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, { unsavedChangesWarning: false });
+      client.setAuth(async () => {
+        try {
+          const token = await (getToken?.({ template: 'convex' }) ?? Promise.resolve(undefined));
+          return token ?? undefined;
+        } catch {
+          return undefined;
+        }
+      });
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+  const { createConversation: createConvexConversation, isUsingConvex } = useConvexMessages(userId || undefined, convexClient);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -349,6 +369,13 @@ export default function NewMessagesScreen() {
 
     try {
       setLoading(true);
+      // Attempt Convex-first creation (best effort) so Convex clients see the conversation
+      try {
+        if (isUsingConvex) {
+          await createConvexConversation([contact.clerk_user_id], `${contact.first_name} ${contact.last_name}`.trim());
+        }
+      } catch (_e) { /* ignore and proceed to ensure backend conversation exists */ }
+
       const result = await messagingService.createConversation(userId, {
         participantIds: [contact.clerk_user_id], // Use actual participant ID
         conversationType: 'direct',

@@ -25,6 +25,8 @@ import { AppHeader } from "../../../../../components/AppHeader";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
+import { ConvexReactClient } from "convex/react";
+import { useConvexAppointments } from "../../../../../utils/hooks/useConvexAppointments";
 
 
 interface Appointment {
@@ -37,6 +39,7 @@ interface Appointment {
   status: string;
   meetingLink?: string;
   notes?: string;
+  cancellationReason?: string;
 }
 
 /**
@@ -71,8 +74,40 @@ export default function AppointmentList() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+
+  // Initialize Convex client with Clerk auth
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
+        unsavedChangesWarning: false,
+      });
+
+      const fetchToken = async () => {
+        if (getToken) {
+          const token = await getToken({ template: 'convex' });
+          return token ?? undefined;
+        }
+        return undefined;
+      };
+      
+      client.setAuth(fetchToken);
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  // Convex appointments hook
+  const {
+    appointments: convexAppointments,
+    loading: convexLoading,
+    loadAppointments,
+    updateAppointmentStatus,
+    deleteAppointment,
+    isUsingConvex,
+  } = useConvexAppointments(user?.id, convexClient);
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -94,6 +129,19 @@ const fetchAppointments = useCallback(async () => {
   try {
     setLoading(true);
     console.log('📅 Fetching appointment detail for ID:', id, 'User:', user?.id);
+    
+    // Use Convex data if available
+    if (isUsingConvex && convexAppointments.length > 0) {
+      console.log('✅ Using Convex appointments data');
+      const foundAppointment = convexAppointments.find((apt: any) => apt.id.toString() === id);
+      if (foundAppointment) {
+        setAppointment(foundAppointment as any);
+      } else {
+        showStatusModal('error', 'Not Found', 'Appointment not found.');
+      }
+      setLoading(false);
+      return;
+    }
     
     const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
     const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
@@ -153,12 +201,19 @@ const fetchAppointments = useCallback(async () => {
     } finally {
       setLoading(false);
     }
-  }, [id, user?.id, showStatusModal]);
+  }, [id, user?.id, showStatusModal, isUsingConvex, convexAppointments]);
 
   // Find the appointment based on the ID from the URL
   useEffect(() => {
-    if (user?.id && id) fetchAppointments();
-  }, [user?.id, id, fetchAppointments]);
+    if (user?.id && id) {
+      // Refresh Convex data if using Convex
+      if (isUsingConvex) {
+        loadAppointments();
+      } else {
+        fetchAppointments();
+      }
+    }
+  }, [user?.id, id, isUsingConvex, loadAppointments, fetchAppointments]);
   /**
    * Show status modal with given parameters
    */
@@ -272,29 +327,56 @@ const fetchAppointments = useCallback(async () => {
 
   /**
    * Confirms appointment cancellation
-   * Simulates API call with timeout
+   * Uses optimistic UI: updates immediately, then syncs with server
    */
   const confirmCancel = async () => {
+    if (!appointment) return;
+    
+    // Save previous state for rollback
+    const previousAppointment = { ...appointment };
+    
     try {
+      // Optimistic update: immediately show cancelled state
+      setAppointment({ ...appointment, status: 'cancelled', cancellationReason: 'Cancelled by user' });
+      setCancelModalVisible(false);
       setLoading(true);
+      
+      // Try Convex first if available
+      if (isUsingConvex && deleteAppointment) {
+        try {
+          await deleteAppointment(id as string);
+          showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
+          setTimeout(() => router.back(), 1200);
+          return;
+        } catch (convexError) {
+          console.warn('Convex cancel failed, falling back to REST:', convexError);
+        }
+      }
+      
+      // Fallback to REST API
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/appointments/${id}/cancel`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cancellationReason: 'Cancelled by user' }),
       });
+      
       const result = await response.json();
+      
       if (response.ok && result.success) {
-        setCancelModalVisible(false);
         showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
-        // Update local state optimistically
-        setAppointment(prev => prev ? { ...prev, status: 'Cancelled' } : prev);
         setTimeout(() => router.back(), 1200);
       } else {
+        // Rollback on error
+        setAppointment(previousAppointment);
+        setCancelModalVisible(true);
         showStatusModal('error', 'Cancel Failed', result.error || 'Unable to cancel appointment.');
       }
-    } catch (e) {
-      console.error('Cancel error:', e);
+    } catch (error) {
+      console.error('Cancel error:', error);
+      // Rollback on error
+      setAppointment(previousAppointment);
+      setCancelModalVisible(true);
       showStatusModal('error', 'Cancel Failed', 'Unable to cancel appointment. Please try again.');
     } finally {
       setLoading(false);

@@ -21,7 +21,9 @@
     "test:e2e:android": "detox test --configuration android.emu.debug",
     "test:performance": "ts-node testing/performance/performance-test-runner.ts",
     "test:load": "artillery run testing/performance/load-test-config.js --output testing/performance/report.json",
-    "test:load:report": "artillery report testing/performance/report.json --output testing/performance/report.html"
+    "test:load:report": "artillery report testing/performance/report.json --output testing/performance/report.html",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
@@ -39,7 +41,8 @@
     "@supabase/supabase-js": "^2.54.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
+  "cors": "^2.8.5",
+  "convex": "^1.17.4",
     "dotenv": "^17.2.3",
     "expo": "~54.0.21",
     "expo-audio": "~1.0.14",
@@ -73,7 +76,9 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-animatable": "^1.4.0",
+  "react-native-animatable": "^1.4.0",
+  "react-native-get-random-values": "^1.11.0",
+  "react-native-url-polyfill": "^2.0.0",
     "react-native-google-places-autocomplete": "^2.5.7",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",

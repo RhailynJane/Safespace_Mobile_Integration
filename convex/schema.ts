@@ -1,0 +1,272 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+// Initial Convex schema: simple presence tracking
+export default defineSchema({
+	users: defineTable({
+		clerkId: v.string(),
+		email: v.optional(v.string()),
+		firstName: v.optional(v.string()),
+		lastName: v.optional(v.string()),
+		imageUrl: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	}).index("by_clerkId", ["clerkId"]),
+	presence: defineTable({
+		userId: v.string(),
+		status: v.string(), // e.g., 'online' | 'away'
+		lastSeen: v.number(), // Date.now()
+	})
+		.index("by_userId", ["userId"]) // fast upsert by user
+		.index("by_lastSeen", ["lastSeen"]), // list online recently
+	conversations: defineTable({
+		title: v.optional(v.string()),
+		createdBy: v.string(), // clerk user id
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_createdBy", ["createdBy"]) 
+		.index("by_createdAt", ["createdAt"]),
+	conversationParticipants: defineTable({
+		conversationId: v.id("conversations"),
+		userId: v.string(),
+		role: v.optional(v.string()),
+		joinedAt: v.number(),
+		lastReadAt: v.optional(v.number()),
+	})
+		.index("by_conversation", ["conversationId"]) 
+		.index("by_user", ["userId"]),
+	messages: defineTable({
+		conversationId: v.id("conversations"),
+		senderId: v.string(),
+		body: v.string(),
+		// Optional attachment and metadata fields
+		messageType: v.optional(v.string()), // 'text' | 'image' | 'file' etc.
+		attachmentUrl: v.optional(v.string()),
+		fileName: v.optional(v.string()),
+		fileSize: v.optional(v.number()),
+		storageId: v.optional(v.id("_storage")),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_conversation", ["conversationId"]) 
+		.index("by_createdAt", ["createdAt"]),
+	communityPosts: defineTable({
+		authorId: v.string(),
+		title: v.string(),
+		content: v.string(),
+		isDraft: v.boolean(),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_author", ["authorId"]) 
+		.index("by_createdAt", ["createdAt"]),
+	postReactions: defineTable({
+		postId: v.id("communityPosts"),
+		userId: v.string(),
+		emoji: v.string(),
+		createdAt: v.number(),
+	})
+		.index("by_post", ["postId"]) 
+		.index("by_user", ["userId"]),
+	
+	// Mood tracking
+	moods: defineTable({
+		userId: v.string(),
+		moodType: v.string(), // 'very-happy' | 'happy' | 'neutral' | 'sad' | 'very-sad'
+		moodEmoji: v.optional(v.string()),
+		moodLabel: v.optional(v.string()),
+		intensity: v.optional(v.number()),
+		factors: v.optional(v.array(v.string())),
+		shareWithSupportWorker: v.optional(v.boolean()),
+		notes: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.optional(v.number()),
+	})
+		.index("by_user", ["userId"])
+		.index("by_createdAt", ["createdAt"])
+		.index("by_user_and_date", ["userId", "createdAt"]),
+	
+	// Appointments
+	appointments: defineTable({
+		userId: v.string(),
+		supportWorker: v.string(),
+		supportWorkerId: v.optional(v.number()), // Backend API support worker ID
+		date: v.string(), // ISO date string (YYYY-MM-DD)
+		time: v.string(), // HH:mm format
+		duration: v.optional(v.number()), // Duration in minutes
+		type: v.string(), // 'video' | 'phone' | 'in_person'
+		status: v.string(), // 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
+		meetingLink: v.optional(v.string()), // Video call link
+		notes: v.optional(v.string()),
+		specialization: v.optional(v.string()), // Support worker specialization
+		avatarUrl: v.optional(v.string()), // Support worker avatar
+		cancellationReason: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_date", ["date"])
+		.index("by_user_and_date", ["userId", "date"])
+		.index("by_status", ["status"])
+		.index("by_user_and_status", ["userId", "status"]),
+	
+	// User profiles (extended)
+	profiles: defineTable({
+		clerkId: v.string(),
+		phoneNumber: v.optional(v.string()),
+		location: v.optional(v.string()),
+		bio: v.optional(v.string()),
+		profileImageUrl: v.optional(v.string()),
+		preferences: v.optional(v.object({
+			theme: v.optional(v.string()),
+			notifications: v.optional(v.boolean()),
+		})),
+		updatedAt: v.number(),
+	}).index("by_clerkId", ["clerkId"]),
+	
+	// Activity tracking (for home screen)
+	activities: defineTable({
+		userId: v.string(),
+		activityType: v.string(), // 'login' | 'logout' | 'mood_entry' | 'post_created' | etc.
+		metadata: v.optional(v.any()),
+		createdAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_type", ["activityType"])
+		.index("by_user_and_date", ["userId", "createdAt"]),
+
+	// Help & Support content
+	helpSections: defineTable({
+		slug: v.string(),
+		title: v.string(),
+		icon: v.optional(v.string()),
+		description: v.optional(v.string()),
+		category: v.optional(v.string()), // getting_started | features | support | privacy | troubleshooting
+		priority: v.optional(v.string()), // high | medium | low
+		sort_order: v.optional(v.number()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	}).index("by_slug", ["slug"]).index("by_sort", ["sort_order"]),
+
+	helpItems: defineTable({
+		sectionId: v.id("helpSections"),
+		title: v.string(),
+		content: v.string(),
+		// denormalized lowercase fields for faster search/prefix checks
+		title_lc: v.optional(v.string()),
+		content_lc: v.optional(v.string()),
+		type: v.optional(v.string()), // guide | faq | contact
+		sort_order: v.optional(v.number()),
+		related_features: v.optional(v.array(v.string())),
+		estimated_read_time: v.optional(v.number()),
+		last_updated: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	}).index("by_section", ["sectionId"]).index("by_title", ["title"]).index("by_title_lc", ["title_lc"]).index("by_sort", ["sort_order"]),
+
+	// Optional: store Convex Storage references for attachments
+	// (used by conversations.sendAttachmentFromStorage)
+
+	// Crisis Support resources
+	crisisResources: defineTable({
+		slug: v.string(),
+		title: v.string(),
+		subtitle: v.optional(v.string()),
+		type: v.string(), // 'phone' | 'website'
+		value: v.string(), // phone number or URL
+		icon: v.optional(v.string()), // Ionicons name
+		color: v.optional(v.string()), // hex color string
+		region: v.optional(v.string()), // e.g., 'CA-AB' or 'US-CA'
+		country: v.optional(v.string()), // e.g., 'CA', 'US'
+		priority: v.optional(v.string()), // high | medium | low
+		sort_order: v.optional(v.number()),
+		active: v.boolean(),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_slug", ["slug"]) 
+		.index("by_region", ["region"]) 
+		.index("by_country", ["country"]) 
+		.index("by_type", ["type"]) 
+		.index("by_sort", ["sort_order"]) 
+		.index("by_active", ["active"]),
+
+	crisisEvents: defineTable({
+		resourceId: v.id("crisisResources"),
+		userId: v.optional(v.string()),
+		action: v.string(), // 'view' | 'call' | 'visit'
+		createdAt: v.number(),
+	})
+		.index("by_resource", ["resourceId"]) 
+		.index("by_user", ["userId"]),
+
+	// Journal entries
+	journalEntries: defineTable({
+		clerkId: v.string(),
+		title: v.string(),
+		content: v.string(),
+		emotionType: v.optional(v.string()), // very-sad | sad | neutral | happy | very-happy
+		emoji: v.optional(v.string()),
+		templateId: v.optional(v.number()),
+		tags: v.optional(v.array(v.string())),
+		shareWithSupportWorker: v.optional(v.boolean()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_user", ["clerkId"]) 
+		.index("by_createdAt", ["createdAt"]) 
+		.index("by_user_and_createdAt", ["clerkId", "createdAt"]),
+
+	// Journal templates (Convex-backed; keeps numeric id for UI compatibility)
+	journalTemplates: defineTable({
+		// Numeric identifier to match existing REST/UI expectations
+		tplId: v.number(),
+		name: v.string(),
+		description: v.optional(v.string()),
+		prompts: v.array(v.string()),
+		icon: v.string(),
+		active: v.boolean(),
+		sort_order: v.optional(v.number()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_tplId", ["tplId"]) 
+		.index("by_active", ["active"]) 
+		.index("by_sort", ["sort_order"]),
+
+	// Notifications
+	notifications: defineTable({
+		userId: v.string(), // Clerk user ID
+		type: v.string(), // 'message' | 'appointment' | 'system' | 'reminder' | 'mood' | 'journaling' | 'post_reactions' | 'self_assessment'
+		title: v.string(),
+		message: v.string(),
+		isRead: v.boolean(),
+		createdAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_user_and_read", ["userId", "isRead"])
+		.index("by_createdAt", ["createdAt"]),
+
+	// Resources (mental health content)
+	resources: defineTable({
+		title: v.string(),
+		type: v.string(), // 'Affirmation' | 'Quote' | 'Article' | 'Exercise' | 'Guide'
+		duration: v.string(),
+		category: v.string(), // 'stress' | 'anxiety' | 'depression' | 'sleep' | 'motivation' | 'mindfulness'
+		content: v.string(),
+		author: v.optional(v.string()),
+		imageEmoji: v.string(),
+		backgroundColor: v.string(),
+		tags: v.optional(v.array(v.string())),
+		isExternal: v.optional(v.boolean()), // true for API-fetched content
+		active: v.boolean(),
+		sortOrder: v.optional(v.number()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_category", ["category"])
+		.index("by_type", ["type"])
+		.index("by_active", ["active"])
+		.index("by_sort", ["sortOrder"]),
+});

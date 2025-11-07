@@ -16,6 +16,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { journalApi, JournalEntry } from "../../../utils/journalApi";
+import { useQuery } from "convex/react";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
@@ -77,6 +78,35 @@ export default function JournalScreen() {
     }, [user?.id, fetchRecentEntries])
   );
 
+  // Live recent entries using Convex when available.
+  // We dynamically import the generated API and only render the live child when available.
+  const [convexApi, setConvexApi] = useState<any | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import("../../../convex/_generated/api");
+        if (mounted) setConvexApi(mod.api);
+      } catch (_) {
+        // Convex not generated or not enabled; ignore silently
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const LiveRecent = ({ api, userId, onData }: { api: any; userId: string; onData: (e: JournalEntry[]) => void }) => {
+    const live = useQuery(api.journal.listRecent, { clerkUserId: userId, limit: 2 }) as any[] | undefined;
+    useEffect(() => {
+      if (Array.isArray(live)) {
+        onData(live as unknown as JournalEntry[]);
+      }
+    }, [live, onData]);
+    return null;
+  };
+
+
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
     if (tabId === "home") {
@@ -114,6 +144,9 @@ export default function JournalScreen() {
         <AppHeader title="Journal" showBack={true} showMenu={true} />
 
         <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {user?.id && convexApi ? (
+            <LiveRecent api={convexApi} userId={user.id} onData={setJournalEntries} />
+          ) : null}
           <View style={styles.content}>
             <Text style={[styles.subText, { color: theme.colors.textSecondary }]}>
               Express your thoughts and feelings

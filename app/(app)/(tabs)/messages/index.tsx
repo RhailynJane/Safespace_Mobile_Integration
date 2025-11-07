@@ -37,12 +37,14 @@ import { useRef } from "react";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ConvexReactClient } from "convex/react";
+import { useConvexMessages } from "../../../../utils/hooks/useConvexMessages";
 
 export default function MessagesScreen() {
     // Access isDarkMode and fontScale from useTheme
   const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
   const isFocused = useIsFocused();
-  const { userId } = useAuth(); // Get actual Clerk user ID
+  const { userId, getToken } = useAuth(); // Get actual Clerk user ID
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
@@ -57,6 +59,41 @@ export default function MessagesScreen() {
     message: '',
     confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
   });
+  
+  // Initialize Convex client with Clerk auth
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  
+  useEffect(() => {
+    if (!convexClient && process.env.EXPO_PUBLIC_CONVEX_URL) {
+      const client = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL, {
+        unsavedChangesWarning: false,
+      });
+
+      // Set up auth with Clerk JWT
+      const fetchToken = async () => {
+        if (getToken) {
+          const token = await getToken({ template: 'convex' });
+          return token ?? undefined;
+        }
+        return undefined;
+      };
+      
+      client.setAuth(fetchToken);
+      setConvexClient(client);
+    }
+  }, [convexClient, getToken]);
+
+  // Convex messages hook
+  const {
+    conversations: convexConversations,
+    loading: convexLoading,
+    error: convexError,
+    loadConversations: loadConvexConversations,
+    markAsRead: markConvexAsRead,
+    deleteConversation: deleteConvexConversation,
+    isUsingConvex,
+  } = useConvexMessages(userId || undefined, convexClient);
+  
   // Track conversations marked read in this session to keep unread count at 0
   // Key: conversationId, Value: true if marked read
   const recentlyReadRef = useRef<Record<string, boolean>>({});
@@ -165,9 +202,14 @@ export default function MessagesScreen() {
       console.log("💬 Current userId:", userId);
       console.log("💬 Current conversations count:", conversations.length);
       if (userId) {
-        loadConversations();
+        // Refresh Convex data if using Convex
+        if (isUsingConvex) {
+          loadConvexConversations();
+        } else {
+          loadConversations();
+        }
       }
-    }, [userId])
+    }, [userId, isUsingConvex])
   );
 
   // Filter conversations based on search query
@@ -218,6 +260,14 @@ export default function MessagesScreen() {
     try {
       setLoading(true);
       console.log(`💬 Loading conversations for user: ${userId}`);
+
+      // Use Convex data if available
+      if (isUsingConvex && convexConversations.length > 0) {
+        console.log('✅ Using Convex conversations data');
+        setConversations(convexConversations as any);
+        setLoading(false);
+        return;
+      }
 
       // Add timestamp to prevent caching
       const response = await fetch(
@@ -670,8 +720,13 @@ export default function MessagesScreen() {
                       showStatusModal('error', 'Authentication Required', 'Please sign in to view messages');
                       return;
                     }
-                    // Persistently clear unread via backend mark-read endpoint, and optimistically update UI
+                    // Mark as read (Convex-first, then REST fallback)
                     (async () => {
+                      try {
+                        if (isUsingConvex && typeof conversation.id !== 'number') {
+                          await markConvexAsRead(String(conversation.id));
+                        }
+                      } catch (_e) { /* ignore */ }
                       try {
                         await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}/mark-read`, {
                           method: 'POST',
@@ -712,8 +767,20 @@ export default function MessagesScreen() {
                       'This will remove the conversation from your inbox. Continue?',
                       async () => {
                         try {
-                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                          if (res.ok) {
+                          let deleted = false;
+                          // Try Convex-first
+                          if (isUsingConvex && typeof conversation.id !== 'number') {
+                            try {
+                              await deleteConvexConversation(String(conversation.id));
+                              deleted = true;
+                            } catch { /* fall through */ }
+                          }
+                          // REST fallback
+                          if (!deleted) {
+                            const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
+                            deleted = res.ok;
+                          }
+                          if (deleted) {
                             setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
                             setFilteredConversations((prev) => prev.filter((c) => c.id !== conversation.id));
                             showStatusModal('success', 'Deleted', 'Conversation removed');

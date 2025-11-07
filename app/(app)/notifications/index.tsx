@@ -22,6 +22,8 @@ import { getApiBaseUrl } from '../../../utils/apiBaseUrl';
 import StatusModal from "../../../components/StatusModal";
 import { APP_TIME_ZONE } from '../../../utils/timezone';
 import notificationEvents from '../../../utils/notificationEvents';
+import { useQuery } from 'convex/react';
+import { notificationsApi } from '../../../utils/notificationsApi';
 
 // Type definition for a Notification object.
 interface Notification {
@@ -51,9 +53,26 @@ export default function NotificationsScreen() {
     title: '',
     message: '',
   });
+  const [convexApi, setConvexApi] = useState<any | null>(null);
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  // Dynamic import Convex API
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import('../../../convex/_generated/api');
+        if (mounted) setConvexApi(mod.api);
+      } catch (err) {
+        console.log('Convex API not available for notifications');
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setModalConfig({ type, title, message });
@@ -68,37 +87,15 @@ export default function NotificationsScreen() {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const res = await fetch(`${baseURL}/api/notifications/${user.id}`);
-      if (!res.ok) {
-        console.log('Failed to load notifications:', res.status);
-        showStatusModal('error', 'Load Failed', 'Unable to load notifications. Please try again.');
-        return;
-      }
-      const json = await res.json();
-      const rows = (json.data || []) as Array<{id:number; type:string; title:string; message:string; is_read:boolean; created_at:string}>;
-      const mapped: Notification[] = rows.map(r => {
-        // Parse the UTC timestamp from DB and format it in the app's configured timezone
-        const utcDate = new Date(r.created_at);
-        const localTime = utcDate.toLocaleString('en-US', {
-          timeZone: APP_TIME_ZONE,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: true
-        });
-        console.log(`🔔 Bell: UTC=${r.created_at} → Local(${APP_TIME_ZONE})=${localTime}`);
-        return {
-          id: String(r.id),
-          title: r.title,
-          message: r.message,
-          time: localTime,
-          isRead: Boolean(r.is_read),
-          type: (r.type as Notification['type']) || 'system',
-        };
-      });
+      const { data } = await notificationsApi.getNotifications(user.id);
+      const mapped: Notification[] = data.map(r => ({
+        id: String(r.id),
+        title: r.title,
+        message: r.message,
+        time: r.time,
+        isRead: r.isRead || r.is_read || false,
+        type: (r.type as Notification['type']) || 'system',
+      }));
       setNotifications(mapped);
     } catch (e) {
       console.log('Error loading notifications:', e);
@@ -106,11 +103,14 @@ export default function NotificationsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, baseURL]);
+  }, [user?.id]);
 
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    // Only load via REST if Convex is not available
+    if (!convexApi) {
+      loadNotifications();
+    }
+  }, [loadNotifications, convexApi]);
 
   // Listen for notification events to auto-refresh the list
   useEffect(() => {
@@ -139,21 +139,27 @@ export default function NotificationsScreen() {
    * markAsRead
    * Marks a single notification as read by matching its ID.
    * Useful for when user taps on an unread notification.
+   * Uses optimistic UI for instant feedback.
    */
   const markAsRead = async (id: string) => {
+    // Optimistic update - immediately mark as read in UI
+    const previousNotifications = [...notifications];
+    setNotifications(
+      notifications.map((notification) =>
+        notification.id === id
+          ? { ...notification, isRead: true }
+          : notification
+      )
+    );
+
     try {
-      await fetch(`${baseURL}/api/notifications/${id}/read`, { method: 'POST' });
-      setNotifications(
-        notifications.map((notification) =>
-          notification.id === id
-            ? { ...notification, isRead: true }
-            : notification
-        )
-      );
+      await notificationsApi.markAsRead(id);
       // Show success feedback for the action
       showStatusModal('success', 'Notification Read', 'Notification marked as read.');
     } catch (e) {
       console.log('Failed to mark notification as read:', e);
+      // Rollback on error
+      setNotifications(previousNotifications);
       showStatusModal('error', 'Update Failed', 'Unable to mark notification as read. Please try again.');
     }
   };
@@ -162,15 +168,22 @@ export default function NotificationsScreen() {
    * clearAllNotifications
    * Deletes all notifications from the list.
    * Triggered when user presses the "Clear all" button.
+   * Uses optimistic UI for instant feedback.
    */
   const clearAllNotifications = async () => {
     if (!user?.id) return;
+    
+    // Optimistic update - immediately clear all notifications
+    const previousNotifications = [...notifications];
+    setNotifications([]);
+
     try {
-      await fetch(`${baseURL}/api/notifications/${user.id}/clear-all`, { method: 'DELETE' });
-      setNotifications([]);
+      await notificationsApi.clearAllNotifications(user.id);
       showStatusModal('success', 'Notifications Cleared', 'All notifications have been deleted.');
     } catch (e) {
       console.log('Failed to clear notifications:', e);
+      // Rollback on error
+      setNotifications(previousNotifications);
       showStatusModal('error', 'Delete Failed', 'Unable to clear notifications. Please try again.');
     }
   };
@@ -179,20 +192,27 @@ export default function NotificationsScreen() {
    * markAllAsRead
    * Marks all notifications in the list as read.
    * Triggered when user presses the "Mark all as read" button.
+   * Uses optimistic UI for instant feedback.
    */
   const markAllAsRead = async () => {
     if (!user?.id) return;
+    
+    // Optimistic update - immediately mark all as read in UI
+    const previousNotifications = [...notifications];
+    setNotifications(
+      notifications.map((notification) => ({
+        ...notification,
+        isRead: true,
+      }))
+    );
+
     try {
-      await fetch(`${baseURL}/api/notifications/${user.id}/read-all`, { method: 'POST' });
-      setNotifications(
-        notifications.map((notification) => ({
-          ...notification,
-          isRead: true,
-        }))
-      );
+      await notificationsApi.markAllAsRead(user.id);
       showStatusModal('success', 'All Notifications Read', 'All notifications have been marked as read.');
     } catch (e) {
       console.log('Failed to mark all as read:', e);
+      // Rollback on error
+      setNotifications(previousNotifications);
       showStatusModal('error', 'Update Failed', 'Unable to mark all notifications as read. Please try again.');
     }
   };
@@ -252,11 +272,31 @@ export default function NotificationsScreen() {
     }
   };
 
+  // Live notifications component using Convex subscriptions
+  const LiveNotifications = () => {
+    const liveNotifications = useQuery(
+      convexApi?.notifications?.getNotifications,
+      convexApi && user?.id ? { userId: user.id, limit: 200 } : 'skip'
+    ) as { notifications: Notification[] } | undefined;
+
+    useEffect(() => {
+      if (liveNotifications?.notifications) {
+        setNotifications(liveNotifications.notifications);
+        setLoading(false);
+      }
+    }, [liveNotifications]);
+
+    return null;
+  };
+
   // Calculate the number of unread notifications
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <CurvedBackground>
+      {/* Live notifications subscription (only renders when Convex available) */}
+      {convexApi && user?.id && <LiveNotifications />}
+      
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Notifications" showBack={true} />
 

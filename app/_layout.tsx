@@ -1,7 +1,12 @@
 import { Stack, useRouter, useSegments } from "expo-router";
+// Polyfills required for some browser APIs in React Native
+import "react-native-get-random-values";
+import "react-native-url-polyfill/auto";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo";
 import { tokenCache } from "../utils/cache";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { ConvexReactClient, useConvex } from "convex/react";
 import { useEffect, useState } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox } from "react-native";
@@ -10,6 +15,17 @@ import { ThemeProvider } from "../contexts/ThemeContext";
 import activityApi from "../utils/activityApi";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+
+function isAbsoluteHttpUrl(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
 
 if (!publishableKey) {
   throw new Error(
@@ -21,6 +37,7 @@ if (!publishableKey) {
 function UserSyncHandler() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+  // Note: Don't call useConvex here unless Convex provider is definitely present.
 
   useEffect(() => {
     async function handleUserSync() {
@@ -29,12 +46,26 @@ function UserSyncHandler() {
           const token = await getToken();
           if (token) {
             console.log('🔄 Starting user sync...');
-            // Sync in background - don't block UI
+            // Sync with Postgres/Prisma in background - don't block UI
             syncUserWithDatabase(user, token).then(() => {
               console.log("✅ User synced successfully");
             }).catch((error) => {
               console.error("❌ Failed to sync user (non-blocking):", error);
             });
+
+            // Also sync to Convex (if configured & generated code exists)
+            try {
+              const convexEnabled = !!process.env.EXPO_PUBLIC_CONVEX_URL;
+              if (convexEnabled) {
+                // Dynamic import avoids compile-time issues before `convex dev`
+                const { api } = await import("../convex/_generated/api");
+                // We can't access useConvex() here safely, so schedule a custom event for ConvexHeartbeat to consume if needed.
+                // Instead, trigger a one-off sync using a lightweight fetch to Convex action once added.
+                // For now, we do nothing here; ConvexUserSync below will handle syncing reliably.
+              }
+            } catch (e) {
+              // Silently ignore if Convex not initialized
+            }
           } else {
             console.warn("⚠️ Token is null, skipping user sync.");
           }
@@ -146,17 +177,113 @@ export default function RootLayout() {
     ]);
   }, []);
 
+  // Lazily create Convex client only when URL is a valid absolute http(s) URL
+  let convexClient: ConvexReactClient | null = null;
+  if (isAbsoluteHttpUrl(convexUrl)) {
+    try {
+      convexClient = new ConvexReactClient(convexUrl as string);
+    } catch (e) {
+      console.warn('Convex client not initialized. Invalid EXPO_PUBLIC_CONVEX_URL:', convexUrl, e);
+      convexClient = null;
+    }
+  } else if (convexUrl) {
+    console.warn('EXPO_PUBLIC_CONVEX_URL must be an absolute http(s) URL. Got:', convexUrl);
+  }
+
+  function ConvexHeartbeat() {
+    const convex = useConvex();
+    const { isLoaded, isSignedIn } = useAuth();
+    const { user } = useUser();
+
+    useEffect(() => {
+      if (!isLoaded || !isSignedIn || !user?.id) return;
+
+      const send = async () => {
+        try {
+          // @ts-ignore generated at runtime by `npx convex dev`
+          const { api } = await import("../convex/_generated/api");
+          await convex.mutation(api.presence.heartbeat, { status: "online" });
+        } catch (e: any) {
+          // Convex not initialized yet or generated files missing — skip silently
+          console.log("Convex heartbeat skipped:", e?.message ?? e);
+        }
+      };
+
+      // initial
+      send();
+      // every 5 minutes
+      const id = setInterval(send, 5 * 60 * 1000);
+      return () => clearInterval(id);
+    }, [
+      isLoaded,
+      isSignedIn,
+      user?.id,
+      convex,
+    ]);
+
+    return null;
+  }
+
+  function ConvexUserSync() {
+    const convex = useConvex();
+    const { isLoaded, isSignedIn } = useAuth();
+    const { user } = useUser();
+
+    useEffect(() => {
+      if (!isLoaded || !isSignedIn || !user?.id) return;
+
+      const run = async () => {
+        try {
+          // @ts-ignore generated at runtime by `npx convex dev`
+          const { api } = await import("../convex/_generated/api");
+          await convex.mutation(api.auth.syncUser, {
+            email: user.primaryEmailAddress?.emailAddress ?? undefined,
+            firstName: user.firstName ?? undefined,
+            lastName: user.lastName ?? undefined,
+            imageUrl: user.imageUrl ?? undefined,
+          });
+        } catch (e: any) {
+          console.log("Convex user sync skipped:", e?.message ?? e);
+        }
+      };
+      run();
+    }, [
+      isLoaded,
+      isSignedIn,
+      user?.id,
+      user?.firstName,
+      user?.lastName,
+      user?.imageUrl,
+      user?.primaryEmailAddress?.emailAddress,
+      convex,
+    ]);
+
+    return null;
+  }
+
+  const AppTree = (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <UserSyncHandler />
+        <RootLayoutNav />
+      </ThemeProvider>
+    </SafeAreaProvider>
+  );
+
   return (
     <ClerkProvider 
       publishableKey={publishableKey} 
       tokenCache={tokenCache}
     >
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <UserSyncHandler />
-          <RootLayoutNav />
-        </ThemeProvider>
-      </SafeAreaProvider>
+      {convexClient ? (
+        <ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
+          <ConvexUserSync />
+          <ConvexHeartbeat />
+          {AppTree}
+        </ConvexProviderWithClerk>
+      ) : (
+        AppTree
+      )}
     </ClerkProvider>
   );
 }
