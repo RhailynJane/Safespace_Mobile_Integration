@@ -709,38 +709,13 @@ export default function EditProfileScreen() {
     try {
       setSaving(true);
 
-      // Comprehensive validation for all required fields
-      const missingFields: string[] = [];
+  // Relaxed validation: require only core identity fields
+  const missingFields: string[] = [];
 
-      // Personal Information
-      if (!formData.firstName?.trim()) missingFields.push("First Name");
-      if (!formData.lastName?.trim()) missingFields.push("Last Name");
-      if (!formData.email?.trim()) missingFields.push("Email Address");
-      if (!formData.phoneNumber?.trim()) missingFields.push("Phone Number");
-      if (!formData.dateOfBirth?.trim()) missingFields.push("Date of Birth");
-
-      // Demographics
-      if (!formData.gender?.trim()) missingFields.push("Gender");
-      if (!formData.pronouns?.trim()) missingFields.push("Pronouns");
-      if (!formData.isLGBTQ?.trim()) missingFields.push("LGBTQ+ Identification");
-      if (!formData.primaryLanguage?.trim()) missingFields.push("Primary Language");
-
-      // CMHA Demographics
-      if (!formData.ethnoculturalBackground?.trim()) missingFields.push("Ethnocultural Background");
-      if (!formData.mentalHealthConcerns?.trim()) missingFields.push("Mental Health/Medical Concerns");
-      if (!formData.supportNeeded?.trim()) missingFields.push("Support Needed");
-      if (!formData.canadaStatus?.trim()) missingFields.push("Status in Canada");
-      if (!formData.dateCameToCanada?.trim()) missingFields.push("Date Came to Canada");
-
-      // Address
-      if (!formData.streetAddress?.trim()) missingFields.push("Street Address");
-      if (!formData.location?.trim()) missingFields.push("City");
-      if (!formData.postalCode?.trim()) missingFields.push("Postal Code");
-
-      // Emergency Contact
-      if (!formData.emergencyContactName?.trim()) missingFields.push("Emergency Contact Name");
-      if (!formData.emergencyContactNumber?.trim()) missingFields.push("Emergency Contact Phone");
-      if (!formData.emergencyContactRelationship?.trim()) missingFields.push("Emergency Contact Relationship");
+  // Personal Information (core)
+  if (!formData.firstName?.trim()) missingFields.push("First Name");
+  if (!formData.lastName?.trim()) missingFields.push("Last Name");
+  if (!formData.email?.trim()) missingFields.push("Email Address");
 
       if (missingFields.length > 0) {
         const fieldsList = missingFields.join("\n• ");
@@ -759,23 +734,27 @@ export default function EditProfileScreen() {
         return;
       }
 
-      // Phone number validation (basic)
-      const phoneRegex = /^\d{10}$/;
-      const cleanedPhone = formData.phoneNumber.replace(/\D/g, '');
-      if (!phoneRegex.test(cleanedPhone)) {
-        setErrorTitle("Invalid Phone Number");
-        setErrorMessage("Please enter a valid 10-digit phone number");
-        setShowErrorModal(true);
-        return;
+      // Phone number validation (basic) — only if provided
+      if (formData.phoneNumber?.trim()) {
+        const phoneRegex = /^\d{10}$/;
+        const cleanedPhone = formData.phoneNumber.replace(/\D/g, '');
+        if (!phoneRegex.test(cleanedPhone)) {
+          setErrorTitle("Invalid Phone Number");
+          setErrorMessage("Please enter a valid 10-digit phone number");
+          setShowErrorModal(true);
+          return;
+        }
       }
 
-      // Postal code validation (Canadian format)
-      const postalRegex = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i;
-      if (!postalRegex.test(formData.postalCode.trim())) {
-        setErrorTitle("Invalid Postal Code");
-        setErrorMessage("Please enter a valid Canadian postal code (e.g., A1A 1A1)");
-        setShowErrorModal(true);
-        return;
+      // Postal code validation (Canadian format) — only if provided
+      if (formData.postalCode?.trim()) {
+        const postalRegex = /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i;
+        if (!postalRegex.test(formData.postalCode.trim())) {
+          setErrorTitle("Invalid Postal Code");
+          setErrorMessage("Please enter a valid Canadian postal code (e.g., A1A 1A1)");
+          setShowErrorModal(true);
+          return;
+        }
       }
 
       // Prepare data and persist via Convex

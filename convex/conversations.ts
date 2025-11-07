@@ -1,6 +1,16 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+/**
+ * Utility: produce a deterministic participant key for a set of userIds.
+ * Sorted unique ids joined by '|'. This lets us quickly compare participant sets
+ * and prevents duplicate 1:1 or group conversations.
+ */
+function participantKey(ids: string[]) {
+  const sorted = Array.from(new Set(ids.map(id => id.trim()).filter(Boolean))).sort();
+  return sorted.join("|");
+}
+
 export const listForUser = query({
   args: {},
   handler: async (ctx: any) => {
@@ -29,17 +39,51 @@ export const create = mutation({
     const creator = identity.subject as string;
     const now = Date.now();
 
+    // Normalized, unique full participant set (include creator)
+    const fullSet = Array.from(new Set([creator, ...args.participantIds]));
+    const key = participantKey(fullSet);
+
+    // Attempt dedupe: find existing conversations that include ALL these participants and ONLY these participants.
+    // Strategy: For each participant, gather their conversationIds; intersect sets; verify exact membership match.
+    const candidateIdCounts: Record<string, number> = {};
+    for (const userId of fullSet) {
+      const memberships = await ctx.db
+        .query("conversationParticipants")
+        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .collect();
+      for (const m of memberships) {
+        candidateIdCounts[m.conversationId] = (candidateIdCounts[m.conversationId] || 0) + 1;
+      }
+    }
+
+    const possibleIds = Object.entries(candidateIdCounts)
+      .filter(([, count]) => count === fullSet.length) // appears in all participant membership lists
+      .map(([cid]) => cid);
+
+    for (const cid of possibleIds) {
+      const participants = await ctx.db
+        .query("conversationParticipants")
+        .withIndex("by_conversation", (q: any) => q.eq("conversationId", cid))
+        .collect();
+      const participantIds = participants.map((p: any) => p.userId);
+      const existingKey = participantKey(participantIds);
+      if (existingKey === key && participantIds.length === fullSet.length) {
+        // Exact match; reuse existing conversation
+        return { conversationId: cid, deduped: true } as const;
+      }
+    }
+
+    // No existing exact conversation; create new one.
     const conversationId = await ctx.db.insert("conversations", {
       title: args.title,
       createdBy: creator,
       createdAt: now,
       updatedAt: now,
+      participantKey: key,
     });
 
-    // Add participants including creator
-    const all = Array.from(new Set([creator, ...args.participantIds]));
     await Promise.all(
-      all.map((userId) =>
+      fullSet.map((userId) =>
         ctx.db.insert("conversationParticipants", {
           conversationId,
           userId,
@@ -50,7 +94,7 @@ export const create = mutation({
       )
     );
 
-    return { conversationId } as const;
+    return { conversationId, deduped: false } as const;
   },
 });
 

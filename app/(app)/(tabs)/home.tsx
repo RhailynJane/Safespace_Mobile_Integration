@@ -569,7 +569,8 @@ export default function HomeScreen() {
                         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                           Mood Trends (7 days)
                         </Text>
-                        <TouchableOpacity onPress={() => router.push("/mood-history")}>
+                        {/* Navigate explicitly to grouped mood history route to avoid reloading home */}
+                        <TouchableOpacity onPress={() => router.push("/(app)/mood-tracking/mood-history")}>
                           <Text style={styles.viewAllText}>View All</Text>
                         </TouchableOpacity>
                       </View>
@@ -726,7 +727,8 @@ export default function HomeScreen() {
             {/* Recent Mood History Section */}
             <View style={styles.section}>
               <TouchableOpacity
-                onPress={() => router.push("/mood-history")}
+                // Fix navigation: ensure we target grouped segment path
+                onPress={() => router.push("/(app)/mood-tracking/mood-history")}
                 style={styles.sectionTitleContainer}
               >
                 <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Moods</Text>

@@ -85,7 +85,8 @@ export default function AppLayout() {
         await loadSettings(userId);
         
         // Load settings from Convex to schedule reminders
-        const convexSettings = await convexClient.query(api.settings.getUserSettings, { userId });
+  // Updated to new consolidated Convex settings API (getSettings)
+  const convexSettings = await convexClient.query(api.settings.getSettings, { clerkId: userId });
         if (convexSettings) {
           // Map to UserSettings format for scheduler
           const mappedSettings = {

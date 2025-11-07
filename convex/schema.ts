@@ -24,9 +24,11 @@ export default defineSchema({
 		createdBy: v.string(), // clerk user id
 		createdAt: v.number(),
 		updatedAt: v.number(),
+		participantKey: v.optional(v.string()), // sorted unique participants key for dedupe
 	})
 		.index("by_createdBy", ["createdBy"]) 
-		.index("by_createdAt", ["createdAt"]),
+		.index("by_createdAt", ["createdAt"]) 
+		.index("by_participantKey", ["participantKey"]),
 	conversationParticipants: defineTable({
 		conversationId: v.id("conversations"),
 		userId: v.string(),
@@ -385,4 +387,19 @@ export default defineSchema({
 		updatedAt: v.number(),
 	})
 		.index("by_user", ["userId"]),
+
+	// Dedicated Support Workers (initial hardcoded seed + future expansion)
+	supportWorkers: defineTable({
+		name: v.string(),
+		title: v.optional(v.string()),
+		avatarUrl: v.optional(v.string()),
+		specialization: v.optional(v.string()), // comma-separated specialties string
+		specialties: v.optional(v.array(v.string())), // normalized list
+		bio: v.optional(v.string()),
+		yearsOfExperience: v.optional(v.number()),
+		hourlyRate: v.optional(v.number()),
+		languagesSpoken: v.optional(v.array(v.string())),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	}).index("by_name", ["name"]),
 });

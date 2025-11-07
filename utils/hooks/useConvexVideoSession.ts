@@ -39,8 +39,14 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
           setSessionId(result.sessionId);
           console.log('✅ Video session started in Convex:', result.sessionId);
           return result.sessionId;
-        } catch (convexError) {
-          console.warn('Convex session start failed, continuing without tracking:', convexError);
+        } catch (convexError: any) {
+          // Session tracking is optional - gracefully handle auth errors
+          const errorMsg = convexError?.message || convexError?.toString() || 'Unknown error';
+          if (errorMsg.includes('Unauthenticated')) {
+            console.warn('⚠️ Convex session tracking unavailable (auth required). Call will proceed without tracking.');
+          } else {
+            console.warn('Convex session start failed, continuing without tracking:', convexError);
+          }
         }
       }
 

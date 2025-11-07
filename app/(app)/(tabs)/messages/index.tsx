@@ -23,6 +23,7 @@ import { router } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
 import { useConvex } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { getAvatarSource } from "../../../../utils/avatar";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
@@ -189,25 +190,26 @@ export default function MessagesScreen() {
     try {
       setLoading(true);
       console.log(`💬 Loading conversations for user: ${userId}`);
-      const convs = await convex.query(api.conversations.listForUser, {} as any);
-      // Map Convex shape to Conversation UI expectations
+      // Use enriched query (includes participants metadata + lastMessage + unreadCount)
+      const convs = await convex.query(api.conversations.listForUserEnriched, {} as any);
       const mapped: Conversation[] = (convs as any[]).map((c: any) => ({
         id: c._id,
         channel_url: '',
         title: c.title || '',
-        last_message: c.lastMessage || '',
+        last_message: c.lastMessage?.body || '',
         unread_count: c.unreadCount || 0,
-        updated_at: new Date(c.updatedAt).toISOString(),
-        conversation_type: c.type || 'direct',
+        updated_at: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date().toISOString(),
+        conversation_type: 'direct',
         participants: (c.participants || []).map((p: any) => ({
-          clerk_user_id: p.clerkUserId,
+          clerk_user_id: p.userId,
           first_name: p.firstName || '',
           last_name: p.lastName || '',
-          email: p.email || '',
-          profile_image_url: p.avatarUrl || '',
-          online: !!p.online,
-          presence: p.presence || (p.online ? 'online' : 'offline'),
-          last_active_at: p.lastActiveAt || '',
+          email: '',
+          profile_image_url: p.imageUrl || '',
+          online: false,
+          presence: 'offline',
+          last_active_at: '',
+          id: p.userId,
         })),
       }));
       setConversations(mapped);
@@ -239,24 +241,25 @@ export default function MessagesScreen() {
     if (!isFocused || !userId) return;
     const poll = async () => {
       try {
-        const convs = await convex.query(api.conversations.listForUser, {} as any);
+        const convs = await convex.query(api.conversations.listForUserEnriched, {} as any);
         const mapped: Conversation[] = (convs as any[]).map((c: any) => ({
           id: c._id,
           channel_url: '',
           title: c.title || '',
-          last_message: c.lastMessage || '',
+          last_message: c.lastMessage?.body || '',
           unread_count: c.unreadCount || 0,
-          updated_at: new Date(c.updatedAt).toISOString(),
-          conversation_type: c.type || 'direct',
+          updated_at: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date().toISOString(),
+          conversation_type: 'direct',
           participants: (c.participants || []).map((p: any) => ({
-            clerk_user_id: p.clerkUserId,
+            clerk_user_id: p.userId,
             first_name: p.firstName || '',
             last_name: p.lastName || '',
-            email: p.email || '',
-            profile_image_url: p.avatarUrl || '',
-            online: !!p.online,
-            presence: p.presence || (p.online ? 'online' : 'offline'),
-            last_active_at: p.lastActiveAt || '',
+            email: '',
+            profile_image_url: p.imageUrl || '',
+            online: false,
+            presence: 'offline',
+            last_active_at: '',
+            id: p.userId,
           })),
         }));
         setConversations(mapped);
@@ -273,7 +276,6 @@ export default function MessagesScreen() {
           });
         });
       } catch (e) {
-        // Silent poll failure
         console.log('Convex poll failed', e);
       }
     };
@@ -307,17 +309,17 @@ export default function MessagesScreen() {
 
   const getAvatarDisplay = (participants: Participant[]) => {
     const others = participants.filter(p => p.clerk_user_id !== userId);
-    const display = others.length > 0 ? others[0] : participants[0];
-    if (display?.profile_image_url) {
-      const raw = display.profile_image_url;
-      let normalized = raw;
-      if (raw.startsWith('http')) normalized = raw;
-      else if (raw.startsWith('/')) normalized = `${API_BASE_URL}${raw}`;
-      else if (raw.startsWith('data:image')) normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(display.clerk_user_id || '')}/profile-image`;
-      return { type: 'image' as const, value: normalized };
-    }
-    const initials = getUserInitials(display?.first_name, display?.last_name);
-    return { type: 'text' as const, value: initials };
+    const display = others[0] || participants[0];
+    const avatar = getAvatarSource({
+      profileImageUrl: display?.profile_image_url,
+      imageUrl: display?.profile_image_url,
+      firstName: display?.first_name,
+      lastName: display?.last_name,
+      email: display?.email,
+      clerkId: display?.clerk_user_id,
+      apiBaseUrl: API_BASE_URL,
+    });
+    return avatar;
   };
 
   const onRefresh = async () => {
@@ -613,18 +615,13 @@ export default function MessagesScreen() {
                       'This will remove the conversation from your inbox. Continue?',
                       async () => {
                         try {
-                          let deleted = false;
                           try {
-                            await convex.mutation(api.conversations.sendMessage, { conversationId: conversation.id as any, content: '', deleteOnly: true } as any);
-                            deleted = true;
-                          } catch (err) {
-                            console.log('Delete via sendMessage flag failed', err);
-                          }
-                          if (deleted) {
+                            await convex.mutation(api.conversations.deleteConversation, { conversationId: conversation.id as any });
                             setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
                             setFilteredConversations((prev) => prev.filter((c) => c.id !== conversation.id));
                             showStatusModal('success', 'Deleted', 'Conversation removed');
-                          } else {
+                          } catch (err) {
+                            console.log('Delete conversation failed', err);
                             showStatusModal('error', 'Delete failed', 'Unable to delete this conversation');
                           }
                         } catch (_e) {

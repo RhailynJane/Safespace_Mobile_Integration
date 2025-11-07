@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-// import Slider from "@react-native-community/slider";
+import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
@@ -259,7 +259,7 @@ export default function MoodLoggingScreen() {
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Intensity (1-5)</Text>
             <View style={styles.sliderContainer}>
               <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>1</Text>
-              {/* <Slider
+              <Slider
                 style={styles.slider}
                 minimumValue={1}
                 maximumValue={5}
@@ -269,7 +269,7 @@ export default function MoodLoggingScreen() {
                 minimumTrackTintColor={theme.colors.primary}
                 maximumTrackTintColor={theme.isDark ? "#444" : "#E0E0E0"}
                 thumbTintColor={theme.colors.primary}
-              /> */}
+              />
               <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>5</Text>
             </View>
             <Text style={[styles.intensityValue, { color: theme.colors.primary }]}>

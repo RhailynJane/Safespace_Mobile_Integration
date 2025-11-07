@@ -71,8 +71,13 @@ export const fetchAllHelpData = async (): Promise<HelpSection[]> => {
       const api = await getConvexApi();
       const client = createConvexClientNoAuth();
       if (api && client && api.help?.allSections) {
-        const convexData = await safeQuery(client, api.help.allSections, {});
-        if (Array.isArray(convexData) && convexData.length >= 0) {
+        let convexData = await safeQuery(client, api.help.allSections, {});
+        // If Convex responds but returns an empty array, attempt automatic seed then re-query
+        if (Array.isArray(convexData) && convexData.length === 0 && api.help?.seedDefault) {
+          await safeMutation(client, api.help.seedDefault, {});
+          convexData = await safeQuery(client, api.help.allSections, {});
+        }
+        if (Array.isArray(convexData) && convexData.length > 0) {
           return convexData as HelpSection[];
         }
       }
@@ -88,6 +93,10 @@ export const fetchAllHelpData = async (): Promise<HelpSection[]> => {
       throw new Error(`Failed to fetch help data: ${response.status}`);
     }
     const data = await response.json();
+    // If REST returns empty array, fall back to rich local defaults
+    if (Array.isArray(data) && data.length === 0) {
+      return getFallbackHelpSectionsWithItems();
+    }
     return data;
   } catch (error) {
     console.error('Error fetching all help data:', error);
@@ -838,7 +847,7 @@ A: All your personal data is permanently deleted within 30 days.`,
   return fallbackData[sectionId] || [];
 };
 
-const getFallbackHelpSectionsWithItems = (): HelpSection[] => {
+export const getFallbackHelpSectionsWithItems = (): HelpSection[] => {
   const sections = getFallbackHelpSections();
   return sections.map(section => ({
     ...section,

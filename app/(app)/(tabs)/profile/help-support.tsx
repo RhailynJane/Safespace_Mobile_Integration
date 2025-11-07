@@ -26,6 +26,7 @@ import {
   trackHelpSectionView,
   HelpSection,
   HelpItem,
+  getFallbackHelpSectionsWithItems,
 } from "../../../../utils/helpService";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
@@ -43,7 +44,6 @@ const HelpSupportScreen: React.FC = () => {
     title: '',
     message: '',
   });
-
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
@@ -64,10 +64,17 @@ const HelpSupportScreen: React.FC = () => {
     try {
       setLoading(true);
       const data = await fetchAllHelpData();
-      setHelpSections(data);
+      if (Array.isArray(data) && data.length > 0) {
+        setHelpSections(data);
+      } else {
+        // Local rich fallback when service returns empty
+        setHelpSections(getFallbackHelpSectionsWithItems());
+      }
     } catch (error) {
       console.error("Failed to load help data:", error);
-      showModal('error', 'Load Failed', 'Unable to load help content. Please try again.');
+      // Strong local fallback ensures screen is never empty
+      setHelpSections(getFallbackHelpSectionsWithItems());
+      showModal('error', 'Load Failed', 'Showing offline help content. Some items may be limited.');
     } finally {
       setLoading(false);
     }

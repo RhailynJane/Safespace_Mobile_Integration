@@ -76,7 +76,8 @@ export function useConvexSettings(convexClient: ConvexReactClient | null) {
       setLoading(true);
       setIsUsingConvex(true);
 
-      const convexSettings = await convexClient.query(api.settings.getUserSettings, { userId });
+  // Use consolidated getSettings (clerkId)
+  const convexSettings = await convexClient.query(api.settings.getSettings, { clerkId: userId });
 
       if (convexSettings) {
         // Map Convex settings to UserSettings format
@@ -155,9 +156,10 @@ export function useConvexSettings(convexClient: ConvexReactClient | null) {
       setLoading(true);
       setIsUsingConvex(true);
 
-      await convexClient.mutation(api.settings.saveSettings, {
-        userId,
-        ...newSettings,
+      // Use upsertSettings mutation with settings object
+      await convexClient.mutation(api.settings.upsertSettings, {
+        clerkId: userId,
+        settings: newSettings,
       });
 
       // Persist local reminder times
@@ -188,9 +190,12 @@ export function useConvexSettings(convexClient: ConvexReactClient | null) {
     try {
       setLoading(true);
 
-      await convexClient.mutation(api.settings.updateSettings, {
-        userId,
-        updates,
+      // Fallback approach: fetch existing then patch via upsert (partial)
+      const existing = await convexClient.query(api.settings.getSettings, { clerkId: userId });
+      const merged = { ...(existing || {}), ...updates } as any;
+      await convexClient.mutation(api.settings.upsertSettings, {
+        clerkId: userId,
+        settings: merged,
       });
 
       setSettings(prev => ({ ...prev, ...updates }));
@@ -213,9 +218,13 @@ export function useConvexSettings(convexClient: ConvexReactClient | null) {
     try {
       setLoading(true);
 
-      await convexClient.mutation(api.settings.resetSettings, { userId });
+      // Reset by overwriting with defaults via upsert
+      await convexClient.mutation(api.settings.upsertSettings, {
+        clerkId: userId,
+        settings: DEFAULT_SETTINGS,
+      });
       setSettings(DEFAULT_SETTINGS);
-      console.log('⚙️ Settings reset to defaults');
+      console.log('⚙️ Settings reset to defaults (upsert)');
     } catch (err) {
       console.error('❌ Error resetting settings:', err);
       setError(err instanceof Error ? err.message : 'Failed to reset settings');

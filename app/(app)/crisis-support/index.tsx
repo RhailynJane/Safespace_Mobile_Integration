@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useMemo, useEffect } from "react";
 import { Linking } from "react-native";
 import {
@@ -84,12 +85,41 @@ export default function CrisisScreen() {
   };
 
   // Live crisis resources from Convex
+  // Convex live resources
   const liveResources = useQuery(api.crisis.listResources, { country: 'CA', activeOnly: true });
+
+  // Guaranteed fallback emergency resources (Canada + generic + US 988)
+  const fallbackResources: CrisisResource[] = [
+    {
+      id: '911', slug: 'emergency-services', title: 'Emergency Services (911)', subtitle: 'Life-threatening emergencies',
+      type: 'phone', value: '911', icon: 'call', color: '#D32F2F', region: 'national', country: 'CA', priority: 'critical', sort_order: 1, active: true
+    },
+    {
+      id: '112', slug: 'international-emergency', title: 'International Emergency (112)', subtitle: 'Alternate universal number',
+      type: 'phone', value: '112', icon: 'call', color: '#C62828', region: 'global', country: 'INT', priority: 'high', sort_order: 2, active: true
+    },
+    {
+      id: '988', slug: 'suicide-crisis-hotline', title: 'Suicide & Crisis Hotline (988)', subtitle: 'Mental health emergencies',
+      type: 'phone', value: '988', icon: 'call', color: '#1976D2', region: 'national', country: 'US', priority: 'critical', sort_order: 3, active: true
+    },
+    {
+      id: 'kids-help', slug: 'kids-help-phone', title: 'Kids Help Phone (1-800-668-6868)', subtitle: 'Youth support 24/7',
+      type: 'phone', value: '1-800-668-6868', icon: 'call', color: '#388E3C', region: 'national', country: 'CA', priority: 'high', sort_order: 4, active: true
+    },
+    {
+      id: 'distress-centre', slug: 'distress-centre', title: 'Distress Centre Website', subtitle: 'Find local crisis lines',
+      type: 'website', value: 'https://www.distresscentre.com/', icon: 'globe', color: '#1565C0', region: 'national', country: 'CA', priority: 'medium', sort_order: 5, active: true
+    },
+  ];
+
+  // Merge: live resources if present else fallback
   useEffect(() => {
-    if (Array.isArray(liveResources)) {
+    if (Array.isArray(liveResources) && liveResources.length > 0) {
       setResources(liveResources as CrisisResource[]);
-      setInitialLoading(false);
+    } else {
+      setResources(fallbackResources);
     }
+    setInitialLoading(false);
   }, [liveResources]);
 
   /**
@@ -120,9 +150,10 @@ export default function CrisisScreen() {
       if (supported) {
         await Linking.openURL(phoneNumber);
         showModal('success', 'Call Initiated', `Opening ${serviceName}. If the call doesn't start automatically, please dial ${number} manually.`);
-        // best-effort tracking
-        // Track action best-effort (mutation defined outside handler)
-        try { await trackAction({ resourceId: resource?.id as any, action: 'call' }); } catch (e) { /* ignore */ }
+        // Track action only if resource has a valid Convex ID (starts with Convex table prefix)
+        if (resource?.id && typeof resource.id === 'string' && resource.id.includes('|')) {
+          try { await trackAction({ resourceId: resource.id as any, action: 'call' }); } catch (e) { /* ignore */ }
+        }
       } else {
         showModal('error', 'Call Not Supported', `Your device doesn't support phone calls. Please dial ${number} manually.`);
       }
@@ -145,7 +176,10 @@ export default function CrisisScreen() {
       if (supported) {
         await Linking.openURL(url);
         showModal('success', 'Website Opened', 'Opening Distress Centre website in your browser...');
-        try { await trackAction({ resourceId: resource?.id as any, action: 'visit' }); } catch (e) { /* ignore */ }
+        // Track only if resource has valid Convex ID
+        if (resource?.id && typeof resource.id === 'string' && resource.id.includes('|')) {
+          try { await trackAction({ resourceId: resource.id as any, action: 'visit' }); } catch (e) { /* ignore */ }
+        }
       } else {
         showModal('error', 'Browser Not Available', 'Cannot open website. Please check your browser app.');
       }
@@ -207,7 +241,8 @@ export default function CrisisScreen() {
 
           {/* Emergency Action Buttons */}
           <View style={styles.emergencyButtons}>
-            {resources.filter(r => r.type === 'phone' && r.active !== false).slice(0,3).map((r, idx) => (
+            {/* Phone hotlines (limit visually to top 4 to avoid overwhelming UI) */}
+            {resources.filter(r => r.type === 'phone' && r.active !== false).slice(0,4).map((r, idx) => (
               <TouchableOpacity
                 key={r.slug}
                 style={[styles.emergencyButton, { backgroundColor: r.color || (idx === 0 ? (theme.isDark ? '#C62828' : '#E53935') : idx === 1 ? (theme.isDark ? '#388E3C' : '#4CAF50') : (theme.isDark ? '#1976D2' : '#2196F3')) }]}
@@ -224,6 +259,7 @@ export default function CrisisScreen() {
               </TouchableOpacity>
             ))}
 
+            {/* Crisis website (first available) */}
             {resources.find(r => r.type === 'website' && r.active !== false) && (() => {
               const w = resources.find(r => r.type === 'website' && r.active !== false)!;
               return (

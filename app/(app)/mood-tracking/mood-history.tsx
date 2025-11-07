@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
@@ -138,12 +139,25 @@ export default function MoodHistoryScreen() {
     }) as { moods: any[] } | undefined;
 
     useEffect(() => {
-      if (res && Array.isArray(res.moods)) {
-        setMoodHistory(res.moods as unknown as MoodEntry[]);
-        setHasMore(res.moods.length === LIMIT);
+      if (res !== undefined) {
+        if (Array.isArray(res.moods)) {
+          // Append when paginating, replace on fresh load
+          setMoodHistory((prev) => {
+            const incoming = res.moods as unknown as MoodEntry[];
+            if (offset === 0) return incoming;
+            const existingIds = new Set(prev.map((m) => m.id));
+            const merged = [...prev, ...incoming.filter((m) => !existingIds.has(m.id))];
+            return merged;
+          });
+          setHasMore(res.moods.length === LIMIT);
+        } else {
+          // Query returned but not in expected shape; clear list
+          if (offset === 0) setMoodHistory([]);
+          setHasMore(false);
+        }
         setLoading(false);
       }
-    }, [res]);
+    }, [res, offset]);
 
     return null;
   };
@@ -259,6 +273,13 @@ export default function MoodHistoryScreen() {
       showStatusModal('error', 'Delete Failed', 'Unable to delete mood entry. Please try again.');
     }
   };
+
+  // If there's no authenticated user, don't keep the screen in loading state forever
+  useEffect(() => {
+    if (!user?.id) {
+      setLoading(false);
+    }
+  }, [user]);
 
   // Render mood entry card
   const renderMoodEntry = ({ item }: { item: MoodEntry }) => (

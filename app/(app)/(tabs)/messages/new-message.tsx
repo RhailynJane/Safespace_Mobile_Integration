@@ -26,6 +26,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import { Contact } from "../../../../utils/sendbirdService"; // Keep types only; rely on Convex for actual messaging logic
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
+import { getAvatarSource, getInitials } from "../../../../utils/avatar";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import { useConvex, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -234,65 +235,20 @@ export default function NewMessagesScreen() {
    * Get avatar for conversation (showing other participants, not current user)
    */
   const getAvatarDisplay = (participants: any[]) => {
-    if (!userId) {
-      const firstParticipant = participants[0];
-      if (firstParticipant?.profile_image_url) {
-        const raw = firstParticipant.profile_image_url as string;
-        let normalized = raw;
-        if (raw.startsWith('http')) {
-          normalized = raw;
-        } else if (raw.startsWith('/')) {
-          normalized = `${API_BASE_URL}${raw}`;
-        } else if (raw.startsWith('data:image')) {
-          normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(firstParticipant.clerk_user_id || '')}/profile-image`;
-        }
-        return { type: "image", value: normalized };
-      }
-      const initials = getUserInitials(
-        firstParticipant?.first_name,
-        firstParticipant?.last_name
-      );
-      return { type: "text", value: initials };
-    }
-
-    // Get other participants (not current user)
-    const otherParticipants = participants.filter(
-      (p: any) => p.clerk_user_id?.toString().trim() !== userId.toString().trim()
-    );
-
-    const displayParticipant = otherParticipants.length > 0 
-      ? otherParticipants[0] 
-      : participants[0];
-
-    // If profile image exists, return URL
-    if (displayParticipant?.profile_image_url) {
-      const raw = displayParticipant.profile_image_url as string;
-      let normalized = raw;
-      if (raw.startsWith('http')) {
-        normalized = raw;
-      } else if (raw.startsWith('/')) {
-        normalized = `${API_BASE_URL}${raw}`;
-      } else if (raw.startsWith('data:image')) {
-        normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(displayParticipant.clerk_user_id || '')}/profile-image`;
-      }
-      return { type: "image", value: normalized };
-    }
-
-    // Otherwise return initials for text display
-    const initials = getUserInitials(
-      displayParticipant?.first_name,
-      displayParticipant?.last_name
-    );
-    return { type: "text", value: initials };
-  };
-
-  /**
-   * Get user initials for avatar
-   */
-  const getUserInitials = (firstName?: string, lastName?: string) => {
-    const first = firstName?.charAt(0) || "";
-    const last = lastName?.charAt(0) || "";
-    return `${first}${last}`.toUpperCase() || "U";
+    const others = userId
+      ? participants.filter((p: any) => p.clerk_user_id?.toString().trim() !== userId.toString().trim())
+      : participants;
+    const target = others[0] || participants[0];
+    const avatar = getAvatarSource({
+      profileImageUrl: target?.profile_image_url,
+      imageUrl: target?.profile_image_url, // legacy field mapping
+      firstName: target?.first_name,
+      lastName: target?.last_name,
+      email: target?.email,
+      clerkId: target?.clerk_user_id,
+      apiBaseUrl: API_BASE_URL,
+    });
+    return avatar;
   };
 
   /**
@@ -693,18 +649,24 @@ export default function NewMessagesScreen() {
                         onPress={() => startNewConversation(user)}
                       >
                         <View style={styles.avatarContainer}>
-                          {user.profile_image_url ? (
-                            <Image
-                              source={{ uri: user.profile_image_url }}
-                              style={styles.contactAvatar}
-                            />
-                          ) : (
-                            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
-                              <Text style={styles.avatarText}>
-                                {user.first_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
-                              </Text>
-                            </View>
-                          )}
+                          {(() => {
+                            const avatar = getAvatarSource({
+                              profileImageUrl: user.profile_image_url,
+                              imageUrl: user.profile_image_url,
+                              firstName: user.first_name,
+                              lastName: user.last_name,
+                              email: user.email,
+                              clerkId: user.clerk_user_id,
+                              apiBaseUrl: API_BASE_URL,
+                            });
+                            return avatar.type === 'image' ? (
+                              <Image source={{ uri: avatar.value }} style={styles.contactAvatar} />
+                            ) : (
+                              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
+                                <Text style={styles.avatarText}>{avatar.value}</Text>
+                              </View>
+                            );
+                          })()}
                           {user.online && <View style={[styles.onlineIndicator, { backgroundColor: theme.colors.primary, borderColor: theme.colors.surface }]} />}
                         </View>
                         <View style={styles.contactInfo}>

@@ -169,7 +169,8 @@ export default function ConfirmAppointment() {
     if (!user?.id) return;
     
     try {
-      const settings = await convex.query(api.settings.getUserSettings, { userId: user.id });
+  // Updated to consolidated getSettings API
+  const settings = await convex.query(api.settings.getSettings, { clerkId: user.id });
       if (!settings) {
         console.log('⚠️ No settings found; skipping reminder scheduling');
         return;

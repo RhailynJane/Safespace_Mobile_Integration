@@ -443,6 +443,25 @@ useEffect(() => {
               <Text style={[styles.selectText, { color: theme.colors.text }]}>Select Support Worker</Text>
             </TouchableOpacity>
           ))}
+
+          {/* Empty State when no support workers derived yet */}
+          {filteredSupportWorkers.length === 0 && (
+            <View style={[styles.emptyWorkersContainer, { backgroundColor: theme.colors.surface }]}>
+              <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} style={{ marginBottom: 12 }} />
+              <Text style={[styles.emptyWorkersTitle, { color: theme.colors.text }]}>No Support Workers Available</Text>
+              <Text style={[styles.emptyWorkersSubtitle, { color: theme.colors.textSecondary }]}>
+                Support workers appear once appointments are populated or the system seeds profiles. Retry or check back later.
+              </Text>
+              <TouchableOpacity
+                style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
+                onPress={fetchSupportWorkers}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.refreshButtonText, { color: theme.colors.surface }]}>Retry Load</Text>
+                <Ionicons name="reload" size={18} color={theme.colors.surface} style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -742,6 +761,42 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
     textAlign: "center",
     fontSize: scaledFontSize(14),
+  },
+  emptyWorkersContainer: {
+    borderRadius: 12,
+    padding: 24,
+    marginHorizontal: 15,
+    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  emptyWorkersTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyWorkersSubtitle: {
+    fontSize: scaledFontSize(14),
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  refreshButtonText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
   },
   avatarContainer: {
     flexDirection: "row",
