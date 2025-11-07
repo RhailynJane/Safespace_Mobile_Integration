@@ -10,6 +10,7 @@ import { ConvexReactClient, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useConvexActivity } from "../../utils/hooks/useConvexActivity";
 import { useConvexSettings } from "../../utils/hooks/useConvexSettings";
+import { NotificationsProvider } from "../../contexts/NotificationsContext";
 
 export default function AppLayout() {
   const { isLoaded, isSignedIn, userId } = useAuth();
@@ -121,7 +122,7 @@ export default function AppLayout() {
     loadUserSettings();
   }, [isSignedIn, userId, convexClient, loadSettings]);
 
-  // Real-time notifications using Convex polling
+  // Real-time notifications - now handled by NotificationsProvider
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
   
   useEffect(() => {
@@ -147,7 +148,7 @@ export default function AppLayout() {
     // Initial fetch
     fetchNotifications();
 
-    // Poll every 10 seconds for new notifications
+    // Poll every 10 seconds for new notifications (for banner display)
     const interval = setInterval(fetchNotifications, 10000);
 
     return () => {
@@ -291,7 +292,7 @@ export default function AppLayout() {
   }
 
   return (
-    <>
+    <NotificationsProvider convexClient={convexClient} userId={userId}>
       {/* Foreground in-app banner */}
       {banner.visible && (
         <View style={{
@@ -330,6 +331,6 @@ export default function AppLayout() {
       <Stack.Screen name="self-assessment" />
       <Stack.Screen name="video-consultations" />
       </Stack>
-    </>
+    </NotificationsProvider>
   );
 }

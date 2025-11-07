@@ -22,10 +22,12 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import assessmentsApi from "../utils/assessmentsApi";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
-import activityApi from "../utils/activityApi";
-import { getApiBaseUrl, makeAbsoluteUrl } from "../utils/apiBaseUrl";
+import { makeAbsoluteUrl } from "../utils/apiBaseUrl";
 import avatarEvents from "../utils/avatarEvents";
 import notificationEvents from "../utils/notificationEvents";
+import { useNotifications } from "../contexts/NotificationsContext";
+import { useConvexActivity } from "../utils/hooks/useConvexActivity";
+import { ConvexReactClient } from "convex/react";
 
 const { width } = Dimensions.get("window");
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
@@ -63,6 +65,28 @@ export const AppHeader = ({
 
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+  
+  // Use shared notification context instead of duplicate polling
+  const { unreadCount, refreshNotifications } = useNotifications();
+  
+  // Initialize Convex client for activity tracking
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  const { recordLogout } = useConvexActivity(convexClient);
+
+  useEffect(() => {
+    const initConvex = async () => {
+      try {
+        const url = await AsyncStorage.getItem('convexUrl');
+        if (url) {
+          const client = new ConvexReactClient(url);
+          setConvexClient(client);
+        }
+      } catch (error) {
+        console.error('❌ Failed to initialize Convex client:', error);
+      }
+    };
+    initConvex();
+  }, []);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -113,10 +137,10 @@ export const AppHeader = ({
       setIsSigningOut(true);
       hideSideMenu();
       
-      // Record logout activity
+      // Record logout activity using Convex
       if (user?.id) {
         try {
-          await activityApi.recordLogout(user.id);
+          await recordLogout(user.id);
         } catch (_e) {
           // Continue with logout even if tracking fails
         }
@@ -277,45 +301,14 @@ export const AppHeader = ({
     );
   };
 
-  // Unread notifications badge
-  const [unreadCount, setUnreadCount] = useState(0);
-  const baseURL = getApiBaseUrl();
-
-  const fetchUnreadCount = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const res = await fetch(`${baseURL}/api/notifications/${user.id}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      const rows = (json.data || []) as Array<{ is_read: boolean }>; 
-      const count = rows.reduce((acc, r) => acc + (r.is_read ? 0 : 1), 0);
-      setUnreadCount(count);
-    } catch (e) {
-      // ignore
-    }
-  }, [user?.id, baseURL]);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchUnreadCount();
-      return () => {};
-    }, [fetchUnreadCount])
-  );
-
-  // Poll for unread count periodically to keep the bell badge fresh
-  useEffect(() => {
-    if (!user?.id) return;
-    const id = setInterval(fetchUnreadCount, 15000); // every 15s
-    return () => clearInterval(id);
-  }, [user?.id, fetchUnreadCount]);
-
-  // React immediately when a push arrives (low-latency badge updates)
+  // Unread notifications badge - now handled by NotificationsContext
+  // No more duplicate polling! Just refresh when push arrives
   useEffect(() => {
     const unsubscribe = notificationEvents.subscribe(() => {
-      fetchUnreadCount();
+      refreshNotifications();
     });
     return () => { unsubscribe(); };
-  }, [fetchUnreadCount]);
+  }, [refreshNotifications]);
 
   // Base menu items
   const baseMenuItems = [
