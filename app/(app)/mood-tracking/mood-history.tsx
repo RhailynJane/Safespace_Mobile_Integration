@@ -1,5 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -15,7 +14,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useFocusEffect } from "@react-navigation/native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { AppHeader } from "../../../components/AppHeader";
@@ -24,7 +23,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useConvex } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 // MoodEntry type for Convex
@@ -55,12 +54,169 @@ const moodTypes = [
   { value: "very-sad", label: "Very Sad", emoji: "😢" },
 ];
 
+// Move live data components OUTSIDE of the screen component to keep their identity stable across renders
+function LiveHistoryComponent(props: {
+  userId: string;
+  limit: number;
+  offset: number;
+  selectedMoodType?: string;
+  selectedFactors: string[];
+  startDate: Date | null;
+  endDate: Date | null;
+  setMoodHistory: React.Dispatch<React.SetStateAction<MoodEntry[]>>;
+  setHasMore: React.Dispatch<React.SetStateAction<boolean>>;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+}) {
+  const {
+    userId,
+    limit,
+    offset,
+    selectedMoodType,
+    selectedFactors,
+    startDate,
+    endDate,
+    setMoodHistory,
+    setHasMore,
+    setLoading,
+    setError,
+  } = props;
+
+  // Build filter parameters (memoized)
+  const filterStartDate = useMemo(() => {
+    if (!startDate) return undefined;
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    return start.toISOString();
+  }, [startDate]);
+
+  const filterEndDate = useMemo(() => {
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      return end.toISOString();
+    } else if (startDate && !endDate) {
+      const end = new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+      return end.toISOString();
+    }
+    return undefined;
+  }, [startDate, endDate]);
+
+  console.log("🔍 LiveHistory - Querying with params:", {
+    userId,
+    limit,
+    offset,
+    moodType: selectedMoodType || undefined,
+    startDate: filterStartDate,
+    endDate: filterEndDate,
+    factors: selectedFactors.length > 0 ? selectedFactors : undefined,
+  });
+
+  const res = useQuery(api.moods.getMoodHistory, {
+    userId,
+    limit,
+    offset,
+    moodType: selectedMoodType || undefined,
+    startDate: filterStartDate,
+    endDate: filterEndDate,
+    factors: selectedFactors.length > 0 ? selectedFactors : undefined,
+  }) as { moods: any[] } | undefined;
+
+  console.log("🔍 LiveHistory - Query result:", res);
+
+  // Build a stable signature of the current result to decide when to update parent state
+  const idsKey = useMemo(() => {
+    if (!res || !Array.isArray(res.moods)) return "__undefined__";
+    return res.moods.map((m: any) => m.id).join(",");
+  }, [res]);
+
+  const lastIdsKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    console.log("🔍 LiveHistory useEffect - idsKey:", idsKey, "offset:", offset);
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (res === undefined && offset === 0) {
+      timeoutId = setTimeout(() => {
+        console.log("⏱️ Query timeout - setting loading to false");
+        setError("Unable to load mood history. Convex may not be running or authentication failed.");
+        setLoading(false);
+      }, 5000);
+    }
+
+    if (res !== undefined && Array.isArray(res.moods)) {
+      if (timeoutId) clearTimeout(timeoutId);
+      setError(null);
+
+      if (lastIdsKeyRef.current !== idsKey) {
+        lastIdsKeyRef.current = idsKey;
+        const incoming = res.moods as unknown as MoodEntry[];
+        setMoodHistory((prev) => {
+          if (offset === 0) return incoming;
+          const existingIds = new Set(prev.map((m) => m.id));
+          const merged = [...prev, ...incoming.filter((m) => !existingIds.has(m.id))];
+          return merged;
+        });
+        setHasMore(res.moods.length === limit);
+        console.log(`📊 Loaded ${res.moods.length} mood entries`);
+      }
+      setLoading(false);
+    } else if (res !== undefined) {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (offset === 0) setMoodHistory([]);
+      setHasMore(false);
+      setLoading(false);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  // Intentionally omit 'res' to prevent infinite loop from new object identity each subscription tick.
+  // Safe because we only act when idsKey changes and idsKey depends on res.
+  // Including state setters and 'limit' is optional per React docs; they are stable from React.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey, offset]);
+
+  return null;
+}
+
+function LiveFactorsComponent(props: {
+  userId: string;
+  setAllFactors: React.Dispatch<React.SetStateAction<string[]>>;
+}) {
+  const { userId, setAllFactors } = props;
+  const res = useQuery(api.moods.getFactors, { userId }) as { factors: Array<{ factor: string }> } | undefined;
+
+  const factorsKey = useMemo(() => {
+    if (!res || !Array.isArray(res.factors)) return "__undefined__";
+    return res.factors.map((f) => f.factor).sort().join(",");
+  }, [res]);
+
+  const lastFactorsKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (res && Array.isArray(res.factors) && lastFactorsKeyRef.current !== factorsKey) {
+      lastFactorsKeyRef.current = factorsKey;
+      setAllFactors(res.factors.map((f) => f.factor));
+    }
+  // Intentionally omit 'res' to avoid effect firing on identical factor arrays with new reference.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [factorsKey]);
+
+  return null;
+}
+
 export default function MoodHistoryScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
+  const { getToken } = useAuth();
+  const convex = useConvex();
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const [allFactors, setAllFactors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("mood");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -71,109 +227,36 @@ export default function MoodHistoryScreen() {
     title: '',
     message: '',
   });
-  
-  // Filter states
+
+  // Pagination and filter states
+  const LIMIT = 20;
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [selectedMoodType, setSelectedMoodType] = useState<string>("");
   const [selectedFactors, setSelectedFactors] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [searchQuery, setSearchQuery] = useState<string>("");
-
-  // Date picker states
+  const [searchQuery, setSearchQuery] = useState("");
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
-  // Pagination
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const LIMIT = 20;
-
-  // Convex mutations
+  // Mutations & status modal helpers
   const deleteMood = useMutation(api.moods.deleteMood);
-
-  // Create styles dynamically based on text size
-  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
-
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setModalConfig({ type, title, message });
     setModalVisible(true);
   };
+  const hideStatusModal = () => setModalVisible(false);
+  
+  // Check if Convex is available
+  useEffect(() => {
+    if (!convex) {
+      console.error("❌ Convex client not available");
+      setError("Backend connection not available. Please restart the app.");
+      setLoading(false);
+    }
+  }, [convex]);
 
-  const hideStatusModal = () => {
-    setModalVisible(false);
-  };
-
-  // Live mood history component using Convex
-  const LiveHistory = ({ userId }: { userId: string }) => {
-    // Build filter parameters
-    const filterStartDate = startDate 
-      ? (() => {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          return start.toISOString();
-        })()
-      : undefined;
-
-    const filterEndDate = endDate 
-      ? (() => {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          return end.toISOString();
-        })()
-      : startDate && !endDate
-      ? (() => {
-          const end = new Date(startDate);
-          end.setHours(23, 59, 59, 999);
-          return end.toISOString();
-        })()
-      : undefined;
-
-    const res = useQuery(api.moods.getMoodHistory, {
-      userId,
-      limit: LIMIT,
-      offset,
-      moodType: selectedMoodType || undefined,
-      startDate: filterStartDate,
-      endDate: filterEndDate,
-      factors: selectedFactors.length > 0 ? selectedFactors : undefined,
-    }) as { moods: any[] } | undefined;
-
-    useEffect(() => {
-      if (res !== undefined) {
-        if (Array.isArray(res.moods)) {
-          // Append when paginating, replace on fresh load
-          setMoodHistory((prev) => {
-            const incoming = res.moods as unknown as MoodEntry[];
-            if (offset === 0) return incoming;
-            const existingIds = new Set(prev.map((m) => m.id));
-            const merged = [...prev, ...incoming.filter((m) => !existingIds.has(m.id))];
-            return merged;
-          });
-          setHasMore(res.moods.length === LIMIT);
-        } else {
-          // Query returned but not in expected shape; clear list
-          if (offset === 0) setMoodHistory([]);
-          setHasMore(false);
-        }
-        setLoading(false);
-      }
-    }, [res, offset]);
-
-    return null;
-  };
-
-  // Live factors component using Convex
-  const LiveFactors = ({ userId }: { userId: string }) => {
-    const res = useQuery(api.moods.getFactors, { userId }) as { factors: Array<{ factor: string }> } | undefined;
-
-    useEffect(() => {
-      if (res && Array.isArray(res.factors)) {
-        setAllFactors(res.factors.map((f) => f.factor));
-      }
-    }, [res]);
-
-    return null;
-  };
 
   // Apply filters
   const applyFilters = () => {
@@ -277,7 +360,11 @@ export default function MoodHistoryScreen() {
   // If there's no authenticated user, don't keep the screen in loading state forever
   useEffect(() => {
     if (!user?.id) {
+      console.log("No user ID found, setting loading to false");
       setLoading(false);
+      setError("Please sign in to view mood history");
+    } else {
+      console.log("User ID found:", user.id);
     }
   }, [user]);
 
@@ -332,16 +419,59 @@ export default function MoodHistoryScreen() {
     (startDate ? 1 : 0) +
     (endDate ? 1 : 0);
 
+  // Render LiveHistory and LiveFactors outside of loading check
+  // so that useQuery hooks are always called (React rules of hooks)
+  const liveComponents = user?.id ? (
+    <>
+      <LiveHistoryComponent
+        userId={user.id}
+        limit={LIMIT}
+        offset={offset}
+        selectedMoodType={selectedMoodType}
+        selectedFactors={selectedFactors}
+        startDate={startDate}
+        endDate={endDate}
+        setMoodHistory={setMoodHistory}
+        setHasMore={setHasMore}
+        setLoading={setLoading}
+        setError={setError}
+      />
+      <LiveFactorsComponent userId={user.id} setAllFactors={setAllFactors} />
+    </>
+  ) : null;
+
   if (loading && offset === 0) {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          {liveComponents}
           <AppHeader title="Mood History" showBack={true} />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
               Loading mood history...
             </Text>
+            {error && (
+              <View style={{ marginTop: 20, padding: 16, backgroundColor: '#ffebee', borderRadius: 8 }}>
+                <Text style={{ color: '#c62828', textAlign: 'center' }}>{error}</Text>
+                <TouchableOpacity
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => {
+                    setLoading(true);
+                    setError(null);
+                    setOffset(0);
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '600' }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </SafeAreaView>
       </CurvedBackground>
@@ -351,12 +481,7 @@ export default function MoodHistoryScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {user?.id && (
-          <>
-            <LiveHistory userId={user.id} />
-            <LiveFactors userId={user.id} />
-          </>
-        )}
+        {liveComponents}
         
         <AppHeader title="Mood History" showBack={true} />
 

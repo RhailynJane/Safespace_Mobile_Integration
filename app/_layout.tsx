@@ -8,7 +8,7 @@ import { tokenCache } from "../utils/cache";
 import { ConvexProvider, ConvexReactClient, useConvex } from "convex/react";
 import { useEffect, useState, useRef } from "react";
 import { syncUserWithDatabase } from "../utils/userSync";
-import { ActivityIndicator, View, LogBox } from "react-native";
+import { ActivityIndicator, View, LogBox, Text } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeProvider } from "../contexts/ThemeContext";
 
@@ -28,12 +28,6 @@ function isAbsoluteHttpUrl(url?: string | null): boolean {
   } catch {
     return false;
   }
-}
-
-if (!publishableKey) {
-  throw new Error(
-    "Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env file"
-  );
 }
 
 // Component to handle user synchronization with PostgreSQL
@@ -359,6 +353,24 @@ export default function RootLayout() {
         <ConvexHeartbeat />
         {children}
       </ConvexProviderWithClerk>
+    );
+  }
+
+  // Safety check for missing environment variables
+  if (!publishableKey) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <ActivityIndicator size="large" color="#7BB8A8" />
+          <View style={{ marginTop: 20, alignItems: 'center' }}>
+            <View style={{ backgroundColor: '#ffebee', padding: 15, borderRadius: 8 }}>
+              <Text style={{ color: '#c62828', fontSize: 16, fontWeight: 'bold', marginBottom: 8 }}>Configuration Error</Text>
+              <Text style={{ color: '#666', fontSize: 14 }}>Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY</Text>
+              <Text style={{ color: '#666', fontSize: 12, marginTop: 8 }}>Please configure environment variables in EAS build settings</Text>
+            </View>
+          </View>
+        </View>
+      </SafeAreaProvider>
     );
   }
 
