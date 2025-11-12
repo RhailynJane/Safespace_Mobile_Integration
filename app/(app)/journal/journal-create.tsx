@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   Modal,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
@@ -25,21 +25,27 @@ import StatusModal from "../../../components/StatusModal";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
-type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
+type EmotionType = "ecstatic" | "happy" | "content" | "neutral" | "displeased" | "frustrated" | "annoyed" | "angry" | "furious";
 type CreateStep = "create" | "success";
 
 interface EmotionOption {
   id: EmotionType;
   emoji: string;
   label: string;
+  bg: string;
 }
 
+// New 3x3 mood grid
 const emotionOptions: EmotionOption[] = [
-  { id: "very-sad", emoji: "😢", label: "Very Sad" },
-  { id: "sad", emoji: "🙁", label: "Sad" },
-  { id: "neutral", emoji: "😐", label: "Neutral" },
-  { id: "happy", emoji: "🙂", label: "Happy" },
-  { id: "very-happy", emoji: "😄", label: "Very Happy" },
+  { id: "ecstatic", emoji: "🤩", label: "Ecstatic", bg: "#CCE5FF" },
+  { id: "happy", emoji: "�", label: "Happy", bg: "#FFD1E0" },
+  { id: "content", emoji: "🙂", label: "Content", bg: "#D0E4FF" },
+  { id: "neutral", emoji: "😐", label: "Neutral", bg: "#D5EFDB" },
+  { id: "displeased", emoji: "�", label: "Displeased", bg: "#FFEDD2" },
+  { id: "frustrated", emoji: "😖", label: "Frustrated", bg: "#DFCFFF" },
+  { id: "annoyed", emoji: "�", label: "Annoyed", bg: "#FFDEE3" },
+  { id: "angry", emoji: "😠", label: "Angry", bg: "#FFE2CC" },
+  { id: "furious", emoji: "🤬", label: "Furious", bg: "#FFD3D3" },
 ];
 
 interface JournalData {
@@ -64,6 +70,7 @@ const MAX_CHARACTERS = 1000;
 export default function JournalCreateScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
+  const params = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState("journal");
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
   interface JournalTemplate { id: number; name: string; description: string; prompts: string[]; icon: string; }
@@ -112,6 +119,22 @@ export default function JournalCreateScreen() {
       setLoadingTemplates(true);
     }
   }, [liveTemplates]);
+
+  // Handle templateId from URL params
+  useEffect(() => {
+    if (params.templateId && templates.length > 0) {
+      const templateId = parseInt(params.templateId as string);
+      const template = templates.find(t => t.id === templateId);
+      if (template) {
+        setJournalData((prev) => ({
+          ...prev,
+          templateId: template.id,
+          content: template.prompts?.[0] || prev.content,
+        }));
+        setSelectedTemplate(template);
+      }
+    }
+  }, [params.templateId, templates]);
 
   const handleTitleChange = (text: string) => {
     setJournalData((prev) => ({ ...prev, title: text }));
@@ -397,10 +420,10 @@ export default function JournalCreateScreen() {
               key={emotion.id}
               style={[
                 styles.emotionButton,
-                { backgroundColor: theme.colors.surface },
+                { backgroundColor: emotion.bg },
                 journalData.emotion === emotion.id && [
                   styles.emotionButtonSelected,
-                  { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary + '08' }
+                  { borderColor: theme.colors.primary, borderWidth: 3 }
                 ],
               ]}
               onPress={() => handleEmotionSelect(emotion)}
@@ -409,8 +432,8 @@ export default function JournalCreateScreen() {
               <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
               <Text style={[
                 styles.emotionLabel,
-                { color: theme.colors.textSecondary },
-                journalData.emotion === emotion.id && [styles.emotionLabelSelected, { color: theme.colors.primary }]
+                { color: theme.isDark ? '#1F1B14' : '#2C2620' },
+                journalData.emotion === emotion.id && styles.emotionLabelSelected
               ]}>
                 {emotion.label}
               </Text>
@@ -647,30 +670,33 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flexDirection: "row",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   emotionButton: {
-    flex: 1,
-    minWidth: "30%",
-    borderRadius: 12,
-    padding: Spacing.md,
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    padding: Spacing.sm,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: 'transparent',
   },
   emotionButtonSelected: {
     borderColor: Colors.primary,
+    borderWidth: 3,
   },
   emotionEmoji: {
-    fontSize: scaledFontSize(28), // Base size 28px
+    fontSize: scaledFontSize(32), // Base size 32px
     marginBottom: Spacing.xs,
   },
   emotionLabel: {
-    fontSize: scaledFontSize(12), // Base size 12px
+    fontSize: scaledFontSize(11), // Base size 11px
     textAlign: "center",
+    fontWeight: '600',
   },
   emotionLabelSelected: {
-    fontWeight: "600",
+    fontWeight: "700",
   },
   shareContainer: {
     flexDirection: "row",
