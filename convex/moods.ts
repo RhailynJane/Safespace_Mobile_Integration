@@ -278,23 +278,34 @@ export const getMoodChartData = query({
 		const todayStr = getLocalDateStr(Date.now());
 		const yesterdayStr = getLocalDateStr(Date.now() - 24 * 60 * 60 * 1000);
 
+		console.log('[getMoodChartData] Streak calculation:', {
+			todayStr,
+			yesterdayStr,
+			datesWithMoods,
+		});
+
 		// Calculate current streak (must include today or yesterday)
 		const hasToday = datesWithMoods.includes(todayStr);
 		const hasYesterday = datesWithMoods.includes(yesterdayStr);
 
 		if (hasToday || hasYesterday) {
 			const startDateStr = hasToday ? todayStr : yesterdayStr;
-			let checkDate = new Date(startDateStr);
+			let checkDateTimestamp = hasToday ? Date.now() : (Date.now() - 24 * 60 * 60 * 1000);
+			
 			while (true) {
-				const dateStr = getLocalDateStr(checkDate.getTime());
+				const dateStr = getLocalDateStr(checkDateTimestamp);
+				console.log('[getMoodChartData] Checking streak for date:', dateStr, 'has mood:', datesWithMoods.includes(dateStr));
 				if (datesWithMoods.includes(dateStr)) {
 					currentStreak++;
-					checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
+					// Go back one day (24 hours in milliseconds)
+					checkDateTimestamp -= 24 * 60 * 60 * 1000;
 				} else {
 					break;
 				}
 			}
 		}
+
+		console.log('[getMoodChartData] Streaks:', { currentStreak, hasToday, hasYesterday });
 
 		// Calculate longest streak from all history
 		if (datesWithMoods.length > 0) {
@@ -336,6 +347,13 @@ export const getMoodChartData = query({
 			daysWithMoods: chartData.filter(d => d.hasMood).length,
 			dateRange: `${chartDates[0]} to ${chartDates[chartDates.length - 1]}`,
 			chartDataDates: chartData.map(d => ({ date: d.date, hasMood: d.hasMood, score: d.averageScore })),
+			// STREAK DEBUG INFO
+			streakDebug: {
+				todayStr: getLocalDateStr(Date.now()),
+				datesWithMoods,
+				currentStreak,
+				longestStreak,
+			}
 		});
 
 		return {
