@@ -24,6 +24,8 @@ import { APP_TIME_ZONE } from "../../../utils/timezone";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
+import { LinearGradient } from "expo-linear-gradient";
+import OptimizedImage from "../../../components/OptimizedImage";
 
 type FilterType = "all" | "week" | "month" | "custom";
 
@@ -185,6 +187,10 @@ export default function JournalHistoryScreen() {
     router.push(`/(app)/journal/journal-entry/${entryId}`);
   };
 
+  const toggleExpand = (entryId: string) => {
+    setExpandedEntry((prev) => (prev === entryId ? null : entryId));
+  };
+
   const handleFilterChange = (filter: FilterType) => {
     setActiveFilter(filter);
     if (filter === "custom") {
@@ -292,7 +298,13 @@ export default function JournalHistoryScreen() {
     return (
       <TouchableOpacity
         key={entry.id}
-        style={[styles.entryCard, { backgroundColor: theme.colors.surface }]}
+        style={[
+          styles.entryCard,
+          {
+            backgroundColor: theme.colors.surface,
+            borderColor: theme.colors.border,
+          },
+        ]}
         onPress={() => handleEntryPress(entry.id)}
       >
         <View style={styles.entryHeader}>
@@ -304,12 +316,14 @@ export default function JournalHistoryScreen() {
             {entry.emoji ? (
               <Text style={styles.entryEmoji}>{entry.emoji}</Text>
             ) : null}
-            <Ionicons
-              name={isExpanded ? "chevron-up" : "chevron-down"}
-              size={20}
-              color={theme.colors.textSecondary}
-              style={styles.expandIcon}
-            />
+            <TouchableOpacity onPress={() => toggleExpand(entry.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons
+                name={isExpanded ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={theme.colors.textSecondary}
+                style={styles.expandIcon}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -351,124 +365,159 @@ export default function JournalHistoryScreen() {
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entries" showBack={true} showMenu={true} />
-        <ScrollView style={styles.content}>
-          {user?.id ? (
-            <LiveHistory
-              userId={user.id}
-              startDate={getDateFilters().startDate}
-              endDate={getDateFilters().endDate}
-              onData={(e) => setEntries(e)}
-            />
-          ) : null}
-          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>My Journal Entries</Text>
-
-          {/* Search Bar */}
-          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons
-              name="search"
-              size={20}
-              color={theme.colors.textSecondary}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.text }]}
-              placeholder="Search by title, content, or tags..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholderTextColor={theme.colors.textSecondary}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={handleClearSearch}>
-                <Ionicons
-                  name="close-circle"
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Date Filter Buttons */}
-          <View style={[styles.filterContainer, { backgroundColor: theme.colors.borderLight }]}>
-            {renderFilterButton("all", "All")}
-            {renderFilterButton("week", "Week")}
-            {renderFilterButton("month", "Month")}
-            {renderFilterButton("custom", "Custom")}
-          </View>
-
-          {/* Active Custom Date Filter Display */}
-          {activeFilter === "custom" && customStartDate && (
-            <View style={[styles.activeDateFilter, { backgroundColor: theme.colors.primary + '20' }]}>
-              <Text style={[styles.activeDateText, { color: theme.colors.primary }]}>
-                {formatDateForDisplay(customStartDate)}
-                {customEndDate && ` - ${formatDateForDisplay(customEndDate)}`}
-                {!customEndDate && " (Single Day)"}
-              </Text>
-              <TouchableOpacity onPress={handleClearDateFilter}>
-                <Ionicons name="close-circle" size={20} color={theme.colors.primary} />
-              </TouchableOpacity>
+        <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 140 }]}>
+          <View style={styles.content}>
+            {/* Feature Hero - align with journal index visuals */}
+            <View style={styles.featureRow}>
+              <View style={[styles.featureCard, { borderColor: theme.colors.border }]}> 
+                <LinearGradient
+                  colors={[theme.isDark ? '#EEA84E' : '#F9C257', theme.isDark ? '#F1B766' : '#FAD58D']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.featureGradient}
+                >
+                  <View>
+                    <Text style={[styles.featureTitle, { color: '#1F1B14' }]}>Your past reflections</Text>
+                    <Text style={[styles.featureSubtitle, { color: '#3D3426' }]}>Search and filter your journal history</Text>
+                  </View>
+                  <View style={styles.sunRow}>
+                    <Ionicons name="time" size={48} color="#F57C00" />
+                    <View style={styles.heroImageWrap}>
+                      <OptimizedImage
+                        source={require('../../../assets/images/journal.png')}
+                        style={{ width: 90, height: 90, opacity: 0.9 }}
+                        resizeMode="contain"
+                        accessibilityLabel="Decorative journal"
+                      />
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
             </View>
-          )}
 
-          {/* Results Count */}
-          {!loading && (
-            <Text style={[styles.resultsCount, { color: theme.colors.textSecondary }]}>
-              {filteredEntries.length}{" "}
-              {filteredEntries.length === 1 ? "entry" : "entries"} found
-            </Text>
-          )}
+            {user?.id ? (
+              <LiveHistory
+                userId={user.id}
+                startDate={getDateFilters().startDate}
+                endDate={getDateFilters().endDate}
+                onData={(e) => setEntries(e)}
+              />
+            ) : null}
 
-          <View style={styles.entriesContainer}>
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading entries...</Text>
-              </View>
-            ) : filteredEntries.length > 0 ? (
-              filteredEntries.map(renderJournalEntry)
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons
-                  name={searchQuery ? "search" : "book-outline"}
-                  size={64}
-                  color={theme.colors.textSecondary}
-                />
-                <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                  {searchQuery
-                    ? "No entries match your search"
-                    : activeFilter === "custom" 
-                    ? "No entries found for selected date range"
-                    : "No journal entries yet"}
+            {/* Search Bar */}
+            <View
+              style={[
+                styles.searchContainer,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name="search"
+                size={20}
+                color={theme.colors.textSecondary}
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={[styles.searchInput, { color: theme.colors.text }]}
+                placeholder="Search by title, content, or tags..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor={theme.colors.textSecondary}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={handleClearSearch}>
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    color={theme.colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Date Filter Buttons */}
+            <View style={[styles.filterContainer, { backgroundColor: theme.colors.borderLight }]}>
+              {renderFilterButton("all", "All")}
+              {renderFilterButton("week", "Week")}
+              {renderFilterButton("month", "Month")}
+              {renderFilterButton("custom", "Custom")}
+            </View>
+
+            {/* Active Custom Date Filter Display */}
+            {activeFilter === "custom" && customStartDate && (
+              <View style={[styles.activeDateFilter, { backgroundColor: theme.colors.primary + '20' }] }>
+                <Text style={[styles.activeDateText, { color: theme.colors.primary }]}>
+                  {formatDateForDisplay(customStartDate)}
+                  {customEndDate && ` - ${formatDateForDisplay(customEndDate)}`}
+                  {!customEndDate && " (Single Day)"}
                 </Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                  {searchQuery
-                    ? "Try a different search term"
-                    : activeFilter === "custom"
-                    ? "Try selecting a different date range"
-                    : "Start writing to capture your thoughts and feelings"}
-                </Text>
-                {!searchQuery && activeFilter !== "custom" && (
-                  <TouchableOpacity
-                    style={[styles.addEntryButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={() => router.push("/(app)/journal/journal-create")}
-                  >
-                    <Text style={[styles.addEntryButtonText, { color: theme.colors.surface }]}>
-                      Write First Entry
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity onPress={handleClearDateFilter}>
+                  <Ionicons name="close-circle" size={20} color={theme.colors.primary} />
+                </TouchableOpacity>
               </View>
             )}
-          </View>
 
-          {filteredEntries.length > 0 && (
-            <TouchableOpacity
-              style={[styles.floatingAddButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => router.push("/(app)/journal/journal-create")}
-            >
-              <Ionicons name="add" size={28} color={theme.colors.surface} />
-            </TouchableOpacity>
-          )}
+            {/* Results Count */}
+            {!loading && (
+              <Text style={[styles.resultsCount, { color: theme.colors.textSecondary }]}>
+                {filteredEntries.length}{" "}
+                {filteredEntries.length === 1 ? "entry" : "entries"} found
+              </Text>
+            )}
+
+            <View style={styles.entriesContainer}>
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading entries...</Text>
+                </View>
+              ) : filteredEntries.length > 0 ? (
+                filteredEntries.map(renderJournalEntry)
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons
+                    name={searchQuery ? "search" : "book-outline"}
+                    size={64}
+                    color={theme.colors.textSecondary}
+                  />
+                  <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
+                    {searchQuery
+                      ? "No entries match your search"
+                      : activeFilter === "custom" 
+                      ? "No entries found for selected date range"
+                      : "No journal entries yet"}
+                  </Text>
+                  <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+                    {searchQuery
+                      ? "Try a different search term"
+                      : activeFilter === "custom"
+                      ? "Try selecting a different date range"
+                      : "Start writing to capture your thoughts and feelings"}
+                  </Text>
+                  {!searchQuery && activeFilter !== "custom" && (
+                    <TouchableOpacity
+                      style={[styles.addEntryButton, { backgroundColor: theme.colors.primary }]}
+                      onPress={() => router.push("/(app)/journal/journal-create")}
+                    >
+                      <Text style={[styles.addEntryButtonText, { color: theme.colors.surface }]}>Write First Entry</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {filteredEntries.length > 0 && (
+              <TouchableOpacity
+                style={[styles.floatingAddButton, { backgroundColor: theme.colors.primary }]}
+                onPress={() => router.push("/(app)/journal/journal-create")}
+              >
+                <Ionicons name="add" size={28} color={theme.colors.surface} />
+              </TouchableOpacity>
+            )}
+          </View>
         </ScrollView>
 
         {/* Custom Date Picker Modal */}
@@ -593,17 +642,48 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     backgroundColor: "transparent",
   },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.xxl,
+  },
   content: {
     flex: 1,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.md,
-    marginBottom: 60,
+    paddingTop: Spacing.lg,
   },
-  pageTitle: {
-    fontSize: scaledFontSize(28), // Base size 28px
-    fontWeight: "600",
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.lg,
+  // Feature hero styles to match index
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginBottom: Spacing.xl,
+  },
+  featureCard: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginRight: Spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  featureGradient: {
+    padding: Spacing.xl,
+    height: 180,
+    justifyContent: 'space-between',
+  },
+  featureTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  featureSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+  },
+  sunRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  heroImageWrap: {
+    marginLeft: 'auto',
   },
   searchContainer: {
     flexDirection: "row",
@@ -617,6 +697,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   searchIcon: {
     marginRight: Spacing.md,
@@ -687,6 +768,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   entryHeader: {
     flexDirection: "row",
