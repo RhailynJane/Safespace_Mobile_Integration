@@ -24,6 +24,8 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { LinearGradient } from "expo-linear-gradient";
+import OptimizedImage from "../../../components/OptimizedImage";
 
 type EmotionType = "ecstatic" | "happy" | "content" | "neutral" | "displeased" | "frustrated" | "annoyed" | "angry" | "furious";
 type CreateStep = "create" | "success";
@@ -38,15 +40,16 @@ interface EmotionOption {
 // New 3x3 mood grid
 const emotionOptions: EmotionOption[] = [
   { id: "ecstatic", emoji: "🤩", label: "Ecstatic", bg: "#CCE5FF" },
-  { id: "happy", emoji: "�", label: "Happy", bg: "#FFD1E0" },
+  { id: "happy", emoji: "😃", label: "Happy", bg: "#FFD1E0" },
   { id: "content", emoji: "🙂", label: "Content", bg: "#D0E4FF" },
   { id: "neutral", emoji: "😐", label: "Neutral", bg: "#D5EFDB" },
-  { id: "displeased", emoji: "�", label: "Displeased", bg: "#FFEDD2" },
+  { id: "displeased", emoji: "😕", label: "Displeased", bg: "#FFEDD2" },
   { id: "frustrated", emoji: "😖", label: "Frustrated", bg: "#DFCFFF" },
-  { id: "annoyed", emoji: "�", label: "Annoyed", bg: "#FFDEE3" },
+  { id: "annoyed", emoji: "😒", label: "Annoyed", bg: "#FFDEE3" },
   { id: "angry", emoji: "😠", label: "Angry", bg: "#FFE2CC" },
   { id: "furious", emoji: "🤬", label: "Furious", bg: "#FFD3D3" },
 ];
+
 
 interface JournalData {
   title: string;
@@ -84,6 +87,8 @@ export default function JournalCreateScreen() {
     templateId: null,
     shareWithSupportWorker: false,
   });
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [contentTouched, setContentTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [characterCount, setCharacterCount] = useState(0);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
@@ -99,6 +104,18 @@ export default function JournalCreateScreen() {
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  // Fallback names/prompts if Convex templates are not seeded yet
+  const defaultTemplateNames: Record<number, string> = {
+    1: "Gratitude Journal",
+    2: "Mood Check-In",
+    3: "Free Write",
+  };
+  const defaultTemplatePrompts: Record<number, string> = {
+    1: "List three things you're grateful for today.",
+    2: "Describe your current mood.",
+    3: "Write freely about what's on your mind for 5-10 minutes.",
+  };
 
   const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setModalConfig({ type, title, message });
@@ -120,27 +137,23 @@ export default function JournalCreateScreen() {
     }
   }, [liveTemplates]);
 
-  // Handle templateId from URL params
+  // Handle templateId from URL params (always set id; attach template when available)
   useEffect(() => {
-    if (params.templateId && templates.length > 0) {
+    if (params.templateId) {
       const templateId = parseInt(params.templateId as string);
+      setJournalData((prev) => ({ ...prev, templateId }));
       const template = templates.find(t => t.id === templateId);
-      if (template) {
-        setJournalData((prev) => ({
-          ...prev,
-          templateId: template.id,
-          content: template.prompts?.[0] || prev.content,
-        }));
-        setSelectedTemplate(template);
-      }
+      setSelectedTemplate(template ?? null);
     }
   }, [params.templateId, templates]);
 
   const handleTitleChange = (text: string) => {
+    if (!titleTouched) setTitleTouched(true);
     setJournalData((prev) => ({ ...prev, title: text }));
   };
 
   const handleContentChange = (text: string) => {
+    if (!contentTouched) setContentTouched(true);
     if (text.length <= MAX_CHARACTERS) {
       setJournalData((prev) => ({ ...prev, content: text }));
       setCharacterCount(text.length);
@@ -157,12 +170,10 @@ export default function JournalCreateScreen() {
 
   const handleTemplateSelect = (template: JournalTemplate) => {
     const newTemplateId = journalData.templateId === template.id ? null : template.id;
-    const newContent = newTemplateId === template.id ? template.prompts[0] : journalData.content;
     
     setJournalData((prev) => ({
       ...prev,
       templateId: newTemplateId,
-      content: newContent || prev.content,
     }));
 
     setSelectedTemplate(newTemplateId === template.id ? template : null);
@@ -187,6 +198,10 @@ export default function JournalCreateScreen() {
   const createEntry = useMutation(api.journal.createEntry);
 
   const handleSave = async () => {
+    // mark touched to show inline errors
+    if (!titleTouched) setTitleTouched(true);
+    if (!contentTouched) setContentTouched(true);
+
     if (
       !journalData.title.trim() ||
       !journalData.content.trim() ||
@@ -283,15 +298,38 @@ export default function JournalCreateScreen() {
 
   const renderCreateStep = () => (
     <View style={styles.createContainer}>
-      <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Add New Journal</Text>
-      <Text style={[styles.pageSubtitle, { color: theme.colors.textSecondary }]}>
-        Express your thoughts and feelings
-      </Text>
+      {/* Feature Hero - match visual style from index journal */}
+      <View style={styles.featureRow}>
+        <View style={[styles.featureCard, { borderColor: theme.colors.border }]}> 
+          <LinearGradient
+            colors={[theme.isDark ? '#EEA84E' : '#F9C257', theme.isDark ? '#F1B766' : '#FAD58D']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.featureGradient}
+          >
+            <View>
+              <Text style={[styles.featureTitle, { color: '#1F1B14' }]}>Let it out</Text>
+              <Text style={[styles.featureSubtitle, { color: '#3D3426' }]}>Write about your day, feelings, or intentions</Text>
+            </View>
+            <View style={styles.sunRow}>
+              <Ionicons name="pencil" size={48} color="#F57C00" />
+              <View style={styles.heroImageWrap}>
+                <OptimizedImage
+                  source={require('../../../assets/images/journal.png')}
+                  style={{ width: 90, height: 90, opacity: 0.9 }}
+                  resizeMode="contain"
+                  accessibilityLabel="Decorative journal"
+                />
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      </View>
 
       {/* Template Selection */}
       {!loadingTemplates && templates.length > 0 && (
         <View style={styles.fieldContainer}>
-          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Choose a Template (Optional)</Text>
+          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Quick start (templates)</Text>
           <Text style={[styles.templateSubtext, { color: theme.colors.textSecondary }]}>
             Select a template to get started with guided prompts
           </Text>
@@ -352,30 +390,34 @@ export default function JournalCreateScreen() {
       )}
 
       <View style={styles.fieldContainer}>
-        <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Journal Title *</Text>
+        <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Journal Title*</Text>
         <TextInput
           style={[
             styles.titleInput, 
             { 
               backgroundColor: theme.colors.surface,
               color: theme.colors.text,
-              borderColor: theme.colors.border
+              borderColor: (!journalData.title.trim() && titleTouched) ? theme.colors.error : theme.colors.border
             }
           ]}
           placeholder="Give your entry a title..."
           value={journalData.title}
           onChangeText={handleTitleChange}
           placeholderTextColor={theme.colors.textSecondary}
+          onBlur={() => setTitleTouched(true)}
         />
+        {(!journalData.title.trim() && titleTouched) && (
+          <Text style={[styles.errorText, { color: theme.colors.error }]}>Title is required</Text>
+        )}
       </View>
 
       <View style={styles.fieldContainer}>
         <View style={styles.labelRow}>
           <View>
-            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Write your Entry *</Text>
-            {selectedTemplate && (
+            <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Write your Entry*</Text>
+            {(selectedTemplate || (journalData.templateId && defaultTemplateNames[journalData.templateId])) && (
               <Text style={[styles.templatePromptHint, { color: theme.colors.primary }]}>
-                Using template: {selectedTemplate.name}
+                Using template: {selectedTemplate?.name || (journalData.templateId ? defaultTemplateNames[journalData.templateId] : "")}
               </Text>
             )}
           </View>
@@ -398,17 +440,25 @@ export default function JournalCreateScreen() {
             { 
               backgroundColor: theme.colors.surface,
               color: theme.colors.text,
-              borderColor: theme.colors.border
+              borderColor: (!journalData.content.trim() && contentTouched) ? theme.colors.error : theme.colors.border
             }
           ]}
-          placeholder="Write about your day, feelings or anything on your mind..."
+          placeholder={
+            selectedTemplate?.prompts?.[0]
+            || (journalData.templateId ? defaultTemplatePrompts[journalData.templateId] : undefined)
+            || "Write about your day, feelings or anything on your mind..."
+          }
           value={journalData.content}
           onChangeText={handleContentChange}
           multiline
           textAlignVertical="top"
           placeholderTextColor={theme.colors.textSecondary}
           maxLength={MAX_CHARACTERS}
+          onBlur={() => setContentTouched(true)}
         />
+        {(!journalData.content.trim() && contentTouched) && (
+          <Text style={[styles.errorText, { color: theme.colors.error }]}>Entry is required</Text>
+        )}
       </View>
 
       <View style={styles.fieldContainer}>
@@ -564,6 +614,40 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     paddingTop: Spacing.xl,
   },
+  // Feature hero styles (borrowed from index)
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginBottom: Spacing.xl,
+  },
+  featureCard: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginRight: Spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  featureGradient: {
+    padding: Spacing.xl,
+    height: 180,
+    justifyContent: 'space-between',
+  },
+  featureTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  featureSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+  },
+  sunRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  heroImageWrap: {
+    marginLeft: 'auto',
+  },
   pageTitle: {
     fontSize: scaledFontSize(24), // Base size 24px
     fontWeight: "700",
@@ -714,6 +798,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(14), // Base size 14px
     marginTop: 4,
     color: "#666",
+  },
+  errorText: {
+    fontSize: scaledFontSize(12), // Base size 12px
+    marginTop: Spacing.xs,
+    fontWeight: '500',
   },
   actionButtons: {
     flexDirection: "row",

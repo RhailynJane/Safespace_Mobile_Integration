@@ -74,6 +74,15 @@ export default function JournalScreen() {
     const tpl = templates.find(t => t.name.toLowerCase().includes(name));
     return tpl?.id;
   };
+
+  // Flexible keyword matcher for quick-card to template mapping
+  const getTemplateIdByKeywords = (...keywords: string[]) => {
+    const tpl = templates.find(t => {
+      const n = t.name.toLowerCase();
+      return keywords.some(k => n.includes(k));
+    });
+    return tpl?.id;
+  };
   const morningTplId = getTemplateIdByName('gratitude') ?? 1;
   const eveningTplId = getTemplateIdByName('mood') ?? 2;
 
@@ -175,7 +184,7 @@ export default function JournalScreen() {
                 color="#E9D5CA"
                 tag="Personal"
                 emoji="🌸"
-                onPress={() => handleStartTemplate(getTemplateIdByName('gratitude') ?? 1)}
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('gratitude', 'thanks', 'appreciation') ?? 1)}
               />
               <QuickCard
                 title="Set Intentions"
@@ -183,7 +192,7 @@ export default function JournalScreen() {
                 color="#E3DBFB"
                 tag="Family"
                 emoji="😊"
-                onPress={() => handleStartTemplate(getTemplateIdByName('mood') ?? 2)}
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('intention', 'intent', 'mood', 'check') ?? 2)}
               />
               <QuickCard
                 title="Free Write"
@@ -191,7 +200,7 @@ export default function JournalScreen() {
                 color="#DFF0E6"
                 tag="Notes"
                 emoji="✍️"
-                onPress={() => handleStartTemplate(getTemplateIdByName('free') ?? 3)}
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('free', 'write', 'journal') ?? 3)}
               />
               <QuickCard
                 title="Emotions"
@@ -199,7 +208,7 @@ export default function JournalScreen() {
                 color="#F3EDE5"
                 tag="Mood"
                 emoji="💭"
-                onPress={handleCreateJournal}
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('emotion', 'mood') ?? 2)}
               />
               <QuickCard
                 title="Daily Goal"
@@ -207,7 +216,7 @@ export default function JournalScreen() {
                 color="#FFE8D6"
                 tag="Goals"
                 emoji="🎯"
-                onPress={handleCreateJournal}
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('goal', 'daily', 'intention') ?? 3)}
               />
             </ScrollView>
 
