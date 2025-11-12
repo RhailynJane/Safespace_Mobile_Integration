@@ -109,14 +109,13 @@ export default function JournalScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal" showBack={true} showMenu={true} />
 
-        <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 100 }]}>
+  <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 140 }]}>
           <View style={styles.content}>
             <WeekStrip />
 
             {/* My Journal Header */}
             <SectionHeader
               title="My Journal"
-              onSeeAll={handleViewAllEntries}
               textColor={theme.colors.text}
               hintColor={theme.colors.textSecondary}
             />
@@ -160,7 +159,6 @@ export default function JournalScreen() {
             {/* Quick Journal */}
             <SectionHeader
               title="Quick Journal"
-              onSeeAll={handleViewAllEntries}
               textColor={theme.colors.text}
               hintColor={theme.colors.textSecondary}
             />
@@ -212,6 +210,17 @@ export default function JournalScreen() {
                 onPress={handleCreateJournal}
               />
             </ScrollView>
+
+            {/* View Journal History Button */}
+            <TouchableOpacity 
+              style={styles.historyButton}
+              onPress={handleViewAllEntries}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.historyButtonText}>View Journal History</Text>
+            </TouchableOpacity>
+            {/* Bottom spacer to keep button clear of BottomNavigation and allow scroll */}
+            <View style={{ height: Spacing.lg }} />
           </View>
         </ScrollView>
 
@@ -432,14 +441,14 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: 11,
   },
   quickRow: {
-    paddingVertical: Spacing.md,
-    paddingBottom: 80,
+    paddingVertical: Spacing.sm,
   },
   quickCard: {
     width: 220,
     padding: Spacing.lg,
     borderRadius: 16,
     marginRight: Spacing.md,
+    marginBottom: Spacing.xs,
   },
   quickEmoji: {
     fontSize: scaledFontSize(24),
@@ -466,5 +475,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   chipText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  historyButton: {
+    marginTop: Spacing.xs,
+    marginHorizontal: Spacing.xs,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyButtonText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
