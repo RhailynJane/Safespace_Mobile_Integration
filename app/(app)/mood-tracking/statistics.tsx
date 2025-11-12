@@ -56,10 +56,22 @@ const StatisticsScreen: React.FC = () => {
   const [loadingRiskAnalysis, setLoadingRiskAnalysis] = useState(false);
   const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysis | null>(null);
 
+  // Calculate days based on time filter
+  const getDaysFromFilter = (filter: TimeFilter): number => {
+    switch (filter) {
+      case "All": return 365; // 1 year
+      case "Days": return 7;
+      case "Weeks": return 28; // 4 weeks
+      case "Months": return 30;
+      case "Years": return 365;
+      default: return 30;
+    }
+  };
+
   // Fetch mood data for statistics
   const moodChartData = useQuery(api.moods.getMoodChartData, {
     userId: userId || "",
-    days: 30,
+    days: getDaysFromFilter(timeFilter),
   });
 
   // Navigation tabs
@@ -516,12 +528,6 @@ Respond with ONLY the JSON object, no other text.`;
                 <Text style={styles.barPercentage}>{freudScore.negative}%</Text>
               </View>
             </View>
-
-            {/* Monthly Dropdown (placeholder) */}
-            <TouchableOpacity style={styles.monthlyButton}>
-              <Text style={styles.monthlyButtonText}>Monthly</Text>
-              <Ionicons name="chevron-down" size={16} color={theme.colors.text} />
-            </TouchableOpacity>
           </View>
 
           {/* Mood Distribution Bars */}
@@ -656,11 +662,10 @@ Respond with ONLY the JSON object, no other text.`;
           <View style={styles.card}>
             <View style={styles.predictionHeader}>
               <Text style={styles.cardTitle}>AI Mood Predictions</Text>
-              <TouchableOpacity style={styles.nextWeekButton}>
+              <View style={styles.nextWeekButton}>
                 <Ionicons name="calendar-outline" size={16} color={theme.colors.text} />
                 <Text style={styles.nextWeekText}>Next 1w</Text>
-                <Ionicons name="chevron-down" size={14} color={theme.colors.text} />
-              </TouchableOpacity>
+              </View>
             </View>
 
             {predictions.length === 0 ? (
@@ -864,21 +869,6 @@ const createStyles = (scaledFontSize: (size: number) => number, theme: any) =>
       fontWeight: "600",
       width: 40,
       textAlign: "right",
-    },
-    monthlyButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-      backgroundColor: theme.isDark ? "#2A2A2A" : "#F5F5F5",
-      alignSelf: "center",
-    },
-    monthlyButtonText: {
-      fontSize: scaledFontSize(13),
-      color: theme.colors.text,
-      fontWeight: "500",
     },
     distributionContainer: {
       flexDirection: "row",
