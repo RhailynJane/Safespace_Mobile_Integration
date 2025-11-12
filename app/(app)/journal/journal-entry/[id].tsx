@@ -74,6 +74,8 @@ export default function JournalEntryScreen() {
       setLoading(false);
     } else if (liveEntry === undefined) {
       setLoading(true);
+    } else if (liveEntry === null) {
+      setLoading(false);
     }
   }, [liveEntry]);
 
@@ -119,11 +121,11 @@ export default function JournalEntryScreen() {
       year: "numeric",
       month: "long",
       day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     };
     return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
   };
+
+  // Share removed per request
 
   if (loading) {
     return (
@@ -168,88 +170,71 @@ export default function JournalEntryScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal Entry" showBack={true} showMenu={true} />
 
-        <ScrollView 
-          style={styles.content}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <View style={styles.entryHeader}>
-            <Text style={[styles.entryDate, { color: theme.colors.textSecondary }]}>{formatDate(entry.created_at)}</Text>
-            <Text style={[styles.entryTitle, { color: theme.colors.text }]}>{entry.title}</Text>
-            {entry.emoji && entry.emotion_type && (
-              <Text style={[styles.entryMood, { color: theme.colors.textSecondary }]}>
-                {entry.emoji} {entry.emotion_type.replace("-", " ")}
-              </Text>
-            )}
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          {/* Centered date & title */}
+          <View style={styles.entryHeaderCenter}>
+            <Text style={[styles.prettyDate, { color: '#B06200' }]}>
+              {formatDate(entry.created_at)}
+            </Text>
+            <Text style={[styles.bigTitle, { color: theme.colors.text }]}>{entry.title}</Text>
           </View>
 
-          <Text style={[styles.entryContent, { color: theme.colors.text }]}>{entry.content}</Text>
-
-          {entry.tags && entry.tags.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {entry.tags.map((tag: string, index: number) => (
-                <View 
-                  key={`${entry.id}-${tag}-${index}`} 
-                  style={[styles.tag, { backgroundColor: theme.colors.primary + '20' }]}
-                >
-                  <Text style={[styles.tagText, { color: theme.colors.primary }]}>{tag}</Text>
+          {/* Chips row */}
+          {(entry.tags?.length || entry.emotion_type) ? (
+            <View style={styles.chipsRow}>
+              {entry.tags?.map((tag, i) => (
+                <View key={`${entry.id}-chip-${tag}-${i}`} style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.chipText, { color: theme.colors.textSecondary }]}>{tag}</Text>
                 </View>
               ))}
+              {entry.emotion_type && (
+                <View style={[styles.chip, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.chipText, { color: theme.colors.textSecondary }]}>{entry.emotion_type.replace('-', ' ')}</Text>
+                </View>
+              )}
+            </View>
+          ) : null}
+
+          {/* Visual block removed */}
+
+          {/* Optional audio pill */}
+          {(entry.tags?.some(t => /audio|voice|record/i.test(t)) ?? false) && (
+            <View style={[styles.audioPill, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+              <View style={styles.audioLeft}>
+                <View style={[styles.playButton, { backgroundColor: theme.colors.primary }]}>
+                  <Ionicons name="play" size={18} color={theme.colors.surface} />
+                </View>
+                <View style={styles.waveBar} />
+              </View>
+              <Text style={[styles.audioDuration, { color: theme.colors.textSecondary }]}>00:32</Text>
             </View>
           )}
 
+          {/* Body */}
+          <Text style={[styles.entryBody, { color: theme.colors.text }]}>{entry.content}</Text>
+
+          {/* Shared notice */}
           {entry.share_with_support_worker && (
             <View style={[styles.sharedCard, { backgroundColor: theme.colors.primary + '20' }]}>
               <Ionicons name="people" size={20} color={theme.colors.primary} />
-              <Text style={[styles.sharedCardText, { color: theme.colors.primary }]}>
-                This entry is shared with your support worker
-              </Text>
+              <Text style={[styles.sharedCardText, { color: theme.colors.primary }]}>This entry is shared with your support worker</Text>
             </View>
           )}
-
-          <View style={styles.entryActions}>
-            <TouchableOpacity
-              style={[
-                styles.editButton, 
-                { 
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.primary 
-                }
-              ]}
-              onPress={handleEdit}
-              disabled={deleting}
-            >
-              <Ionicons
-                name="create-outline"
-                size={20}
-                color={theme.colors.primary}
-              />
-              <Text style={[styles.editButtonText, { color: theme.colors.primary }]}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.deleteButton,
-                { 
-                  backgroundColor: theme.colors.error,
-                  borderColor: theme.colors.error 
-                },
-                deleting && styles.disabledButton,
-              ]}
-              onPress={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <ActivityIndicator size="small" color={theme.colors.surface} />
-              ) : (
-                <>
-                  <Ionicons name="trash-outline" size={20} color={theme.colors.surface} />
-                  <Text style={[styles.deleteButtonText, { color: theme.colors.surface }]}>
-                    Delete
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
         </ScrollView>
+
+        {/* Floating actions */}
+        <View style={styles.fabBar}>
+          <TouchableOpacity style={[styles.fab, { backgroundColor: theme.colors.surface }]} onPress={handleEdit}>
+            <Ionicons name="create-outline" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.fab, { backgroundColor: theme.colors.surface }, deleting && styles.disabledButton]} onPress={handleDelete} disabled={deleting}>
+            {deleting ? (
+              <ActivityIndicator size="small" color={theme.colors.text} />
+            ) : (
+              <Ionicons name="trash-outline" size={20} color={theme.colors.text} />
+            )}
+          </TouchableOpacity>
+        </View>
 
         <StatusModal
           visible={modalVisible}
@@ -283,6 +268,75 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   scrollContent: {
     paddingBottom: 150,
+  },
+  entryHeaderCenter: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  prettyDate: {
+    fontSize: scaledFontSize(14),
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+  },
+  bigTitle: {
+    fontSize: scaledFontSize(28),
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: scaledFontSize(13),
+  },
+  // heroImage removed
+  audioPill: {
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  audioLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    flex: 1,
+  },
+  playButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waveBar: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#DADADA',
+    flex: 1,
+  },
+  audioDuration: {
+    fontSize: scaledFontSize(12),
+    marginLeft: Spacing.md,
+  },
+  entryBody: {
+    fontSize: scaledFontSize(16),
+    lineHeight: 24,
+    marginBottom: Spacing.xl,
   },
   loadingContainer: {
     flex: 1,
@@ -402,5 +456,26 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(16), // Base size 16px
     marginLeft: Spacing.sm,
     fontWeight: "600",
+  },
+  fabBar: {
+    position: 'absolute',
+    bottom: 120,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: Spacing.lg,
+    backgroundColor: 'transparent',
+  },
+  fab: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // subtle shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

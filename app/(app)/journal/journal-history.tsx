@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -84,6 +84,11 @@ export default function JournalHistoryScreen() {
     setModalVisible(false);
   };
 
+  // Memoize onData callback to prevent infinite re-renders
+  const handleEntriesData = useCallback((e: JournalEntry[]) => {
+    setEntries(e);
+  }, []);
+
   // Move getDateFilters outside of fetchEntries and use useCallback
   const getDateFilters = React.useCallback(() => {
     const now = new Date();
@@ -109,13 +114,13 @@ export default function JournalHistoryScreen() {
       }
     }
 
-    console.log('Date filters:', {
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      activeFilter,
-      customStartDate: customStartDate?.toISOString(),
-      customEndDate: customEndDate?.toISOString()
-    });
+    // console.log('Date filters:', {
+    //   startDate: startDate?.toISOString(),
+    //   endDate: endDate?.toISOString(),
+    //   activeFilter,
+    //   customStartDate: customStartDate?.toISOString(),
+    //   customEndDate: customEndDate?.toISOString()
+    // });
 
     return {
       ...(startDate && { startDate: startDate.toISOString() }),
@@ -400,7 +405,7 @@ export default function JournalHistoryScreen() {
                 userId={user.id}
                 startDate={getDateFilters().startDate}
                 endDate={getDateFilters().endDate}
-                onData={(e) => setEntries(e)}
+                onData={handleEntriesData}
               />
             ) : null}
 
