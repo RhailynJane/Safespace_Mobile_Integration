@@ -36,7 +36,7 @@ interface MoodEntry {
 const { width } = Dimensions.get("window");
 const EMOJI_SIZE = width / 4.5;
 
-type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad";
+type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad" | "ecstatic" | "content" | "displeased" | "frustrated" | "annoyed" | "angry" | "furious";
 
 interface MoodOption {
   id: MoodType;
@@ -133,17 +133,17 @@ const MoodTrackingScreen: React.FC = () => {
     },
   ]).current;
 
-  // New 3x3 mood grid inspired by the design, mapped to 5 canonical types
+  // New 3x3 mood grid - each mood is its own type (no mapping)
   const moodGrid = [
-    { id: 'ecstatic', label: 'Ecstatic', emoji: '🤩', bg: '#CCE5FF', mapTo: 'very-happy' as MoodType },
+    { id: 'ecstatic', label: 'Ecstatic', emoji: '🤩', bg: '#CCE5FF', mapTo: 'ecstatic' as MoodType },
     { id: 'happy', label: 'Happy', emoji: '😃', bg: '#FFD1E0', mapTo: 'happy' as MoodType },
-    { id: 'content', label: 'Content', emoji: '🙂', bg: '#D0E4FF', mapTo: 'happy' as MoodType },
+    { id: 'content', label: 'Content', emoji: '🙂', bg: '#D0E4FF', mapTo: 'content' as MoodType },
     { id: 'neutral', label: 'Neutral', emoji: '😐', bg: '#D5EFDB', mapTo: 'neutral' as MoodType },
-    { id: 'displeased', label: 'Displeased', emoji: '😕', bg: '#FFEDD2', mapTo: 'sad' as MoodType },
-    { id: 'frustrated', label: 'Frustrated', emoji: '😖', bg: '#DFCFFF', mapTo: 'sad' as MoodType },
-    { id: 'annoyed', label: 'Annoyed', emoji: '😒', bg: '#FFDEE3', mapTo: 'sad' as MoodType },
-    { id: 'angry', label: 'Angry', emoji: '😠', bg: '#FFE2CC', mapTo: 'very-sad' as MoodType },
-    { id: 'furious', label: 'Furious', emoji: '🤬', bg: '#FFD3D3', mapTo: 'very-sad' as MoodType },
+    { id: 'displeased', label: 'Displeased', emoji: '😕', bg: '#FFEDD2', mapTo: 'displeased' as MoodType },
+    { id: 'frustrated', label: 'Frustrated', emoji: '😖', bg: '#DFCFFF', mapTo: 'frustrated' as MoodType },
+    { id: 'annoyed', label: 'Annoyed', emoji: '😒', bg: '#FFDEE3', mapTo: 'annoyed' as MoodType },
+    { id: 'angry', label: 'Angry', emoji: '😠', bg: '#FFE2CC', mapTo: 'angry' as MoodType },
+    { id: 'furious', label: 'Furious', emoji: '🤬', bg: '#FFD3D3', mapTo: 'furious' as MoodType },
   ];
 
   const factorOptions = [

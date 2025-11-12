@@ -1,13 +1,22 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Mapping helpers for UI expectations
+// Mapping helpers for UI expectations - Extended mood grid
 const moodMeta: Record<string, { emoji: string; label: string }> = {
+	// Original 5 canonical types
 	"very-happy": { emoji: "😄", label: "Very Happy" },
 	happy: { emoji: "🙂", label: "Happy" },
 	neutral: { emoji: "😐", label: "Neutral" },
 	sad: { emoji: "🙁", label: "Sad" },
 	"very-sad": { emoji: "😢", label: "Very Sad" },
+	// New 3x3 mood grid
+	ecstatic: { emoji: "🤩", label: "Ecstatic" },
+	content: { emoji: "🙂", label: "Content" },
+	displeased: { emoji: "😕", label: "Displeased" },
+	frustrated: { emoji: "😖", label: "Frustrated" },
+	annoyed: { emoji: "😒", label: "Annoyed" },
+	angry: { emoji: "😠", label: "Angry" },
+	furious: { emoji: "🤬", label: "Furious" },
 };
 
 function toClient(doc: any) {
@@ -187,14 +196,21 @@ export const getFactors = query({
 	},
 });
 
-// Average mood helper
+// Average mood helper - Updated for new mood grid
 function calculateAverageMood(moods: any[]): number {
 	if (moods.length === 0) return 0;
 	const moodScores: Record<string, number> = {
 		"very-sad": 1,
+		furious: 1,
+		angry: 1.5,
 		sad: 2,
+		annoyed: 2,
+		frustrated: 2,
+		displeased: 2.5,
 		neutral: 3,
+		content: 3.5,
 		happy: 4,
+		ecstatic: 5,
 		"very-happy": 5,
 	};
 	const total = moods.reduce((sum, m) => sum + (moodScores[m.moodType] || 3), 0);

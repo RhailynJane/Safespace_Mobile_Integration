@@ -30,28 +30,53 @@ import { api } from "../../../convex/_generated/api";
 // Character limit for notes
 const NOTES_MAX_LENGTH = 200;
 
-// Define mood types for type safety
-type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad";
+// Define mood types for type safety - Extended with new mood grid
+type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad" | "ecstatic" | "content" | "displeased" | "frustrated" | "annoyed" | "angry" | "furious";
 
-// Configuration for different mood types with emojis and labels
-const moodConfig = {
+// New 3x3 mood grid inspired by the design
+const moodGrid = [
+  { id: 'ecstatic', label: 'Ecstatic', emoji: '🤩', bg: '#CCE5FF' },
+  { id: 'happy', label: 'Happy', emoji: '😃', bg: '#FFD1E0' },
+  { id: 'content', label: 'Content', emoji: '🙂', bg: '#D0E4FF' },
+  { id: 'neutral', label: 'Neutral', emoji: '😐', bg: '#D5EFDB' },
+  { id: 'displeased', label: 'Displeased', emoji: '😕', bg: '#FFEDD2' },
+  { id: 'frustrated', label: 'Frustrated', emoji: '😖', bg: '#DFCFFF' },
+  { id: 'annoyed', label: 'Annoyed', emoji: '😒', bg: '#FFDEE3' },
+  { id: 'angry', label: 'Angry', emoji: '😠', bg: '#FFE2CC' },
+  { id: 'furious', label: 'Furious', emoji: '🤬', bg: '#FFD3D3' },
+];
+
+// Configuration for different mood types with emojis and labels (kept for backward compatibility)
+const moodConfig: Record<MoodType, { emoji: string; label: string }> = {
   "very-happy": { emoji: "😄", label: "Very Happy" },
-  happy: { emoji: "🙂", label: "Happy" },
+  happy: { emoji: "�", label: "Happy" },
   neutral: { emoji: "😐", label: "Neutral" },
   sad: { emoji: "🙁", label: "Sad" },
   "very-sad": { emoji: "😢", label: "Very Sad" },
+  ecstatic: { emoji: "🤩", label: "Ecstatic" },
+  content: { emoji: "🙂", label: "Content" },
+  displeased: { emoji: "😕", label: "Displeased" },
+  frustrated: { emoji: "😖", label: "Frustrated" },
+  annoyed: { emoji: "😒", label: "Annoyed" },
+  angry: { emoji: "😠", label: "Angry" },
+  furious: { emoji: "🤬", label: "Furious" },
 };
 
-// Predefined list of mood factors for user selection
+// Predefined list of mood factors for user selection - Updated list
 const moodFactors = [
+  "Work",
   "Family",
-  "Health Concerns",
-  "Sleep Quality",
+  "Relationship",
+  "Friends",
+  "Myself",
+  "School",
+  "Coworkers",
+  "Health",
   "Social Interaction",
-  "Financial Stress",
+  "Financial",
   "Physical Activity",
-  "Work/School Stress",
   "Weather",
+  "Sleep",
 ];
 
 // Navigation tabs configuration
