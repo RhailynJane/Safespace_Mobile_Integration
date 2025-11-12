@@ -15,6 +15,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../contexts/ThemeContext";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
+import BottomNavigation from "../../../components/BottomNavigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import StatusModal from "../../../components/StatusModal";
@@ -35,6 +36,7 @@ const MoodEntryDetailsScreen: React.FC = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = user?.id;
 
+  const [activeTab, setActiveTab] = useState("home");
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
   const [status, setStatus] = useState<{ 
@@ -52,6 +54,24 @@ const MoodEntryDetailsScreen: React.FC = () => {
   const entry = history?.moods.find((m) => m.id === id);
   const updateMood = useMutation(api.moods.updateMood);
   const deleteMood = useMutation(api.moods.deleteMood);
+
+  // Navigation tabs
+  const tabs = [
+    { id: "home", name: "Home", icon: "home" },
+    { id: "community-forum", name: "Community", icon: "people" },
+    { id: "appointments", name: "Appointments", icon: "calendar" },
+    { id: "messages", name: "Messages", icon: "chatbubbles" },
+    { id: "profile", name: "Profile", icon: "person" },
+  ];
+
+  const handleTabPress = (tabId: string) => {
+    setActiveTab(tabId);
+    if (tabId === "home") {
+      router.replace("/(app)/(tabs)/home");
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
+    }
+  };
 
   React.useEffect(() => {
     if (entry?.notes) {
@@ -129,6 +149,7 @@ const MoodEntryDetailsScreen: React.FC = () => {
               Mood entry not found
             </Text>
           </View>
+          <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
         </SafeAreaView>
       </CurvedBackground>
     );
@@ -286,6 +307,8 @@ const MoodEntryDetailsScreen: React.FC = () => {
           message={status.message || ""}
           type={status.type || "info"}
         />
+
+        <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -296,7 +319,7 @@ export default MoodEntryDetailsScreen;
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
+  scrollContent: { padding: 16, paddingBottom: 100 },
   centerContent: {
     flex: 1,
     justifyContent: "center",
