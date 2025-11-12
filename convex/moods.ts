@@ -196,6 +196,157 @@ export const getFactors = query({
 	},
 });
 
+/** Get mood chart data with streaks for visualization */
+export const getMoodChartData = query({
+	args: { userId: v.string(), days: v.optional(v.number()) },
+	handler: async (ctx, { userId, days = 30 }) => {
+		// Get all moods for the user
+		const allMoods = await ctx.db
+			.query("moods")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.order("desc")
+			.collect();
+
+		// Helper to get local date string in America/Edmonton timezone
+		const getLocalDateStr = (timestamp: number) => {
+			// Convert to America/Edmonton timezone (MST/MDT)
+			const d = new Date(timestamp);
+			const dateStr = d.toLocaleString('en-US', {
+				timeZone: 'America/Edmonton',
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+			});
+			
+			// Parse MM/DD/YYYY format to YYYY-MM-DD
+			const parts = dateStr.split('/');
+			const month = parts[0] || '01';
+			const day = parts[1] || '01';
+			const year = parts[2] || '2025';
+			return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+		};
+
+		// Group ALL moods by LOCAL date
+		const moodsByDate: Record<string, any[]> = {};
+		allMoods.forEach((m) => {
+			const dateStr = getLocalDateStr(m.createdAt);
+			if (!moodsByDate[dateStr]) moodsByDate[dateStr] = [];
+			moodsByDate[dateStr].push(m);
+		});
+
+		console.log('[getMoodChartData] Moods grouped by date:', {
+			totalMoods: allMoods.length,
+			allMoodsWithDates: allMoods.slice(0, 5).map(m => ({
+				type: m.moodType,
+				createdAt: m.createdAt,
+				utc: new Date(m.createdAt).toISOString(),
+				localDate: getLocalDateStr(m.createdAt),
+			})),
+			moodsByDateKeys: Object.keys(moodsByDate),
+			moodsByDate: Object.entries(moodsByDate).map(([date, moods]) => ({
+				date,
+				count: moods.length,
+				moodTypes: moods.map(m => m.moodType),
+			})),
+		});
+
+		// Generate last N days including today
+		const today = new Date();
+		const chartDates: string[] = [];
+		
+		console.log('[getMoodChartData] Generating date range:', {
+			days,
+			today: getLocalDateStr(today.getTime()),
+			todayISO: today.toISOString(),
+		});
+		
+		// Generate dates for the last N days (including today)
+		for (let i = days - 1; i >= 0; i--) {
+			const date = new Date(today);
+			date.setDate(date.getDate() - i);
+			const dateStr = getLocalDateStr(date.getTime());
+			chartDates.push(dateStr);
+		}
+		
+		console.log('[getMoodChartData] Chart dates:', chartDates);
+
+		// Calculate streaks (consecutive days with mood entries)
+		const datesWithMoods = Object.keys(moodsByDate).sort();
+		let currentStreak = 0;
+		let longestStreak = 0;
+		let tempStreak = 0;
+		const todayStr = getLocalDateStr(Date.now());
+		const yesterdayStr = getLocalDateStr(Date.now() - 24 * 60 * 60 * 1000);
+
+		// Calculate current streak (must include today or yesterday)
+		const hasToday = datesWithMoods.includes(todayStr);
+		const hasYesterday = datesWithMoods.includes(yesterdayStr);
+
+		if (hasToday || hasYesterday) {
+			const startDateStr = hasToday ? todayStr : yesterdayStr;
+			let checkDate = new Date(startDateStr);
+			while (true) {
+				const dateStr = getLocalDateStr(checkDate.getTime());
+				if (datesWithMoods.includes(dateStr)) {
+					currentStreak++;
+					checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
+				} else {
+					break;
+				}
+			}
+		}
+
+		// Calculate longest streak from all history
+		if (datesWithMoods.length > 0) {
+			tempStreak = 1;
+			for (let i = 1; i < datesWithMoods.length; i++) {
+				const prevDateStr = datesWithMoods[i - 1];
+				const currDateStr = datesWithMoods[i];
+				if (!prevDateStr || !currDateStr) continue;
+				
+				const prevDate = new Date(prevDateStr);
+				const currDate = new Date(currDateStr);
+				const diffDays = Math.floor((currDate.getTime() - prevDate.getTime()) / (24 * 60 * 60 * 1000));
+				
+				if (diffDays === 1) {
+					tempStreak++;
+				} else {
+					longestStreak = Math.max(longestStreak, tempStreak);
+					tempStreak = 1;
+				}
+			}
+			longestStreak = Math.max(longestStreak, tempStreak, currentStreak);
+		}
+
+		// Prepare chart data for ALL 30 days (including days without moods)
+		const chartData = chartDates.map((date) => {
+			const moods = moodsByDate[date] || [];
+			const avgScore = moods.length > 0 ? calculateAverageMood(moods) : null;
+			return {
+				date,
+				mood: moods[0] ? toClient(moods[0]) : null,
+				averageScore: avgScore,
+				count: moods.length,
+				hasMood: moods.length > 0,
+			};
+		});
+
+		console.log('[getMoodChartData] Generated 30-day chart:', {
+			totalDays: chartData.length,
+			daysWithMoods: chartData.filter(d => d.hasMood).length,
+			dateRange: `${chartDates[0]} to ${chartDates[chartDates.length - 1]}`,
+			chartDataDates: chartData.map(d => ({ date: d.date, hasMood: d.hasMood, score: d.averageScore })),
+		});
+
+		return {
+			currentStreak,
+			longestStreak,
+			chartData,
+			totalEntries: allMoods.length,
+		};
+	},
+});
+
 // Average mood helper - Updated for new mood grid
 function calculateAverageMood(moods: any[]): number {
 	if (moods.length === 0) return 0;

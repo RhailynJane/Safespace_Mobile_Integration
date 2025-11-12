@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import Svg, { Line } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -28,6 +29,8 @@ import OptimizedImage from "../../../components/OptimizedImage";
 import React from "react";
 import { useConvexMoods } from "../../../utils/hooks/useConvexMoods";
 import { LiveMoodStats } from "../../../components/LiveMoodStats";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 type MoodEntry = {
   id: string;
@@ -36,6 +39,174 @@ type MoodEntry = {
   mood_emoji?: string;
   mood_label?: string;
 };
+
+/**
+ * MoodChartSection Component - Shows mood chart with streaks
+ */
+function MoodChartSection({ userId }: { userId: string }) {
+  const { theme } = useTheme();
+  const chartData = useQuery(api.moods.getMoodChartData, { userId, days: 7 });
+
+  // Mood emoji mapping
+  const getEmojiForMood = (moodType: string) => {
+    const moodMap: Record<string, string> = {
+      "very-happy": "😄", "happy": "🙂", "neutral": "😐", "sad": "🙁", "very-sad": "😢",
+      "ecstatic": "🤩", "content": "🙂", "displeased": "😕", "frustrated": "😖",
+      "annoyed": "😒", "angry": "😠", "furious": "🤬",
+    };
+    return moodMap[moodType] || "😐";
+  };
+
+  if (!chartData) {
+    return (
+      <View style={{ backgroundColor: theme.colors.surface, padding: 20, borderRadius: 12 }}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  const { currentStreak, longestStreak, chartData: moodPoints } = chartData;
+  // Show all 30 days
+  const displayDays = moodPoints;
+  const daysWithMoods = displayDays.filter(d => d.averageScore !== null);
+
+  console.log('[MoodChartSection] Chart data:', { 
+    totalDays: displayDays.length,
+    daysWithMoods: daysWithMoods.length,
+    dates: displayDays.map(d => d.date),
+    scores: displayDays.map(d => d.averageScore)
+  });
+
+  return (
+    <View style={{ backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, marginTop: 8 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <Text style={{ fontSize: 18, fontWeight: "600", color: theme.colors.text }}>
+          Mood Trends (7 days)
+        </Text>
+        <TouchableOpacity onPress={() => router.push("/(app)/mood-tracking/mood-history")}>
+          <Text style={{ fontSize: 14, color: "#4CAF50", fontWeight: "600" }}>View All</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Streaks Section */}
+      <View style={{ flexDirection: "row", backgroundColor: theme.isDark ? '#2A2A2A' : '#F5F0F5', borderRadius: 12, padding: 12, marginBottom: 16 }}>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2, marginBottom: 4 }}>Current Streak</Text>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: theme.colors.text }}>{currentStreak} days</Text>
+        </View>
+        <View style={{ width: 1, marginHorizontal: 12, backgroundColor: theme.colors.borderLight }} />
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Ionicons name="trophy-outline" size={16} color={theme.colors.textSecondary} />
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2, marginBottom: 4 }}>Longest Streak</Text>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: theme.colors.text }}>{longestStreak} days</Text>
+        </View>
+      </View>
+
+      {/* Mood Chart */}
+      {displayDays.length > 0 ? (
+        <>
+          <Text style={{ fontSize: 15, fontWeight: "600", marginBottom: 12, color: theme.colors.text }}>Mood Chart</Text>
+          <View style={{ height: 200, marginBottom: 8 }}>
+            {/* Chart Area with bars */}
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', paddingHorizontal: 8, backgroundColor: theme.isDark ? '#1a1a1a' : '#f8f8f8', borderRadius: 8, paddingTop: 20, paddingBottom: 50 }}>
+              {displayDays.map((point, i) => {
+                const score = point.averageScore;
+                const hasMood = score !== null;
+                
+                // Map score (1-5) to bar height percentage
+                const heightPercent = hasMood ? ((score - 1) / 4) * 100 : 5;
+                
+                // Get emoji for the mood
+                const emoji = hasMood && point.mood ? (point.mood.mood_emoji || getEmojiForMood(point.mood.mood_type)) : '';
+                
+                // Get color based on score
+                const getBarColor = (s: number | null) => {
+                  if (s === null) return theme.isDark ? '#2a2a2a' : '#e0e0e0';
+                  if (s >= 4.5) return '#FFD700'; // ecstatic - gold
+                  if (s >= 3.5) return '#FFB74D'; // happy/content - orange
+                  if (s >= 2.5) return '#90CAF9'; // neutral/displeased - blue
+                  if (s >= 1.5) return '#EF9A9A'; // frustrated/annoyed - light red
+                  return '#F48FB1'; // angry/furious - pink
+                };
+                
+                return (
+                  <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', marginHorizontal: 2 }}>
+                    {/* Bar */}
+                    <View style={{
+                      width: '100%',
+                      maxWidth: 35,
+                      height: `${heightPercent}%`,
+                      minHeight: hasMood ? 30 : 5,
+                      backgroundColor: getBarColor(score),
+                      borderRadius: 8,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      opacity: hasMood ? 1 : 0.3,
+                    }}>
+                      {hasMood && emoji && (
+                        <Text style={{ fontSize: 18 }}>{emoji}</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+            
+            {/* Day of week and date labels */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8, paddingHorizontal: 8 }}>
+              {displayDays.map((point, i) => {
+                // Parse date string properly (YYYY-MM-DD)
+                const [year, month, dayStr] = point.date.split('-');
+                const date = new Date(parseInt(year || '2025'), parseInt(month || '1') - 1, parseInt(dayStr || '1'));
+                const day = date.getDate();
+                const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+                
+                // Check if this is today by comparing date strings
+                const todayStr = (() => {
+                  const d = new Date();
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  return `${year}-${month}-${day}`;
+                })();
+                const isToday = point.date === todayStr;
+                
+                return (
+                  <View key={i} style={{ flex: 1, alignItems: 'center', marginHorizontal: 2 }}>
+                    <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginBottom: 2 }}>
+                      {dayOfWeek}
+                    </Text>
+                    <View style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: isToday ? theme.colors.primary : 'transparent',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      <Text style={{ fontSize: 11, color: isToday ? '#fff' : theme.colors.text, fontWeight: isToday ? '700' : '400' }}>
+                        {day}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </>
+      ) : (
+        <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 24, alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: theme.colors.textSecondary, fontWeight: "500", marginBottom: 4 }}>
+            No mood data yet
+          </Text>
+          <Text style={{ fontSize: 14, color: theme.colors.textDisabled, textAlign: "center" }}>
+            Track your mood to see trends
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 /**
  * HomeScreen Component
@@ -164,20 +335,23 @@ export default function HomeScreen() {
    * Returns emoji representation for mood type
    */
   const getEmojiForMood = (moodType: string) => {
-    switch (moodType) {
-      case "very-happy":
-        return "😄";
-      case "happy":
-        return "🙂";
-      case "neutral":
-        return "😐";
-      case "sad":
-        return "🙁";
-      case "very-sad":
-        return "😢";
-      default:
-        return "😐";
-    }
+    const moodMap: Record<string, string> = {
+      // Original 5 moods
+      "very-happy": "😄",
+      "happy": "🙂",
+      "neutral": "�",
+      "sad": "🙁",
+      "very-sad": "�",
+      // New 9 mood grid
+      "ecstatic": "🤩",
+      "content": "�",
+      "displeased": "😕",
+      "frustrated": "�",
+      "annoyed": "😒",
+      "angry": "�",
+      "furious": "🤬",
+    };
+    return moodMap[moodType] || "😐";
   };
 
 
@@ -187,20 +361,23 @@ export default function HomeScreen() {
    * Returns label text for mood type
    */
   const getLabelForMood = (moodType: string) => {
-    switch (moodType) {
-      case "very-happy":
-        return "Very Happy";
-      case "happy":
-        return "Happy";
-      case "neutral":
-        return "Neutral";
-      case "sad":
-        return "Sad";
-      case "very-sad":
-        return "Very Sad";
-      default:
-        return "Unknown";
-    }
+    const labelMap: Record<string, string> = {
+      // Original 5 moods
+      "very-happy": "Very Happy",
+      "happy": "Happy",
+      "neutral": "Neutral",
+      "sad": "Sad",
+      "very-sad": "Very Sad",
+      // New 9 mood grid
+      "ecstatic": "Ecstatic",
+      "content": "Content",
+      "displeased": "Displeased",
+      "frustrated": "Frustrated",
+      "annoyed": "Annoyed",
+      "angry": "Angry",
+      "furious": "Furious",
+    };
+    return labelMap[moodType] || "Unknown";
   };
 
   /**
@@ -557,78 +734,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Live Mood Stats Section */}
-            {user?.id && (
-              <View style={styles.section}>
-                <LiveMoodStats 
-                  userId={user.id} 
-                  days={7}
-                  renderStats={(stats) => (
-                    <View style={[styles.statsCard, { backgroundColor: theme.colors.surface }]}>
-                      <View style={styles.statsHeader}>
-                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                          Mood Trends (7 days)
-                        </Text>
-                        {/* Navigate explicitly to grouped mood history route to avoid reloading home */}
-                        <TouchableOpacity onPress={() => router.push("/(app)/mood-tracking/mood-history")}>
-                          <Text style={styles.viewAllText}>View All</Text>
-                        </TouchableOpacity>
-                      </View>
-                      
-                      {stats.totalEntries > 0 ? (
-                        <>
-                          <View style={styles.statsGrid}>
-                            <View style={styles.statBox}>
-                              <Text style={[styles.statValue, { color: theme.colors.primary }]}>
-                                {stats.totalEntries}
-                              </Text>
-                              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-                                Entries
-                              </Text>
-                            </View>
-                            <View style={styles.statBox}>
-                              <Text style={[styles.statValue, { color: theme.colors.primary }]}>
-                                {stats.averageMood.toFixed(1)}
-                              </Text>
-                              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-                                Avg Mood
-                              </Text>
-                            </View>
-                          </View>
-                          
-                          {Object.keys(stats.distribution).length > 0 && (
-                            <View style={styles.distributionList}>
-                              {Object.entries(stats.distribution)
-                                .sort(([, a], [, b]) => (b as number) - (a as number))
-                                .slice(0, 3)
-                                .map(([mood, count]) => (
-                                  <View key={mood} style={[styles.distributionItem, { borderColor: theme.colors.borderLight }]}>
-                                    <Text style={[styles.distributionMood, { color: theme.colors.text }]}>
-                                      {getEmojiForMood(mood)} {getLabelForMood(mood)}
-                                    </Text>
-                                    <Text style={[styles.distributionCount, { color: theme.colors.textSecondary }]}>
-                                      {String(count)}×
-                                    </Text>
-                                  </View>
-                                ))}
-                            </View>
-                          )}
-                        </>
-                      ) : (
-                        <View style={[styles.noDataContainer, { backgroundColor: theme.colors.background }]}>
-                          <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>
-                            No mood data yet
-                          </Text>
-                          <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
-                            Track your mood to see trends
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                />
-              </View>
-            )}
+           
 
             {/* Pending Assessment Task - Only show if due */}
             {isAssessmentDue && (
@@ -671,6 +777,13 @@ export default function HomeScreen() {
                     />
                   </View>
                 </TouchableOpacity>
+              </View>
+            )}
+
+             {/* Mood Chart with Streaks Section */}
+            {user?.id && (
+              <View style={styles.section}>
+                <MoodChartSection userId={user.id} />
               </View>
             )}
 
@@ -722,43 +835,6 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-
-            {/* Recent Mood History Section */}
-            <View style={styles.section}>
-              <TouchableOpacity
-                // Fix navigation: ensure we target grouped segment path
-                onPress={() => router.push("/(app)/mood-tracking/mood-history")}
-                style={styles.sectionTitleContainer}
-              >
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Moods</Text>
-              </TouchableOpacity>
-              {displayedRecentMoods.length > 0 ? (
-                <View style={[styles.recentMoods, { backgroundColor: theme.colors.surface }]}>
-                  {displayedRecentMoods.map((mood) => (
-                    <View key={mood.id} style={[styles.moodItem, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
-                      <Text style={styles.moodEmoji}>
-                        {getEmojiForMood(mood.mood_type)}
-                      </Text>
-                      <View style={styles.moodDetails}>
-                        <Text style={[styles.moodDate, { color: theme.colors.textSecondary }]}>
-                          {formatDate(mood.created_at)}
-                        </Text>
-                        <Text style={[styles.moodText, { color: theme.colors.text }]}>
-                          {getLabelForMood(mood.mood_type)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <View style={[styles.noDataContainer, { backgroundColor: theme.colors.surface }]}>
-                  <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>No mood entries yet</Text>
-                  <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
-                    Start tracking your mood to see insights here
-                  </Text>
-                </View>
-              )}
             </View>
 
             {/* Resources Section */}
