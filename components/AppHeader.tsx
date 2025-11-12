@@ -27,7 +27,8 @@ import avatarEvents from "../utils/avatarEvents";
 import notificationEvents from "../utils/notificationEvents";
 import { useNotifications } from "../contexts/NotificationsContext";
 import { useConvexActivity } from "../utils/hooks/useConvexActivity";
-import { ConvexReactClient } from "convex/react";
+import { ConvexReactClient, useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 
 const { width } = Dimensions.get("window");
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
@@ -240,6 +241,25 @@ export const AppHeader = ({
       loadProfileImage();
     }
   }, [user?.id, loadProfileImage]);
+
+  // Live profile subscription from Convex: keep avatar in sync with profile personal info
+  const fullProfile = useQuery(
+    api.profiles.getFullProfile,
+    user?.id ? { clerkId: user.id } : "skip"
+  ) as { profileImageUrl?: string } | undefined;
+
+  useEffect(() => {
+    const url = fullProfile?.profileImageUrl;
+    if (url && typeof url === 'string') {
+      const normalized = normalizeImageUri(url);
+      if (normalized && normalized !== profileImage) {
+        setProfileImage(normalized);
+        // Persist for fast startup
+        AsyncStorage.setItem('profileImage', normalized).catch(() => {});
+        AsyncStorage.setItem('profileData', JSON.stringify({ profileImageUrl: normalized })).catch(() => {});
+      }
+    }
+  }, [fullProfile?.profileImageUrl, profileImage]);
 
   useFocusEffect(
     useCallback(() => {
