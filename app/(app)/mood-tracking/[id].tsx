@@ -20,7 +20,7 @@ import { api } from "../../../convex/_generated/api";
 import StatusModal from "../../../components/StatusModal";
 
 interface MoodEntry {
-  _id: string;
+  id: string;
   mood_type: string;
   mood_emoji: string;
   mood_label: string;
@@ -49,7 +49,7 @@ const MoodEntryDetailsScreen: React.FC = () => {
     userId ? { userId, limit: 100, offset: 0 } : "skip"
   ) as { moods: MoodEntry[] } | undefined;
 
-  const entry = history?.moods.find((m) => m._id === id);
+  const entry = history?.moods.find((m) => m.id === id);
   const updateMood = useMutation(api.moods.updateMood);
   const deleteMood = useMutation(api.moods.deleteMood);
 
@@ -63,7 +63,7 @@ const MoodEntryDetailsScreen: React.FC = () => {
     if (!entry) return;
     try {
       await updateMood({
-        id: entry._id as any,
+        id: entry.id as any,
         notes: editedNotes,
       });
       setStatus({
@@ -152,11 +152,6 @@ const MoodEntryDetailsScreen: React.FC = () => {
         <AppHeader 
           title="Mood Entry" 
           showBack={true}
-          rightActions={
-            <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
-              <Ionicons name="trash-outline" size={24} color={theme.colors.error} />
-            </TouchableOpacity>
-          }
         />
         
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -273,6 +268,15 @@ const MoodEntryDetailsScreen: React.FC = () => {
               </Text>
             )}
           </View>
+
+          {/* Delete Button */}
+          <TouchableOpacity 
+            onPress={handleDelete} 
+            style={[styles.deleteButton, { backgroundColor: theme.colors.error }]}
+          >
+            <Ionicons name="trash-outline" size={20} color="#FFF" />
+            <Text style={styles.deleteButtonText}>Delete Mood Entry</Text>
+          </TouchableOpacity>
         </ScrollView>
 
         <StatusModal
@@ -303,9 +307,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 18,
     fontWeight: "600",
-  },
-  deleteBtn: {
-    padding: 8,
   },
   moodCard: {
     borderRadius: 16,
@@ -418,6 +419,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionBtnText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 24,
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: "#FFF",
     fontSize: 16,
     fontWeight: "600",
   },
