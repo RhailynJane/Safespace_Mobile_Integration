@@ -297,6 +297,21 @@ const MoodHistoryScreen: React.FC = () => {
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>        
         <AppHeader title="Mood History" showBack={true} />
+        
+        {/* Statistics Button */}
+        <View style={styles.statsButtonContainer}>
+          <TouchableOpacity
+            style={[styles.statsButton, { backgroundColor: theme.colors.surface }]}
+            onPress={() => router.push("/(app)/mood-tracking/statistics")}
+          >
+            <Ionicons name="stats-chart" size={20} color={theme.colors.primary} />
+            <Text style={[styles.statsButtonText, { color: theme.colors.text }]}>
+              View Statistics & AI Predictions
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
@@ -420,6 +435,24 @@ export default MoodHistoryScreen;
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { paddingBottom: 120, paddingHorizontal: 12 },
+  statsButtonContainer: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8 },
+  statsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 12,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  statsButtonText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+  },
   searchWrapper: { paddingHorizontal: 12, paddingTop: 8 },
   searchInputContainer: { flexDirection: "row", alignItems: "center", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   searchInput: { flex: 1, marginLeft: 8, fontSize: 16 },
