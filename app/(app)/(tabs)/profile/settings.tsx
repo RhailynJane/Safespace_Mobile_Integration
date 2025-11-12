@@ -38,6 +38,8 @@ import { api } from "../../../../convex/_generated/api";
  * display, privacy, and notification settings.
  */
 export default function SettingsScreen() {
+  // When true, use REST settings API; when false, rely on Convex + local defaults only
+  const USE_REST_SETTINGS = false;
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [ready, setReady] = useState(false); // prevent auto-save on initial load
@@ -158,7 +160,9 @@ export default function SettingsScreen() {
           appointmentReminderAdvanceMinutes,
         };
         console.log('🔔 Auto-saving notification settings:', settings);
-        await settingsAPI.saveSettings(settings, user?.id);
+        if (USE_REST_SETTINGS) {
+          await settingsAPI.saveSettings(settings, user?.id);
+        }
         // Schedule local notifications based on updated settings
         try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
         // Best-effort: also reflect preferences in Convex profile (theme/notifications)
@@ -196,7 +200,30 @@ export default function SettingsScreen() {
   const loadSettings = async () => {
     try {
       setIsLoading(true);
-      const settings = await settingsAPI.fetchSettings(user?.id);
+      const settings = USE_REST_SETTINGS
+        ? await settingsAPI.fetchSettings(user?.id)
+        : {
+            darkMode: isDarkMode,
+            textSize,
+            notificationsEnabled: true,
+            notifMoodTracking: true,
+            notifJournaling: true,
+            notifMessages: true,
+            notifPostReactions: true,
+            notifAppointments: true,
+            notifSelfAssessment: true,
+            reminderFrequency: 'Daily',
+            moodReminderEnabled: false,
+            moodReminderTime: '09:00',
+            moodReminderFrequency: 'Daily',
+            moodReminderCustomSchedule: {},
+            journalReminderEnabled: false,
+            journalReminderTime: '20:00',
+            journalReminderFrequency: 'Daily',
+            journalReminderCustomSchedule: {},
+            appointmentReminderEnabled: true,
+            appointmentReminderAdvanceMinutes: 60,
+          } as UserSettings;
       
       // Apply all saved settings EXCEPT dark mode and text size (managed by ThemeContext)
       // Do not override current theme/context values here to avoid reverting user changes
@@ -258,7 +285,9 @@ export default function SettingsScreen() {
         appointmentReminderAdvanceMinutes,
       };
 
-  const result = await settingsAPI.saveSettings(settings, user?.id);
+  const result = USE_REST_SETTINGS
+    ? await settingsAPI.saveSettings(settings, user?.id)
+    : { success: true, message: 'Saved locally (REST disabled)' } as any;
   // Always schedule locally regardless of server result
   try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
       if (!result.success) {

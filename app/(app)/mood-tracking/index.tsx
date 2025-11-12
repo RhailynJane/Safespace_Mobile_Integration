@@ -1,29 +1,23 @@
-/**
- * LLM Prompt: Add concise comments to this React Native component. 
- * Reference: chat.deepseek.com
- */
-import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Animated,
   Dimensions,
   Pressable,
-  ActivityIndicator,
+  InteractionManager,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useUser } from "@clerk/clerk-expo";
-import { Colors, Spacing, Typography } from "../../../constants/theme";
+import { Colors, Spacing } from "../../../constants/theme";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { useTheme } from "../../../contexts/ThemeContext";
-import { APP_TIME_ZONE } from "../../../utils/timezone";
 import StatusModal from "../../../components/StatusModal";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -53,31 +47,19 @@ interface MoodOption {
   opacity: Animated.Value;
 }
 
-const MoodTrackingScreen = () => {
+const MoodTrackingScreen: React.FC = () => {
   const { theme, scaledFontSize } = useTheme();
-  const { user } = useUser();
+  const [activeTab, setActiveTab] = useState("home");
+  const [selectedMoodCard, setSelectedMoodCard] = useState<string | null>(null);
+  const [selectedFactors, setSelectedFactors] = useState<string[]>([]);
   const [activeEmoji, setActiveEmoji] = useState<MoodType | null>(null);
-  const [activeTab, setActiveTab] = useState("mood");
-  const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalConfig, setModalConfig] = useState({
-    type: 'info' as 'success' | 'error' | 'info',
-    title: '',
-    message: '',
-  });
-
-  // Create styles dynamically based on text size
-  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
-
-  const showStatusModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-    setModalConfig({ type, title, message });
-    setModalVisible(true);
-  };
-
-  const hideStatusModal = () => {
-    setModalVisible(false);
-  };
+  const [modalConfig, setModalConfig] = useState<{
+    type: "success" | "error" | "info";
+    title: string;
+    message: string;
+  }>({ type: "info", title: "", message: "" });
 
   // Navigation tabs configuration
   const tabs = [
@@ -96,6 +78,16 @@ const MoodTrackingScreen = () => {
       router.push(`/(app)/(tabs)/${tabId}`);
     }
   };
+
+  const showStatusModal = (
+    type: "success" | "error" | "info",
+    title: string,
+    message: string
+  ) => {
+    setModalConfig({ type, title, message });
+    setModalVisible(true);
+  };
+  const hideStatusModal = () => setModalVisible(false);
 
   // Initialize animated values for mood emojis with visual feedback
   const moodOptions = useRef<MoodOption[]>([
@@ -140,6 +132,23 @@ const MoodTrackingScreen = () => {
       opacity: new Animated.Value(1),
     },
   ]).current;
+
+  // New 3x3 mood grid inspired by the design, mapped to 5 canonical types
+  const moodGrid = [
+    { id: 'ecstatic', label: 'Ecstatic', emoji: '🤩', bg: '#CCE5FF', mapTo: 'very-happy' as MoodType },
+    { id: 'happy', label: 'Happy', emoji: '😃', bg: '#FFD1E0', mapTo: 'happy' as MoodType },
+    { id: 'content', label: 'Content', emoji: '🙂', bg: '#D0E4FF', mapTo: 'happy' as MoodType },
+    { id: 'neutral', label: 'Neutral', emoji: '😐', bg: '#D5EFDB', mapTo: 'neutral' as MoodType },
+    { id: 'displeased', label: 'Displeased', emoji: '😕', bg: '#FFEDD2', mapTo: 'sad' as MoodType },
+    { id: 'frustrated', label: 'Frustrated', emoji: '😖', bg: '#DFCFFF', mapTo: 'sad' as MoodType },
+    { id: 'annoyed', label: 'Annoyed', emoji: '😒', bg: '#FFDEE3', mapTo: 'sad' as MoodType },
+    { id: 'angry', label: 'Angry', emoji: '😠', bg: '#FFE2CC', mapTo: 'very-sad' as MoodType },
+    { id: 'furious', label: 'Furious', emoji: '🤬', bg: '#FFD3D3', mapTo: 'very-sad' as MoodType },
+  ];
+
+  const factorOptions = [
+    'work','family','relationship','friends','myself','school','coworkers','health','social interaction','financial','physical activity','weather','sleep'
+  ];
 
   // Live subscription for recent moods (child component to avoid conditional hook)
   const LiveRecentMoods = ({ userId, onData }: { userId: string; onData: (e: MoodEntry[]) => void }) => {
@@ -192,19 +201,42 @@ const MoodTrackingScreen = () => {
     });
   };
 
-  // Navigate to mood logging screen with selected mood
-  const handleMoodPress = (moodId: MoodType) => {
-    router.push(`/(app)/mood-tracking/mood-logging?selectedMood=${moodId}`);
+  // Navigate to mood logging with the chosen canonical mood
+  const proceedNext = () => {
+    if (!selectedMoodCard) {
+      showStatusModal('info', 'Choose a mood', 'Please pick how your day felt to continue.');
+      return;
+    }
+    const selected = moodGrid.find(m => m.id === selectedMoodCard);
+    const mapped = selected?.mapTo || 'neutral';
+    const factorsParam = selectedFactors.join(',');
+    handleEmojiPressOut();
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        try {
+          const params = new URLSearchParams({ 
+            selectedMood: mapped, 
+            factors: factorsParam,
+            selectedId: selected?.id || '',
+            selectedLabel: selected?.label || '',
+            selectedEmoji: selected?.emoji || '',
+          });
+          router.push(`/(app)/mood-tracking/mood-logging?${params.toString()}`);
+        } catch (_e) {
+          showStatusModal('error', 'Navigation Error', 'Unable to open mood logging. Please try again.');
+        }
+      });
+    });
   };
 
-  // Render individual mood emoji with animations
+  // Render original animated emoji (kept for possible reuse below grid)
   const renderMoodEmoji = (mood: MoodOption) => {
     return (
       <Pressable
         key={mood.id}
         onPressIn={() => handleEmojiPressIn(mood.id)}
         onPressOut={handleEmojiPressOut}
-        onPress={() => handleMoodPress(mood.id)}
+        onPress={() => setSelectedMoodCard(mood.id)}
         style={styles.emojiContainer}
       >
         <Animated.View
@@ -216,7 +248,21 @@ const MoodTrackingScreen = () => {
             },
           ]}
         >
-          <Text style={styles.emoji}>{mood.emoji}</Text>
+          <View
+            style={[
+              styles.emojiBubble,
+              { backgroundColor: mood.color + '26', shadowColor: theme.isDark ? '#000' : mood.color }
+            ]}
+          >
+            <Text
+              style={[
+                styles.emoji,
+                { textShadowColor: '#00000030', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+              ]}
+            >
+              {mood.emoji}
+            </Text>
+          </View>
           <Text style={[styles.emojiLabel, { color: theme.colors.text }]}>
             {mood.label}
           </Text>
@@ -224,6 +270,8 @@ const MoodTrackingScreen = () => {
       </Pressable>
     );
   };
+
+  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   return (
     <CurvedBackground>
@@ -237,119 +285,80 @@ const MoodTrackingScreen = () => {
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
-          {user?.id ? (
-            <LiveRecentMoods userId={user.id} onData={setRecentEntries} />
-          ) : null}
-          {/* Mood selection section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              How are you feeling?
-            </Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
-              Tap an emoji to log your mood
-            </Text>
-
-            <View style={styles.moodGrid}>
-              <View style={styles.moodRow}>
-                {moodOptions.slice(0, 3).map(renderMoodEmoji)}
-              </View>
-              <View style={styles.moodRow}>
-                {moodOptions.slice(3, 5).map(renderMoodEmoji)}
-              </View>
+          {/* Mood selection grid (exact 3x3 using FlatList) */}
+          <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.lg }}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>How was your day?</Text>
+            <View style={styles.flatGridContent}>
+              {/* Render mood grid in rows of 3 */}
+              {[0, 1, 2].map((rowIndex) => (
+                <View key={`row-${rowIndex}`} style={styles.columnWrapper}>
+                  {moodGrid.slice(rowIndex * 3, rowIndex * 3 + 3).map((item) => {
+                    const selected = selectedMoodCard === item.id;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[
+                          styles.moodCardNew,
+                          selected && styles.moodCardNewSelected,
+                          { backgroundColor: item.bg },
+                        ]}
+                        activeOpacity={0.85}
+                        onPress={() => setSelectedMoodCard(item.id)}
+                      >
+                        {/* Native text emoji */}
+                        <Text style={styles.moodCardEmojiNew}>{item.emoji}</Text>
+                        <Text style={styles.moodCardLabelNew}>{item.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
             </View>
           </View>
 
-          {/* Recent moods section - Limited to 5 entries */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                Recent Moods
-              </Text>
-              <Text style={[styles.entriesCount, { color: theme.colors.textSecondary }]}>
-                {recentEntries.length}/5 entries
-              </Text>
-            </View>
-
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-                <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>
-                  Loading your moods...
-                </Text>
-              </View>
-            ) : recentEntries.length > 0 ? (
-              <View style={styles.recentMoodsContainer}>
-                {recentEntries.slice(0, 5).map((entry, index) => ( // Ensure max 5 entries
-                  <View 
-                    key={entry.id || index} 
+          {/* Factors chips and selected factors summary */}
+          <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.lg }}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text, marginBottom: Spacing.md }]}>What was it about?</Text>
+            <View style={styles.chipsRow}>
+              {factorOptions.map((f) => {
+                const isOn = selectedFactors.includes(f);
+                return (
+                  <TouchableOpacity
+                    key={f}
                     style={[
-                      styles.moodCard,
-                      { 
-                        backgroundColor: theme.colors.surface,
-                        shadowColor: theme.isDark ? "#000" : "#000",
-                      }
+                      styles.chip,
+                      isOn && styles.chipOn,
+                      { backgroundColor: isOn ? Colors.primary : (theme.isDark ? '#2A2A2A' : '#F1F1F1') },
                     ]}
+                    onPress={() =>
+                      setSelectedFactors((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))
+                    }
+                    activeOpacity={0.8}
                   >
-                    <Text
-                      style={[
-                        styles.moodCardEmoji,
-                        {
-                          color: moodOptions.find((m) => m.id === entry.mood_type)
-                            ?.color,
-                        },
-                      ]}
-                    >
-                      {entry.mood_emoji}
-                    </Text>
-                    <View style={styles.moodCardContent}>
-                      <Text style={[styles.moodCardTitle, { color: theme.colors.text }]}>
-                        {entry.mood_label}
-                      </Text>
-                      <Text style={[styles.moodCardDate, { color: theme.colors.textSecondary }]}>
-                        {new Date(entry.created_at).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          timeZone: APP_TIME_ZONE,
-                        })}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View style={[styles.emptyState, { backgroundColor: theme.colors.surface }]}>
-                <Ionicons 
-                  name="happy-outline" 
-                  size={48} 
-                  color={theme.colors.textSecondary} 
-                />
-                <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-                  No recent entries
-                </Text>
-                <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                  Start tracking your mood by selecting an emoji above
-                </Text>
-              </View>
-            )}
+                    <Text style={[styles.chipText, { color: isOn ? '#FFF' : theme.colors.text }]}>{f}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={[styles.selectedFactorsBox, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }] }>
+              <Text style={[styles.selectedFactorsTitle, { color: theme.colors.text }]}>Selected factors</Text>
+              <Text style={[styles.selectedFactorsText, { color: theme.colors.text }]}>
+                {selectedFactors.length ? selectedFactors.join(', ') : 'None selected'}
+              </Text>
+            </View>
           </View>
 
-          {/* Navigation to view full mood history */}
+          {/* Next button matching the reference flow */}
           <TouchableOpacity
             style={[
-              styles.historyLink,
-              { 
-                backgroundColor: theme.colors.surface,
-                shadowColor: theme.isDark ? "#000" : "#000",
-              }
+              styles.nextButton,
+              { backgroundColor: Colors.success, opacity: selectedMoodCard ? 1 : 0.6 }
             ]}
-            onPress={() => router.push("../mood-tracking/mood-history")}
+            onPress={proceedNext}
+            disabled={!selectedMoodCard}
           >
-            <Text style={[styles.historyLinkText, { color: theme.colors.primary }]}>
-              View Mood History
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
+            <Text style={styles.nextButtonText}>Next</Text>
+            <Ionicons name="chevron-forward" size={18} color="#FFF" />
           </TouchableOpacity>
 
           {/* Extra bottom padding for better scrolling */}
@@ -404,6 +413,98 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(20), // Base size 20px
     fontWeight: "600",
   },
+  // Grid styles for FlatList 3 columns
+  flatGridContent: {
+    paddingTop: Spacing.md,
+  },
+  columnWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  moodCardNew: {
+    flex: 1,
+    marginHorizontal: Spacing.xs,
+    aspectRatio: 1,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  moodCardNewSelected: {
+    borderColor: '#4CAF50',
+  },
+  moodCardEmojiImage: {
+    width: '70%',
+    height: '55%',
+    marginBottom: 6,
+  },
+  moodCardEmojiNew: { // fallback text emoji style (unused in image version but retained)
+    fontSize: 40,
+    marginBottom: 6,
+    opacity: 100,
+  },
+  moodCardLabelNew: {
+    fontSize: scaledFontSize(12),
+    fontWeight: '600',
+    color: '#333',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: '#F1F1F1',
+    minHeight: 38,
+  },
+  chipOn: {
+    backgroundColor: Colors.primary,
+  },
+  chipText: {
+    color: '#000',
+    fontSize: scaledFontSize(13),
+    fontWeight: '600',
+  },
+  chipTextOn: {
+    color: '#FFF',
+  },
+  selectedFactorsBox: {
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  selectedFactorsTitle: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  selectedFactorsText: {
+    fontSize: scaledFontSize(12),
+  },
+  nextButton: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  nextButtonText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: scaledFontSize(16),
+  },
   sectionSubtitle: {
     fontSize: scaledFontSize(16), // Base size 16px
     marginBottom: Spacing.lg,
@@ -426,6 +527,17 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   emojiWrapper: {
     alignItems: "center",
+  },
+  emojiBubble: {
+    width: EMOJI_SIZE,
+    height: EMOJI_SIZE,
+    borderRadius: EMOJI_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   emoji: {
     fontSize: EMOJI_SIZE * 0.7,

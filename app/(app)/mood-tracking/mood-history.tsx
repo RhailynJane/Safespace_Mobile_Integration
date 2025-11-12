@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  FlatList,
+  SectionList,
   ActivityIndicator,
   Modal,
   TextInput,
   Platform,
+  FlatList,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -247,6 +248,31 @@ export default function MoodHistoryScreen() {
     setModalVisible(true);
   };
   const hideStatusModal = () => setModalVisible(false);
+
+  // Calendar state: month/week toggle and cursor date
+  const [calendarMode, setCalendarMode] = useState<'month' | 'week'>('month');
+  const [calendarDate, setCalendarDate] = useState<Date>(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+
+  // Helpers to compute ranges
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+  const endOfDay = (d: Date) => { const x = new Date(d); x.setHours(23,59,59,999); return x; };
+  const startOfMonth = (d: Date) => { const x = new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0,0,0,0); return x; };
+  const endOfMonth = (d: Date) => { const x = new Date(d.getFullYear(), d.getMonth()+1, 0); x.setHours(23,59,59,999); return x; };
+  const startOfWeek = (d: Date) => { const x = new Date(d); const day = x.getDay(); x.setDate(x.getDate() - day); x.setHours(0,0,0,0); return x; };
+  const addMonths = (d: Date, m: number) => { const x = new Date(d); x.setMonth(x.getMonth()+m); return x; };
+  const addDays = (d: Date, days: number) => { const x = new Date(d); x.setDate(x.getDate()+days); return x; };
+
+  // When calendar cursor changes or mode toggles, drive screen date filters
+  useEffect(() => {
+    let s: Date, e: Date;
+    if (calendarMode === 'month') {
+      s = startOfMonth(calendarDate); e = endOfMonth(calendarDate);
+    } else {
+      const sw = startOfWeek(calendarDate); s = startOfDay(sw); e = endOfDay(addDays(sw, 6));
+    }
+    setStartDate(s); setEndDate(e); setOffset(0);
+  }, [calendarMode, calendarDate]);
   
   // Check if Convex is available
   useEffect(() => {
@@ -316,6 +342,46 @@ export default function MoodHistoryScreen() {
       ? entry.notes?.toLowerCase().includes(searchQuery.toLowerCase())
       : true
   );
+
+  // Build a date -> count map for calendar badges
+  const dateKey = (d: Date | string) => {
+    const dd = typeof d === 'string' ? new Date(d) : d;
+    const y = dd.getFullYear();
+    const m = (dd.getMonth()+1).toString().padStart(2,'0');
+    const day = dd.getDate().toString().padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
+  const countsByDay = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const e of moodHistory) {
+      const k = dateKey(e.created_at);
+      map[k] = (map[k] || 0) + 1;
+    }
+    return map;
+  }, [moodHistory]);
+
+  // If a day is selected, narrow list to that day
+  const dayFilteredHistory = useMemo(() => {
+    if (!selectedDay) return filteredHistory;
+    const k = dateKey(selectedDay);
+    return filteredHistory.filter(e => dateKey(e.created_at) === k);
+  }, [filteredHistory, selectedDay]);
+
+  // Group entries by month for SectionList
+  const monthLabel = (d: Date | string) => {
+    const dd = typeof d === 'string' ? new Date(d) : d;
+    return dd.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: APP_TIME_ZONE });
+  };
+  const sections = useMemo(() => {
+    const groups = new Map<string, MoodEntry[]>();
+    for (const e of dayFilteredHistory) {
+      const label = monthLabel(e.created_at);
+      const arr = groups.get(label) || [];
+      arr.push(e);
+      groups.set(label, arr);
+    }
+    return Array.from(groups.entries()).map(([title, data]) => ({ title, data }));
+  }, [dayFilteredHistory]);
 
   // Handle tab navigation
   const handleTabPress = (tabId: string) => {
@@ -440,6 +506,111 @@ export default function MoodHistoryScreen() {
     </>
   ) : null;
 
+  // Calendar UI components
+  const WeekdayHeader = () => (
+    <View style={styles.calendarWeekHeader}>
+      {['S','M','T','W','T','F','S'].map((d) => (
+        <Text key={d} style={styles.calendarWeekLabel}>{d}</Text>
+      ))}
+    </View>
+  );
+
+  const buildMonthGrid = (base: Date) => {
+    const first = startOfMonth(base);
+    const start = startOfWeek(first);
+    const days: Date[] = [];
+    for (let i=0;i<42;i++) days.push(addDays(start, i));
+    return days;
+  };
+
+  const buildWeekRow = (base: Date) => {
+    const start = startOfWeek(base);
+    const days: Date[] = [];
+    for (let i=0;i<7;i++) days.push(addDays(start, i));
+    return days;
+  };
+
+  const CalendarView = () => {
+    const isMonth = calendarMode === 'month';
+    const days = isMonth ? buildMonthGrid(calendarDate) : buildWeekRow(calendarDate);
+    const title = new Date(calendarDate).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: APP_TIME_ZONE });
+    return (
+      <View style={[styles.calendarCard, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? '#000' : '#000' }]}>
+        <View style={styles.calendarHeader}>
+          <Text style={[styles.calendarTitle, { color: theme.colors.text }]}>{title}</Text>
+          <View style={styles.calendarActions}>
+            <View style={styles.segmented}>
+              <TouchableOpacity
+                style={[styles.segmentButton, isMonth && styles.segmentActive]}
+                onPress={() => { setCalendarMode('month'); setSelectedDay(null); }}
+              >
+                <Text style={[styles.segmentText, isMonth && styles.segmentTextActive]}>Month</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.segmentButton, !isMonth && styles.segmentActive]}
+                onPress={() => { setCalendarMode('week'); setSelectedDay(null); }}
+              >
+                <Text style={[styles.segmentText, !isMonth && styles.segmentTextActive]}>Week</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection:'row', gap: 8 }}>
+              <TouchableOpacity
+                style={styles.navPill}
+                onPress={() => {
+                  setSelectedDay(null);
+                  setCalendarDate(isMonth ? addMonths(calendarDate, -1) : addDays(calendarDate, -7));
+                }}
+              >
+                <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.navPill}
+                onPress={() => {
+                  setSelectedDay(null);
+                  setCalendarDate(isMonth ? addMonths(calendarDate, 1) : addDays(calendarDate, 7));
+                }}
+              >
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+        <WeekdayHeader />
+        <View style={styles.calendarGrid}>
+          {days.map((d) => {
+            const isCurr = d.getMonth() === calendarDate.getMonth();
+            const k = dateKey(d);
+            const cnt = countsByDay[k] || 0;
+            const isSel = selectedDay && dateKey(selectedDay) === k;
+            return (
+              <TouchableOpacity
+                key={k}
+                style={[styles.dayCell, isSel && styles.dayCellSelected, !isCurr && styles.dayCellFaded]}
+                onPress={() => setSelectedDay((prev) => (prev && dateKey(prev) === k ? null : d))}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.dayNumber}>{d.getDate()}</Text>
+                {cnt > 0 && (
+                  <View style={styles.dayDot}><Text style={styles.dayDotText}>{cnt > 9 ? '9+' : String(cnt)}</Text></View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {selectedDay && (
+          <View style={styles.selectedDayBar}>
+            <Text style={[styles.selectedDayText, { color: theme.colors.text }]}>
+              {selectedDay.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric', timeZone: APP_TIME_ZONE })}
+            </Text>
+            <TouchableOpacity onPress={() => setSelectedDay(null)}>
+              <Ionicons name="close-circle" size={18} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   if (loading && offset === 0) {
     return (
       <CurvedBackground>
@@ -481,8 +652,11 @@ export default function MoodHistoryScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {liveComponents}
-        
+  {liveComponents}
+
+  {/* My Calendar */}
+  <CalendarView />
+
         <AppHeader title="Mood History" showBack={true} />
 
         {/* Search and Filter Bar */}
@@ -556,11 +730,16 @@ export default function MoodHistoryScreen() {
           </View>
         )}
 
-        {/* Mood History List */}
-        <FlatList
-          data={filteredHistory}
+        {/* Mood History List grouped by month */}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => item.id}
           renderItem={renderMoodEntry}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.monthHeaderContainer}>
+              <Text style={[styles.monthHeaderText, { color: theme.colors.text }]}>{section.title}</Text>
+            </View>
+          )}
           contentContainerStyle={styles.listContent}
           onEndReached={() => {
             if (hasMore && !loading) {
@@ -821,6 +1000,126 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     backgroundColor: "transparent",
   },
+  // Calendar styles
+  calendarCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    borderRadius: 16,
+    padding: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  calendarTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '700',
+  },
+  calendarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  segmented: {
+    flexDirection: 'row',
+    backgroundColor: '#EEEEEE',
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  segmentButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  segmentActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  segmentText: {
+    fontSize: scaledFontSize(12),
+    fontWeight: '600',
+  },
+  segmentTextActive: {
+    color: '#4CAF50',
+  },
+  navPill: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  calendarWeekHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    marginTop: 4,
+  },
+  calendarWeekLabel: {
+    width: `${100/7}%`,
+    textAlign: 'center',
+    fontSize: scaledFontSize(12),
+    color: '#777',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 6,
+  },
+  dayCell: {
+    width: `${100/7}%`,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+    borderRadius: 10,
+  },
+  dayCellSelected: {
+    backgroundColor: '#4CAF500F',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  dayCellFaded: {
+    opacity: 0.4,
+  },
+  dayNumber: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+  },
+  dayDot: {
+    position: 'absolute',
+    bottom: 4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4CAF50',
+  },
+  dayDotText: {
+    color: '#FFF',
+    fontSize: scaledFontSize(10),
+    fontWeight: '700',
+  },
+  selectedDayBar: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectedDayText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -895,6 +1194,15 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   listContent: {
     padding: 16,
     paddingBottom: 100,
+  },
+  monthHeaderContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  monthHeaderText: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '700',
   },
   entryCard: {
     borderRadius: 12,
