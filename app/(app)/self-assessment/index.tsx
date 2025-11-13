@@ -574,7 +574,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#FFFFFF",
   },
   bottomPadding: {
-    height: 100,
+    height: 140,
   },
   modalOverlay: {
     flex: 1,
