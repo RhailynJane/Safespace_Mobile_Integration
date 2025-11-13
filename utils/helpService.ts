@@ -308,7 +308,7 @@ const getFallbackHelpItems = (sectionId: string): HelpItem[] => {
 **Quick Access**
 - Emergency contacts
 - Crisis resources
-- Favorite features
+ 
 
 ### Navigation Tips:
 - Swipe left/right to see different sections
@@ -459,7 +459,6 @@ const getFallbackHelpItems = (sectionId: string): HelpItem[] => {
 
 ### Organization:
 - **Categories**: Anxiety, depression, relationships, self-care, etc.
-- **Favorites**: Save resources for quick access
 
 ### Personalization:
 - Recommendations based on your interests and needs
@@ -467,7 +466,7 @@ const getFallbackHelpItems = (sectionId: string): HelpItem[] => {
 - Progress-tracking for completed resources`,
         type: 'guide',
         sort_order: 5,
-        related_features: ['resources', 'library', 'favorites'],
+        related_features: ['resources', 'library'],
         estimated_read_time: 3,
         last_updated: '2024-01-15',
       },
