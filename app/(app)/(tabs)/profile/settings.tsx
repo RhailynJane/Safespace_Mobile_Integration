@@ -43,6 +43,7 @@ export default function SettingsScreen() {
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [ready, setReady] = useState(false); // prevent auto-save on initial load
+  const [hasHydrated, setHasHydrated] = useState(false); // prevent duplicate hydration
   const { theme, isDarkMode, setDarkMode: setGlobalDarkMode, textSize, setTextSize: setGlobalTextSize, scaledFontSize } = useTheme();
 
   // Settings state
@@ -109,7 +110,7 @@ export default function SettingsScreen() {
     api.profiles.getFullProfile as any,
     user?.id ? { clerkId: user.id } : (undefined as any)
   ) as any;
-  const updatePreferencesMutation = useMutation(api.profiles.updatePreferences);
+  const saveSettingsMutation = useMutation(api.profiles.saveSettings);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -119,12 +120,43 @@ export default function SettingsScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Load settings from backend on component mount
+  // Hydrate settings from Convex profile when it loads
+  useEffect(() => {
+    if (!convexProfile?.preferences || hasHydrated) return;
+    
+    const prefs = convexProfile.preferences;
+    console.log('💾 Hydrating settings from Convex:', prefs);
+    
+    // Apply saved preferences
+    setNotificationsEnabled(prefs.notificationsEnabled ?? true);
+    setNotifMoodTracking(prefs.notifMoodTracking ?? true);
+    setNotifJournaling(prefs.notifJournaling ?? true);
+    setNotifMessages(prefs.notifMessages ?? true);
+    setNotifPostReactions(prefs.notifPostReactions ?? true);
+    setNotifAppointments(prefs.notifAppointments ?? true);
+    setNotifSelfAssessment(prefs.notifSelfAssessment ?? true);
+    setReminderFrequency(prefs.reminderFrequency ?? 'Daily');
+    // If category is enabled but per-reminder toggle is off, auto-enable the reminder to match intent
+    setMoodReminderEnabled((prefs.moodReminderEnabled ?? false) || (prefs.notifMoodTracking ?? false));
+    setMoodReminderTime(prefs.moodReminderTime ?? '09:00');
+    setMoodReminderFrequency(prefs.moodReminderFrequency ?? 'Daily');
+    setMoodReminderCustomSchedule(prefs.moodReminderCustomSchedule ?? {});
+    setJournalReminderEnabled((prefs.journalReminderEnabled ?? false) || (prefs.notifJournaling ?? false));
+    setJournalReminderTime(prefs.journalReminderTime ?? '20:00');
+    setJournalReminderFrequency(prefs.journalReminderFrequency ?? 'Daily');
+    setJournalReminderCustomSchedule(prefs.journalReminderCustomSchedule ?? {});
+    setAppointmentReminderEnabled(prefs.appointmentReminderEnabled ?? true);
+    setAppointmentReminderAdvanceMinutes(prefs.appointmentReminderAdvanceMinutes ?? 60);
+    
+    // Mark as hydrated and ready after hydration
+    setHasHydrated(true);
+    setTimeout(() => setReady(true), 100);
+  }, [convexProfile, hasHydrated]);
+
+  // Load settings from backend on component mount (fallback for non-Convex data)
   useEffect(() => {
     (async () => {
       await loadSettings();
-      // Slight delay to allow state to stabilize before enabling auto-save
-      setTimeout(() => setReady(true), 50);
     })();
   }, []);
 
@@ -162,21 +194,38 @@ export default function SettingsScreen() {
         console.log('🔔 Auto-saving notification settings:', settings);
         if (USE_REST_SETTINGS) {
           await settingsAPI.saveSettings(settings, user?.id);
+        } else if (user?.id) {
+          // Save to Convex
+          await saveSettingsMutation({
+            clerkId: user.id,
+            preferences: {
+              theme: isDarkMode ? 'dark' : 'light',
+              notifications: notificationsEnabled,
+              darkMode: isDarkMode,
+              textSize,
+              notificationsEnabled,
+              notifMoodTracking,
+              notifJournaling,
+              notifMessages,
+              notifPostReactions,
+              notifAppointments,
+              notifSelfAssessment,
+              reminderFrequency,
+              moodReminderEnabled,
+              moodReminderTime,
+              moodReminderFrequency,
+              moodReminderCustomSchedule,
+              journalReminderEnabled,
+              journalReminderTime,
+              journalReminderFrequency,
+              journalReminderCustomSchedule,
+              appointmentReminderEnabled,
+              appointmentReminderAdvanceMinutes,
+            },
+          });
         }
         // Schedule local notifications based on updated settings
         try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
-        // Best-effort: also reflect preferences in Convex profile (theme/notifications)
-        try {
-          if (user?.id) {
-            await updatePreferencesMutation({
-              clerkId: user.id,
-              preferences: {
-                theme: isDarkMode ? 'dark' : 'light',
-                notifications: notificationsEnabled,
-              },
-            });
-          }
-        } catch (_e) { /* ignore convex preference sync errors */ }
       } catch (error) {
         console.log('Auto-save notification settings failed:', error);
       }
@@ -200,30 +249,52 @@ export default function SettingsScreen() {
   const loadSettings = async () => {
     try {
       setIsLoading(true);
-      const settings = USE_REST_SETTINGS
-        ? await settingsAPI.fetchSettings(user?.id)
-        : {
-            darkMode: isDarkMode,
-            textSize,
-            notificationsEnabled: true,
-            notifMoodTracking: true,
-            notifJournaling: true,
-            notifMessages: true,
-            notifPostReactions: true,
-            notifAppointments: true,
-            notifSelfAssessment: true,
-            reminderFrequency: 'Daily',
-            moodReminderEnabled: false,
-            moodReminderTime: '09:00',
-            moodReminderFrequency: 'Daily',
-            moodReminderCustomSchedule: {},
-            journalReminderEnabled: false,
-            journalReminderTime: '20:00',
-            journalReminderFrequency: 'Daily',
-            journalReminderCustomSchedule: {},
-            appointmentReminderEnabled: true,
-            appointmentReminderAdvanceMinutes: 60,
-          } as UserSettings;
+      
+      // Load from Convex profile preferences
+      const prefs = convexProfile?.preferences;
+      const settings = prefs ? {
+        darkMode: prefs.darkMode ?? isDarkMode,
+        textSize: prefs.textSize ?? textSize,
+        notificationsEnabled: prefs.notificationsEnabled ?? true,
+        notifMoodTracking: prefs.notifMoodTracking ?? true,
+        notifJournaling: prefs.notifJournaling ?? true,
+        notifMessages: prefs.notifMessages ?? true,
+        notifPostReactions: prefs.notifPostReactions ?? true,
+        notifAppointments: prefs.notifAppointments ?? true,
+        notifSelfAssessment: prefs.notifSelfAssessment ?? true,
+        reminderFrequency: prefs.reminderFrequency ?? 'Daily',
+        moodReminderEnabled: prefs.moodReminderEnabled ?? false,
+        moodReminderTime: prefs.moodReminderTime ?? '09:00',
+        moodReminderFrequency: prefs.moodReminderFrequency ?? 'Daily',
+        moodReminderCustomSchedule: prefs.moodReminderCustomSchedule ?? {},
+        journalReminderEnabled: prefs.journalReminderEnabled ?? false,
+        journalReminderTime: prefs.journalReminderTime ?? '20:00',
+        journalReminderFrequency: prefs.journalReminderFrequency ?? 'Daily',
+        journalReminderCustomSchedule: prefs.journalReminderCustomSchedule ?? {},
+        appointmentReminderEnabled: prefs.appointmentReminderEnabled ?? true,
+        appointmentReminderAdvanceMinutes: prefs.appointmentReminderAdvanceMinutes ?? 60,
+      } : {
+        darkMode: isDarkMode,
+        textSize,
+        notificationsEnabled: true,
+        notifMoodTracking: true,
+        notifJournaling: true,
+        notifMessages: true,
+        notifPostReactions: true,
+        notifAppointments: true,
+        notifSelfAssessment: true,
+        reminderFrequency: 'Daily',
+        moodReminderEnabled: false,
+        moodReminderTime: '09:00',
+        moodReminderFrequency: 'Daily',
+        moodReminderCustomSchedule: {},
+        journalReminderEnabled: false,
+        journalReminderTime: '20:00',
+        journalReminderFrequency: 'Daily',
+        journalReminderCustomSchedule: {},
+        appointmentReminderEnabled: true,
+        appointmentReminderAdvanceMinutes: 60,
+      } as UserSettings;
       
       // Apply all saved settings EXCEPT dark mode and text size (managed by ThemeContext)
       // Do not override current theme/context values here to avoid reverting user changes
@@ -285,9 +356,37 @@ export default function SettingsScreen() {
         appointmentReminderAdvanceMinutes,
       };
 
-  const result = USE_REST_SETTINGS
-    ? await settingsAPI.saveSettings(settings, user?.id)
-    : { success: true, message: 'Saved locally (REST disabled)' } as any;
+      const result = USE_REST_SETTINGS
+        ? await settingsAPI.saveSettings(settings, user?.id)
+        : user?.id
+        ? await saveSettingsMutation({
+            clerkId: user.id,
+            preferences: {
+              theme: isDarkMode ? 'dark' : 'light',
+              notifications: notificationsEnabled,
+              darkMode: isDarkMode,
+              textSize,
+              notificationsEnabled,
+              notifMoodTracking,
+              notifJournaling,
+              notifMessages,
+              notifPostReactions,
+              notifAppointments,
+              notifSelfAssessment,
+              reminderFrequency,
+              moodReminderEnabled,
+              moodReminderTime,
+              moodReminderFrequency,
+              moodReminderCustomSchedule,
+              journalReminderEnabled,
+              journalReminderTime,
+              journalReminderFrequency,
+              journalReminderCustomSchedule,
+              appointmentReminderEnabled,
+              appointmentReminderAdvanceMinutes,
+            },
+          }).then(() => ({ success: true, message: 'Saved to Convex' }))
+        : { success: true, message: 'Saved locally (no user)' } as any;
   // Always schedule locally regardless of server result
   try { await scheduleFromSettings(settings); } catch (e) { console.log('🔔 Scheduling reminders failed:', e); }
       if (!result.success) {
@@ -295,18 +394,6 @@ export default function SettingsScreen() {
       } else {
         setStatusModal({visible:true, type:'success', title:'Saved', message:'Settings saved successfully'});
       }
-      // Also try to persist minimal preferences to Convex
-      try {
-        if (user?.id) {
-          await updatePreferencesMutation({
-            clerkId: user.id,
-            preferences: {
-              theme: isDarkMode ? 'dark' : 'light',
-              notifications: notificationsEnabled,
-            },
-          });
-        }
-      } catch (_e) { /* ignore */ }
       
     } catch (error) {
       console.log('Error saving settings:', error);
@@ -660,7 +747,11 @@ export default function SettingsScreen() {
                       value={notifMoodTracking}
                       onValueChange={(val) => {
                         setNotifMoodTracking(val);
-                        setMoodReminderEnabled(val);
+                        if (val) {
+                          setMoodReminderEnabled(true);
+                        } else {
+                          setMoodReminderEnabled(false);
+                        }
                       }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
@@ -684,8 +775,67 @@ export default function SettingsScreen() {
                               "Reminder Time",
                               "Time of day for mood check-in",
                               moodReminderTime,
-                              (time) => {
+                              async (time) => {
                                 setMoodReminderTime(time);
+                                // Immediately save to trigger auto-save and persist
+                                const updated = {
+                                  ...{
+                                    darkMode: isDarkMode,
+                                    textSize,
+                                    notificationsEnabled,
+                                    notifMoodTracking,
+                                    notifJournaling,
+                                    notifMessages,
+                                    notifPostReactions,
+                                    notifAppointments,
+                                    notifSelfAssessment,
+                                    reminderFrequency,
+                                    moodReminderEnabled,
+                                    moodReminderFrequency,
+                                    moodReminderCustomSchedule,
+                                    journalReminderEnabled,
+                                    journalReminderTime,
+                                    journalReminderFrequency,
+                                    journalReminderCustomSchedule,
+                                    appointmentReminderEnabled,
+                                    appointmentReminderAdvanceMinutes,
+                                  },
+                                  moodReminderTime: time,
+                                };
+                                try {
+                                  if (USE_REST_SETTINGS) {
+                                    await settingsAPI.saveSettings(updated, user?.id);
+                                  } else if (user?.id) {
+                                    await saveSettingsMutation({
+                                      clerkId: user.id,
+                                      preferences: {
+                                        theme: isDarkMode ? 'dark' : 'light',
+                                        notifications: notificationsEnabled,
+                                        darkMode: isDarkMode,
+                                        textSize,
+                                        notificationsEnabled,
+                                        notifMoodTracking,
+                                        notifJournaling,
+                                        notifMessages,
+                                        notifPostReactions,
+                                        notifAppointments,
+                                        notifSelfAssessment,
+                                        reminderFrequency,
+                                        moodReminderEnabled,
+                                        moodReminderTime: time,
+                                        moodReminderFrequency,
+                                        moodReminderCustomSchedule,
+                                        journalReminderEnabled,
+                                        journalReminderTime,
+                                        journalReminderFrequency,
+                                        journalReminderCustomSchedule,
+                                        appointmentReminderEnabled,
+                                        appointmentReminderAdvanceMinutes,
+                                      },
+                                    });
+                                  }
+                                  await scheduleFromSettings(updated);
+                                } catch (e) { console.log('Immediate save error:', e); }
                               },
                               moodTimePickerVisible,
                               setMoodTimePickerVisible,
@@ -762,7 +912,11 @@ export default function SettingsScreen() {
                       value={notifJournaling}
                       onValueChange={(val) => {
                         setNotifJournaling(val);
-                        setJournalReminderEnabled(val);
+                        if (val) {
+                          setJournalReminderEnabled(true);
+                        } else {
+                          setJournalReminderEnabled(false);
+                        }
                       }}
                       trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                       thumbColor="#FFFFFF"
@@ -786,8 +940,67 @@ export default function SettingsScreen() {
                               "Reminder Time",
                               "Time of day for journaling",
                               journalReminderTime,
-                              (time) => {
+                              async (time) => {
                                 setJournalReminderTime(time);
+                                // Immediately save to trigger auto-save and persist
+                                const updated = {
+                                  ...{
+                                    darkMode: isDarkMode,
+                                    textSize,
+                                    notificationsEnabled,
+                                    notifMoodTracking,
+                                    notifJournaling,
+                                    notifMessages,
+                                    notifPostReactions,
+                                    notifAppointments,
+                                    notifSelfAssessment,
+                                    reminderFrequency,
+                                    moodReminderEnabled,
+                                    moodReminderTime,
+                                    moodReminderFrequency,
+                                    moodReminderCustomSchedule,
+                                    journalReminderEnabled,
+                                    journalReminderFrequency,
+                                    journalReminderCustomSchedule,
+                                    appointmentReminderEnabled,
+                                    appointmentReminderAdvanceMinutes,
+                                  },
+                                  journalReminderTime: time,
+                                };
+                                try {
+                                  if (USE_REST_SETTINGS) {
+                                    await settingsAPI.saveSettings(updated, user?.id);
+                                  } else if (user?.id) {
+                                    await saveSettingsMutation({
+                                      clerkId: user.id,
+                                      preferences: {
+                                        theme: isDarkMode ? 'dark' : 'light',
+                                        notifications: notificationsEnabled,
+                                        darkMode: isDarkMode,
+                                        textSize,
+                                        notificationsEnabled,
+                                        notifMoodTracking,
+                                        notifJournaling,
+                                        notifMessages,
+                                        notifPostReactions,
+                                        notifAppointments,
+                                        notifSelfAssessment,
+                                        reminderFrequency,
+                                        moodReminderEnabled,
+                                        moodReminderTime,
+                                        moodReminderFrequency,
+                                        moodReminderCustomSchedule,
+                                        journalReminderEnabled,
+                                        journalReminderTime: time,
+                                        journalReminderFrequency,
+                                        journalReminderCustomSchedule,
+                                        appointmentReminderEnabled,
+                                        appointmentReminderAdvanceMinutes,
+                                      },
+                                    });
+                                  }
+                                  await scheduleFromSettings(updated);
+                                } catch (e) { console.log('Immediate save error:', e); }
                               },
                               journalTimePickerVisible,
                               setJournalTimePickerVisible,

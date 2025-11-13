@@ -11,6 +11,7 @@ import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox, Text } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeProvider } from "../contexts/ThemeContext";
+import * as Notifications from "expo-notifications";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
@@ -19,6 +20,18 @@ const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
 let convexUserSyncCompleted = false;
 let convexHeartbeatStarted = false;
 let onboardingStatusCached: boolean | null = null;
+
+// Show notifications while app is in the foreground (SDK 54+ requires banner/list flags)
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    // iOS presentation options
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 function isAbsoluteHttpUrl(url?: string | null): boolean {
   if (!url) return false;

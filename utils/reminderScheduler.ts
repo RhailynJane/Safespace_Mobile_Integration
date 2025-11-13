@@ -243,23 +243,21 @@ export async function scheduleFromSettings(settings: UserSettings) {
         if (wk === todayWk) {
           const delta = secondsUntilTodayTime(h, m, 0);
           console.log(`🕐 MOOD Custom ${key}: delta=${delta}s`);
-          
+          // Bridge for today if needed (in addition to weekly repeating below)
           if (delta < 0) {
-            // Time has passed for today - skip, will fire next week
-            console.log(`⏭️ MOOD Custom ${key} time passed, skipping (will fire next occurrence)`);
-            continue;
+            const nextWeek = new Date();
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            nextWeek.setHours(h, m, 0, 0);
+            const idOnce = await scheduleOneShot('Mood check-in', 'How are you feeling today?', nextWeek, { type: 'mood', bootstrap: true });
+            perDayIds.push(idOnce);
           } else if (delta >= 0 && delta <= 300) {
-            // Within 5 minutes (300s) - schedule one-shot for today to avoid immediate fire from weekly trigger
-            console.log(`⏳ MOOD Custom ${key} within 5min, scheduling one-shot today at target`);
             const today = new Date();
             today.setHours(h, m, 0, 0);
             const msUntil = today.getTime() - Date.now();
             if (msUntil >= 0 && msUntil < 3000) today.setSeconds(today.getSeconds() + 2);
-            const id = await scheduleOneShot('Mood check-in', 'How are you feeling today?', today, { type: 'mood', bootstrap: true });
-            perDayIds.push(id);
-            continue;
+            const idOnce = await scheduleOneShot('Mood check-in', 'How are you feeling today?', today, { type: 'mood', bootstrap: true });
+            perDayIds.push(idOnce);
           }
-          // else: future time > 5min, fall through to normal weekly schedule
         }
         console.log(`📅 Scheduling weekly MOOD for ${key} at ${h}:${m} (weekday=${wk})`);
         const id = await Notifications.scheduleNotificationAsync({
@@ -274,30 +272,29 @@ export async function scheduleFromSettings(settings: UserSettings) {
     } else if (settings.moodReminderFrequency === 'Daily') {
       const delta = secondsUntilTodayTime(hour, minute, 0);
       console.log(`🕐 MOOD Daily check: target=${settings.moodReminderTime}, delta=${delta}s (${Math.floor(delta/60)}m ${delta%60}s)`);
-      
+      // Always schedule the repeating daily as the backbone
+      console.log(`📅 MOOD scheduling repeating daily backbone`);
+      const repId = await scheduleDaily('Mood check-in', 'How are you feeling today?', hour, minute, { type: 'mood' });
+      const ids: string[] = [repId];
       if (delta < 0) {
-        // Time has passed for today - schedule one-shot for tomorrow, then bootstrap repeating
-        console.log(`⏭️ MOOD time passed for today, scheduling one-shot tomorrow with bootstrap`);
+        // Time has passed for today - add a one-shot for tomorrow to bridge
+        console.log(`⏭️ MOOD time passed today; adding one-shot for tomorrow`);
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(hour, minute, 0, 0);
         const onceId = await scheduleOneShot('Mood check-in', 'How are you feeling today?', tomorrow, { type: 'mood', bootstrap: true });
-        moodIds = [onceId];
+        ids.push(onceId);
       } else if (delta >= 0 && delta <= 300) {
-        // Within 5 minutes (300s) before the target time - schedule one-shot for today with nudge to avoid immediate fire
-        console.log(`⚡ MOOD within 5min window, scheduling one-shot for today`);
+        // Within 5 min window: add a one-shot for today
+        console.log(`⚡ MOOD within 5min; adding one-shot for today`);
         const d = new Date();
         d.setHours(hour, minute, 0, 0);
         const msUntil = d.getTime() - Date.now();
         if (msUntil >= 0 && msUntil < 3000) d.setSeconds(d.getSeconds() + 2);
         const onceId = await scheduleOneShot('Mood check-in', 'How are you feeling today?', d, { type: 'mood', bootstrap: true });
-        moodIds = [onceId];
-      } else {
-        // Future time more than 5 minutes away - use normal repeating schedule
-        console.log(`📅 MOOD using normal repeating daily schedule`);
-        const id = await scheduleDaily('Mood check-in', 'How are you feeling today?', hour, minute, { type: 'mood' });
-        moodIds = [id];
+        ids.push(onceId);
       }
+      moodIds = ids;
     }
   }
   await AsyncStorage.setItem('moodReminderIds', JSON.stringify(moodIds));
@@ -326,32 +323,21 @@ export async function scheduleFromSettings(settings: UserSettings) {
         if (wk === todayWk) {
           const delta = secondsUntilTodayTime(h, m, 0);
           console.log(`🕐 JOURNAL Custom ${key}: delta=${delta}s`);
-          
+          // Bridge for today if needed (in addition to weekly repeating below)
           if (delta < 0) {
-            // Time has passed for today
-            // Schedule one-shot for next week AND a weekly repeating notification
-            // The one-shot ensures it fires next week, the weekly ensures it continues after that
-            console.log(`⏭️ JOURNAL Custom ${key} time passed, scheduling one-shot for next ${key} + weekly`);
             const nextWeek = new Date();
             nextWeek.setDate(nextWeek.getDate() + 7);
             nextWeek.setHours(h, m, 0, 0);
-            const oneShotId = await scheduleOneShot('Journaling reminder', 'Take a moment to jot your thoughts.', nextWeek, { type: 'journaling', bootstrap: true });
-            perDayIds.push(oneShotId);
-            // Now also schedule the weekly repeating (it might fire immediately but the one-shot will cover next week)
-            // Actually, let's skip the weekly since it will fire immediately - just rely on one-shot
-            continue;
+            const idOnce = await scheduleOneShot('Journaling reminder', 'Take a moment to jot your thoughts.', nextWeek, { type: 'journaling', bootstrap: true });
+            perDayIds.push(idOnce);
           } else if (delta >= 0 && delta <= 300) {
-            // Within 5 minutes (300s) - schedule one-shot for today to avoid immediate fire from weekly trigger
-            console.log(`⏳ JOURNAL Custom ${key} within 5min, scheduling one-shot today at target`);
             const today = new Date();
             today.setHours(h, m, 0, 0);
             const msUntil = today.getTime() - Date.now();
             if (msUntil >= 0 && msUntil < 3000) today.setSeconds(today.getSeconds() + 2);
-            const id = await scheduleOneShot('Journaling reminder', 'Take a moment to jot your thoughts.', today, { type: 'journaling', bootstrap: true });
-            perDayIds.push(id);
-            continue;
+            const idOnce = await scheduleOneShot('Journaling reminder', 'Take a moment to jot your thoughts.', today, { type: 'journaling', bootstrap: true });
+            perDayIds.push(idOnce);
           }
-          // else: future time > 5min, fall through to normal weekly schedule
         }
         console.log(`📅 Scheduling weekly JOURNAL for ${key} at ${h}:${m} (weekday=${wk})`);
         const id = await Notifications.scheduleNotificationAsync({
@@ -366,30 +352,27 @@ export async function scheduleFromSettings(settings: UserSettings) {
     } else if (settings.journalReminderFrequency === 'Daily') {
       const delta = secondsUntilTodayTime(hour, minute, 0);
       console.log(`🕐 JOURNAL Daily check: target=${settings.journalReminderTime}, delta=${delta}s (${Math.floor(delta/60)}m ${delta%60}s)`);
-      
+      // Always schedule the repeating daily as the backbone
+      console.log(`📅 JOURNAL scheduling repeating daily backbone`);
+      const repId = await scheduleDaily('Journaling reminder', 'Take a moment to jot your thoughts.', hour, minute, { type: 'journaling' });
+      const ids: string[] = [repId];
       if (delta < 0) {
-        // Time has passed for today - schedule one-shot for tomorrow, then bootstrap repeating
-        console.log(`⏭️ JOURNAL time passed for today, scheduling one-shot tomorrow with bootstrap`);
+        console.log(`⏭️ JOURNAL time passed today; adding one-shot for tomorrow`);
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         tomorrow.setHours(hour, minute, 0, 0);
         const onceId = await scheduleOneShot('Journaling reminder', 'Take a moment to jot your thoughts.', tomorrow, { type: 'journaling', bootstrap: true });
-        journalIds = [onceId];
+        ids.push(onceId);
       } else if (delta >= 0 && delta <= 300) {
-        // Within 5 minutes (300s) before the target time - schedule one-shot for today with nudge to avoid immediate fire
-        console.log(`⚡ JOURNAL within 5min window, scheduling one-shot for today`);
+        console.log(`⚡ JOURNAL within 5min; adding one-shot for today`);
         const d = new Date();
         d.setHours(hour, minute, 0, 0);
         const msUntil = d.getTime() - Date.now();
         if (msUntil >= 0 && msUntil < 3000) d.setSeconds(d.getSeconds() + 2);
         const onceId = await scheduleOneShot('Journaling reminder', 'Take a moment to jot your thoughts.', d, { type: 'journaling', bootstrap: true });
-        journalIds = [onceId];
-      } else {
-        // Future time more than 5 minutes away - use normal repeating schedule
-        console.log(`📅 JOURNAL using normal repeating daily schedule`);
-        const id = await scheduleDaily('Journaling reminder', 'Take a moment to jot your thoughts.', hour, minute, { type: 'journaling' });
-        journalIds = [id];
+        ids.push(onceId);
       }
+      journalIds = ids;
     }
   }
   await AsyncStorage.setItem('journalReminderIds', JSON.stringify(journalIds));

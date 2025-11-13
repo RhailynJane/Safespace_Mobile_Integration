@@ -110,7 +110,63 @@ export const updateProfileImage = mutation({
 	});
 
 /**
- * Update profile preferences
+ * Save all user settings (notifications, reminders, display preferences)
+ */
+export const saveSettings = mutation({
+	args: {
+		clerkId: v.string(),
+		preferences: v.object({
+			theme: v.optional(v.string()),
+			notifications: v.optional(v.boolean()),
+			// Display settings
+			darkMode: v.optional(v.boolean()),
+			textSize: v.optional(v.string()),
+			// Notification toggles
+			notificationsEnabled: v.optional(v.boolean()),
+			notifMoodTracking: v.optional(v.boolean()),
+			notifJournaling: v.optional(v.boolean()),
+			notifMessages: v.optional(v.boolean()),
+			notifPostReactions: v.optional(v.boolean()),
+			notifAppointments: v.optional(v.boolean()),
+			notifSelfAssessment: v.optional(v.boolean()),
+			// Reminder settings
+			reminderFrequency: v.optional(v.string()),
+			moodReminderEnabled: v.optional(v.boolean()),
+			moodReminderTime: v.optional(v.string()),
+			moodReminderFrequency: v.optional(v.string()),
+			moodReminderCustomSchedule: v.optional(v.any()),
+			journalReminderEnabled: v.optional(v.boolean()),
+			journalReminderTime: v.optional(v.string()),
+			journalReminderFrequency: v.optional(v.string()),
+			journalReminderCustomSchedule: v.optional(v.any()),
+			appointmentReminderEnabled: v.optional(v.boolean()),
+			appointmentReminderAdvanceMinutes: v.optional(v.number()),
+		}),
+	},
+	handler: async (ctx, { clerkId, preferences }) => {
+		const profile = await ctx.db
+			.query("profiles")
+			.withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+			.first();
+
+		if (profile) {
+			await ctx.db.patch(profile._id, {
+				preferences,
+				updatedAt: Date.now(),
+			});
+			return profile._id;
+		} else {
+			return await ctx.db.insert("profiles", {
+				clerkId,
+				preferences,
+				updatedAt: Date.now(),
+			});
+		}
+	},
+});
+
+/**
+ * Update profile preferences (legacy - for theme/notifications only)
  */
 export const updatePreferences = mutation({
 	args: {

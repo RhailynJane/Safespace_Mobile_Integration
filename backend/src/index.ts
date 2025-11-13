@@ -164,12 +164,48 @@ ensureNotificationsSchema();
 // ==============================
 // Helper: create DB notification and send Expo push
 // ==============================
-async function notifyUserByIds(userId: number, title: string, message: string, data?: any) {
+async function notifyUserByIds(userId: number, title: string, message: string, data?: any, notificationType?: string) {
   try {
+    // Check user notification preferences if notification type is provided
+    if (notificationType) {
+      try {
+        const settingsResult = await pool.query(
+          `SELECT notification_settings FROM user_settings WHERE user_id = $1`,
+          [userId]
+        );
+        if (settingsResult.rows.length > 0) {
+          const settings = settingsResult.rows[0].notification_settings;
+          
+          // Check if notifications are enabled globally
+          if (settings?.notificationsEnabled === false) {
+            console.log(`⏭️ Notifications disabled for user ${userId}`);
+            return;
+          }
+          
+          // Check specific notification type settings
+          if (notificationType === 'message' && settings?.notifMessages === false) {
+            console.log(`⏭️ Message notifications disabled for user ${userId}`);
+            return;
+          }
+          if (notificationType === 'post_reaction' && settings?.notifPostReactions === false) {
+            console.log(`⏭️ Post reaction notifications disabled for user ${userId}`);
+            return;
+          }
+          if (notificationType === 'appointment' && settings?.notifAppointments === false) {
+            console.log(`⏭️ Appointment notifications disabled for user ${userId}`);
+            return;
+          }
+        }
+      } catch (settingsError: any) {
+        console.log(`⚠️ Could not check notification settings for user ${userId}:`, settingsError.message);
+        // Continue sending notification if settings check fails
+      }
+    }
+
     // Insert into notifications table
     await pool.query(
       `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, $2, $3, $4)`,
-      [userId, 'system', title, message]
+      [userId, notificationType || 'system', title, message]
     );
 
     // Fetch active Expo push tokens
@@ -199,12 +235,12 @@ async function notifyUserByIds(userId: number, title: string, message: string, d
   }
 }
 
-async function notifyUserByClerkId(clerkUserId: string, title: string, message: string, data?: any) {
+async function notifyUserByClerkId(clerkUserId: string, title: string, message: string, data?: any, notificationType?: string) {
   try {
     const u = await pool.query(`SELECT id FROM users WHERE clerk_user_id = $1`, [clerkUserId]);
     if (u.rows.length === 0) return;
     const userId = u.rows[0].id as number;
-    await notifyUserByIds(userId, title, message, data);
+    await notifyUserByIds(userId, title, message, data, notificationType);
   } catch (e: any) {
     console.error('⚠️ notifyUserByClerkId failed:', e.message);
   }
@@ -1060,7 +1096,8 @@ app.post('/api/appointments/notify', async (req: Request, res: Response) => {
     if (!clerkUserId || !title || !message) {
       return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
     }
-    await notifyUserByClerkId(clerkUserId, title, message, data || {});
+    // Respect user settings by specifying the notification category
+    await notifyUserByClerkId(clerkUserId, title, message, data || {}, 'appointment');
     res.json({ success: true });
   } catch (e: any) {
     console.error('❌ Error in /api/appointments/notify:', e.message);
@@ -1087,7 +1124,8 @@ app.post('/api/test-reminder/:clerkUserId', async (req: Request, res: Response) 
       default:
         break;
     }
-    await notifyUserByClerkId(clerkUserId, title, message, { type });
+    // Forward the type to honor user settings per category
+    await notifyUserByClerkId(clerkUserId, title, message, { type }, type);
     res.json({ success: true });
   } catch (e: any) {
     console.error('❌ Error in /api/test-reminder:', e.message);
@@ -1098,7 +1136,7 @@ app.post('/api/test-reminder/:clerkUserId', async (req: Request, res: Response) 
 app.post('/api/test-push/:clerkUserId', async (req: Request, res: Response) => {
   try {
     const { clerkUserId } = req.params;
-    await notifyUserByClerkId(clerkUserId, 'Test notification', 'This is a test push notification', { type: 'system' });
+    await notifyUserByClerkId(clerkUserId, 'Test notification', 'This is a test push notification', { type: 'system' }, 'system');
     res.json({ success: true });
   } catch (e: any) {
     console.error('❌ Error in /api/test-push:', e.message);
@@ -1113,7 +1151,8 @@ app.post('/api/notifications/send', async (req: Request, res: Response) => {
     if (!clerkUserId || !title || !message) {
       return res.status(400).json({ success: false, message: 'clerkUserId, title and message are required' });
     }
-    await notifyUserByClerkId(clerkUserId, title, message, data || {});
+    const inferredType = data && typeof (data as any).type === 'string' ? (data as any).type : undefined;
+    await notifyUserByClerkId(clerkUserId, title, message, data || {}, inferredType);
     res.json({ success: true });
   } catch (e: any) {
     console.error('❌ Error sending notification:', e.message);
@@ -1417,7 +1456,8 @@ app.post(
                 ownerClerkId,
                 'New reaction on your post',
                 `${emoji} ${reactorName} reacted to your post`,
-                { postId: Number.parseInt(id), emoji, actorName: reactorName, actorClerkId: clerkUserId }
+                { postId: Number.parseInt(id), emoji, actorName: reactorName, actorClerkId: clerkUserId },
+                'post_reaction'
               );
             }
           }
@@ -3235,7 +3275,8 @@ app.post(
             recipientId,
             'New message',
             result.message_text || 'You have a new message',
-            { type: 'message', conversationId: Number.parseInt(conversationId) }
+            { type: 'message', conversationId: Number.parseInt(conversationId) },
+            'message'
           );
         }
       } catch (e: any) {
@@ -5340,7 +5381,8 @@ app.post("/api/appointments", async (req: Request, res: Response) => {
           supportWorker: workerName,
           date: formattedDate,
           time: aptTime
-        }
+        },
+        'appointment'
       );
     } catch (notifyError: any) {
       console.error('⚠️ Failed to send appointment notification:', notifyError.message);
@@ -5711,12 +5753,7 @@ app.post("/api/twilio/token", async (req: Request, res: Response) => {
   }
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`SafeSpace API server running on http://localhost:${PORT}`);
-  console.log(`API documentation: http://localhost:${PORT}/`);
-  console.log('Press Ctrl+C to stop the server');
-});
+// (Removed duplicate app.listen; server started earlier above)
 
 
 
