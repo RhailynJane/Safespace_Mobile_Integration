@@ -12,7 +12,6 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from "../../../components/AppHeader";
 import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";
@@ -300,35 +299,46 @@ export default function NotificationsScreen() {
       {/* Live notifications subscription (only renders when Convex available) */}
       {convexApi && user?.id && <LiveNotifications />}
       
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Notifications" showBack={true} />
 
         {/* Top bar showing unread count & action buttons */}
         <View style={[styles.headerActions, { 
-          borderBottomColor: theme.colors.border,
-          backgroundColor: theme.colors.surface 
+          borderBottomColor: theme.colors.borderLight,
+          backgroundColor: theme.isDark ? theme.colors.surface : '#FFFFFF'
         }]}>
-          <Text style={[styles.unreadText, { color: theme.colors.text }]}>
-            {unreadCount} unread{" "}
-            {unreadCount === 1 ? "notification" : "notifications"}
-          </Text>
+          <View style={styles.unreadContainer}>
+            <View style={[styles.unreadBadgeIcon, { backgroundColor: unreadCount > 0 ? theme.colors.primary : theme.colors.borderLight }]}>
+              <Text style={[styles.unreadCountNumber, { color: unreadCount > 0 ? '#FFFFFF' : theme.colors.textSecondary }]}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+            <Text style={[styles.unreadText, { color: theme.colors.text }]}>
+              {unreadCount === 1 ? "unread notification" : "unread notifications"}
+            </Text>
+          </View>
           <View style={styles.actionButtons}>
             {unreadCount > 0 && (
-              <TouchableOpacity onPress={markAllAsRead}>
-                <Text style={[styles.actionText, { color: theme.colors.primary }]}>
-                  Mark all as read
+              <TouchableOpacity 
+                onPress={markAllAsRead}
+                style={[styles.actionButton, { backgroundColor: theme.isDark ? theme.colors.primary + '20' : '#E3F2FD' }]}
+              >
+                <Ionicons name="checkmark-done" size={16} color={theme.colors.primary} />
+                <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>
+                  Mark read
                 </Text>
               </TouchableOpacity>
             )}
             {notifications.length > 0 && (
-              <>
-                {unreadCount > 0 && <Text style={[styles.separator, { color: theme.colors.border }]}>|</Text>}
-                <TouchableOpacity onPress={clearAllNotifications}>
-                  <Text style={[styles.actionText, { color: theme.colors.error }]}>
-                    Clear all
-                  </Text>
-                </TouchableOpacity>
-              </>
+              <TouchableOpacity 
+                onPress={clearAllNotifications}
+                style={[styles.actionButton, { backgroundColor: theme.isDark ? theme.colors.error + '20' : '#FFEBEE' }]}
+              >
+                <Ionicons name="trash-outline" size={16} color={theme.colors.error} />
+                <Text style={[styles.actionButtonText, { color: theme.colors.error }]}>
+                  Clear
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -356,11 +366,15 @@ export default function NotificationsScreen() {
           ) : notifications.length === 0 ? (
             /* Empty state when no notifications are available */
             <View style={styles.emptyState}>
-              <Ionicons
-                name="notifications-off-outline"
-                size={64}
-                color={theme.colors.textSecondary}
-              />
+              <View style={[styles.emptyStateIconContainer, { 
+                backgroundColor: theme.isDark ? theme.colors.borderLight : '#F5F5F5' 
+              }]}>
+                <Ionicons
+                  name="notifications-off-outline"
+                  size={48}
+                  color={theme.colors.textSecondary}
+                />
+              </View>
               <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
                 No notifications yet
               </Text>
@@ -376,48 +390,67 @@ export default function NotificationsScreen() {
                 style={[
                   styles.notificationItem,
                   { 
-                    backgroundColor: theme.colors.surface,
-                    borderBottomColor: theme.colors.borderLight 
+                    backgroundColor: theme.isDark ? theme.colors.surface : '#FFFFFF',
                   },
                   !notification.isRead && [
                     styles.unreadNotification,
-                    { backgroundColor: theme.isDark ? theme.colors.primary + '10' : '#F8F9FF' }
+                    { 
+                      backgroundColor: theme.isDark ? theme.colors.primary + '15' : '#F0F7FF',
+                      borderLeftColor: theme.colors.primary,
+                      borderLeftWidth: 4,
+                    }
                   ],
                 ]}
                 onPress={() => markAsRead(notification.id)}
+                activeOpacity={0.7}
               >
                 {/* Left: Notification Icon */}
                 <View style={[
                   styles.notificationIconContainer,
-                  { backgroundColor: theme.colors.borderLight }
+                  { 
+                    backgroundColor: getNotificationColor(notification.type) + '15',
+                  }
                 ]}>
                   <Ionicons
                     name={getNotificationIcon(notification.type)}
-                    size={20}
+                    size={22}
                     color={getNotificationColor(notification.type)}
                   />
                 </View>
 
                 {/* Middle: Notification details (title, message, time) */}
                 <View style={styles.notificationContent}>
-                  <Text style={[styles.notificationTitle, { color: theme.colors.text }]}>
-                    {notification.title}
-                  </Text>
-                  <Text style={[styles.notificationMessage, { color: theme.colors.textSecondary }]}>
+                  <View style={styles.notificationTitleRow}>
+                    <Text 
+                      style={[
+                        styles.notificationTitle, 
+                        { color: theme.colors.text },
+                        !notification.isRead && styles.notificationTitleUnread
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {notification.title}
+                    </Text>
+                    {!notification.isRead && (
+                      <View style={[
+                        styles.unreadDot,
+                        { backgroundColor: theme.colors.primary }
+                      ]} />
+                    )}
+                  </View>
+                  <Text 
+                    style={[styles.notificationMessage, { color: theme.colors.textSecondary }]}
+                    numberOfLines={2}
+                  >
                     {notification.message}
                   </Text>
-                  <Text style={[styles.notificationTime, { color: theme.colors.textDisabled }]}>
-                    {notification.time}
-                  </Text>
+                  <View style={styles.notificationFooter}>
+                    <Ionicons name="time-outline" size={12} color={theme.colors.textDisabled} />
+                    <Text style={[styles.notificationTime, { color: theme.colors.textDisabled }]}>
+                      {notification.time}
+                    </Text>
+                  </View>
                 </View>
-
-                {/* Right: Green dot indicator for unread notifications */}
-                {!notification.isRead && (
-                  <View style={[
-                    styles.unreadIndicator,
-                    { backgroundColor: theme.colors.primary }
-                  ]} />
-                )}
               </TouchableOpacity>
             ))
           )}
@@ -432,7 +465,7 @@ export default function NotificationsScreen() {
           onClose={hideStatusModal}
           buttonText="OK"
         />
-      </SafeAreaView>
+      </View>
     </CurvedBackground>
   );
 }
@@ -449,29 +482,53 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  unreadContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  unreadBadgeIcon: {
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  unreadCountNumber: {
+    fontSize: scaledFontSize(14),
+    fontWeight: "700",
   },
   unreadText: {
-    fontSize: scaledFontSize(14), // Base size 14px
+    fontSize: scaledFontSize(13),
+    fontWeight: "500",
   },
   actionButtons: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 8,
   },
-  actionText: {
-    fontSize: scaledFontSize(14), // Base size 14px
-    fontWeight: "500",
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
-  separator: {
-    fontSize: scaledFontSize(14),
-    fontWeight: "300",
-  },
-  markAllText: {
-    fontSize: scaledFontSize(14), // Base size 14px
-    fontWeight: "500",
+  actionButtonText: {
+    fontSize: scaledFontSize(12),
+    fontWeight: "600",
   },
   notificationsList: {
     flex: 1,
@@ -483,38 +540,54 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingHorizontal: 40,
   },
   loadingText: {
-    fontSize: scaledFontSize(16), // Base size 16px
+    fontSize: scaledFontSize(16),
     marginTop: 16,
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 100,
+    paddingTop: 80,
     paddingHorizontal: 40,
   },
+  emptyStateIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   emptyStateText: {
-    fontSize: scaledFontSize(18), // Base size 18px
+    fontSize: scaledFontSize(20),
     fontWeight: "600",
-    marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtext: {
-    fontSize: scaledFontSize(14), // Base size 14px
+    fontSize: scaledFontSize(14),
     textAlign: "center",
+    lineHeight: 20,
   },
   notificationItem: {
     flexDirection: "row",
     alignItems: "flex-start",
     padding: 16,
-    borderBottomWidth: 1,
+    marginHorizontal: 12,
+    marginVertical: 6,
+    borderRadius: 12,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
   },
   unreadNotification: {
-    // backgroundColor applied via inline style
+    elevation: 2,
+    shadowOpacity: 0.12,
   },
   notificationIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -522,24 +595,36 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   notificationContent: {
     flex: 1,
   },
+  notificationTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   notificationTitle: {
-    fontSize: scaledFontSize(16), // Base size 16px
+    fontSize: scaledFontSize(15),
+    fontWeight: "500",
+    flex: 1,
+  },
+  notificationTitleUnread: {
     fontWeight: "600",
-    marginBottom: 4,
   },
-  notificationMessage: {
-    fontSize: scaledFontSize(14), // Base size 14px
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  notificationTime: {
-    fontSize: scaledFontSize(12), // Base size 12px
-  },
-  unreadIndicator: {
+  unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginLeft: 8,
-    marginTop: 8,
+    marginLeft: 6,
+  },
+  notificationMessage: {
+    fontSize: scaledFontSize(14),
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  notificationFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  notificationTime: {
+    fontSize: scaledFontSize(12),
   },
 });
