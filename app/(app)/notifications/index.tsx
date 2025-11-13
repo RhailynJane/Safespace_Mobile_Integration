@@ -304,8 +304,14 @@ export default function NotificationsScreen() {
 
         {/* Top bar showing unread count & action buttons */}
         <View style={[styles.headerActions, { 
-          borderBottomColor: theme.colors.borderLight,
-          backgroundColor: theme.isDark ? theme.colors.surface : '#FFFFFF'
+          // Make the header bar fully transparent
+          backgroundColor: 'transparent',
+          borderBottomColor: 'transparent',
+          borderBottomWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+          // Add a little space below the header actions
+          marginBottom: 15
         }]}>
           <View style={styles.unreadContainer}>
             <View style={[styles.unreadBadgeIcon, { backgroundColor: unreadCount > 0 ? theme.colors.primary : theme.colors.borderLight }]}>
@@ -346,6 +352,7 @@ export default function NotificationsScreen() {
         {/* Main notifications list (scrollable with pull-to-refresh) */}
         <ScrollView
           style={styles.notificationsList}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl 
               refreshing={refreshing} 
@@ -532,6 +539,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   notificationsList: {
     flex: 1,
+  },
+  listContent: {
+    paddingTop: 4,
+    paddingBottom: 40, // bottom gap so last card isn't flush with gesture bar
   },
   loadingContainer: {
     alignItems: "center",
