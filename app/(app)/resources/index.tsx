@@ -224,11 +224,20 @@ export default function ResourcesScreen() {
     ) as { ids: string[] } | undefined;
 
     useEffect(() => {
-      if (liveResources?.resources) {
-        setResources(liveResources.resources);
-        // Set first quote or affirmation as featured content
-        const featured = liveResources.resources.find((r: Resource) => r.type === 'Quote' || r.type === 'Affirmation');
-        setFeaturedResource(featured || null);
+      // Log for debugging
+      console.log('LiveResources - Query result:', liveResources);
+      
+      if (liveResources !== undefined) {
+        if (liveResources?.resources) {
+          console.log(`Found ${liveResources.resources.length} resources`);
+          setResources(liveResources.resources);
+          // Set first quote or affirmation as featured content
+          const featured = liveResources.resources.find((r: Resource) => r.type === 'Quote' || r.type === 'Affirmation');
+          setFeaturedResource(featured || null);
+        } else {
+          console.log('No resources in response');
+          setResources([]);
+        }
         setLoading(false);
       }
     }, [liveResources]);
@@ -259,11 +268,19 @@ export default function ResourcesScreen() {
     ) as { ids: string[] } | undefined;
 
     useEffect(() => {
-      if (liveResources?.resources) {
-        setResources(liveResources.resources);
+      console.log(`LiveCategoryResources (${category}) - Query result:`, liveResources);
+      
+      if (liveResources !== undefined) {
+        if (liveResources?.resources) {
+          console.log(`Found ${liveResources.resources.length} resources for ${category}`);
+          setResources(liveResources.resources);
+        } else {
+          console.log(`No resources for category: ${category}`);
+          setResources([]);
+        }
         setLoading(false);
       }
-    }, [liveResources]);
+    }, [liveResources, category]);
 
     const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
     useEffect(() => {
@@ -288,11 +305,19 @@ export default function ResourcesScreen() {
     ) as { ids: string[] } | undefined;
 
     useEffect(() => {
-      if (searchResults?.resources) {
-        setResources(searchResults.resources);
+      console.log(`LiveSearchResults (${query}) - Query result:`, searchResults);
+      
+      if (searchResults !== undefined) {
+        if (searchResults?.resources) {
+          console.log(`Found ${searchResults.resources.length} search results`);
+          setResources(searchResults.resources);
+        } else {
+          console.log('No search results');
+          setResources([]);
+        }
         setLoading(false);
       }
-    }, [searchResults]);
+    }, [searchResults, query]);
 
     const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
     useEffect(() => {

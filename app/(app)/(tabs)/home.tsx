@@ -24,6 +24,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { 
   Resource, 
   fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
+import { getPersonalizedRecommendations } from "../../../utils/resourceRecommendations";
 import { useTheme } from "../../../contexts/ThemeContext";
 import OptimizedImage from "../../../components/OptimizedImage";
 import React from "react";
@@ -229,6 +230,7 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(true);
   const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([]);
+  const [recentJournals, setRecentJournals] = useState<any[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
@@ -425,32 +427,72 @@ export default function HomeScreen() {
   }, [user?.id, isUsingConvex]);
 
   /**
-   * Loads real resources from local API
+   * Loads personalized resources based on user's mood patterns
+   * Note: Journal analysis temporarily disabled due to network issues
    */
   const fetchResources = useCallback(async () => {
     try {
-      // Get all resources and pick 2-3 random ones for recommendations
+      // Get all resources
       const allResources = await fetchAllResourcesWithExternal();
       
-      // Filter for quick, actionable resources (exercises, affirmations, quotes)
-      const recommendedResources = allResources
-        .filter(resource => 
-          resource.type === 'Exercise' || 
-          resource.type === 'Affirmation' || 
-          resource.type === 'Quote'
-        )
-        .sort(() => Math.random() - 0.5) // Shuffle array
-        .slice(0, 3); // Take 3 random ones
+      // Get recent moods for personalization
+      const moodsForAnalysis = isUsingConvex ? convexMoods.slice(0, 7) : recentMoods;
+      
+      // Get personalized recommendations based on mood patterns only
+      const recommendedResources = getPersonalizedRecommendations(
+        allResources,
+        moodsForAnalysis,
+        [], // Journal analysis disabled temporarily
+        3 // Limit to 3 recommendations
+      );
+      
+      console.log('[HomeScreen] Personalized recommendations based on mood:', 
+        recommendedResources.map(r => `${r.title} (${r.category})`)
+      );
       
       setResources(recommendedResources);
     } catch (error) {
       console.error("Error loading resources:", error);
       setResources([]);
     }
-  }, []);
+  }, [isUsingConvex, convexMoods, recentMoods]);
 
   // NOTE: We intentionally do NOT copy Convex moods into component state to avoid
   // triggering additional renders. Instead, derive a displayed list below.
+
+  // Separate effect to update resources when moods change
+  // Note: Journal recommendations are currently disabled due to network issues
+  useEffect(() => {
+    if (loading || IS_TEST_ENV) return;
+    
+    const updatePersonalizedResources = async () => {
+      try {
+        const allResources = await fetchAllResourcesWithExternal();
+        
+        // Use convexMoods if available, otherwise use recentMoods state
+        const moodsForAnalysis = isUsingConvex ? convexMoods.slice(0, 7) : recentMoods;
+        
+        // Skip journal analysis for now (empty array)
+        const recommendedResources = getPersonalizedRecommendations(
+          allResources,
+          moodsForAnalysis,
+          [], // Journal recommendations disabled temporarily
+          3
+        );
+        
+        setResources(recommendedResources);
+        console.log('[HomeScreen] Updated personalized recommendations based on moods');
+      } catch (error) {
+        console.error("Error updating resources:", error);
+      }
+    };
+    
+    // Only update if we have mood data
+    if (convexMoods.length > 0 || recentMoods.length > 0) {
+      updatePersonalizedResources();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convexMoods.length, recentMoods.length, isUsingConvex, loading, IS_TEST_ENV]);
 
   useFocusEffect(
     useCallback(() => {
@@ -513,7 +555,7 @@ export default function HomeScreen() {
             if (!isUsingConvex) {
               try {
                 if (user?.id) {
-                  const data = await moodApi.getRecentMoods(user.id, 3);
+                  const data = await moodApi.getRecentMoods(user.id, 7); // Get more moods for analysis
                   if (isMounted) {
                     setRecentMoods(data.moods);
                   }
@@ -527,7 +569,19 @@ export default function HomeScreen() {
             }
           };
 
-          // Load resources
+          // Load recent journal entries for personalized recommendations
+          // Commented out REST API call - journals will be fetched from Convex instead
+          const loadJournals = async () => {
+            if (!isMounted) return;
+            
+            // For now, skip journal loading to prevent network errors
+            // Will implement Convex journal query instead
+            if (isMounted) {
+              setRecentJournals([]);
+            }
+          };
+
+          // Load resources with personalization
           const loadResources = async () => {
             if (!isMounted) return;
             
@@ -535,17 +589,15 @@ export default function HomeScreen() {
               const allResources = await fetchAllResourcesWithExternal();
               if (!isMounted) return;
               
-              const recommendedResources = allResources
-                .filter(resource => 
-                  resource.type === 'Exercise' || 
-                  resource.type === 'Affirmation' || 
-                  resource.type === 'Quote'
-                )
+              // Initial load with default/random resources
+              // Will be updated by the separate useEffect when moods/journals are loaded
+              const quickResources = allResources
+                .filter(r => r.type === 'Exercise' || r.type === 'Affirmation' || r.type === 'Quote')
                 .sort(() => Math.random() - 0.5)
                 .slice(0, 3);
               
               if (isMounted) {
-                setResources(recommendedResources);
+                setResources(quickResources);
               }
             } catch (error) {
               console.error("Error loading resources:", error);
@@ -577,10 +629,13 @@ export default function HomeScreen() {
           
           await Promise.all([
             loadMoods(),
-            loadResources(),
+            loadJournals(),
             loadAssessmentStatus(),
             loadProfileImage(),
           ]);
+          
+          // Load resources after moods and journals are fetched
+          await loadResources();
         } finally {
           if (isMounted) setLoading(false);
         }
@@ -839,7 +894,12 @@ export default function HomeScreen() {
 
             {/* Resources Section */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recommended Resources</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text, flex: 1 }]}>
+                  Recommended For You
+                </Text>
+                <Ionicons name="sparkles" size={18} color={theme.colors.primary} />
+              </View>
               {resources.length > 0 ? (
                 resources.map((resource) => (
                   <TouchableOpacity
