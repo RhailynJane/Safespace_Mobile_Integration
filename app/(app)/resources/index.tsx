@@ -653,15 +653,8 @@ export default function ResourcesScreen() {
                       )}
                     </View>
 
-                    {/* Navigation Chevron */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <TouchableOpacity onPress={() => handleToggleFavorite(resource)}>
-                        <Ionicons
-                          name={(ResourcesScreen as any)._favoriteIds?.has(resource.id) ? "star" : "star-outline"}
-                          size={20}
-                          color={(ResourcesScreen as any)._favoriteIds?.has(resource.id) ? "#FFC107" : theme.colors.icon}
-                        />
-                      </TouchableOpacity>
+                    {/* Navigation Chevron (favorite star removed) */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Ionicons
                         name="chevron-forward"
                         size={20}
