@@ -22,9 +22,49 @@ export const list = query({
     }
     
     const rows = await q.order("desc").take(limit);
-    
-    // Filter out drafts from public feed
-    return rows.filter((p: any) => !p.isDraft);
+    const publicRows = rows.filter((p: any) => !p.isDraft);
+
+    const identity = await ctx.auth.getUserIdentity();
+    const currentUserId = identity?.subject as string | undefined;
+
+    // Enrich with reaction counts, author info, and current user's reaction
+    const enriched = await Promise.all(publicRows.map(async (p: any) => {
+      const reactions = await ctx.db
+        .query("postReactions")
+        .withIndex("by_post", (qb: any) => qb.eq("postId", p._id))
+        .collect();
+
+      const countsMap = reactions.reduce((acc: Record<string, number>, r: any) => {
+        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const reactionCounts = Object.entries(countsMap).map(([emoji, count]) => ({ e: emoji, c: count }));
+
+      let userReaction: string | null = null;
+      if (currentUserId) {
+        const ur = reactions.find((r: any) => r.userId === currentUserId);
+        userReaction = ur ? ur.emoji : null;
+      }
+
+      const author = await ctx.db
+        .query("users")
+        .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", p.authorId))
+        .first();
+      
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", p.authorId))
+        .first();
+
+      return {
+        ...p,
+        reactionCounts, // array of { e, c }
+        userReaction,   // emoji or null
+        authorName: author?.firstName || "Community Member",
+        authorImage: profile?.profileImageUrl || null,
+      };
+    }));
+    return enriched;
   },
 });
 
@@ -51,7 +91,35 @@ export const myPosts = query({
     if (!args.includeDrafts) {
       rows = rows.filter((p: any) => !p.isDraft);
     }
-    return rows;
+    const enriched = await Promise.all(rows.map(async (p: any) => {
+      const reactions = await ctx.db
+        .query("postReactions")
+        .withIndex("by_post", (qb: any) => qb.eq("postId", p._id))
+        .collect();
+      const countsMap = reactions.reduce((acc: Record<string, number>, r: any) => {
+        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const reactionCounts = Object.entries(countsMap).map(([emoji, count]) => ({ e: emoji, c: count }));
+      const author = await ctx.db
+        .query("users")
+        .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", p.authorId))
+        .first();
+      
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", p.authorId))
+        .first();
+      
+      return {
+        ...p,
+        reactionCounts,
+        userReaction: reactions.find((r: any) => r.userId === authorId)?.emoji || null,
+        authorName: author?.firstName || "You",
+        authorImage: profile?.profileImageUrl || null,
+      };
+    }));
+    return enriched;
   },
 });
 
@@ -81,7 +149,42 @@ export const bookmarkedPosts = query({
     );
 
     // Filter out null posts (in case post was deleted)
-    return posts.filter((p: any) => p !== null);
+    const validPosts = posts.filter((p: any) => p !== null);
+    const currentUserId = userId;
+    const enriched = await Promise.all(validPosts.map(async (p: any) => {
+      const reactions = await ctx.db
+        .query("postReactions")
+        .withIndex("by_post", (qb: any) => qb.eq("postId", p._id))
+        .collect();
+      const countsMap = reactions.reduce((acc: Record<string, number>, r: any) => {
+        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      const reactionCounts = Object.entries(countsMap).map(([emoji, count]) => ({ e: emoji, c: count }));
+      let userReaction: string | null = null;
+      if (currentUserId) {
+        const ur = reactions.find((r: any) => r.userId === currentUserId);
+        userReaction = ur ? ur.emoji : null;
+      }
+      const author = await ctx.db
+        .query("users")
+        .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", p.authorId))
+        .first();
+      
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", p.authorId))
+        .first();
+      
+      return {
+        ...p,
+        reactionCounts,
+        userReaction,
+        authorName: author?.firstName || "Community Member",
+        authorImage: profile?.profileImageUrl || null,
+      };
+    }));
+    return enriched;
   },
 });
 

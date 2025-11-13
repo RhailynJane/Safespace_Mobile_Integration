@@ -456,38 +456,33 @@ export default function PostDetailScreen() {
 
             {/* Reaction Statistics Bar */}
             <View style={[styles.reactionStats, { borderColor: theme.colors.borderLight }]}>
-              {Object.entries(allReactions).map(([emoji, count]) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[
-                    styles.reactionStat,
-                    userReaction === emoji && styles.reactionStatActive,
-                    count === 0 && styles.reactionStatEmpty,
-                  ]}
-                  onPress={() => handleReactionPress(emoji)}
-                  disabled={reacting}
-                >
-                  <Text style={styles.reactionStatEmoji}>{emoji}</Text>
-                  <Text style={[
-                    styles.reactionStatCount,
-                    count === 0 && styles.reactionStatCountEmpty
-                  ]}>
-                    {count}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {/* Only show reactions that have been received (count > 0) */}
+              {Object.entries(allReactions)
+                .filter(([_, count]) => count > 0)
+                .map(([emoji, count]) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={[
+                      styles.reactionStat,
+                      userReaction === emoji && styles.reactionStatActive,
+                    ]}
+                    onPress={() => handleReactionPress(emoji)}
+                    disabled={reacting}
+                  >
+                    <Text style={styles.reactionStatEmoji}>{emoji}</Text>
+                    <Text style={styles.reactionStatCount}>
+                      {count}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               
-              {/* Add More Reactions Button */}
+              {/* Add Reaction Button */}
               <TouchableOpacity
                 style={styles.addMoreReactionButton}
                 onPress={() => setReactionPickerVisible(!reactionPickerVisible)}
                 disabled={reacting}
               >
-                <Ionicons 
-                  name="add-circle" 
-                  size={scaledFontSize(20)} 
-                  color={reacting ? "#CCC" : "#4CAF50"} 
-                />
+                <Text style={styles.addReactionText}>+</Text>
               </TouchableOpacity>
             </View>
 
@@ -782,6 +777,13 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
+    minWidth: 40,
+    minHeight: 32,
+  },
+  addReactionText: {
+    fontSize: scaledFontSize(20),
+    fontWeight: "600",
+    color: "#4CAF50",
   },
   userReactionIndicator: {
     backgroundColor: "#E8F5E9",
