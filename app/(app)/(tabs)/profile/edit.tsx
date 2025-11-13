@@ -34,6 +34,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import { useConvex, useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { computeCoreProfileCompletion } from "../../../../utils/profileCompletion";
 
 // Gender options for the form
 const GENDER_OPTIONS = [
@@ -1117,14 +1118,22 @@ export default function EditProfileScreen() {
               Profile Completion
             </Text>
             <Text style={[styles.progressPercentage, { color: theme.colors.primary }]}>
-              {getOverallCompletion()}%
+              {computeCoreProfileCompletion([
+                { photoUrl: profileImage, location: formData.location, phone: formData.phoneNumber },
+                { photoUrl: fullProfile?.profileImageUrl, location: fullProfile?.location, phone: fullProfile?.phoneNumber },
+                { photoUrl: user?.imageUrl, location: undefined, phone: user?.phoneNumbers?.[0]?.phoneNumber },
+              ]).percent}%
             </Text>
           </View>
           <View style={styles.progressBarContainer}>
             <View 
               style={[
                 styles.progressBarFill, 
-                { width: `${getOverallCompletion()}%` }
+                { width: `${computeCoreProfileCompletion([
+                  { photoUrl: profileImage, location: formData.location, phone: formData.phoneNumber },
+                  { photoUrl: fullProfile?.profileImageUrl, location: fullProfile?.location, phone: fullProfile?.phoneNumber },
+                  { photoUrl: user?.imageUrl, location: undefined, phone: user?.phoneNumbers?.[0]?.phoneNumber },
+                ]).percent}%` }
               ]} 
             />
           </View>

@@ -28,6 +28,7 @@ import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
 import { useConvex, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { computeCoreProfileCompletion } from "../../../../utils/profileCompletion";
 
 const IS_TEST_ENV = process.env.NODE_ENV === 'test';
 
@@ -118,14 +119,23 @@ export default function ProfileScreen() {
   }, [journalHistory, upcomingAppointments, myPosts, moodStats]);
 
   const profileCompleteness = useMemo(() => {
-    const checks = [
-      !!(profileData.profileImageUrl || convexProfile?.profileImageUrl || user?.imageUrl),
-      !!(profileData.location || convexProfile?.location),
-      !!(profileData.phoneNumber || convexProfile?.phoneNumber || user?.phoneNumbers?.[0]?.phoneNumber),
-    ];
-    const completed = checks.filter(Boolean).length;
-    const percent = Math.round((completed / checks.length) * 100);
-    return { completed, total: checks.length, percent };
+    return computeCoreProfileCompletion([
+      {
+        photoUrl: profileData.profileImageUrl,
+        location: profileData.location,
+        phone: profileData.phoneNumber,
+      },
+      {
+        photoUrl: convexProfile?.profileImageUrl,
+        location: convexProfile?.location,
+        phone: convexProfile?.phoneNumber,
+      },
+      {
+        photoUrl: user?.imageUrl,
+        location: undefined,
+        phone: user?.phoneNumbers?.[0]?.phoneNumber,
+      },
+    ]);
   }, [profileData, convexProfile, user]);
 
   // Create styles dynamically based on text size
