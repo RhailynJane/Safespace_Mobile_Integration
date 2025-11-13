@@ -209,15 +209,26 @@ export const submitAssessment = mutation({
       updatedAt: now,
     });
     
-    // Create notification for completion
-    await ctx.db.insert("notifications", {
-      userId: args.userId,
-      type: "self_assessment",
-      title: "Assessment Completed",
-      message: `Your wellbeing assessment has been recorded. Score: ${args.totalScore}/35. Next assessment due in 6 months.`,
-      isRead: false,
-      createdAt: now,
-    });
+    // Create notification for completion (respect user settings)
+    try {
+      const settings = await ctx.db
+        .query("settings")
+        .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+        .first();
+      const enabled = settings?.notificationsEnabled !== false && settings?.notifSelfAssessment !== false;
+      if (enabled) {
+        await ctx.db.insert("notifications", {
+          userId: args.userId,
+          type: "self_assessment",
+          title: "Assessment Completed",
+          message: `Your wellbeing assessment has been recorded. Score: ${args.totalScore}/35. Next assessment due in 6 months.`,
+          isRead: false,
+          createdAt: now,
+        });
+      }
+    } catch (_e) {
+      // non-blocking
+    }
     
     // Log activity
     await ctx.db.insert("activities", {

@@ -147,23 +147,47 @@ export function addNotificationListeners(
       if (!type || (type !== 'mood' && type !== 'journaling')) return;
       if (identifier && loggedIds.has(identifier)) return; // de-dup
       
-      // Log when notification fires (use server time since device time is unreliable)
-      const baseURL = getApiBaseUrl();
+      // Log notification to Convex so it appears in notification bell
       console.log(`📝 Notification fired: type=${type}, title=${title}`);
       
-      await fetch(`${baseURL}/api/notifications/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clerkUserId,
-          type,
-          title: title || (type === 'mood' ? 'Mood check-in' : 'Journaling reminder'),
-          message: body || (type === 'mood' ? 'How are you feeling today?' : 'Take a moment to jot your thoughts.'),
-          // Backend will use server time
-        })
-      });
+      try {
+        // Call Convex mutation directly via HTTP
+        const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+        if (!convexUrl) {
+          console.log('⚠️ No Convex URL configured');
+          return;
+        }
+
+        const response = await fetch(`${convexUrl}/api/mutation`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            path: 'notifications:createNotification',
+            args: {
+              userId: clerkUserId,
+              type: type,
+              title: title || (type === 'mood' ? 'Mood check-in' : 'Journaling reminder'),
+              message: body || (type === 'mood' ? 'How are you feeling today?' : 'Take a moment to jot your thoughts.'),
+            },
+            format: 'json',
+          })
+        });
+        
+        if (response.ok) {
+          console.log('✅ Notification saved to Convex');
+        } else {
+          const errorText = await response.text();
+          console.log('⚠️ Failed to save notification to Convex:', response.status, errorText);
+        }
+      } catch (error) {
+        console.log('⚠️ Failed to save notification:', error);
+      }
+      
       if (identifier) loggedIds.add(identifier);
     } catch (_e) {
+      console.log('⚠️ Failed to log notification:', _e);
       // ignore logging failures
     }
   }
@@ -180,10 +204,11 @@ export function addNotificationListeners(
       try { notificationEvents.publish({ type: 'received', title, body }); } catch { /* no-op */ }
       // If this is a local reminder, log it to backend to appear in bell
       await logLocalReminderIfNeeded(notification);
-      // If this was a bootstrap one-time reminder, lay down the repeating schedule now
+      // Reschedule the next occurrence for daily reminders (since we use one-time triggers)
       try {
         const data = notification?.request?.content?.data || {};
-        if (clerkUserId && (data?.bootstrap === true || data?.bootstrap === 'true')) {
+        if (clerkUserId && (data?.type === 'mood' || data?.type === 'journaling')) {
+          console.log(`🔄 Rescheduling next ${data.type} reminder after fire`);
           const settings = await settingsAPI.fetchSettings(clerkUserId);
           await scheduleFromSettings(settings);
         }
@@ -194,8 +219,10 @@ export function addNotificationListeners(
       const data = response.notification.request.content.data;
       // Also log on tap in case receive listener didn't run (background state)
       await logLocalReminderIfNeeded(response.notification);
+      // Reschedule the next occurrence for daily reminders
       try {
-        if (clerkUserId && (data?.bootstrap === true || data?.bootstrap === 'true')) {
+        if (clerkUserId && (data?.type === 'mood' || data?.type === 'journaling')) {
+          console.log(`🔄 Rescheduling next ${data.type} reminder after tap`);
           const settings = await settingsAPI.fetchSettings(clerkUserId);
           await scheduleFromSettings(settings);
         }

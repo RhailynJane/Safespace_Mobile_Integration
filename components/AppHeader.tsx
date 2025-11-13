@@ -511,9 +511,9 @@ export const AppHeader = ({
             <TouchableOpacity onPress={() => router.push("/notifications")} style={{ position: 'relative', padding: 4 }}>
               <Ionicons name="notifications-outline" size={24} color={theme.colors.icon} />
               {unreadCount > 0 && (
-                <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+                <View style={[styles.unreadBadge, { backgroundColor: '#FF3B30' }]}>
                   <Text style={styles.unreadBadgeText} numberOfLines={1}>
-                    {unreadCount > 9 ? '9+' : String(unreadCount)}
+                    {unreadCount > 99 ? '99+' : String(unreadCount)}
                   </Text>
                 </View>
               )}

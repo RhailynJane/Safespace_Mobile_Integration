@@ -111,6 +111,7 @@ export default function SettingsScreen() {
     user?.id ? { clerkId: user.id } : (undefined as any)
   ) as any;
   const saveSettingsMutation = useMutation(api.profiles.saveSettings);
+  const upsertSettingsMutation = useMutation(api.settings.upsertSettings);
 
   const tabs = [
     { id: "home", name: "Home", icon: "home" },
@@ -120,7 +121,7 @@ export default function SettingsScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
-  // Hydrate settings from Convex profile when it loads
+    // Hydrate settings from Convex profile when it loads
   useEffect(() => {
     if (!convexProfile?.preferences || hasHydrated) return;
     
@@ -136,12 +137,16 @@ export default function SettingsScreen() {
     setNotifAppointments(prefs.notifAppointments ?? true);
     setNotifSelfAssessment(prefs.notifSelfAssessment ?? true);
     setReminderFrequency(prefs.reminderFrequency ?? 'Daily');
-    // If category is enabled but per-reminder toggle is off, auto-enable the reminder to match intent
-    setMoodReminderEnabled((prefs.moodReminderEnabled ?? false) || (prefs.notifMoodTracking ?? false));
+    // If category is enabled, ensure per-reminder toggle is also enabled
+    const shouldEnableMoodReminder = (prefs.moodReminderEnabled ?? false) || (prefs.notifMoodTracking ?? false);
+    const shouldEnableJournalReminder = (prefs.journalReminderEnabled ?? false) || (prefs.notifJournaling ?? false);
+    console.log(`🔔 Mood reminder auto-enable: ${shouldEnableMoodReminder} (saved: ${prefs.moodReminderEnabled}, category: ${prefs.notifMoodTracking})`);
+    console.log(`🔔 Journal reminder auto-enable: ${shouldEnableJournalReminder} (saved: ${prefs.journalReminderEnabled}, category: ${prefs.notifJournaling})`);
+    setMoodReminderEnabled(shouldEnableMoodReminder);
     setMoodReminderTime(prefs.moodReminderTime ?? '09:00');
     setMoodReminderFrequency(prefs.moodReminderFrequency ?? 'Daily');
     setMoodReminderCustomSchedule(prefs.moodReminderCustomSchedule ?? {});
-    setJournalReminderEnabled((prefs.journalReminderEnabled ?? false) || (prefs.notifJournaling ?? false));
+    setJournalReminderEnabled(shouldEnableJournalReminder);
     setJournalReminderTime(prefs.journalReminderTime ?? '20:00');
     setJournalReminderFrequency(prefs.journalReminderFrequency ?? 'Daily');
     setJournalReminderCustomSchedule(prefs.journalReminderCustomSchedule ?? {});
@@ -164,6 +169,32 @@ export default function SettingsScreen() {
   useEffect(() => {
     applySettings();
   }, [isDarkMode, textSize]);
+
+  // Ensure reminder toggles stay in sync with category toggles
+  useEffect(() => {
+    if (!ready) return; // Skip during initial load
+    
+    // If mood tracking category is ON but reminder is OFF, auto-enable it
+    if (notifMoodTracking && !moodReminderEnabled) {
+      console.log('🔧 Auto-enabling mood reminder (category is ON)');
+      setMoodReminderEnabled(true);
+    }
+    // If mood tracking category is OFF, ensure reminder is also OFF
+    if (!notifMoodTracking && moodReminderEnabled) {
+      console.log('🔧 Auto-disabling mood reminder (category is OFF)');
+      setMoodReminderEnabled(false);
+    }
+    
+    // Same for journaling
+    if (notifJournaling && !journalReminderEnabled) {
+      console.log('🔧 Auto-enabling journal reminder (category is ON)');
+      setJournalReminderEnabled(true);
+    }
+    if (!notifJournaling && journalReminderEnabled) {
+      console.log('🔧 Auto-disabling journal reminder (category is OFF)');
+      setJournalReminderEnabled(false);
+    }
+  }, [ready, notifMoodTracking, notifJournaling, moodReminderEnabled, journalReminderEnabled]);
 
   // Auto-save notification settings when they change
   useEffect(() => {
@@ -195,12 +226,39 @@ export default function SettingsScreen() {
         if (USE_REST_SETTINGS) {
           await settingsAPI.saveSettings(settings, user?.id);
         } else if (user?.id) {
-          // Save to Convex
+          // Save to Convex profiles (preferences) - primary storage
           await saveSettingsMutation({
             clerkId: user.id,
             preferences: {
               theme: isDarkMode ? 'dark' : 'light',
               notifications: notificationsEnabled,
+              darkMode: isDarkMode,
+              textSize,
+              notificationsEnabled,
+              notifMoodTracking,
+              notifJournaling,
+              notifMessages,
+              notifPostReactions,
+              notifAppointments,
+              notifSelfAssessment,
+              reminderFrequency,
+              moodReminderEnabled,
+              moodReminderTime,
+              moodReminderFrequency,
+              moodReminderCustomSchedule,
+              journalReminderEnabled,
+              journalReminderTime,
+              journalReminderFrequency,
+              journalReminderCustomSchedule,
+              appointmentReminderEnabled,
+              appointmentReminderAdvanceMinutes,
+            },
+          });
+          
+          // Also save to dedicated settings table for Convex dashboard visibility
+          await upsertSettingsMutation({
+            clerkId: user.id,
+            settings: {
               darkMode: isDarkMode,
               textSize,
               notificationsEnabled,

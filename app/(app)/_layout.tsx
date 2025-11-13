@@ -11,9 +11,10 @@ import { api } from "../../convex/_generated/api";
 import { useConvexActivity } from "../../utils/hooks/useConvexActivity";
 import { useConvexSettings } from "../../utils/hooks/useConvexSettings";
 import { NotificationsProvider } from "../../contexts/NotificationsContext";
+import { createConvexClient, isConvexEnabled } from "../../utils/convexAuthSync";
 
 export default function AppLayout() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
   const appState = useRef(AppState.currentState);
   const [banner, setBanner] = useState<{visible:boolean; title:string; body:string}>({visible:false, title:'', body:''});
   const pushSubsRef = useRef<{ remove: () => void } | null>(null);
@@ -22,22 +23,50 @@ export default function AppLayout() {
 
   console.log('📱 AppLayout - Auth State:', { isLoaded, isSignedIn });
 
-  // Initialize Convex client
+  // Initialize Convex client using env + Clerk token; fallback to AsyncStorage if present
   useEffect(() => {
     const initConvex = async () => {
       try {
+        // Avoid recreating the client if already set
+        if (convexClient) {
+          return;
+        }
+
+        // Prefer EXPO_PUBLIC_CONVEX_URL with Clerk auth
+        if (isConvexEnabled()) {
+          const client = createConvexClient(getToken);
+          if (client) {
+            setConvexClient(client);
+            console.log('✅ Convex client initialized via EXPO_PUBLIC_CONVEX_URL');
+            return;
+          } else {
+            console.log('⚠️ Failed to create Convex client from env, will try AsyncStorage fallback');
+          }
+        } else {
+          console.log('ℹ️ EXPO_PUBLIC_CONVEX_URL not set; attempting AsyncStorage fallback');
+        }
+
+        // Fallback: legacy storage key used by older builds
+        console.log('🔌 Attempting to retrieve convexUrl from AsyncStorage...');
         const url = await AsyncStorage.getItem('convexUrl');
+        console.log('🔌 Retrieved convexUrl:', url);
         if (url) {
           const client = new ConvexReactClient(url);
           setConvexClient(client);
-          console.log('� Convex client initialized in AppLayout');
+          console.log('✅ Convex client initialized from AsyncStorage URL');
+        } else {
+          console.log('⚠️ No convexUrl found in AsyncStorage and env not configured');
         }
       } catch (error) {
         console.error('❌ Failed to initialize Convex client:', error);
       }
     };
-    initConvex();
-  }, []);
+
+    // Wait for auth to load to attach Clerk token
+    if (isLoaded && isSignedIn && !convexClient) {
+      initConvex();
+    }
+  }, [isLoaded, isSignedIn, convexClient]);
 
   // Initialize activity and settings hooks
   const { recordLogin } = useConvexActivity(convexClient);

@@ -244,6 +244,37 @@ export const react = mutation({
       });
     }
 
+    // Notify the post author (not the reactor) if their settings allow
+    try {
+      const post = await ctx.db.get(args.postId);
+      const authorId = post?.authorId as string | undefined;
+      if (authorId && authorId !== userId) {
+        const settings = await ctx.db
+          .query("settings")
+          .withIndex("by_user", (q: any) => q.eq("userId", authorId))
+          .first();
+        const enabled = settings?.notificationsEnabled !== false && settings?.notifPostReactions !== false;
+        if (enabled) {
+          // Load reactor name for nicer title if available
+          const reactor = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q: any) => q.eq("clerkId", userId))
+            .first();
+          const name = reactor?.firstName || "Someone";
+          await ctx.db.insert("notifications", {
+            userId: authorId,
+            type: "post_reactions",
+            title: `New reaction on your post`,
+            message: `${name} reacted ${args.emoji}`,
+            isRead: false,
+            createdAt: Date.now(),
+          });
+        }
+      }
+    } catch (_e) {
+      // non-blocking
+    }
+
     return { ok: true } as const;
   },
 });

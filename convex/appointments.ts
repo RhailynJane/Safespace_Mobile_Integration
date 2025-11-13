@@ -266,6 +266,27 @@ export const createAppointment = mutation({
 			createdAt: now,
 		});
 
+			// Create notification if user settings allow
+			try {
+				const settings = await ctx.db
+					.query("settings")
+					.withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+					.first();
+				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+				if (enabled) {
+					await ctx.db.insert("notifications", {
+						userId: args.userId,
+						type: "appointment",
+						title: "Appointment Scheduled",
+						message: `${args.supportWorker} on ${args.date} at ${args.time}`,
+						isRead: false,
+						createdAt: Date.now(),
+					});
+				}
+			} catch (_e) {
+				// non-blocking
+			}
+
 		return { id: appointmentId };
 	},
 });
@@ -296,6 +317,27 @@ export const rescheduleAppointment = mutation({
 			notes: noteUpdate,
 			updatedAt: Date.now(),
 		});
+
+			// Notify user about reschedule if enabled
+			try {
+				const settings = await ctx.db
+					.query("settings")
+					.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+					.first();
+				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+				if (enabled) {
+					await ctx.db.insert("notifications", {
+						userId: appointment.userId,
+						type: "appointment",
+						title: "Appointment Rescheduled",
+						message: `New time: ${newDate} ${newTime}`,
+						isRead: false,
+						createdAt: Date.now(),
+					});
+				}
+			} catch (_e) {
+				// non-blocking
+			}
 		
 		return { success: true };
 	},
@@ -320,6 +362,27 @@ export const cancelAppointment = mutation({
 			cancellationReason,
 			updatedAt: Date.now(),
 		});
+
+			// Notify user about cancellation if enabled
+			try {
+				const settings = await ctx.db
+					.query("settings")
+					.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+					.first();
+				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+				if (enabled) {
+					await ctx.db.insert("notifications", {
+						userId: appointment.userId,
+						type: "appointment",
+						title: "Appointment Cancelled",
+						message: cancellationReason || "Your appointment has been cancelled.",
+						isRead: false,
+						createdAt: Date.now(),
+					});
+				}
+			} catch (_e) {
+				// non-blocking
+			}
 		
 		return { success: true };
 	},
@@ -334,10 +397,35 @@ export const updateAppointmentStatus = mutation({
 		status: v.string(), // 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'
 	},
 	handler: async (ctx, { appointmentId, status }) => {
-		await ctx.db.patch(appointmentId, {
+			await ctx.db.patch(appointmentId, {
 			status,
 			updatedAt: Date.now(),
 		});
+
+			// Notify on key status changes if enabled
+			try {
+				const appointment = await ctx.db.get(appointmentId);
+				if (appointment) {
+					const settings = await ctx.db
+						.query("settings")
+						.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+						.first();
+					const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+					if (enabled && (status === 'confirmed' || status === 'completed')) {
+						const title = status === 'confirmed' ? 'Appointment Confirmed' : 'Appointment Completed';
+						await ctx.db.insert("notifications", {
+							userId: appointment.userId,
+							type: "appointment",
+							title,
+							message: `${appointment.date} ${appointment.time}`,
+							isRead: false,
+							createdAt: Date.now(),
+						});
+					}
+				}
+			} catch (_e) {
+				// non-blocking
+			}
 
 		return { success: true };
 	},

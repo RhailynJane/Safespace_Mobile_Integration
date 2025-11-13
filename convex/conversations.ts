@@ -212,6 +212,43 @@ export const sendMessage = mutation({
       updatedAt: now,
     });
     await ctx.db.patch(args.conversationId, { updatedAt: now });
+
+    // Create notifications for other participants if enabled in their settings
+    try {
+      const participants = await ctx.db
+        .query("conversationParticipants")
+        .withIndex("by_conversation", (q: any) => q.eq("conversationId", args.conversationId))
+        .collect();
+
+      // Load sender name for a nicer title if available
+      const senderUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerkId", (q: any) => q.eq("clerkId", sender))
+        .first();
+      const senderFirstName = senderUser?.firstName || "Someone";
+
+      const recipients = participants.map((p: any) => p.userId).filter((uid: string) => uid !== sender);
+      for (const uid of recipients) {
+        // Check settings gate
+        const settings = await ctx.db
+          .query("settings")
+          .withIndex("by_user", (q: any) => q.eq("userId", uid))
+          .first();
+        const enabled = settings?.notificationsEnabled !== false && settings?.notifMessages !== false;
+        if (!enabled) continue;
+
+        await ctx.db.insert("notifications", {
+          userId: uid,
+          type: "message",
+          title: `New message from ${senderFirstName}`,
+          message: args.body?.slice(0, 120) || "New message",
+          isRead: false,
+          createdAt: Date.now(),
+        });
+      }
+    } catch (_e) {
+      // non-blocking
+    }
     return { messageId: msgId } as const;
   },
 });
