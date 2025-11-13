@@ -46,12 +46,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
-import { useUser } from "@clerk/clerk-expo";
 
 /**
  * ResourceDetailScreen Component
@@ -74,7 +73,6 @@ interface ClientResource {
 export default function ResourceDetailScreen() {
   const { theme, scaledFontSize } = useTheme();
   const params = useLocalSearchParams();
-  const { user } = useUser();
   
   const [loading, setLoading] = useState(false); // Loading state for future enhancements
 
@@ -117,30 +115,6 @@ export default function ResourceDetailScreen() {
 
   // Show a loading indicator while attempting to fetch from Convex if we lack initial content
   const isLoadingFromConvex = shouldFetchFromConvex && convexResource === undefined;
-
-  // Favorites (bookmark) integration
-  const userId = user?.id;
-  const bookmarkResult = useQuery(
-    api.resources.listBookmarkedIds,
-    userId ? { userId } : 'skip'
-  ) as { ids: string[] } | undefined;
-  const addBookmark = useMutation(api.resources.addBookmark);
-  const removeBookmark = useMutation(api.resources.removeBookmark);
-  const canBookmark = !!userId && !resource.id.startsWith('external-') && resource.id !== 'unknown';
-  const isFavorited = canBookmark && bookmarkResult?.ids?.includes(resource.id) === true;
-
-  const handleToggleFavorite = async () => {
-    if (!canBookmark || !userId) return;
-    try {
-      if (isFavorited) {
-        await removeBookmark({ userId, resourceId: resource.id as any });
-      } else {
-        await addBookmark({ userId, resourceId: resource.id as any });
-      }
-    } catch (err) {
-      console.error('Favorite toggle failed', err);
-    }
-  };
 
   /**
    * Handle social sharing of resource content
@@ -238,29 +212,6 @@ export default function ResourceDetailScreen() {
                 <Text style={[styles.metaText, { color: theme.colors.textSecondary }]}>{resource.type}</Text>
               </View>
             </View>
-          </View>
-
-          {/* Action Bar - User interactions with the resource */}
-          <View style={[styles.actionBar, { 
-            backgroundColor: theme.colors.borderLight,
-            borderColor: theme.colors.border 
-          }]}>
-            {canBookmark && (
-              <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: theme.colors.surface }]} 
-                onPress={handleToggleFavorite}
-              >
-                <Ionicons name={isFavorited ? 'star' : 'star-outline'} size={24} color={isFavorited ? '#FFC107' : theme.colors.textSecondary} />
-                <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>{isFavorited ? 'Favorited' : 'Favorite'}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: theme.colors.surface }]} 
-              onPress={handleShare}
-            >
-              <Ionicons name="share-outline" size={24} color={theme.colors.textSecondary} />
-              <Text style={[styles.actionButtonText, { color: theme.colors.textSecondary }]}>Share</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Resource Content Section - Main reading area */}
@@ -411,35 +362,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   metaText: {
     fontSize: scaledFontSize(14),
-  },
-  
-  // Action Bar - User interaction controls
-  actionBar: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    gap: 15,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    justifyContent: "center", // Center the single button
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  actionButtonText: {
-    fontSize: scaledFontSize(14),
-    fontWeight: "600",
   },
   
   // Content Section - Main reading area

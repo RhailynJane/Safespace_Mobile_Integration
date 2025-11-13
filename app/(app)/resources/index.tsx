@@ -224,18 +224,13 @@ export default function ResourcesScreen() {
     ) as { ids: string[] } | undefined;
 
     useEffect(() => {
-      // Log for debugging
-      console.log('LiveResources - Query result:', liveResources);
-      
       if (liveResources !== undefined) {
         if (liveResources?.resources) {
-          console.log(`Found ${liveResources.resources.length} resources`);
           setResources(liveResources.resources);
           // Set first quote or affirmation as featured content
           const featured = liveResources.resources.find((r: Resource) => r.type === 'Quote' || r.type === 'Affirmation');
           setFeaturedResource(featured || null);
         } else {
-          console.log('No resources in response');
           setResources([]);
         }
         setLoading(false);
@@ -268,14 +263,10 @@ export default function ResourcesScreen() {
     ) as { ids: string[] } | undefined;
 
     useEffect(() => {
-      console.log(`LiveCategoryResources (${category}) - Query result:`, liveResources);
-      
       if (liveResources !== undefined) {
         if (liveResources?.resources) {
-          console.log(`Found ${liveResources.resources.length} resources for ${category}`);
           setResources(liveResources.resources);
         } else {
-          console.log(`No resources for category: ${category}`);
           setResources([]);
         }
         setLoading(false);
@@ -305,14 +296,10 @@ export default function ResourcesScreen() {
     ) as { ids: string[] } | undefined;
 
     useEffect(() => {
-      console.log(`LiveSearchResults (${query}) - Query result:`, searchResults);
-      
       if (searchResults !== undefined) {
         if (searchResults?.resources) {
-          console.log(`Found ${searchResults.resources.length} search results`);
           setResources(searchResults.resources);
         } else {
-          console.log('No search results');
           setResources([]);
         }
         setLoading(false);
@@ -890,7 +877,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   resourcesSection: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 100, // Extra padding for bottom navigation
+    paddingBottom: 140, // Extra padding for bottom navigation
   },
   resourcesSectionTitle: {
     fontSize: scaledFontSize(18),
