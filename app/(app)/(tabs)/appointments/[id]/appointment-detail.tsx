@@ -242,7 +242,7 @@ const fetchAppointment = useCallback(async () => {
       pathname: '/appointments/book',
       params: {
         reschedule: '1',
-        appointmentId: String(appointment.id),
+        appointmentId: String(appointment?.id),
       },
     });
   };
@@ -489,6 +489,21 @@ const fetchAppointment = useCallback(async () => {
     },
   ];
 
+  // Show loading while fetching appointment
+  if (loading || !appointment) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <AppHeader title="Appointment Details" showBack={true} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading appointment...</Text>
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -496,69 +511,120 @@ const fetchAppointment = useCallback(async () => {
 
           <ScrollView 
             style={styles.content}
-            contentContainerStyle={{ paddingBottom: 120 }}
+            contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
             showsVerticalScrollIndicator={false}
           >
-          {/* Appointment Card */}
-          <View style={[styles.appointmentCard, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
-              {appointment.supportWorker}
-            </Text>
+          {/* Page Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Session Details</Text>
 
-            {/* Appointment Details */}
-            <View style={styles.detailRow}>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.icon} />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.date}</Text>
+          {/* Support Worker Card */}
+          <View style={styles.workerCard}>
+            <View style={styles.workerIconCircle}>
+              <Ionicons name="person" size={32} color="#FFFFFF" />
             </View>
-            <View style={styles.detailRow}>
-              <Ionicons name="time-outline" size={20} color={theme.colors.icon} />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.time}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Ionicons name="videocam-outline" size={20} color={theme.colors.icon} />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.type} Session</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Ionicons
-                name="information-circle-outline"
-                size={20}
-                color={theme.colors.icon}
-              />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                Status: {appointment.status}
+            <View style={styles.workerInfo}>
+              <Text style={styles.workerName}>
+                {appointment.supportWorker}
               </Text>
+              <Text style={styles.workerRole}>CMHA Support Worker</Text>
+            </View>
+          </View>
+
+          {/* Appointment Details Card */}
+          <View style={styles.detailsCard}>
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailLabel}>Date</Text>
+                <Text style={styles.detailValue}>{appointment.date}</Text>
+              </View>
+            </View>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons name="time-outline" size={20} color="#FF9800" />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailLabel}>Time</Text>
+                <Text style={styles.detailValue}>{appointment.time}</Text>
+              </View>
+            </View>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons name="videocam" size={20} color="#9C27B0" />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailLabel}>Session Type</Text>
+                <Text style={styles.detailValue}>{appointment.type}</Text>
+              </View>
+            </View>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons
+                  name="information-circle"
+                  size={20}
+                  color="#2196F3"
+                />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={styles.detailLabel}>Status</Text>
+                <Text style={[styles.detailValue, styles.statusBadge, {
+                  backgroundColor: appointment.status.toLowerCase() === 'upcoming' ? '#E8F5E9' : '#F5F5F5',
+                  color: appointment.status.toLowerCase() === 'upcoming' ? '#2E7D32' : '#666'
+                }]}>
+                  {appointment.status}
+                </Text>
+              </View>
             </View>
           </View>
 
           {/* Action Buttons - Only show for upcoming appointments */}
           {appointment.status.toLowerCase() !== 'past' && appointment.status.toLowerCase() !== 'cancelled' && (
             <View style={styles.actions}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
+              
               {/* Join Session Button */}
               <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+                style={styles.actionButtonJoin}
                 onPress={handleJoinSession}
+                activeOpacity={0.8}
               >
-                <Ionicons name="videocam" size={20} color="#FFF" />
-                <Text style={styles.primaryButtonText}>Join Session</Text>
+                <View style={styles.actionButtonContent}>
+                  <View style={styles.actionIconCircle}>
+                    <Ionicons name="videocam" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.actionTextContainer}>
+                    <Text style={styles.actionButtonTitle}>Join Video Session</Text>
+                    <Text style={styles.actionButtonSubtitle}>Start your appointment</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </View>
               </TouchableOpacity>
 
-              {/* Reschedule Button */}
-              <TouchableOpacity
-                style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
-                onPress={handleReschedule}
-              >
-                <Ionicons name="calendar" size={20} color={theme.colors.primary} />
-                <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>Reschedule</Text>
-              </TouchableOpacity>
+              {/* Reschedule and Cancel Row */}
+              <View style={styles.actionButtonRow}>
+                {/* Reschedule Button */}
+                <TouchableOpacity
+                  style={styles.actionButtonSecondary}
+                  onPress={handleReschedule}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="calendar" size={20} color="#FF9800" />
+                  <Text style={styles.actionButtonSecondaryText}>Reschedule</Text>
+                </TouchableOpacity>
 
-              {/* Cancel Appointment Button */}
-              <TouchableOpacity
-                style={[styles.tertiaryButton, { borderColor: theme.colors.error }]}
-                onPress={handleCancel}
-              >
-                <Ionicons name="close-circle" size={20} color={theme.colors.error} />
-                <Text style={[styles.tertiaryButtonText, { color: theme.colors.error }]}>Cancel Appointment</Text>
-              </TouchableOpacity>
+                {/* Cancel Appointment Button */}
+                <TouchableOpacity
+                  style={styles.actionButtonCancel}
+                  onPress={handleCancel}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close-circle" size={20} color="#F44336" />
+                  <Text style={styles.actionButtonCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -581,7 +647,7 @@ const fetchAppointment = useCallback(async () => {
                   <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Cancel Appointment?</Text>
                   <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
                     Are you sure you want to cancel your session with{" "}
-                    {appointment.supportWorker} on {appointment.date}?
+                    {appointment?.supportWorker} on {appointment?.date}?
                   </Text>
                   <View style={styles.modalButtons}>
                     <TouchableOpacity
@@ -692,6 +758,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingText: {
+    marginTop: 16,
+    fontSize: scaledFontSize(16),
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -713,6 +783,175 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     textAlign: "center",
     marginTop: 16,
   },
+  pageTitle: {
+    fontSize: scaledFontSize(22),
+    fontWeight: '700',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  content: {
+    flex: 1,
+  },
+  workerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  workerIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#757575',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  workerInfo: {
+    flex: 1,
+  },
+  workerName: {
+    fontSize: scaledFontSize(17),
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 2,
+  },
+  workerRole: {
+    fontSize: scaledFontSize(13),
+    color: '#666',
+  },
+  detailsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  detailIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  detailTextContainer: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: scaledFontSize(11),
+    color: '#999',
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: scaledFontSize(15),
+    color: '#333',
+    fontWeight: '600',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    overflow: 'hidden',
+  },
+  sectionTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  actions: {
+    marginBottom: 20,
+  },
+  actionButtonJoin: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  actionTextContainer: {
+    flex: 1,
+  },
+  actionButtonTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  actionButtonSubtitle: {
+    fontSize: scaledFontSize(12),
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  actionButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionButtonSecondary: {
+    flex: 1,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionButtonSecondaryText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+    color: '#FF9800',
+  },
+  actionButtonCancel: {
+    flex: 1,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionButtonCancelText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+    color: '#F44336',
+  },
   modalContainer: {
     flex: 1,
     flexDirection: "row",
@@ -720,6 +959,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sideMenu: {
     width: "75%",
@@ -784,143 +1025,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#FF6B6B",
     marginTop: 16,
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  appointmentCard: {
-    backgroundColor: "#f1f5f9",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  supportWorkerName: {
-    fontSize: scaledFontSize(17),
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 10,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: scaledFontSize(13),
-    color: "#666",
-    marginLeft: 12,
-  },
-  actions: {
-    marginBottom: 24,
-  },
-  primaryButton: {
-    backgroundColor: "#4CAF50",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    marginBottom: 12,
-  },
-  secondaryButtonText: {
-    color: "#4CAF50",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  tertiaryButton: {
-    backgroundColor: "transparent",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#F44336",
-  },
-  tertiaryButtonText: {
-    color: "#F44336",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 24,
-    width: "100%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: scaledFontSize(20),
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 12,
-  },
-  modalText: {
-    fontSize: scaledFontSize(16),
-    color: "#666",
-    marginBottom: 24,
-    lineHeight: 24,
-    textAlign: "center",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  modalButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 6,
-  },
-  modalCancelButton: {
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  modalCancelButtonText: {
-    color: "#666",
-    fontSize: scaledFontSize(14),
-    fontWeight: "600",
-    textAlign: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  modalConfirmButton: {
-    backgroundColor: "#F44336",
-  },
-  modalConfirmButtonText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(14),
-    fontWeight: "600",
-    textAlign: "center",
-    justifyContent: "center",
-    marginTop: 6,
-  },
   blurContainer: {
     width: "100%",
     height: "100%",
@@ -929,7 +1033,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   confirmationModalContent: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     width: "85%",
     maxWidth: 400,
@@ -939,40 +1043,50 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#FFEBEE",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
   },
-  rescheduleOptions: {
-    width: "100%",
-    marginBottom: 20,
-  },
-  rescheduleHint: {
-    fontSize: scaledFontSize(14),
-    color: "#666",
+  modalTitle: {
+    fontSize: scaledFontSize(22),
+    fontWeight: '700',
     marginBottom: 12,
-    textAlign: "center",
+    textAlign: 'center',
   },
-  timeSlot: {
-    backgroundColor: "#F8F9FA",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    alignItems: "center",
+  modalText: {
+    fontSize: scaledFontSize(15),
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
   },
-  timeSlotText: {
-    fontSize: scaledFontSize(14),
-    color: "#2c3e50",
-    fontWeight: "500",
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
   },
-  selectedTimeSlot: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#4CAF50",
-    borderWidth: 2,
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  selectedTimeSlotText: {
-    color: "#2E7D32",
-    fontWeight: "600",
+  modalCancelButton: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  modalCancelButtonText: {
+    color: '#666',
+    fontSize: scaledFontSize(15),
+    fontWeight: '600',
+  },
+  modalConfirmButton: {
+    backgroundColor: '#F44336',
+  },
+  modalConfirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(15),
+    fontWeight: '600',
   },
 });

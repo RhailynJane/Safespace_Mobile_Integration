@@ -319,30 +319,41 @@ useEffect(() => {
                     key={appointment.id}
                     style={styles.appointmentCard}
                     onPress={() => handleAppointmentPress(appointment.id)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.supportWorker}>
-                      {appointment.supportWorker}
-                    </Text>
+                    <View style={styles.cardHeader}>
+                      <View style={styles.workerIconCircle}>
+                        <Ionicons name="person" size={20} color="#FFFFFF" />
+                      </View>
+                      <Text style={styles.supportWorker}>
+                        {appointment.supportWorker}
+                      </Text>
+                    </View>
                     <View style={styles.appointmentDetails}>
                       <View style={styles.detailRow}>
-                        <Ionicons name="calendar-outline" size={16} color={theme.colors.icon} />
+                        <View style={styles.detailIconCircle}>
+                          <Ionicons name="calendar-outline" size={16} color="#4CAF50" />
+                        </View>
                         <Text style={styles.detailText}>{appointment.date}</Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
+                        <View style={styles.detailIconCircle}>
+                          <Ionicons name="time-outline" size={16} color="#FF9800" />
+                        </View>
                         <Text style={styles.detailText}>{appointment.time}</Text>
                       </View>
-                    </View>
-                    <View style={styles.sessionType}>
-                      <Ionicons name="videocam" size={14} color={theme.colors.primary} />
-                      <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
+                      <View style={styles.sessionTypeBadge}>
+                        <Ionicons name="videocam" size={14} color="#9C27B0" />
+                        <Text style={styles.sessionTypeText}>{appointment.type}</Text>
+                      </View>
                     </View>
                   </TouchableOpacity>
                 ))
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
-                <Text style={styles.emptyStateText}>No upcoming appointments</Text>
+                <Ionicons name="calendar-outline" size={56} color="#E0E0E0" />
+                <Text style={styles.emptyStateTitle}>No upcoming appointments</Text>
+                <Text style={styles.emptyStateSubtitle}>Book a session to get started</Text>
               </View>
             )
           ) : appointments.filter((a) => a.status === "past").length > 0 ? (
@@ -351,32 +362,43 @@ useEffect(() => {
               .map((appointment) => (
                 <TouchableOpacity
                   key={appointment.id}
-                  style={styles.appointmentCard}
+                  style={[styles.appointmentCard, styles.pastAppointmentCard]}
                   onPress={() => handleAppointmentPress(appointment.id)}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.supportWorker}>
-                    {appointment.supportWorker}
-                  </Text>
+                  <View style={styles.cardHeader}>
+                    <View style={[styles.workerIconCircle, styles.pastIconCircle]}>
+                      <Ionicons name="person" size={20} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.supportWorker}>
+                      {appointment.supportWorker}
+                    </Text>
+                  </View>
                   <View style={styles.appointmentDetails}>
                     <View style={styles.detailRow}>
-                      <Ionicons name="calendar-outline" size={16} color={theme.colors.icon} />
+                      <View style={styles.detailIconCircle}>
+                        <Ionicons name="calendar-outline" size={16} color="#4CAF50" />
+                      </View>
                       <Text style={styles.detailText}>{appointment.date}</Text>
                     </View>
                     <View style={styles.detailRow}>
-                      <Ionicons name="time-outline" size={16} color={theme.colors.icon} />
+                      <View style={styles.detailIconCircle}>
+                        <Ionicons name="time-outline" size={16} color="#FF9800" />
+                      </View>
                       <Text style={styles.detailText}>{appointment.time}</Text>
                     </View>
-                  </View>
-                  <View style={styles.sessionType}>
-                    <Ionicons name="videocam" size={14} color={theme.colors.primary} />
-                    <Text style={styles.sessionTypeText}>{appointment.type} Session</Text>
+                    <View style={styles.sessionTypeBadge}>
+                      <Ionicons name="videocam" size={14} color="#9C27B0" />
+                      <Text style={styles.sessionTypeText}>{appointment.type}</Text>
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
-              <Text style={styles.emptyStateText}>No past appointments</Text>
+              <Ionicons name="calendar-outline" size={56} color="#E0E0E0" />
+              <Text style={styles.emptyStateTitle}>No past appointments</Text>
+              <Text style={styles.emptyStateSubtitle}>Your history will appear here</Text>
             </View>
           )}
         </ScrollView>
@@ -554,61 +576,95 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     padding: 16,
   },
   appointmentCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  pastAppointmentCard: {
+    backgroundColor: '#F5F5F5',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  workerIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  pastIconCircle: {
+    backgroundColor: '#999',
   },
   supportWorker: {
-    fontSize: scaledFontSize(18),
-    fontWeight: "600",
-    color: colors.text,
-    marginBottom: 12,
+    fontSize: scaledFontSize(17),
+    fontWeight: "700",
+    color: '#000',
+    flex: 1,
   },
   appointmentDetails: {
-    marginBottom: 12,
+    gap: 8,
   },
   detailRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+  },
+  detailIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#757575',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   detailText: {
     fontSize: scaledFontSize(14),
-    color: colors.textSecondary,
-    marginLeft: 8,
+    color: '#333',
+    fontWeight: '500',
   },
-  sessionType: {
+  sessionTypeBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.primary + '20', // 20% opacity
+    backgroundColor: '#F3E5F5',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 16,
     alignSelf: "flex-start",
+    marginTop: 4,
   },
   sessionTypeText: {
-    fontSize: scaledFontSize(14),
-    color: colors.primary,
+    fontSize: scaledFontSize(13),
+    color: '#9C27B0',
     marginLeft: 6,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    padding: 40,
+    padding: 60,
   },
-  emptyStateText: {
-    fontSize: scaledFontSize(16),
-    color: colors.text,
+  emptyStateTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    color: '#666',
     marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: scaledFontSize(14),
+    color: '#999',
+    textAlign: 'center',
   },
   footer: {
     padding: 16,
@@ -616,18 +672,23 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     borderTopColor: colors.border,
   },
   scheduleButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#4CAF50',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 15,
-    borderRadius: 30,
+    padding: 16,
+    borderRadius: 16,
     marginHorizontal: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   scheduleButtonText: {
     color: "#FFFFFF",
-    fontSize: scaledFontSize(15),
-    fontWeight: "600",
+    fontSize: scaledFontSize(16),
+    fontWeight: "700",
     marginLeft: 8,
   },
 });

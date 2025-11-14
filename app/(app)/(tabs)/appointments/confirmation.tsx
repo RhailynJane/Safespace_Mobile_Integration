@@ -334,90 +334,101 @@ export default function ConfirmAppointment() {
             contentContainerStyle={{ paddingBottom: 120 }}
             showsVerticalScrollIndicator={false}
           >
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Schedule a session with a support worker
+          {/* Page Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>
+            Booking Confirmed
           </Text>
 
-          {/* Step Indicator */}
-          <View style={styles.stepsContainer}>
-            <View style={styles.stepRow}>
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
-                <Text style={[styles.stepNumber, styles.stepNumberActive]}>4</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Confirmation Card */}
-          <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.confirmationCard, { backgroundColor: '#FAFAFA' }]}>
             {/* Success Icon */}
-            <View style={[styles.successIcon, { backgroundColor: theme.colors.successLight || '#E8F5E9' }]}>
-              <Ionicons name="checkmark-circle" size={64} color={theme.colors.success || '#4CAF50'} />
+            <View style={[styles.successIconCircle, { backgroundColor: '#4CAF50' }]}>
+              <Ionicons name="checkmark-circle" size={56} color="#FFFFFF" />
             </View>
 
-            <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>Appointment Booked!</Text>
+            <Text style={[styles.confirmationTitle, { color: theme.colors.text }]}>Appointment Booked!</Text>
             <Text style={[styles.confirmationMessage, { color: theme.colors.textSecondary }]}>
               Your appointment has been successfully scheduled.
             </Text>
 
-            <View style={[styles.appointmentDetails, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.appointmentDetails, { backgroundColor: '#F5F5F5' }]}>
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {supportWorkerName || 'Auto-assigned by CMHA'}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                    <Ionicons name="person" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {supportWorkerName || 'Auto-assigned by CMHA'}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {selectedDate}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                    <Ionicons name="calendar" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {selectedDate}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {selectedTime}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                    <Ionicons name="time" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {selectedTime}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {selectedType}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                    <Ionicons name="videocam" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {selectedType}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+              style={[styles.primaryButton, { backgroundColor: '#4CAF50' }]}
               onPress={() => router.replace("/appointments/appointment-list")}
             >
-              <Text style={styles.buttonText}>View My Appointments</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="calendar" size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>View My Appointments</Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
+              style={[styles.secondaryButton, { backgroundColor: '#FFFFFF', borderColor: '#4CAF50', borderWidth: 1 }]}
               onPress={() => router.replace("/appointments/book")}
             >
-              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-                Book Another Appointment
-              </Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="add-circle" size={20} color="#4CAF50" />
+                <Text style={[styles.secondaryButtonText, { color: '#4CAF50' }]}>
+                  Book Another Appointment
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -530,60 +541,29 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   signOutText: {
     fontWeight: "600",
   },
-  title: {
-    fontSize: scaledFontSize(15),
-    fontWeight: "600",
-    marginBottom: 5,
+  pageTitle: {
+    fontSize: scaledFontSize(24),
+    fontWeight: "bold",
+    marginBottom: 24,
     textAlign: "center",
     marginTop: 16,
   },
-  stepsContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-    marginTop: 16,
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepCircleActive: {},
-  stepNumber: {
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-  },
-  stepNumberActive: {
-    color: "white",
-  },
-  stepConnector: {
-    width: 40,
-    height: 2,
-    marginHorizontal: 8,
-  },
   confirmationCard: {
-    borderRadius: 12,
-    padding: 24,
+    borderRadius: 16,
+    padding: 16,
     marginHorizontal: 15,
-    marginBottom: 24,
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
     alignItems: "center",
   },
-  successIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
@@ -602,30 +582,59 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   appointmentDetails: {
     width: "100%",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     marginBottom: 12,
   },
+  detailIconContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  detailIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  detailTextContainer: {
+    flex: 1,
+  },
   detailLabel: {
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
+    fontSize: scaledFontSize(12),
+    fontWeight: "500",
+    marginBottom: 2,
   },
   detailValue: {
     fontSize: scaledFontSize(16),
-    fontWeight: "500",
+    fontWeight: "600",
   },
   primaryButton: {
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 8,
+    borderRadius: 12,
     width: "100%",
     alignItems: "center",
     marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   buttonText: {
     color: "#FFFFFF",
@@ -633,11 +642,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
   },
   secondaryButton: {
-    backgroundColor: "transparent",
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 12,
     width: "100%",
     alignItems: "center",
   },

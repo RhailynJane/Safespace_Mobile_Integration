@@ -380,104 +380,102 @@ export default function AppointmentsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Welcome Section with Icons */}
-          <View style={styles.welcomeContainer}>
-            <View style={[styles.iconCircle, { backgroundColor: theme.colors.primary + '20' }]}>
-              <Ionicons name="calendar" size={40} color={theme.colors.primary} />
-            </View>
-            <Text style={[styles.welcomeTitle, { color: theme.colors.text }]}>
-              Manage Your Sessions
-            </Text>
-            <Text style={[styles.welcomeSubtitle, { color: theme.colors.textSecondary }]}>
-              Schedule new appointments or view your upcoming sessions with support workers at CMHA
-            </Text>
-          </View>
+          {/* Header Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>
+            My Appointments
+          </Text>
 
           {/* Quick Stats Cards */}
           <View style={styles.statsContainer}>
-            <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{upcomingCount}</Text>
-              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Upcoming</Text>
+            <View style={[styles.statCard, styles.statCardUpcoming]}>
+              <Ionicons name="time-outline" size={28} color="#FF9800" />
+              <Text style={styles.statNumber}>{upcomingCount}</Text>
+              <Text style={styles.statLabel}>Upcoming</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="checkmark-circle-outline" size={24} color={theme.colors.primary} />
-              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{completedCount}</Text>
-              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Completed</Text>
+            <View style={[styles.statCard, styles.statCardCompleted]}>
+              <Ionicons name="checkmark-circle-outline" size={28} color="#4CAF50" />
+              <Text style={styles.statNumber}>{completedCount}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            {/* Primary action button - Book Appointment */}
-            <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={handleBookAppointment}
-            >
-              <Ionicons name="add-circle" size={24} color="#FFFFFF" style={styles.buttonIcon} />
-              <Text style={styles.buttonText}>Book New Appointment</Text>
-            </TouchableOpacity>
+          {/* Main Action Card */}
+          <TouchableOpacity
+            style={styles.mainActionCard}
+            onPress={handleBookAppointment}
+            activeOpacity={0.9}
+          >
+            <View style={styles.mainActionContent}>
+              <View style={styles.mainActionTextContainer}>
+                <Text style={styles.mainActionTitle}>Book New Session</Text>
+                <Text style={styles.mainActionSubtitle}>
+                  Connect with a support worker at CMHA
+                </Text>
+              </View>
+              <View style={styles.mainActionIconContainer}>
+                <Ionicons name="add-circle" size={48} color="#FFFFFF" />
+              </View>
+            </View>
+          </TouchableOpacity>
 
-            {/* Secondary action button - View Scheduled Appointments */}
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
-              onPress={handleViewScheduled}
-            >
-              <Ionicons name="list" size={24} color={theme.colors.primary} style={styles.buttonIcon} />
-              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-                View Scheduled Appointments
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Upcoming Session Preview */}
-          {nextAppointment && (
+          {/* Upcoming Session Card */}
+          {nextAppointment ? (
             <View style={styles.upcomingSection}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                 Next Session
               </Text>
-              <View style={[styles.upcomingCard, { backgroundColor: theme.colors.surface }]}>
-                <View style={styles.upcomingHeader}>
-                  <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
-                  <View style={styles.upcomingInfo}>
-                    <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
+              <View style={styles.nextSessionCard}>
+                <View style={styles.nextSessionHeader}>
+                  <View style={styles.nextSessionIconCircle}>
+                    <Ionicons name="person" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.nextSessionInfo}>
+                    <Text style={styles.nextSessionWorker}>
                       {nextAppointment.supportWorker}
                     </Text>
-                    <Text style={[styles.upcomingSpecialty, { color: theme.colors.textSecondary }]}>
-                      Support Worker
-                    </Text>
+                    <Text style={styles.nextSessionRole}>Support Worker</Text>
                   </View>
                 </View>
-                <View style={styles.upcomingDetails}>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
-                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                      {nextAppointment.date} • {nextAppointment.time}
+                <View style={styles.nextSessionDetails}>
+                  <View style={styles.nextSessionDetailRow}>
+                    <Ionicons name="calendar-outline" size={16} color="#666" />
+                    <Text style={styles.nextSessionDetailText}>
+                      {nextAppointment.date}
                     </Text>
                   </View>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
-                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                  <View style={styles.nextSessionDetailRow}>
+                    <Ionicons name="time-outline" size={16} color="#666" />
+                    <Text style={styles.nextSessionDetailText}>
+                      {nextAppointment.time}
+                    </Text>
+                  </View>
+                  <View style={styles.nextSessionDetailRow}>
+                    <Ionicons name="videocam" size={16} color="#666" />
+                    <Text style={styles.nextSessionDetailText}>
                       {nextAppointment.type} Session
                     </Text>
                   </View>
                 </View>
               </View>
             </View>
-          )}
-
-          {/* No appointments message */}
-          {!nextAppointment && upcomingCount === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
-              <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-                No upcoming appointments
-              </Text>
-              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+          ) : upcomingCount === 0 ? (
+            <View style={styles.emptyStateCard}>
+              <Ionicons name="calendar-outline" size={56} color="#E0E0E0" />
+              <Text style={styles.emptyStateTitle}>No upcoming sessions</Text>
+              <Text style={styles.emptyStateSubtitle}>
                 Book your first session to get started
               </Text>
             </View>
-          )}
+          ) : null}
+
+          {/* View All Button */}
+          <TouchableOpacity
+            style={styles.viewAllButton}
+            onPress={handleViewScheduled}
+          >
+            <Text style={styles.viewAllButtonText}>View All Appointments</Text>
+            <Ionicons name="arrow-forward" size={20} color="#4CAF50" />
+          </TouchableOpacity>
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -562,173 +560,183 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 120,
+    paddingHorizontal: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  welcomeContainer: {
-    alignItems: 'center',
-    padding: 24,
-    marginTop: 20,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  welcomeTitle: {
-    fontSize: scaledFontSize(24),
+  pageTitle: {
+    fontSize: scaledFontSize(28),
     fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  welcomeSubtitle: {
-    fontSize: scaledFontSize(16),
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 24,
+    textAlign: "center",
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 20,
+    gap: 12,
   },
   statCard: {
     flex: 1,
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginHorizontal: 6,
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statCardUpcoming: {
+    backgroundColor: '#FFF3E0',
+  },
+  statCardCompleted: {
+    backgroundColor: '#E8F5E9',
   },
   statNumber: {
-    fontSize: scaledFontSize(24),
+    fontSize: scaledFontSize(32),
     fontWeight: '700',
     marginVertical: 8,
+    color: '#000',
   },
   statLabel: {
     fontSize: scaledFontSize(14),
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#666',
   },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    width: '100%',
+  mainActionCard: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-  },
-  secondaryButton: {
+  mainActionContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#4CAF50",
-    width: '100%',
+    justifyContent: 'space-between',
   },
-  secondaryButtonText: {
-    color: "#4CAF50",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
+  mainActionTextContainer: {
+    flex: 1,
+  },
+  mainActionTitle: {
+    fontSize: scaledFontSize(22),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  mainActionSubtitle: {
+    fontSize: scaledFontSize(14),
+    color: '#FFFFFF',
+    opacity: 0.9,
+    lineHeight: 20,
+  },
+  mainActionIconContainer: {
+    marginLeft: 16,
   },
   upcomingSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: scaledFontSize(18),
-    fontWeight: '600',
-    marginBottom: 16,
+    fontWeight: '700',
+    marginBottom: 12,
   },
-  upcomingCard: {
+  nextSessionCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  upcomingHeader: {
+  nextSessionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  upcomingInfo: {
+  nextSessionIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#9C27B0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextSessionInfo: {
     marginLeft: 12,
     flex: 1,
   },
-  upcomingTitle: {
+  nextSessionWorker: {
     fontSize: scaledFontSize(16),
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 4,
   },
-  upcomingSpecialty: {
-    fontSize: scaledFontSize(14),
+  nextSessionRole: {
+    fontSize: scaledFontSize(13),
     color: '#666',
   },
-  upcomingDetails: {
-    gap: 8,
+  nextSessionDetails: {
+    gap: 10,
   },
-  detailRow: {
+  nextSessionDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  detailText: {
+  nextSessionDetailText: {
     fontSize: scaledFontSize(14),
-    marginLeft: 8,
+    marginLeft: 10,
+    color: '#333',
+    fontWeight: '500',
   },
-  emptyState: {
+  emptyStateCard: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: scaledFontSize(14),
+    color: '#999',
+    textAlign: 'center',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 20,
   },
-  emptyStateText: {
+  viewAllButtonText: {
     fontSize: scaledFontSize(16),
-    marginTop: 16,
     fontWeight: '600',
-  },
-  emptyStateSubtext: {
-    fontSize: scaledFontSize(14),
-    marginTop: 8,
-    textAlign: 'center',
+    color: '#4CAF50',
+    marginRight: 8,
   },
   modalContainer: {
     flex: 1,

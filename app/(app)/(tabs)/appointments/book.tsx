@@ -349,84 +349,67 @@ export default function BookAppointment() {
 
         <ScrollView 
           style={{ flex: 1, backgroundColor: theme.colors.background }}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.title, { color: theme.colors.text }]}>
+          {/* Page Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>
+            Book Your Session
+          </Text>
+          
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
             Choose a date and time. A support worker will be assigned automatically.
           </Text>
 
-    {/* Step Indicator */}
-    <View style={styles.stepsContainer}>
-      <View style={styles.stepRow}>
-        <View style={[
-          styles.stepCircle, 
-          styles.stepCircleActive,
-          { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
-        ]}>
-          <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-            1
-          </Text>
-        </View>
-        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-        <View style={[
-          styles.stepCircle,
-          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
-        ]}>
-          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
-        </View>
-        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-        <View style={[
-          styles.stepCircle,
-          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
-        ]}>
-          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
-        </View>
-      </View>
-    </View>
-
           {/* Session type */}
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Session Type</Text>
           <View style={styles.sessionTypeRow}>
-            {[{ key: 'video', icon: 'videocam', label: 'Video' }, { key: 'in_person', icon: 'pin', label: 'In person' }].map((opt: any) => (
+            {[{ key: 'video', icon: 'videocam', label: 'Video', color: '#9C27B0' }, { key: 'in_person', icon: 'pin', label: 'In person', color: '#4CAF50' }].map((opt: any) => (
               <TouchableOpacity
                 key={opt.key}
                 style={[
-                  styles.sessionTypeChip,
-                  { borderColor: theme.colors.primary, backgroundColor: 'transparent' },
-                  selectedType === opt.key && { backgroundColor: theme.colors.primary }
+                  styles.sessionTypeCard,
+                  { backgroundColor: selectedType === opt.key ? opt.color : '#F5F5F5' }
                 ]}
                 onPress={() => setSelectedType(opt.key)}
+                activeOpacity={0.8}
               >
-                <Ionicons name={opt.icon as any} size={16} color={selectedType === opt.key ? '#fff' : theme.colors.primary} />
-                <Text style={[styles.sessionTypeChipText, { color: selectedType === opt.key ? '#fff' : theme.colors.primary }]}>{opt.label}</Text>
+                <View style={[
+                  styles.sessionIconCircle,
+                  { backgroundColor: selectedType === opt.key ? 'rgba(255,255,255,0.3)' : '#FFF' }
+                ]}>
+                  <Ionicons name={opt.icon as any} size={24} color={selectedType === opt.key ? '#FFF' : opt.color} />
+                </View>
+                <Text style={[styles.sessionTypeLabel, { color: selectedType === opt.key ? '#FFF' : '#333' }]}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {/* Day selector */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 12 }}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Date</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
             {days.map((d) => (
               <TouchableOpacity
                 key={d.iso}
                 style={[
-                  styles.dayChip,
-                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-                  selectedDate === d.iso && { backgroundColor: theme.colors.primary }
+                  styles.dayCard,
+                  selectedDate === d.iso && styles.dayCardSelected
                 ]}
                 onPress={() => { setSelectedDate(d.iso); setSelectedTime(null); }}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.dayChipWeekday, { color: selectedDate === d.iso ? '#fff' : theme.colors.textSecondary }]}>{d.weekday}</Text>
-                <Text style={[styles.dayChipLabel, { color: selectedDate === d.iso ? '#fff' : theme.colors.text }]}>{d.label}</Text>
+                <Text style={[styles.dayWeekday, selectedDate === d.iso && styles.dayWeekdaySelected]}>{d.weekday}</Text>
+                <Text style={[styles.dayNumber, selectedDate === d.iso && styles.dayNumberSelected]}>{d.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
           {/* Time slots */}
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Time</Text>
           <View style={styles.timeGrid}>
             {timeSlots.map((t) => {
               const disabled = !selectedDate || isPastSlot(selectedDate, t);
               const active = selectedTime === t;
-              const textColor = active ? '#fff' : (disabled ? theme.colors.textSecondary : theme.colors.text);
               return (
                 <TouchableOpacity
                   key={t}
@@ -434,35 +417,44 @@ export default function BookAppointment() {
                   onPress={() => setSelectedTime(t)}
                   style={[
                     styles.timeSlot,
-                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, width: slotWidth },
-                    active && { backgroundColor: theme.colors.primary },
-                    disabled && { opacity: 0.4 }
+                    { width: slotWidth },
+                    active && styles.timeSlotActive,
+                    disabled && styles.timeSlotDisabled
                   ]}
+                  activeOpacity={0.7}
                 >
-                  <Text style={[styles.timeSlotText, { color: textColor, textAlign: 'center', lineHeight: scaledFontSize(16) }]} numberOfLines={2}>{t.replace(' ', '\n')}</Text>
+                  <Text style={[
+                    styles.timeSlotText,
+                    active && styles.timeSlotTextActive,
+                    disabled && styles.timeSlotTextDisabled
+                  ]} numberOfLines={2}>{t.replace(' ', '\n')}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
           {selectedDate && selectedTime && (
-            <View style={{ paddingHorizontal: 16, marginTop: 8, marginBottom: 4 }}>
-              <Text style={{ color: theme.colors.textSecondary, fontSize: scaledFontSize(12), textAlign: 'center' }}>
-                Selected: {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, {selectedTime} {selectedType === 'in_person' ? '(In person)' : '(Video)'}
+            <View style={styles.selectionSummary}>
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+              <Text style={styles.selectionText}>
+                {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, {selectedTime} • {selectedType === 'in_person' ? 'In person' : 'Video'}
               </Text>
             </View>
           )}
 
           {/* Continue button */}
-          <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-            <TouchableOpacity
-              disabled={!selectedDate || !selectedTime}
-              onPress={handleContinue}
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary, opacity: (!selectedDate || !selectedTime) ? 0.5 : 1 }]}
-            >
-              <Text style={styles.buttonText}>Continue</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            disabled={!selectedDate || !selectedTime}
+            onPress={handleContinue}
+            style={[
+              styles.continueButton,
+              (!selectedDate || !selectedTime) && styles.continueButtonDisabled
+            ]}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.continueButtonText}>Continue to Confirmation</Text>
+            <Ionicons name="arrow-forward" size={20} color="#FFF" />
+          </TouchableOpacity>
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -662,6 +654,24 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     textAlign: "center",
     marginTop: 16,
   },
+  pageTitle: {
+    fontSize: scaledFontSize(24),
+    fontWeight: '700',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: scaledFontSize(14),
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  sectionTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+    marginBottom: 12,
+    marginTop: 8,
+  },
   stepsContainer: {
     alignItems: "center",
     marginBottom: 24,
@@ -692,15 +702,36 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   stepConnector: {
     width: 40,
     height: 2,
-
     marginHorizontal: 8,
   },
   sessionTypeRow: {
     flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  sessionTypeCard: {
+    flex: 1,
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  sessionIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
-    gap: 8,
-    marginVertical: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sessionTypeLabel: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '700',
   },
   sessionTypeChip: {
     flexDirection: 'row',
@@ -716,6 +747,40 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   sessionTypeChipText: {
     marginLeft: 6,
     fontWeight: '600',
+  },
+  dayCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
+    minWidth: 70,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dayCardSelected: {
+    backgroundColor: '#FF9800',
+  },
+  dayWeekday: {
+    fontSize: scaledFontSize(12),
+    color: '#999',
+    marginBottom: 4,
+  },
+  dayWeekdaySelected: {
+    color: '#FFF',
+  },
+  dayNumber: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '700',
+    color: '#333',
+  },
+  dayNumberSelected: {
+    color: '#FFF',
   },
   dayChip: {
     alignItems: 'center',
@@ -739,21 +804,75 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   timeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    marginTop: 12,
+    gap: 8,
+    marginBottom: 20,
   },
   timeSlot: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    margin: 6,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  timeSlotActive: {
+    backgroundColor: '#4CAF50',
+  },
+  timeSlotDisabled: {
+    opacity: 0.4,
   },
   timeSlotText: {
-    fontSize: scaledFontSize(14),
+    fontSize: scaledFontSize(13),
     fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    lineHeight: scaledFontSize(16),
+  },
+  timeSlotTextActive: {
+    color: '#FFF',
+  },
+  timeSlotTextDisabled: {
+    color: '#999',
+  },
+  selectionSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  selectionText: {
+    fontSize: scaledFontSize(14),
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  continueButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  continueButtonDisabled: {
+    backgroundColor: '#C8E6C9',
+    opacity: 0.6,
+  },
+  continueButtonText: {
+    color: '#FFF',
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
   },
   contentContainer: {
     flex: 1,
