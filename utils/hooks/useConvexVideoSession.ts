@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ConvexReactClient } from 'convex/react';
+import { ConvexReactClient, useConvex } from 'convex/react';
 
 /**
  * Hook for video call session management with Convex integration
@@ -8,9 +8,11 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const providerClient = useConvex();
+  const effectiveClient: ConvexReactClient | null = convexClient ?? (providerClient as unknown as ConvexReactClient);
 
   // Check if Convex is enabled
-  const isConvexEnabled = Boolean(convexClient);
+  const isConvexEnabled = Boolean(effectiveClient);
 
   /**
    * Start a new video call session
@@ -25,16 +27,19 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
       setLoading(true);
       setError(null);
 
-      if (isConvexEnabled && convexClient) {
+      if (isConvexEnabled && effectiveClient) {
         try {
           // @ts-ignore
           const { api } = await import('../../convex/_generated/api');
-          const result = await convexClient.mutation(api.videoCallSessions.startSession, {
-            appointmentId: params.appointmentId as any,
+          const args: any = {
             supportWorkerName: params.supportWorkerName,
             supportWorkerId: params.supportWorkerId,
             audioOption: params.audioOption,
-          });
+          };
+          if (params.appointmentId) {
+            args.appointmentId = params.appointmentId as any;
+          }
+          const result = await effectiveClient.mutation(api.videoCallSessions.startSession, args);
 
           setSessionId(result.sessionId);
           console.log('✅ Video session started in Convex:', result.sessionId);
@@ -59,7 +64,7 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     } finally {
       setLoading(false);
     }
-  }, [isConvexEnabled, convexClient]);
+  }, [isConvexEnabled, effectiveClient]);
 
   /**
    * Mark session as connected
@@ -69,11 +74,11 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     if (!targetSessionId) return;
 
     try {
-      if (isConvexEnabled && convexClient) {
+      if (isConvexEnabled && effectiveClient) {
         try {
           // @ts-ignore
           const { api } = await import('../../convex/_generated/api');
-          await convexClient.mutation(api.videoCallSessions.markConnected, {
+          await effectiveClient.mutation(api.videoCallSessions.markConnected, {
             sessionId: targetSessionId as any,
           });
 
@@ -85,7 +90,7 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     } catch (err) {
       console.error('Error marking session connected:', err);
     }
-  }, [sessionId, isConvexEnabled, convexClient]);
+  }, [sessionId, isConvexEnabled, effectiveClient]);
 
   /**
    * Attach an existing session ID (e.g., received via navigation params)
@@ -110,11 +115,11 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     try {
       setLoading(true);
 
-      if (isConvexEnabled && convexClient) {
+      if (isConvexEnabled && effectiveClient) {
         try {
           // @ts-ignore
           const { api } = await import('../../convex/_generated/api');
-          const result = await convexClient.mutation(api.videoCallSessions.endSession, {
+          const result = await effectiveClient.mutation(api.videoCallSessions.endSession, {
             sessionId: targetSessionId as any,
             endReason: params?.endReason,
           });
@@ -136,7 +141,7 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, isConvexEnabled, convexClient]);
+  }, [sessionId, isConvexEnabled, effectiveClient]);
 
   /**
    * Update session settings
@@ -149,11 +154,11 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     if (!sessionId) return;
 
     try {
-      if (isConvexEnabled && convexClient) {
+      if (isConvexEnabled && effectiveClient) {
         try {
           // @ts-ignore
           const { api } = await import('../../convex/_generated/api');
-          await convexClient.mutation(api.videoCallSessions.updateSessionSettings, {
+          await effectiveClient.mutation(api.videoCallSessions.updateSessionSettings, {
             sessionId: sessionId as any,
             ...settings,
           });
@@ -166,7 +171,7 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     } catch (err) {
       console.error('Error updating session settings:', err);
     }
-  }, [sessionId, isConvexEnabled, convexClient]);
+  }, [sessionId, isConvexEnabled, effectiveClient]);
 
   /**
    * Report a quality issue
@@ -175,11 +180,11 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     if (!sessionId) return;
 
     try {
-      if (isConvexEnabled && convexClient) {
+      if (isConvexEnabled && effectiveClient) {
         try {
           // @ts-ignore
           const { api } = await import('../../convex/_generated/api');
-          await convexClient.mutation(api.videoCallSessions.reportQualityIssue, {
+          await effectiveClient.mutation(api.videoCallSessions.reportQualityIssue, {
             sessionId: sessionId as any,
             issue,
           });
@@ -192,7 +197,7 @@ export function useConvexVideoSession(convexClient: ConvexReactClient | null) {
     } catch (err) {
       console.error('Error reporting quality issue:', err);
     }
-  }, [sessionId, isConvexEnabled, convexClient]);
+  }, [sessionId, isConvexEnabled, effectiveClient]);
 
   return {
     sessionId,

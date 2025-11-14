@@ -139,8 +139,32 @@ const fetchAppointments = useCallback(async () => {
       });
     };
 
+    // Helper to check if appointment is in the past
+    const isPastAppointment = (apt: any) => {
+      // Only completed/no_show, or scheduled/confirmed with date/time in the past
+      if (["completed", "no_show"].includes(apt.status)) return true;
+      if (["scheduled", "confirmed"].includes(apt.status)) {
+        try {
+          const aptDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`);
+          return aptDateTime.getTime() < Date.now();
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    };
+
+    // Upcoming: scheduled/confirmed and date/time in future
     const mappedUpcoming: Appointment[] = (upcoming as any[])
-      .filter((apt: any) => apt.status !== 'cancelled') // Exclude cancelled appointments immediately
+      .filter((apt: any) => ["scheduled", "confirmed"].includes(apt.status))
+      .filter((apt: any) => {
+        try {
+          const aptDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`);
+          return aptDateTime.getTime() >= Date.now();
+        } catch {
+          return true;
+        }
+      })
       .map((apt: any) => ({
         id: String(apt.id),
         supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',
@@ -153,17 +177,20 @@ const fetchAppointments = useCallback(async () => {
         notes: apt.notes,
       }));
 
-    const mappedPast: Appointment[] = (past as any[]).map((apt: any) => ({
-      id: String(apt.id),
-      supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',
-      supportWorkerId: apt.supportWorkerId,
-      date: formatDate(apt.date),
-      time: apt.time || '',
-      type: (apt.type || 'video').toString().replace('_', ' '),
-      status: mapAppointmentStatus(apt.status as any, apt.date, apt.time).toLowerCase() as 'upcoming' | 'past' | 'cancelled',
-      meetingLink: apt.meetingLink,
-      notes: apt.notes,
-    }));
+    // Past: completed/no_show, or scheduled/confirmed with date/time in past
+    const mappedPast: Appointment[] = ([...upcoming, ...past] as any[])
+      .filter(isPastAppointment)
+      .map((apt: any) => ({
+        id: String(apt.id),
+        supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',
+        supportWorkerId: apt.supportWorkerId,
+        date: formatDate(apt.date),
+        time: apt.time || '',
+        type: (apt.type || 'video').toString().replace('_', ' '),
+        status: 'past',
+        meetingLink: apt.meetingLink,
+        notes: apt.notes,
+      }));
 
     const combined = [...mappedUpcoming, ...mappedPast];
     setAppointments(combined);
@@ -331,20 +358,20 @@ useEffect(() => {
                     </View>
                     <View style={styles.appointmentDetails}>
                       <View style={styles.detailRow}>
-                        <View style={styles.detailIconCircle}>
-                          <Ionicons name="calendar-outline" size={16} color="#4CAF50" />
+                        <View style={[styles.detailIconCircle, { backgroundColor: theme.isDark ? '#4A5F4F' : '#E8F5E9' }]}>
+                          <Ionicons name="calendar-outline" size={16} color={theme.isDark ? '#81C784' : '#4CAF50'} />
                         </View>
                         <Text style={[styles.detailText, { color: theme.colors.text }]}>{appointment.date}</Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <View style={styles.detailIconCircle}>
-                          <Ionicons name="time-outline" size={16} color="#FF9800" />
+                        <View style={[styles.detailIconCircle, { backgroundColor: theme.isDark ? '#5F4E3F' : '#FFF3E0' }]}>
+                          <Ionicons name="time-outline" size={16} color={theme.isDark ? '#FFB74D' : '#FF9800'} />
                         </View>
                         <Text style={[styles.detailText, { color: theme.colors.text }]}>{appointment.time}</Text>
                       </View>
-                      <View style={[styles.sessionTypeBadge, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F3E5F5' }]}>
-                        <Ionicons name="videocam" size={14} color="#9C27B0" />
-                        <Text style={styles.sessionTypeText}>{appointment.type}</Text>
+                      <View style={[styles.sessionTypeBadge, { backgroundColor: theme.isDark ? '#3A2A3F' : '#F3E5F5' }]}>
+                        <Ionicons name="videocam" size={14} color={theme.isDark ? '#CE93D8' : '#9C27B0'} />
+                        <Text style={[styles.sessionTypeText, { color: theme.isDark ? '#CE93D8' : '#9C27B0' }]}>{appointment.type}</Text>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -362,34 +389,34 @@ useEffect(() => {
               .map((appointment) => (
                 <TouchableOpacity
                   key={appointment.id}
-                  style={[styles.appointmentCard, styles.pastAppointmentCard]}
+                  style={[styles.appointmentCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#555' : '#D0D0D0', opacity: 0.85 }]}
                   onPress={() => handleAppointmentPress(appointment.id)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.cardHeader}>
-                    <View style={[styles.workerIconCircle, styles.pastIconCircle]}>
+                    <View style={[styles.workerIconCircle, { backgroundColor: theme.isDark ? '#555' : '#9E9E9E' }]}>
                       <Ionicons name="person" size={20} color="#FFFFFF" />
                     </View>
-                    <Text style={styles.supportWorker}>
+                    <Text style={[styles.supportWorker, { color: theme.colors.text, opacity: 0.9 }]}>
                       {appointment.supportWorker}
                     </Text>
                   </View>
                   <View style={styles.appointmentDetails}>
                     <View style={styles.detailRow}>
-                      <View style={styles.detailIconCircle}>
-                        <Ionicons name="calendar-outline" size={16} color="#4CAF50" />
+                      <View style={[styles.detailIconCircle, { backgroundColor: theme.isDark ? '#4A5F4F' : '#E8F5E9' }]}>
+                        <Ionicons name="calendar-outline" size={16} color={theme.isDark ? '#66BB6A' : '#4CAF50'} />
                       </View>
-                      <Text style={styles.detailText}>{appointment.date}</Text>
+                      <Text style={[styles.detailText, { color: theme.colors.text, opacity: 0.9 }]}>{appointment.date}</Text>
                     </View>
                     <View style={styles.detailRow}>
-                      <View style={styles.detailIconCircle}>
-                        <Ionicons name="time-outline" size={16} color="#FF9800" />
+                      <View style={[styles.detailIconCircle, { backgroundColor: theme.isDark ? '#5F4E3F' : '#FFF3E0' }]}>
+                        <Ionicons name="time-outline" size={16} color={theme.isDark ? '#FFA726' : '#FF9800'} />
                       </View>
-                      <Text style={styles.detailText}>{appointment.time}</Text>
+                      <Text style={[styles.detailText, { color: theme.colors.text, opacity: 0.9 }]}>{appointment.time}</Text>
                     </View>
-                    <View style={styles.sessionTypeBadge}>
-                      <Ionicons name="videocam" size={14} color="#9C27B0" />
-                      <Text style={styles.sessionTypeText}>{appointment.type}</Text>
+                    <View style={[styles.sessionTypeBadge, { backgroundColor: theme.isDark ? '#3A2A3F' : '#F3E5F5' }]}>
+                      <Ionicons name="videocam" size={14} color={theme.isDark ? '#BA68C8' : '#9C27B0'} />
+                      <Text style={[styles.sessionTypeText, { color: theme.isDark ? '#BA68C8' : '#9C27B0' }]}>{appointment.type}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -586,9 +613,6 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     elevation: 4,
     borderWidth: 1,
   },
-  pastAppointmentCard: {
-    opacity: 0.7,
-  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -602,9 +626,6 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
-  },
-  pastIconCircle: {
-    backgroundColor: '#999',
   },
   supportWorker: {
     fontSize: scaledFontSize(17),
@@ -622,7 +643,7 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#757575',
+    backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -642,7 +663,6 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
   },
   sessionTypeText: {
     fontSize: scaledFontSize(13),
-    color: '#9C27B0',
     marginLeft: 6,
     fontWeight: "600",
   },
@@ -656,10 +676,12 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     fontWeight: '600',
     marginTop: 16,
     marginBottom: 8,
+    color: colors.textSecondary,
   },
   emptyStateSubtitle: {
     fontSize: scaledFontSize(14),
     textAlign: 'center',
+    color: colors.textSecondary,
   },
   footer: {
     padding: 16,

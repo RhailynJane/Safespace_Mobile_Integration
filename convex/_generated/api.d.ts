@@ -15,6 +15,7 @@ import type * as auth from "../auth.js";
 import type * as categories from "../categories.js";
 import type * as conversations from "../conversations.js";
 import type * as crisis from "../crisis.js";
+import type * as email from "../email.js";
 import type * as hello from "../hello.js";
 import type * as help from "../help.js";
 import type * as journal from "../journal.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   categories: typeof categories;
   conversations: typeof conversations;
   crisis: typeof crisis;
+  email: typeof email;
   hello: typeof hello;
   help: typeof help;
   journal: typeof journal;

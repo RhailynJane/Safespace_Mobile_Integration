@@ -6,6 +6,7 @@ import { api } from '../convex/_generated/api';
 interface NotificationsContextType {
   unreadCount: number;
   notifications: any[];
+  loading: boolean;
   refreshNotifications: () => void;
 }
 
@@ -20,9 +21,11 @@ interface NotificationsProviderProps {
 export function NotificationsProvider({ children, convexClient, userId }: NotificationsProviderProps) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
   // Track last active pair to avoid re-subscribing on harmless re-renders
   const activeKeyRef = useRef<string | null>(null);
   const hasLoggedInitRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   // Log initialization only when inputs transition to a usable state or change
   useEffect(() => {
@@ -50,7 +53,14 @@ export function NotificationsProvider({ children, convexClient, userId }: Notifi
     console.log(`🔔 NotificationsProvider starting subscription for userId: ${userId}`);
 
     const fetchNotifications = async () => {
+      // Prevent concurrent fetches
+      if (isFetchingRef.current) {
+        console.log(`🔔 Skipping fetch - already in progress`);
+        return;
+      }
+      
       try {
+        isFetchingRef.current = true;
         console.log(`🔔 Fetching notifications for userId: ${userId}`);
         const result = await convexClient.query(
           api.notifications.getNotifications,
@@ -66,16 +76,20 @@ export function NotificationsProvider({ children, convexClient, userId }: Notifi
           setUnreadCount(count);
           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
         }
+        setLoading(false);
       } catch (error) {
         console.error('❌ Error fetching notifications:', error);
+        setLoading(false);
+      } finally {
+        isFetchingRef.current = false;
       }
     };
 
     // Initial fetch
     fetchNotifications();
 
-    // Poll every 5 seconds for real-time updates
-    const interval = setInterval(fetchNotifications, 5000);
+    // Poll every 30 seconds for real-time updates (reduced from 5s to prevent excessive fetching)
+    const interval = setInterval(fetchNotifications, 30000);
 
     return () => {
       clearInterval(interval);
@@ -87,10 +101,17 @@ export function NotificationsProvider({ children, convexClient, userId }: Notifi
   const refreshNotifications = async () => {
     if (!convexClient || !userId) return;
 
+    // Prevent concurrent refreshes
+    if (isFetchingRef.current) {
+      console.log(`🔔 Refresh skipped - fetch already in progress`);
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
       const result = await convexClient.query(
         api.notifications.getNotifications,
-        { userId, limit: 10 }
+        { userId, limit: 50 }
       );
 
       if (result?.notifications) {
@@ -100,11 +121,13 @@ export function NotificationsProvider({ children, convexClient, userId }: Notifi
       }
     } catch (error) {
       console.error('❌ Error fetching notifications:', error);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
   return (
-    <NotificationsContext.Provider value={{ unreadCount, notifications, refreshNotifications }}>
+    <NotificationsContext.Provider value={{ unreadCount, notifications, loading, refreshNotifications }}>
       {children}
     </NotificationsContext.Provider>
   );

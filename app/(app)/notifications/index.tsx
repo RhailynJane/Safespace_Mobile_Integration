@@ -24,6 +24,7 @@ import notificationEvents from '../../../utils/notificationEvents';
 import { useQuery } from 'convex/react';
 import { useConvex } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { useNotifications } from '../../../contexts/NotificationsContext';
 
 // Type definition for a Notification object.
 interface Notification {
@@ -42,9 +43,10 @@ interface Notification {
  */
 export default function NotificationsScreen() {
   const { theme, scaledFontSize } = useTheme();
+  // Use notifications from context instead of local state to avoid duplicate fetching
+  const { notifications: contextNotifications, loading: contextLoading, refreshNotifications } = useNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const { user } = useUser();
   const baseURL = getApiBaseUrl();
   const [modalVisible, setModalVisible] = useState(false);
@@ -84,13 +86,11 @@ export default function NotificationsScreen() {
   };
 
   const convex = useConvex();
-  const loadNotifications = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      setLoading(true);
-      // Direct Convex query (returns array of notification documents)
-      const result = await convex.query(api.notifications.getNotifications, { userId: user.id });
-      const mapped: Notification[] = (result.notifications || []).map((r: any) => ({
+  
+  // Sync context notifications to local state for display
+  useEffect(() => {
+    if (contextNotifications && contextNotifications.length >= 0) {
+      const mapped: Notification[] = contextNotifications.map((r: any) => ({
         id: String(r.id),
         title: r.title,
         message: r.message,
@@ -99,33 +99,21 @@ export default function NotificationsScreen() {
         type: (r.type as Notification['type']) || 'system',
       }));
       setNotifications(mapped);
-    } catch (e) {
-      console.log('Error loading notifications via Convex:', e);
-      showStatusModal('error', 'Connection Error', 'Unable to load notifications.');
-    } finally {
-      setLoading(false);
     }
-  }, [user?.id, convex]);
+  }, [contextNotifications]);
 
-  useEffect(() => {
-    // Only load via REST if Convex is not available
-    if (!convexApi) {
-      loadNotifications();
-    }
-  }, [loadNotifications, convexApi]);
-
-  // Listen for notification events to auto-refresh the list
+  // Listen for notification events to auto-refresh via context
   useEffect(() => {
     const unsubscribe = notificationEvents.subscribe((event) => {
       if (event.type === 'received') {
-        console.log('🔔 Notification event received, refreshing notification list');
-        loadNotifications();
+        console.log('🔔 Notification event received, refreshing via context');
+        refreshNotifications();
       }
     });
     return () => {
       unsubscribe();
     };
-  }, [loadNotifications]);
+  }, [refreshNotifications]);
 
   /**
    * onRefresh
@@ -133,7 +121,7 @@ export default function NotificationsScreen() {
    */
   const onRefresh = () => {
     setRefreshing(true);
-    loadNotifications();
+    refreshNotifications();
     setTimeout(() => setRefreshing(false), 1000);
   };
 
@@ -274,31 +262,11 @@ export default function NotificationsScreen() {
     }
   };
 
-  // Live notifications component using Convex subscriptions
-  const LiveNotifications = () => {
-    const liveNotifications = useQuery(
-      convexApi?.notifications?.getNotifications,
-      convexApi && user?.id ? { userId: user.id, limit: 200 } : 'skip'
-    ) as { notifications: Notification[] } | undefined;
-
-    useEffect(() => {
-      if (liveNotifications?.notifications) {
-        setNotifications(liveNotifications.notifications);
-        setLoading(false);
-      }
-    }, [liveNotifications]);
-
-    return null;
-  };
-
   // Calculate the number of unread notifications
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <CurvedBackground>
-      {/* Live notifications subscription (only renders when Convex available) */}
-      {convexApi && user?.id && <LiveNotifications />}
-      
       <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Notifications" showBack={true} />
 
@@ -363,7 +331,7 @@ export default function NotificationsScreen() {
           }
         >
           {/* Loading state */}
-          {loading && notifications.length === 0 ? (
+          {contextLoading && notifications.length === 0 ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
               <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>

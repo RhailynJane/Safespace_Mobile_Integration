@@ -98,7 +98,7 @@ export const getUpcomingAppointments = query({
 	handler: async (ctx, { userId, limit = 50 }) => {
 		const today = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
 		
-		// Get appointments with upcoming statuses
+		// Get appointments with upcoming statuses (today or future dates)
 		const appointments = await ctx.db
 			.query("appointments")
 			.withIndex("by_user_and_date", (q) => 
@@ -110,7 +110,7 @@ export const getUpcomingAppointments = query({
 					q.eq(q.field("status"), "confirmed")
 				)
 			)
-			.take(limit);
+			.collect();
 
 		// Sort by date then time (ascending)
 		const sorted = appointments.sort((a, b) => {
@@ -119,12 +119,13 @@ export const getUpcomingAppointments = query({
 			return a.time.localeCompare(b.time);
 		});
 
-		return sorted.map(toClient);
+		return sorted.slice(0, limit).map(toClient);
 	},
 });
 
 /**
  * Get past appointments (completed, cancelled, no_show, or date < today)
+ * Appointments only move to past when the date has passed, not just the time
  */
 export const getPastAppointments = query({
 	args: { 
@@ -134,7 +135,7 @@ export const getPastAppointments = query({
 	handler: async (ctx, { userId, limit = 50 }) => {
 		const today = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
 		
-		// Get appointments with past dates
+		// Get appointments with past dates (before today)
 		const pastDates = await ctx.db
 			.query("appointments")
 			.withIndex("by_user_and_date", (q) => 
@@ -142,7 +143,7 @@ export const getPastAppointments = query({
 			)
 			.collect();
 		
-		// Get appointments with completed/cancelled/no_show status
+		// Get appointments with completed/cancelled/no_show status (regardless of date)
 		const completedStatuses = await ctx.db
 			.query("appointments")
 			.withIndex("by_user", (q) => q.eq("userId", userId))

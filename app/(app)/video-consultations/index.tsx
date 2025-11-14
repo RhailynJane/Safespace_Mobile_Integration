@@ -24,7 +24,7 @@ import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUser } from "@clerk/clerk-expo";
 import { useConvexAppointments } from "../../../utils/hooks/useConvexAppointments";
-import { ConvexReactClient, useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 const { width } = Dimensions.get("window");
@@ -55,40 +55,39 @@ export default function VideoScreen() {
   const [upcoming, setUpcoming] = useState<Appointment | null>(null);
   const startSession = useMutation(api.videoCallSessions.startSession);
   const endSession = useMutation(api.videoCallSessions.endSession);
+  const pruneStale = useMutation(api.videoCallSessions.pruneStaleSessions as any);
   const activeSession = useQuery(api.videoCallSessions.getActiveSession, {} as any) as any | null;
   const callStats = useQuery(api.videoCallSessions.getCallStats, {} as any) as any | null;
 
   // Local Convex client instance
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-
-  // Initialize Convex client with Clerk auth
-  useEffect(() => {
-    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
-    if (!convexUrl) {
-      setConvexClient(null);
-      return;
-    }
-
-    const client = new ConvexReactClient(convexUrl);
-    setConvexClient(client);
-
-    return () => {
-      setConvexClient(null);
-    };
-  }, []);
+  const providerClient = useConvex();
+  // Convex auth readiness check (prevents unauthenticated mutations)
+  const whoami = useQuery(api.auth.whoami as any, {} as any) as any;
 
   // Use the appointments hook for data management
   const { 
     appointments: convexAppointments, 
-    loading, 
+    loading,
+    error,
     isUsingConvex 
-  } = useConvexAppointments(user?.id, convexClient);
+  } = useConvexAppointments(user?.id, providerClient);
 
   /**
    * Create styles dynamically based on text size scaling
    * Uses useMemo for performance optimization
    */
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+
+  // Opportunistically prune stale sessions on screen mount
+  useEffect(() => {
+    (async () => {
+      try {
+        await pruneStale({});
+      } catch (e) {
+        // best-effort cleanup; ignore failures
+      }
+    })();
+  }, [pruneStale]);
 
   // Navigation tabs configuration
   const tabs = [
@@ -120,64 +119,69 @@ export default function VideoScreen() {
     }
 
     try {
-      // Build MST numeric for current time
-      const mstFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Denver', 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit',
-        hour: '2-digit', 
-        minute: '2-digit', 
-        hour12: false,
-      });
-      const nowParts = mstFormatter.formatToParts(new Date());
-      const nowYear = parseInt(nowParts.find(p => p.type === 'year')?.value || '0');
-      const nowMonth = parseInt(nowParts.find(p => p.type === 'month')?.value || '0');
-      const nowDay = parseInt(nowParts.find(p => p.type === 'day')?.value || '0');
-      const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
-      const nowMinute = parseInt(nowParts.find(p => p.type === 'minute')?.value || '0');
-      const nowNumeric = nowYear * 100000000 + nowMonth * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
-
-      // Transform and filter upcoming appointments
+      // Transform appointments - use backend status directly
       const transformed: Appointment[] = convexAppointments
-        .filter(apt => apt.status !== 'cancelled')
-        .map((apt) => {
-          // Format readable date
-          const appointmentDate = new Date(apt.date);
-          const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric'
-          });
+        .filter((apt: any) => {
+          // Only include scheduled/confirmed appointments (backend query already filtered these)
+          return apt.status === 'scheduled' || apt.status === 'confirmed';
+        })
+        .map((apt: any) => {
+          try {
+            // Validate and parse date
+            let appointmentDate: Date;
+            if (typeof apt.date === 'string') {
+              appointmentDate = new Date(apt.date);
+            } else if (apt.date instanceof Date) {
+              appointmentDate = apt.date;
+            } else {
+              console.warn('Invalid date format for appointment:', apt.id);
+              return null;
+            }
 
-          // Calculate numeric timestamp for comparison
-          const year = appointmentDate.getUTCFullYear();
-          const month = appointmentDate.getUTCMonth() + 1;
-          const day = appointmentDate.getUTCDate();
+            if (isNaN(appointmentDate.getTime())) {
+              console.warn('Invalid date value for appointment:', apt.id, apt.date);
+              return null;
+            }
 
-          const timeStr: string = apt.time || '00:00:00';
-          const [hStr, mStr] = timeStr.split(':');
-          const aptHour = parseInt(hStr || '0', 10);
-          const aptMinute = parseInt(mStr || '0', 10);
-          const aptNumeric = year * 100000000 + month * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
+            // Format readable date
+            const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric'
+            });
 
-          return {
-            id: apt.id,
-            supportWorker: apt.supportWorker || 'Support Worker',
-            date: formattedDate,
-            time: apt.time || '',
-            type: apt.type || 'Video',
-            status: aptNumeric > nowNumeric ? 'upcoming' : 'past',
-            mstNumeric: aptNumeric,
-            meetingLink: (apt as any).meetingLink,
-          } as Appointment;
-        });
+            // Calculate numeric timestamp for sorting
+            const year = appointmentDate.getUTCFullYear();
+            const month = appointmentDate.getUTCMonth() + 1;
+            const day = appointmentDate.getUTCDate();
 
-      // Find next upcoming appointment
-      const upcomingList = transformed.filter(a => a.status === 'upcoming');
-      if (upcomingList.length > 0) {
-        const sorted = [...upcomingList].sort((a, b) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
+            const timeStr: string = apt.time || '00:00:00';
+            const [hStr, mStr] = timeStr.split(':');
+            const aptHour = parseInt(hStr || '0', 10);
+            const aptMinute = parseInt(mStr || '0', 10);
+            const aptNumeric = year * 100000000 + month * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
+
+            return {
+              id: apt.id,
+              supportWorker: apt.supportWorker || 'Support Worker',
+              date: formattedDate,
+              time: apt.time || '',
+              type: apt.type || 'Video',
+              status: 'upcoming', // Backend already filtered to upcoming only
+              mstNumeric: aptNumeric,
+              meetingLink: (apt as any).meetingLink,
+            } as Appointment;
+          } catch (dateError) {
+            console.error('Error processing appointment date:', apt.id, dateError);
+            return null;
+          }
+        })
+        .filter((apt: Appointment | null): apt is Appointment => apt !== null);
+
+      // Sort by numeric timestamp and get first one
+      if (transformed.length > 0) {
+        const sorted = [...transformed].sort((a, b) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
         setUpcoming(sorted[0] ?? null);
       } else {
         setUpcoming(null);
@@ -186,19 +190,57 @@ export default function VideoScreen() {
       console.error('Error processing appointments for video screen:', e);
       setUpcoming(null);
     }
-  }, [convexAppointments]);
+  }, [convexAppointments]);  
+
+  // Check if appointment can be joined (scheduled/confirmed and within time window)
+  // Check if appointment can be joined (scheduled/confirmed and within time window)
+  const canJoinAppointment = useCallback((appointment: Appointment | null): boolean => {
+    if (!appointment || !appointment.date || !appointment.time) return false;
+    if (!["scheduled", "confirmed"].includes(appointment.status)) return false;
+    try {
+      const aptDateTime = new Date(`${appointment.date}T${appointment.time}`);
+      if (isNaN(aptDateTime.getTime())) return false;
+      const now = new Date();
+      const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+      return minutesUntilAppointment >= -60 && minutesUntilAppointment <= 10;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // State for join restriction message
+  const [joinRestrictionMsg, setJoinRestrictionMsg] = useState<string | null>(null);
+
+  // Handler for join button
+  const handleJoinMeetingWithRestriction = () => {
+    if (!upcoming || !upcoming.date || !upcoming.time) return;
+    const aptDateTime = new Date(`${upcoming.date}T${upcoming.time}`);
+    if (isNaN(aptDateTime.getTime())) return;
+    const now = new Date();
+    const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+    if (minutesUntilAppointment > 10) {
+      // Format date/time as MM-DD-YYYY HH:SS
+      const formatted = `${String(aptDateTime.getMonth()+1).padStart(2,'0')}-${String(aptDateTime.getDate()).padStart(2,'0')}-${aptDateTime.getFullYear()} ${String(aptDateTime.getHours()).padStart(2,'0')}:${String(aptDateTime.getMinutes()).padStart(2,'0')}`;
+      setJoinRestrictionMsg(`The date is in ${formatted}. You can join 10 mins before the scheduled appt.`);
+      return;
+    }
+    setJoinRestrictionMsg(null);
+    handleJoinMeeting();
+  };
 
   // Join meeting: route to pre-join with real params
   const handleJoinMeeting = () => {
     if (!upcoming) return;
     (async () => {
       try {
-        // Start a Convex video call session (omit appointmentId to avoid Id type mismatch)
-        const result = await startSession({
-          supportWorkerName: upcoming.supportWorker,
-          audioOption: 'internet',
-        } as any);
-        const sessionId = result?.sessionId || '';
+        // If Convex identity not ready, skip mutation to avoid Unauthenticated
+        if (!whoami) {
+          console.warn('Convex identity not ready yet; joining without session tracking.');
+        }
+        const result = whoami
+          ? await startSession({ supportWorkerName: upcoming.supportWorker, audioOption: 'internet' } as any)
+          : null;
+        const sessionId = (result as any)?.sessionId || '';
         router.push({
           pathname: "/(app)/video-consultations/video-call",
           params: {
@@ -233,9 +275,44 @@ export default function VideoScreen() {
         <CurvedBackground>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary, marginTop: 16 }]}>Loading appointments...</Text>
           </View>
         </CurvedBackground>
       </SafeAreaView>
+    );
+  }
+
+  // Show error state if there's an error from the hook
+  if (error && !loading) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+          <AppHeader title="Video Consultations" showBack={true} />
+          <View style={styles.loadingContainer}>
+            <Ionicons name="alert-circle-outline" size={64} color={theme.colors.error || '#FF5252'} />
+            <Text style={[styles.title, { color: theme.colors.text, marginTop: 16 }]}>Connection Error</Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary, textAlign: 'center', paddingHorizontal: 20, marginTop: 8 }]}>
+              {error}
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.colors.textSecondary, textAlign: 'center', paddingHorizontal: 20, marginTop: 12, fontSize: scaledFontSize(12) }]}>
+              This usually means the backend server is not running. Make sure the server is started and try again.
+            </Text>
+            <TouchableOpacity
+              style={[styles.joinButton, { backgroundColor: theme.colors.primary, marginTop: 24 }]}
+              onPress={() => {
+                router.replace('/(app)/(tabs)/appointments');
+              }}
+            >
+              <Text style={styles.joinButtonText}>Go to Appointments</Text>
+            </TouchableOpacity>
+          </View>
+          <BottomNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        </SafeAreaView>
+      </CurvedBackground>
     );
   }
 
@@ -245,38 +322,13 @@ export default function VideoScreen() {
         <AppHeader title="Video Consultations" showBack={true} />
 
         {/* Main Content */}
-        <ScrollView style={styles.scrollContent}>
+        <ScrollView 
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.content}>
             <View style={[styles.appointmentCard, { backgroundColor: theme.colors.surface }]}>
-              {/* Active session banner */}
-              {activeSession && (
-                <View style={{ marginBottom: 12, padding: 12, borderRadius: 10, backgroundColor: theme.isDark ? '#263238' : '#E3F2FD' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="videocam" size={18} color={theme.colors.primary} style={{ marginRight: 8 }} />
-                      <Text style={{ color: theme.colors.text }}>Active call in progress</Text>
-                    </View>
-                    <TouchableOpacity onPress={async () => { try { await endSession({ sessionId: activeSession._id, endReason: 'user_left' }); } catch(e) { console.error('End session failed', e);} }}>
-                      <Ionicons name="close-circle" size={22} color="#D32F2F" />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={{ flexDirection: 'row', marginTop: 8, gap: 8 }}>
-                    <TouchableOpacity
-                      style={[styles.joinButton, { backgroundColor: theme.colors.primary, flex: 1 }]}
-                      onPress={() => router.push({ pathname: "/(app)/video-consultations/video-call", params: { sessionId: String(activeSession._id || '') } })}
-                    >
-                      <Ionicons name="enter" size={18} color="#FFFFFF" />
-                      <Text style={styles.joinButtonText}>Rejoin</Text>
-                    </TouchableOpacity>
-                    <View style={[styles.joinButton, { backgroundColor: theme.isDark ? '#37474F' : '#FFFFFF', flex: 1, flexDirection: 'column', alignItems: 'flex-start' }]}> 
-                      <Text style={{ color: theme.colors.textSecondary, fontSize: 11 }}>Started</Text>
-                      <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 12 }}>{activeSession.joinedAt ? new Date(activeSession.joinedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.divider, { backgroundColor: theme.colors.border, marginTop: 10 }]} />
-                </View>
-              )}
-
               {/* Upcoming Meeting */}
               {upcoming ? (
                 <>
@@ -300,12 +352,27 @@ export default function VideoScreen() {
 
                   {/* Join Meeting */}
                   <TouchableOpacity
-                    style={[styles.joinButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={handleJoinMeeting}
+                    style={[
+                      styles.joinButton,
+                      canJoinAppointment(upcoming)
+                        ? { backgroundColor: theme.colors.primary }
+                        : { backgroundColor: theme.colors.iconDisabled, opacity: 0.5 }
+                    ]}
+                    onPress={handleJoinMeetingWithRestriction}
+                    disabled={!canJoinAppointment(upcoming)}
                   >
                     <Ionicons name="videocam" size={20} color="#FFFFFF" />
-                    <Text style={styles.joinButtonText}>Join Meeting</Text>
+                    <Text style={styles.joinButtonText}>
+                      {canJoinAppointment(upcoming) ? 'Join Meeting' : 'Available 10 min before'}
+                    </Text>
                   </TouchableOpacity>
+
+                  {/* Show restriction message if trying to join too early */}
+                  {joinRestrictionMsg && (
+                    <View style={{ marginTop: 12, padding: 10, backgroundColor: theme.colors.surface, borderRadius: 8 }}>
+                      <Text style={{ color: theme.colors.error || '#FF5252', textAlign: 'center' }}>{joinRestrictionMsg}</Text>
+                    </View>
+                  )}
 
                   <View style={[styles.divider, { backgroundColor: theme.colors.border, marginTop: 16 }]} />
                 </>
@@ -365,20 +432,6 @@ export default function VideoScreen() {
                 </Text>
               </View>
             </View>
-            {/* Call Stats Panel */}
-            {callStats && (
-              <View style={{ marginTop: 8, padding: 12, borderRadius: 12, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.borderLight }}>
-                <Text style={{ fontWeight: '600', marginBottom: 6, color: theme.colors.text }}>Your Call Stats</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                  <View style={styles.statChip}><Ionicons name="swap-vertical" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Total: {callStats.totalSessions}</Text></View>
-                  <View style={styles.statChip}><Ionicons name="checkmark-circle" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Completed: {callStats.completedSessions}</Text></View>
-                  <View style={styles.statChip}><Ionicons name="alert" size={14} color="#D32F2F" /><Text style={styles.statChipText}>Failed: {callStats.failedSessions}</Text></View>
-                  <View style={styles.statChip}><Ionicons name="time" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Minutes: {Math.round((callStats.totalDuration || 0)/60)}</Text></View>
-                  <View style={styles.statChip}><Ionicons name="speedometer" size={14} color={theme.colors.primary} /><Text style={styles.statChipText}>Avg (m): {Math.round((callStats.avgDuration || 0)/60)}</Text></View>
-                  <View style={styles.statChip}><Ionicons name="bug" size={14} color="#F57C00" /><Text style={styles.statChipText}>Issues: {callStats.qualityIssuesCount}</Text></View>
-                </View>
-              </View>
-            )}
           </View>
         </ScrollView>
 
@@ -426,8 +479,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
   },
   content: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
   },
@@ -594,12 +645,15 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 14,
-    backgroundColor: '#F5F5F5',
     marginRight: 8,
     marginBottom: 8,
     gap: 6,
   },
   statChipText: {
     fontSize: scaledFontSize(12),
+  },
+  scrollContentContainer: {
+    paddingBottom: 20,
+    minHeight: '100%',
   },
 });

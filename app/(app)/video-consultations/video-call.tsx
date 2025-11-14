@@ -3,6 +3,7 @@
  */
 import React, { useMemo, useState, useEffect } from "react";
 import {
+  Alert,
   Dimensions,
   SafeAreaView,
   StyleSheet,
@@ -15,7 +16,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import { ConvexReactClient } from "convex/react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
@@ -41,33 +43,20 @@ export default function VideoCallScreen() {
   const [activeTab, setActiveTab] = useState<string>("home");
   const [confirmVisible, setConfirmVisible] = useState(false);
 
-  // Convex client for session tracking
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-
-  // Initialize Convex client
-  useEffect(() => {
-    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
-    if (!convexUrl) {
-      setConvexClient(null);
-      return;
-    }
-
-    const client = new ConvexReactClient(convexUrl);
-    setConvexClient(client);
-
-    return () => {
-      setConvexClient(null);
-    };
-  }, []);
-
   // Video session tracking hook
-  const { startSession, sessionId } = useConvexVideoSession(convexClient);
+  const { startSession, sessionId } = useConvexVideoSession(null);
 
   // Styles with dynamic text scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Use Clerk user for display name instead of demo
   const { user } = useUser();
+  
+  // Get Convex profile for profile image
+  const convexProfile = useQuery(
+    api.profiles.getFullProfile as any,
+    user?.id ? { clerkId: user.id } : (undefined as any)
+  ) as any;
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
     if (user?.fullName) return user.fullName.split(" ")[0];
@@ -78,8 +67,13 @@ export default function VideoCallScreen() {
 
   // Start meeting: navigate to the in-call screen, forward context
   const handleStartMeeting = async () => {
-    // If appointment is in the future (MST), show confirmation modal
-    if (shouldConfirmFutureJoin(date, time)) {
+    // Check if appointment is too early or in the future
+    const joinCheck = canJoinMeeting(date, time);
+    if (joinCheck === 'too-early') {
+      Alert.alert('Too Early', 'You can only join the meeting starting 10 minutes before the scheduled time.');
+      return;
+    }
+    if (joinCheck === 'too-late') {
       setConfirmVisible(true);
       return;
     }
@@ -88,76 +82,56 @@ export default function VideoCallScreen() {
 
   const pushToMeeting = async () => {
     // Start session tracking in Convex
-    const newSessionId = await startSession({
-      appointmentId: appointmentId || undefined,
+    const sessionArgs: any = {
       supportWorkerName,
-      supportWorkerId: undefined, // Could be extracted from params if needed
+      supportWorkerId: undefined,
       audioOption,
-    });
+    };
+    
+    // Only include appointmentId if it's actually defined and not the string "undefined"
+    if (appointmentId && appointmentId !== "undefined") {
+      sessionArgs.appointmentId = appointmentId;
+    }
+    
+    const newSessionId = await startSession(sessionArgs);
 
     router.push({
       pathname: "/(app)/video-consultations/video-call-meeting",
       params: { 
         supportWorkerName, 
-        appointmentId, 
+        appointmentId: appointmentId || '', 
         audioOption, 
-        meetingLink, 
-        date, 
-        time,
+        meetingLink: meetingLink || '', 
+        date: date || '', 
+        time: time || '',
         sessionId: newSessionId || '', // Pass session ID to meeting screen
       },
     });
   };
 
-  // Determine if appointment time (date + time) is in the future relative to now in MST
-  const shouldConfirmFutureJoin = (dateStr?: string, timeStr?: string) => {
-    if (!dateStr || !timeStr) return false; // no guard if missing
-    // Build MST now numeric
-    const mst = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Denver",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-    const nowParts = mst.formatToParts(new Date());
-    const nowYear = parseInt(nowParts.find(p => p.type === "year")?.value || "0");
-    const nowMonth = parseInt(nowParts.find(p => p.type === "month")?.value || "0");
-    const nowDay = parseInt(nowParts.find(p => p.type === "day")?.value || "0");
-    const nowHour = parseInt(nowParts.find(p => p.type === "hour")?.value || "0");
-    const nowMinute = parseInt(nowParts.find(p => p.type === "minute")?.value || "0");
-    const nowNumeric = nowYear * 100000000 + nowMonth * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
-
-    // Parse date string into Y/M/D (tolerate weekday prefix)
-    const d = new Date(String(dateStr));
-    if (isNaN(d.getTime())) return false; // if unparseable, don’t block
-    const year = d.getFullYear();
-    const month = d.getMonth() + 1; // 1-based
-    const day = d.getDate();
-
-    // Parse time string (supports HH:mm, HH:mm:ss, or 12h with AM/PM)
-    const { h, m } = parseTime(timeStr);
-    const aptNumeric = year * 100000000 + month * 1000000 + day * 10000 + h * 100 + m;
-    return aptNumeric > nowNumeric;
-  };
-
-  const parseTime = (t: string) => {
+  // Determine if user can join the meeting
+  // Returns: 'allowed' | 'too-early' (>10 min before) | 'too-late' (significantly past, needs confirmation)
+  const canJoinMeeting = (dateStr?: string, timeStr?: string): 'allowed' | 'too-early' | 'too-late' => {
+    if (!dateStr || !timeStr) return 'allowed'; // No restrictions if date/time missing
+    
     try {
-      const s = t.trim();
-      const ampm = /am|pm/i.test(s) ? s.match(/am|pm/i)![0].toLowerCase() : null;
-      const timePart = s.replace(/am|pm/ig, "").trim();
-      const parts = timePart.split(":");
-      let hh = parseInt(parts[0] || "0", 10);
-      const mm = parseInt(parts[1] || "0", 10);
-      if (ampm) {
-        if (ampm === "pm" && hh < 12) hh += 12;
-        if (ampm === "am" && hh === 12) hh = 0;
-      }
-      return { h: hh, m: mm };
+      // Parse appointment date/time
+      const aptDateTime = new Date(`${dateStr}T${timeStr}`);
+      if (isNaN(aptDateTime.getTime())) return 'allowed'; // Invalid format, allow
+      
+      const now = new Date();
+      const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+      
+      // Too early: more than 10 minutes before scheduled time
+      if (minutesUntilAppointment > 10) return 'too-early';
+      
+      // Too late: more than 60 minutes after scheduled time (show confirmation)
+      if (minutesUntilAppointment < -60) return 'too-late';
+      
+      // Within acceptable range: 10 minutes before to 60 minutes after
+      return 'allowed';
     } catch {
-      return { h: 0, m: 0 };
+      return 'allowed'; // On error, allow joining
     }
   };
 
@@ -193,8 +167,8 @@ export default function VideoCallScreen() {
           {/* Avatar + user name */}
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              {user?.imageUrl ? (
-                <Image source={{ uri: user.imageUrl }} style={styles.avatarImage} />
+              {(convexProfile?.profileImageUrl || user?.imageUrl) ? (
+                <Image source={{ uri: convexProfile?.profileImageUrl || user?.imageUrl }} style={styles.avatarImage} />
               ) : (
                 <Ionicons name="person" size={50} color="#FFFFFF" />
               )}
@@ -269,7 +243,7 @@ export default function VideoCallScreen() {
   <View style={styles.meetingActions}>
           <TouchableOpacity
             style={[styles.cancelButton, { borderColor: theme.colors.borderLight, backgroundColor: theme.colors.surface }]}
-            onPress={() => router.back()}
+            onPress={() => router.replace("/(app)/video-consultations")}
             accessibilityRole="button"
           >
             <Text style={[styles.cancelButtonText, { color: theme.colors.textSecondary }]}>Cancel</Text>

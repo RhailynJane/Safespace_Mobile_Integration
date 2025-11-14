@@ -35,6 +35,7 @@ interface Appointment {
   supportWorker: string;
   supportWorkerId?: number;
   date: string;
+  originalDate?: string; // Store original date for calculations
   time: string;
   type: string;
   status: string;
@@ -127,6 +128,7 @@ const fetchAppointment = useCallback(async () => {
       supportWorker: supportWorkerName || 'Support Worker',
       supportWorkerId: result.supportWorkerId,
       date: readableDate,
+      originalDate: result.date, // Store original date for calculations
       time: result.time || '',
       type: result.type || 'Video',
       meetingLink: result.meetingLink,
@@ -218,8 +220,41 @@ const fetchAppointment = useCallback(async () => {
   /**
    * Handles navigation to video consultation screen
    */
+  // State for join restriction popup
+  const [joinRestrictionMsg, setJoinRestrictionMsg] = useState<string | null>(null);
+
+  // Handler for join session with restriction
   const handleJoinSession = () => {
     if (!appointment) return;
+    // Parse date/time using originalDate (YYYY-MM-DD format from backend)
+    const dateToUse = appointment.originalDate || appointment.date;
+    const aptDateTime = new Date(`${dateToUse}T${appointment.time}`);
+    if (isNaN(aptDateTime.getTime())) {
+      console.error('Failed to parse appointment date/time:', dateToUse, appointment.time);
+      // If parsing fails, allow join anyway
+      router.push({
+        pathname: "/(app)/video-consultations/video-call",
+        params: {
+          appointmentId: String(appointment.id),
+          supportWorkerName: appointment.supportWorker,
+          date: appointment.date,
+          time: appointment.time,
+          meetingLink: appointment.meetingLink || '',
+        },
+      });
+      return;
+    }
+    const now = new Date();
+    const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+    console.log('Join restriction check:', { minutesUntilAppointment, aptDateTime: aptDateTime.toISOString(), now: now.toISOString() });
+    if (minutesUntilAppointment > 10) {
+      // Format date/time as MM-DD-YYYY HH:SS
+      const formatted = `${String(aptDateTime.getMonth()+1).padStart(2,'0')}-${String(aptDateTime.getDate()).padStart(2,'0')}-${aptDateTime.getFullYear()} ${String(aptDateTime.getHours()).padStart(2,'0')}:${String(aptDateTime.getMinutes()).padStart(2,'0')}`;
+      console.log('Join too early, showing restriction message');
+      setJoinRestrictionMsg(`The date is in ${formatted}. You can join 10 mins before the scheduled appt.`);
+      return;
+    }
+    setJoinRestrictionMsg(null);
     // Route to the pre-join Video Consultation screen
     router.push({
       pathname: "/(app)/video-consultations/video-call",
@@ -584,7 +619,7 @@ const fetchAppointment = useCallback(async () => {
           {appointment.status.toLowerCase() !== 'past' && appointment.status.toLowerCase() !== 'cancelled' && (
             <View style={styles.actions}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
-              
+            
               {/* Join Session Button */}
               <TouchableOpacity
                 style={styles.actionButtonJoin}
@@ -602,6 +637,31 @@ const fetchAppointment = useCallback(async () => {
                   <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
                 </View>
               </TouchableOpacity>
+
+              {/* Show join restriction popup if needed */}
+              {joinRestrictionMsg && (
+                <Modal
+                  visible={!!joinRestrictionMsg}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setJoinRestrictionMsg(null)}
+                >
+                  <View style={styles.modalOverlay}>
+                    <View style={[styles.confirmationModalContent, { backgroundColor: theme.colors.surface }] }>
+                      <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Join Video Session</Text>
+                      <Text style={[styles.modalText, { color: theme.colors.error || '#FF5252' }]}>{joinRestrictionMsg}</Text>
+                      <View style={styles.modalButtons}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, styles.modalCancelButton]}
+                          onPress={() => setJoinRestrictionMsg(null)}
+                        >
+                          <Text style={styles.modalCancelButtonText}>OK</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                </Modal>
+              )}
 
               {/* Reschedule and Cancel Row */}
               <View style={styles.actionButtonRow}>

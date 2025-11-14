@@ -20,9 +20,11 @@ import { useUser } from "@clerk/clerk-expo";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
-import { ConvexReactClient } from "convex/react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import SendBirdCallService from "../../../lib/sendbird-service";
 import { useConvexVideoSession } from "../../../utils/hooks/useConvexVideoSession";
+import StatusModal from "../../../components/StatusModal";
 
 const { width, height } = Dimensions.get("window");
 
@@ -43,32 +45,17 @@ export default function VideoCallScreen() {
   const supportWorkerId = params.supportWorkerId as string;
   const supportWorkerName = params.supportWorkerName as string || "Support Worker";
   const sessionIdParam = params.sessionId as string || '';
+  const audioOption = params.audioOption as string || 'phone';
 
-  // Convex client for session tracking
-  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
-
-  // Initialize Convex client
-  useEffect(() => {
-    const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL as string | undefined;
-    if (!convexUrl) {
-      setConvexClient(null);
-      return;
-    }
-
-    const client = new ConvexReactClient(convexUrl);
-    setConvexClient(client);
-
-    return () => {
-      setConvexClient(null);
-    };
-  }, []);
+  // Convex whoami — helps detect auth readiness (optional UI use)
+  const whoami = useQuery(api.auth.whoami as any, {} as any) as any;
 
   // Video session tracking hook
-  const { markConnected, endSession, updateSettings, reportQualityIssue, attachExistingSession, isUsingConvex } = useConvexVideoSession(convexClient);
+  const { markConnected, endSession, updateSettings, reportQualityIssue, attachExistingSession, isUsingConvex } = useConvexVideoSession(null);
 
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(true);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(audioOption !== 'none');
+  // Chat removed per request
   const [isRaiseHand, setIsRaiseHand] = useState(false);
   const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
   const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
@@ -76,7 +63,7 @@ export default function VideoCallScreen() {
   const [qualitySubmitting, setQualitySubmitting] = useState(false);
   const [qualityFeedback, setQualityFeedback] = useState<string | null>(null);
   const [messages, setMessages] = useState(initialMessages);
-  const [newMessage, setNewMessage] = useState("");
+  // Chat removed
   const [reactions, setReactions] = useState<
     { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
   >([]);
@@ -94,6 +81,7 @@ export default function VideoCallScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraRefresh, setCameraRefresh] = useState(0);
   const [showFullCamera, setShowFullCamera] = useState(false);
+  const [showCamera, setShowCamera] = useState(true);
 
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
   const cameraReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -113,8 +101,14 @@ export default function VideoCallScreen() {
 
   // Flip between front/back camera
   const handleFlipCamera = useCallback(() => {
+    // Fully unmount and remount camera to avoid stuck preview on some devices
     setCameraReady(false);
+    setShowCamera(false);
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
+    setTimeout(() => {
+      setCameraRefresh((prev) => prev + 1);
+      setShowCamera(true);
+    }, 150);
   }, []);
 
   // Start call duration timer (defined early for use in callbacks)
@@ -145,7 +139,7 @@ export default function VideoCallScreen() {
       setCallStatus("Call Ended");
       setIsCallConnected(false);
       setTimeout(() => {
-        router.back();
+        router.replace("/(app)/video-consultations");
       }, 2000);
     };
 
@@ -202,20 +196,8 @@ export default function VideoCallScreen() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleLeaveCall = () => {
-    Alert.alert(
-      "End Call",
-      "Are you sure you want to end this call?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "End Call",
-          style: "destructive",
-          onPress: () => endCall(),
-        },
-      ]
-    );
-  };
+  const [endModalVisible, setEndModalVisible] = useState(false);
+  const handleLeaveCall = () => setEndModalVisible(true);
 
   const endCall = useCallback(async () => {
     // End session in Convex first
@@ -231,7 +213,7 @@ export default function VideoCallScreen() {
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      router.back();
+      router.replace("/(app)/video-consultations");
       return;
     }
 
@@ -241,12 +223,26 @@ export default function VideoCallScreen() {
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      router.back();
+      router.replace("/(app)/video-consultations");
     } catch (error) {
       console.error("Error ending call:", error);
-      router.back();
+      router.replace("/(app)/video-consultations");
     }
   }, [isDemoMode, isUsingConvex, sessionIdParam, endSession]);
+
+  // End session when app goes to background (user left call)
+  useEffect(() => {
+    const sub = (state: string) => {
+      if (state === 'background' || state === 'inactive') {
+        endCall();
+      }
+    };
+    const { AppState } = require('react-native');
+    const subscription = AppState.addEventListener('change', sub);
+    return () => {
+      subscription?.remove?.();
+    };
+  }, [endCall]);
 
   useEffect(() => {
     // Attach existing session id so updateSettings/reportQualityIssue works
@@ -265,7 +261,7 @@ export default function VideoCallScreen() {
 
   // Add a timeout fallback for camera ready
   useEffect(() => {
-    if (isFocused && isCameraOn && permission?.granted && !cameraReady) {
+    if (isFocused && isCameraOn && permission?.granted && !cameraReady && showCamera) {
       // Clear any existing timeout
       if (cameraReadyTimeoutRef.current) {
         clearTimeout(cameraReadyTimeoutRef.current);
@@ -283,7 +279,7 @@ export default function VideoCallScreen() {
         clearTimeout(cameraReadyTimeoutRef.current);
       }
     };
-  }, [isFocused, isCameraOn, permission?.granted, cameraReady]);
+  }, [isFocused, isCameraOn, permission?.granted, cameraReady, showCamera]);
 
   const handleToggleCamera = () => {
     const newState = !isCameraOn;
@@ -292,6 +288,11 @@ export default function VideoCallScreen() {
     if (newState) {
       // Reset camera ready state when turning camera back on
       setCameraReady(false);
+      setShowCamera(false);
+      setTimeout(() => {
+        setCameraRefresh((prev) => prev + 1);
+        setShowCamera(true);
+      }, 120);
     }
     
     // Update session settings in Convex
@@ -318,12 +319,22 @@ export default function VideoCallScreen() {
     }
   };
 
-  const handleToggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-    if (!isChatOpen) {
-      setIsEmojiPanelOpen(false);
+  // Apply initial mic state based on audioOption immediately when session is available
+  useEffect(() => {
+    if (!sessionIdParam) return;
+    try {
+      if (isUsingConvex) {
+        updateSettings({ micEnabled: isMicOn });
+      }
+      if (!isDemoMode) {
+        SendBirdCallService.toggleAudio(isMicOn);
+      }
+    } catch (e) {
+      // no-op: initial mic state propagation is best-effort
     }
-  };
+  }, [sessionIdParam, isUsingConvex, isMicOn, updateSettings, isDemoMode]);
+
+  // Chat removed
 
   const handleToggleRaiseHand = () => {
     setIsRaiseHand(!isRaiseHand);
@@ -331,9 +342,6 @@ export default function VideoCallScreen() {
 
   const handleToggleEmojiPanel = () => {
     setIsEmojiPanelOpen(!isEmojiPanelOpen);
-    if (!isEmojiPanelOpen && isChatOpen) {
-      setIsChatOpen(false);
-    }
   };
 
   // Quality Issue Reporting Helpers
@@ -357,7 +365,7 @@ export default function VideoCallScreen() {
     try {
       if (isUsingConvex && sessionIdParam) {
         await reportQualityIssue(qualityIssueText.trim());
-        setQualityFeedback("Issue reported. Thank you!");
+        setQualityFeedback("Issue reported to support. Thank you!");
       } else {
         setQualityFeedback("Issue captured locally (offline mode)");
       }
@@ -369,43 +377,32 @@ export default function VideoCallScreen() {
     }
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const newMsg = {
-        id: messages.length + 1,
-        text: newMessage,
-        sender: "You",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages([...messages, newMsg]);
-      setNewMessage("");
-    }
-  };
+  // Chat removed
 
   const handleAddReaction = (emoji: string) => {
     const newReaction = {
       id: Date.now(),
       emoji,
       position: {
-        x: Math.random() * (width - 100) + 50,
-        y: Math.random() * (height - 200) + 100,
+        x: Math.random() * (width - 120) + 60,
+        y: Math.random() * (height - 300) + 140,
       },
       opacity: new Animated.Value(1),
     };
     
     setReactions([...reactions, newReaction]);
     
-    Animated.sequence([
-      Animated.timing(newReaction.opacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(newReaction.opacity, {
-        toValue: 0,
-        duration: 2000,
-        useNativeDriver: true,
-      }),
+    const driftX = new Animated.Value(0);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(newReaction.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(newReaction.opacity, { toValue: 0, duration: 2200, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(driftX, { toValue: 15, duration: 800, useNativeDriver: true }),
+        Animated.timing(driftX, { toValue: -10, duration: 800, useNativeDriver: true }),
+        Animated.timing(driftX, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]),
     ]).start();
     
     setTimeout(() => {
@@ -470,10 +467,10 @@ export default function VideoCallScreen() {
               style={[
                 styles.selfVideoPreview,
                 Platform.OS === 'ios' ? styles.previewClipIOS : styles.previewClipAndroid,
-                { bottom: Math.max(insets.bottom, 8) + 110 }
+                { bottom: Math.max(insets.bottom, 8) + 60 }
               ]}
             >
-              {isFocused && isCameraOn && permission?.granted ? (
+              {isFocused && isCameraOn && permission?.granted && showCamera ? (
                 <>
                   <CameraView
                     style={[styles.camera, { backgroundColor: '#000' }]}
@@ -505,7 +502,11 @@ export default function VideoCallScreen() {
                       activeOpacity={0.8}
                       onPress={() => {
                         setCameraReady(false);
-                        setCameraRefresh(r => r + 1);
+                        setShowCamera(false);
+                        setTimeout(() => {
+                          setCameraRefresh(r => r + 1);
+                          setShowCamera(true);
+                        }, 120);
                       }}
                       style={[styles.cameraOffOverlay, { position: 'absolute', left: 0, top: 0, zIndex: 10 }]}
                     >
@@ -534,7 +535,10 @@ export default function VideoCallScreen() {
             </View>
 
             {/* Call Status */}
-            <View style={styles.callStatus}>
+            <View style={[
+              styles.callStatus,
+              isCallConnected ? { top: 100 } : { top: 20 }
+            ]}>
               <Text style={styles.callStatusText}>
                 {isCallConnected ? formatDuration(callDuration) : callStatus}
               </Text>
@@ -547,6 +551,14 @@ export default function VideoCallScreen() {
                 <Text style={styles.connectionText}>
                   {permission?.granted ? "Connected to Support Worker" : "Tap to grant camera access"}
                 </Text>
+              </View>
+            )}
+
+            {/* Hand Raised indicator */}
+            {isRaiseHand && (
+              <View style={[styles.connectionBanner, { top: 140, backgroundColor: 'rgba(255, 193, 7, 0.95)' }]}>
+                <Ionicons name="hand-left" size={20} color="#000" />
+                <Text style={[styles.connectionText, { color: '#000' }]}>Hand Raised</Text>
               </View>
             )}
 
@@ -567,6 +579,8 @@ export default function VideoCallScreen() {
                           outputRange: [0, -50],
                         }),
                       },
+                      // slight horizontal drift for a nicer effect
+                      { translateX: reaction.opacity.interpolate({ inputRange: [0, 1], outputRange: [0, 10] }) },
                     ],
                   },
                 ]}
@@ -632,71 +646,12 @@ export default function VideoCallScreen() {
           </SafeAreaView>
         </Modal>
 
-        {/* Chat Panel */}
-        {isChatOpen && (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.chatPanelContainer}
-          >
-            <View style={styles.chatPanel}>
-              <View style={styles.chatHeader}>
-                <Text style={styles.chatTitle}>Chat</Text>
-                <TouchableOpacity onPress={handleToggleChat}>
-                  <Ionicons name="close" size={24} color="#333333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView 
-                style={styles.messagesContainer}
-                contentContainerStyle={{ paddingBottom: 16 }}
-              >
-                {messages.map((message) => (
-                  <View
-                    key={message.id}
-                    style={[
-                      styles.messageBubble,
-                      message.sender === "You" ? styles.myMessage : styles.theirMessage,
-                    ]}
-                  >
-                    <Text style={styles.messageText}>{message.text}</Text>
-                    <Text style={styles.messageTime}>{message.time}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-              <View style={styles.messageInputContainer}>
-                <TextInput
-                  style={styles.messageInput}
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChangeText={setNewMessage}
-                  multiline
-                  maxLength={500}
-                />
-                <TouchableOpacity 
-                  style={styles.sendButton}
-                  onPress={handleSendMessage}
-                  disabled={!newMessage.trim()}
-                >
-                  <Ionicons 
-                    name="send" 
-                    size={20} 
-                    color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        )}
+        {/* Chat removed */}
 
         {/* Bottom Controls and Leave Button */}
         <View style={{ backgroundColor: '#2D2D2D', paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) + 16 }}>
           <View style={styles.controlsRow}>
-            <TouchableOpacity 
-              style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
-              onPress={handleToggleChat}
-            >
-              <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
-              <Text style={styles.controlText}>Chat</Text>
-            </TouchableOpacity>
+            {/* Chat button removed */}
             <TouchableOpacity 
               style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
               onPress={handleToggleRaiseHand}
@@ -821,6 +776,19 @@ export default function VideoCallScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* End Call Confirmation (StatusModal) */}
+      <StatusModal
+        visible={endModalVisible}
+        type="info"
+        title="End Call?"
+        message="Are you sure you want to end this call?"
+        buttonText="Keep Calling"
+        onClose={() => setEndModalVisible(false)}
+        secondaryButtonText="End Call"
+        secondaryButtonType="destructive"
+        onSecondaryButtonPress={() => { setEndModalVisible(false); endCall(); }}
+      />
 
     </SafeAreaView>
   );
@@ -1030,9 +998,10 @@ const styles = StyleSheet.create({
   },
   controlsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    justifyContent: "center",
+    marginBottom: 6,
     flexWrap: "wrap",
+    gap: 8,
   },
   controlButton: {
     alignItems: "center",
@@ -1040,7 +1009,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#404040",
     minWidth: 60,
-    marginBottom: 5,
+    marginBottom: 6,
+    marginRight: 8,
   },
   controlButtonActive: {
     backgroundColor: "#4CAF50",
