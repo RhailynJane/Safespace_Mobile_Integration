@@ -81,7 +81,7 @@ export default function ConfirmAppointment() {
    * Create the appointment in the database
    */
   const createAppointment = useCallback(async () => {
-    if (!user?.id || !supportWorkerId || appointmentCreated) {
+    if (!user?.id || appointmentCreated) {
       return;
     }
 
@@ -106,8 +106,8 @@ export default function ConfirmAppointment() {
       try {
         await convex.mutation(api.appointments.createAppointment, {
           userId: user.id,
-          supportWorker: supportWorkerName,
-          supportWorkerId: parseInt(supportWorkerId) || undefined,
+          supportWorker: supportWorkerName || 'Auto-assigned by CMHA',
+          supportWorkerId: supportWorkerId ? (parseInt(supportWorkerId) || undefined) : undefined,
           date: selectedDate,
           time: selectedTime,
           type: sessionType,
@@ -128,10 +128,10 @@ export default function ConfirmAppointment() {
 
   // Create appointment when page loads
   useEffect(() => {
-    if (user?.id && supportWorkerId && !appointmentCreated) {
+    if (user?.id && !appointmentCreated) {
       createAppointment();
     }
-  }, [user?.id, supportWorkerId, appointmentCreated, createAppointment]);
+  }, [user?.id, appointmentCreated, createAppointment]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -176,7 +176,7 @@ export default function ConfirmAppointment() {
   };
 
   // Check if we have the required data
-  if (!supportWorkerName || !selectedDate || !selectedTime) {
+  if (!selectedDate || !selectedTime) {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -378,7 +378,7 @@ export default function ConfirmAppointment() {
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {supportWorkerName}
+                  {supportWorkerName || 'Auto-assigned by CMHA'}
                 </Text>
               </View>
 

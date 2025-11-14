@@ -24,6 +24,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useConvex } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { mapAppointmentStatus } from "../../../../utils/appointmentStatus";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
@@ -86,17 +87,81 @@ export default function AppointmentsScreen() {
   }, []);
 
   /**
-   * Fetch appointments from API and calculate stats
-   * Now checks Convex first, falls back to REST if needed
+   * Fetch appointments using the same source and mapping as the list screen
+   * to keep Upcoming count and Next Session perfectly in sync.
    */
   const fetchAppointments = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
-      console.log('📅 Fetching Convex appointment stats...');
-      const stats = await convex.query(api.appointments.getAppointmentStats, { userId: user?.id as string });
-      setUpcomingCount(stats.upcomingCount);
-      setCompletedCount(stats.completedCount);
-      setNextAppointment(stats.nextAppointment as any);
+      console.log('📅 Fetching upcoming/past appointments for dashboard...');
+
+      const [upcoming, past] = await Promise.all([
+        convex.query(api.appointments.getUpcomingAppointments, { userId: user.id }),
+        convex.query(api.appointments.getPastAppointments, { userId: user.id }),
+      ]);
+
+      // Build support worker enrichment map for items missing names
+      const collectIds = (list: any[]) =>
+        list
+          .filter((apt) => !apt.supportWorker && apt.supportWorkerId)
+          .map((apt) => String(apt.supportWorkerId));
+
+      const idsToFetch = Array.from(new Set([
+        ...collectIds(upcoming as any[]),
+        ...collectIds(past as any[]),
+      ]));
+
+      const nameMap: Record<string, string> = {};
+      if (idsToFetch.length > 0) {
+        const results = await Promise.all(
+          idsToFetch.map(async (id) => {
+            try {
+              const worker = await convex.query(api.supportWorkers.getSupportWorker, { workerId: id });
+              return { id, name: worker?.name as string | undefined };
+            } catch {
+              return { id, name: undefined };
+            }
+          })
+        );
+        results.forEach(({ id, name }) => {
+          if (name) nameMap[id] = name;
+        });
+      }
+
+      // Format date to match the list view
+      const formatDate = (iso: string) => {
+        const d = new Date(iso);
+        return d.toLocaleDateString('en-US', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+      };
+
+      // Upcoming count from same source as list
+      const upcomingCountVal = (upcoming as any[]).length;
+      setUpcomingCount(upcomingCountVal);
+
+      // Completed count mirrors the list logic (exclude cancelled)
+      const completedCountVal = (past as any[])
+        .map((apt: any) => mapAppointmentStatus(apt.status as any, apt.date, apt.time).toLowerCase())
+        .filter((s) => s === 'past').length;
+      setCompletedCount(completedCountVal);
+
+      // Next session = first upcoming item (backend should already sort soonest-first)
+      const nextRaw = (upcoming as any[])[0];
+      if (nextRaw) {
+        const mappedNext: Appointment = {
+          id: 0 as any,
+          supportWorker: nextRaw.supportWorker || nameMap[String(nextRaw.supportWorkerId)] || 'Auto-assigned by CMHA',
+          date: formatDate(nextRaw.date),
+          time: nextRaw.time || '',
+          type: (nextRaw.type || 'video').toString().replace('_', ' '),
+          status: 'upcoming',
+        };
+        setNextAppointment(mappedNext as any);
+      } else {
+        setNextAppointment(null);
+      }
     } catch (error) {
       console.error('❌ Error fetching appointments:', error);
       showStatusModal('error', 'Error', 'Unable to fetch appointments. Please try again.');
@@ -324,7 +389,7 @@ export default function AppointmentsScreen() {
               Manage Your Sessions
             </Text>
             <Text style={[styles.welcomeSubtitle, { color: theme.colors.textSecondary }]}>
-              Schedule new appointments or view your upcoming sessions with mental health professionals
+              Schedule new appointments or view your upcoming sessions with support workers at CMHA
             </Text>
           </View>
 

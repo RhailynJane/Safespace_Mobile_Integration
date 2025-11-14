@@ -23,7 +23,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import { useConvex } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { mapAppointmentStatus } from "../../../../utils/appointmentStatus";
 
@@ -62,6 +62,16 @@ export default function AppointmentList() {
 
   const convex = useConvex();
 
+  // Use reactive queries for real-time updates
+  const upcomingData = useQuery(
+    api.appointments.getUpcomingAppointments,
+    user?.id ? { userId: user.id } : "skip"
+  );
+  const pastData = useQuery(
+    api.appointments.getPastAppointments,
+    user?.id ? { userId: user.id } : "skip"
+  );
+
   // Create dynamic styles with theme colors
   const styles = useMemo(() => createStyles(scaledFontSize, theme.colors), [scaledFontSize, theme.colors]);
 
@@ -86,14 +96,12 @@ const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: 
 }, []);
 
 const fetchAppointments = useCallback(async () => {
-  if (!user?.id) return;
+  if (!user?.id || !upcomingData || !pastData) return;
   try {
     setLoading(true);
-    console.log('📅 Fetching appointments from Convex for user:', user.id);
-    const [upcoming, past] = await Promise.all([
-      convex.query(api.appointments.getUpcomingAppointments, { userId: user.id }),
-      convex.query(api.appointments.getPastAppointments, { userId: user.id }),
-    ]);
+    console.log('📅 Processing appointments from Convex for user:', user.id);
+    const upcoming = upcomingData;
+    const past = pastData;
 
     // Build support worker enrichment map for items missing names
     const collectIds = (list: any[]) =>
@@ -131,21 +139,23 @@ const fetchAppointments = useCallback(async () => {
       });
     };
 
-    const mappedUpcoming: Appointment[] = (upcoming as any[]).map((apt: any) => ({
-      id: String(apt.id),
-      supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Support Worker',
-      supportWorkerId: apt.supportWorkerId,
-      date: formatDate(apt.date),
-      time: apt.time || '',
-      type: (apt.type || 'video').toString().replace('_', ' '),
-      status: 'upcoming',
-      meetingLink: apt.meetingLink,
-      notes: apt.notes,
-    }));
+    const mappedUpcoming: Appointment[] = (upcoming as any[])
+      .filter((apt: any) => apt.status !== 'cancelled') // Exclude cancelled appointments immediately
+      .map((apt: any) => ({
+        id: String(apt.id),
+        supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',
+        supportWorkerId: apt.supportWorkerId,
+        date: formatDate(apt.date),
+        time: apt.time || '',
+        type: (apt.type || 'video').toString().replace('_', ' '),
+        status: 'upcoming',
+        meetingLink: apt.meetingLink,
+        notes: apt.notes,
+      }));
 
     const mappedPast: Appointment[] = (past as any[]).map((apt: any) => ({
       id: String(apt.id),
-      supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Support Worker',
+      supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',
       supportWorkerId: apt.supportWorkerId,
       date: formatDate(apt.date),
       time: apt.time || '',
@@ -165,15 +175,15 @@ const fetchAppointments = useCallback(async () => {
   } finally {
     setLoading(false);
   }
-}, [user?.id, convex, showStatusModal]);
+}, [user?.id, upcomingData, pastData, convex, showStatusModal]);
   
 
-// Run fetch when user id is ready
+// Run fetch when user id is ready or when data changes
 useEffect(() => {
-  if (user?.id) {
+  if (user?.id && (upcomingData !== undefined || pastData !== undefined)) {
     fetchAppointments();
   }
-}, [user?.id, fetchAppointments]);
+}, [user?.id, upcomingData, pastData, fetchAppointments]);
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

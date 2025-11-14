@@ -237,16 +237,10 @@ const fetchAppointment = useCallback(async () => {
    * Opens reschedule modal
    */
   const handleReschedule = () => {
-    if (!appointment?.supportWorkerId) {
-      // If we don't have the worker id, fall back to the booking flow
-      router.push(`/appointments/book`);
-      return;
-    }
-    // Navigate to details screen in reschedule mode; user selects new date/time there
+    // Navigate to book screen in reschedule mode; user selects new date/time there
     router.push({
-      pathname: '/appointments/details',
+      pathname: '/appointments/book',
       params: {
-        supportWorkerId: String(appointment.supportWorkerId),
         reschedule: '1',
         appointmentId: String(appointment.id),
       },
@@ -536,35 +530,37 @@ const fetchAppointment = useCallback(async () => {
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actions}>
-            {/* Join Session Button */}
-            <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={handleJoinSession}
-            >
-              <Ionicons name="videocam" size={20} color="#FFF" />
-              <Text style={styles.primaryButtonText}>Join Session</Text>
-            </TouchableOpacity>
+          {/* Action Buttons - Only show for upcoming appointments */}
+          {appointment.status.toLowerCase() !== 'past' && appointment.status.toLowerCase() !== 'cancelled' && (
+            <View style={styles.actions}>
+              {/* Join Session Button */}
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
+                onPress={handleJoinSession}
+              >
+                <Ionicons name="videocam" size={20} color="#FFF" />
+                <Text style={styles.primaryButtonText}>Join Session</Text>
+              </TouchableOpacity>
 
-            {/* Reschedule Button */}
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
-              onPress={handleReschedule}
-            >
-              <Ionicons name="calendar" size={20} color={theme.colors.primary} />
-              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>Reschedule</Text>
-            </TouchableOpacity>
+              {/* Reschedule Button */}
+              <TouchableOpacity
+                style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
+                onPress={handleReschedule}
+              >
+                <Ionicons name="calendar" size={20} color={theme.colors.primary} />
+                <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>Reschedule</Text>
+              </TouchableOpacity>
 
-            {/* Cancel Appointment Button */}
-            <TouchableOpacity
-              style={[styles.tertiaryButton, { borderColor: theme.colors.error }]}
-              onPress={handleCancel}
-            >
-              <Ionicons name="close-circle" size={20} color={theme.colors.error} />
-              <Text style={[styles.tertiaryButtonText, { color: theme.colors.error }]}>Cancel Appointment</Text>
-            </TouchableOpacity>
-          </View>
+              {/* Cancel Appointment Button */}
+              <TouchableOpacity
+                style={[styles.tertiaryButton, { borderColor: theme.colors.error }]}
+                onPress={handleCancel}
+              >
+                <Ionicons name="close-circle" size={20} color={theme.colors.error} />
+                <Text style={[styles.tertiaryButtonText, { color: theme.colors.error }]}>Cancel Appointment</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Cancel Confirmation Modal */}
           <Modal

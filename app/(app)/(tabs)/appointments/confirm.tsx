@@ -246,7 +246,7 @@ export default function ConfirmAppointment() {
    * Create the appointment in the database
    */
   const createAppointment = useCallback(async () => {
-    if (!user?.id || !supportWorkerId || appointmentCreated) {
+    if (!user?.id || appointmentCreated) {
       return;
     }
 
@@ -268,12 +268,12 @@ export default function ConfirmAppointment() {
       const sessionType = sessionTypeMap[normalizedType] || 'video';
 
       const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
-      const workerIdInt = parseInt(chosenIdRaw);
+      const workerIdInt = chosenIdRaw ? parseInt(chosenIdRaw) : NaN;
       const normalizedTime = toHHMMSS(selectedTime); // HH:MM:SS
       try {
         const result = await convex.mutation(api.appointments.createAppointment, {
           userId: user.id,
-          supportWorker: supportWorkerName,
+          supportWorker: supportWorkerName || 'Auto-assigned by CMHA',
           supportWorkerId: Number.isFinite(workerIdInt) ? workerIdInt : undefined,
           date: selectedDate,
           time: normalizedTime.slice(0,5), // HH:MM
@@ -284,7 +284,7 @@ export default function ConfirmAppointment() {
         setAppointmentCreated(true);
         setAppointmentId(workerIdInt);
         try {
-          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
+          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName || 'Auto-assigned by CMHA');
         } catch (reminderError) {
           console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
         }
@@ -352,8 +352,8 @@ export default function ConfirmAppointment() {
     if (isReschedule && rescheduleAppointmentId) {
       // Reschedule existing appointment
       rescheduleAppointment();
-    } else if (supportWorkerId) {
-      // Create a new appointment
+    } else {
+      // Create a new appointment (auto-assign support worker)
       createAppointment();
     }
   }, [user?.id, appointmentCreated, isReschedule, rescheduleAppointmentId, supportWorkerId, selectedDate, selectedTime, isPastInMountain, showStatusModal, rescheduleAppointment, createAppointment]);
@@ -401,7 +401,7 @@ export default function ConfirmAppointment() {
   };
 
   // Check if we have the required data
-  if (!supportWorkerName || !selectedDate || !selectedTime) {
+  if (!selectedDate || !selectedTime) {
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -605,7 +605,7 @@ export default function ConfirmAppointment() {
               <View style={styles.detailRow}>
                 <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
                 <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {supportWorkerName}
+                  {supportWorkerName || 'Auto-assigned by CMHA'}
                 </Text>
               </View>
 

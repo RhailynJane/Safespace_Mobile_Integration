@@ -14,22 +14,21 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
-  Image,
   Alert,
 } from "react-native";
+import { Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { useConvex } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import StatusModal from "../../../../components/StatusModal";
-// Note: This screen only lists support workers (currently via REST). No Convex client needed here.
+// CMHA flow: user is auto-assigned to an available support worker.
+// This screen focuses on selecting date, time and session type (no worker browsing).
 
 /**
  * BookAppointment Component
@@ -42,28 +41,27 @@ import StatusModal from "../../../../components/StatusModal";
  * Features an elegant curved background and intuitive interface.
  */
 
-interface SupportWorker {
-  id: string | number;
-  name: string;
-  title: string;
-  avatar: string;
-  specialties: string[];
-  bio?: string;
-  yearsOfExperience?: number;
-  hourlyRate?: number;
-  languagesSpoken?: string[];
-}
-
 export default function BookAppointment() {
   const { theme, scaledFontSize } = useTheme();
+  const windowWidth = Dimensions.get("window").width;
+  const COLUMNS = 4;
+  const H_MARGIN = 6; // must match styles.timeSlot margin horizontal
+  const PAD_H = 12; // must match styles.timeGrid paddingHorizontal
+  const slotWidth = Math.floor((windowWidth - PAD_H * 2 - H_MARGIN * 2 * COLUMNS) / COLUMNS);
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [searchQuery, setSearchQuery] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
-  // State for support workers
-  const [supportWorkers, setSupportWorkers] = useState<SupportWorker[]>([]);
+  // Booking selections
+  const [selectedType, setSelectedType] = useState<'video' | 'in_person'>('video');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
+  // Get reschedule params if rescheduling
+  const params = useLocalSearchParams();
+  const isReschedule = params.reschedule === '1' || params.reschedule === 'true';
+  const appointmentId = params.appointmentId as string | undefined;
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -74,8 +72,6 @@ export default function BookAppointment() {
   // Clerk authentication hooks
   const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
-
-  // No Convex client init required for this screen
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -90,56 +86,69 @@ export default function BookAppointment() {
     setStatusModalVisible(true);
   }, []);
 
-  /**
-   * Handles navigation to support worker details screen
-   * @param supportWorkerId - ID of the selected support worker
-   */
-  const handleSelectSupportWorker = (supportWorkerId: string | number) => {
-    router.push(`/appointments/details?supportWorkerId=${supportWorkerId}`);
+  // Build next 14 days for quick selection. If all slots for today are past (after 4:30 PM), skip today.
+  const days = useMemo(() => {
+    const list: { iso: string; label: string; weekday: string }[] = [];
+    const now = new Date();
+    const includeToday = now.getHours() < 16 || (now.getHours() === 16 && now.getMinutes() < 30);
+    const startOffset = includeToday ? 0 : 1;
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + i + startOffset);
+      const iso = d.toISOString().split('T')[0]!;
+      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const label = d.getDate().toString();
+      list.push({ iso, label, weekday });
+    }
+    return list;
+  }, []);
+
+  const timeSlots = [
+    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+    '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
+    '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
+    '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+  ];
+
+  const parseTimeTo24h = (time: string) => {
+    const m = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return { hour: 0, minute: 0 };
+    let hour = Number(m[1]);
+    const minute = Number(m[2]);
+    const ampm = (m[3] || 'AM').toUpperCase();
+    if (ampm === 'AM') { if (hour === 12) hour = 0; } else { if (hour !== 12) hour += 12; }
+    return { hour, minute };
   };
 
-  // Fetch support workers on mount
-// Fetch support workers on mount
-// (moved below fetchSupportWorkers declaration)
+  const isPastSlot = (isoDate: string, label: string) => {
+    const now = new Date();
+    const [y, m, d] = isoDate.split('-').map(Number);
+    if (!y || !m || !d) return true;
+    const slot = new Date(y, m - 1, d);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (slot.getTime() > today.getTime()) return false;
+    if (slot.getTime() < today.getTime()) return true;
+    const { hour, minute } = parseTimeTo24h(label);
+    if (hour < now.getHours()) return true;
+    if (hour > now.getHours()) return false;
+    return minute <= now.getMinutes();
+  };
 
-/**
- * Fetch support workers from the API
- */
-const convex = useConvex();
-
-const fetchSupportWorkers = useCallback(async () => {
-  try {
-    setLoading(true);
-    const res = await convex.query(api.supportWorkers.listSupportWorkers, { limit: 100 });
-    const workers = (res.workers || []).map((w: any) => ({
-      id: w.id,
-      name: w.name,
-      title: w.title,
-      avatar: w.avatar,
-      specialties: w.specialties || [],
-      bio: w.bio,
-      yearsOfExperience: w.yearsOfExperience,
-      hourlyRate: w.hourlyRate,
-      languagesSpoken: w.languagesSpoken,
-    }));
-    setSupportWorkers(workers);
-  } catch (error) {
-    console.error('Error loading support workers from Convex:', error);
-    showStatusModal('error', 'Error', 'Unable to fetch support workers. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-}, [convex, showStatusModal]);
-
-// Fetch support workers on mount
-useEffect(() => {
-  fetchSupportWorkers();
-}, [fetchSupportWorkers]);
-
-  // Filter support workers based on search query
-  const filteredSupportWorkers = supportWorkers.filter((sw) =>
-    sw.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleContinue = () => {
+    if (!selectedDate || !selectedTime) return;
+    const typeLabel = selectedType === 'in_person' ? 'in-person' : 'video';
+    router.push({
+      pathname: '/appointments/confirm',
+      params: {
+        selectedDate: selectedDate,
+        selectedTime: selectedTime,
+        selectedType: typeLabel,
+        supportWorkerName: 'Auto-assigned by CMHA',
+        reschedule: isReschedule ? '1' : undefined,
+        appointmentId: isReschedule ? appointmentId : undefined,
+      },
+    } as any);
+  };
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -324,11 +333,11 @@ useEffect(() => {
     );
   };
 
-  // Show loading indicator if data is being fetched
+  // Show loading indicator if any background work
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -344,13 +353,12 @@ useEffect(() => {
           showsVerticalScrollIndicator={false}
         >
           <Text style={[styles.title, { color: theme.colors.text }]}>
-            Schedule a session with a support worker
+            Choose a date and time. A support worker will be assigned automatically.
           </Text>
 
-    {/* Step Indicator - Shows progress through booking process */}
+    {/* Step Indicator */}
     <View style={styles.stepsContainer}>
       <View style={styles.stepRow}>
-        {/* Step 1 - Active (Current Step) */}
         <View style={[
           styles.stepCircle, 
           styles.stepCircleActive,
@@ -361,8 +369,6 @@ useEffect(() => {
           </Text>
         </View>
         <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-        {/* Step 2 - Inactive */}
         <View style={[
           styles.stepCircle,
           { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
@@ -370,98 +376,93 @@ useEffect(() => {
           <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
         </View>
         <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-        {/* Step 3 - Inactive */}
         <View style={[
           styles.stepCircle,
           { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
         ]}>
           <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
         </View>
-        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-        {/* Step 4 - Inactive */}
-        <View style={[
-          styles.stepCircle,
-          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
-        ]}>
-          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>4</Text>
-        </View>
       </View>
     </View>
 
-          {/* Search Bar */}
-          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons
-              name="search"
-              size={20}
-              color={theme.colors.icon}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.text }]}
-              placeholder="Search support worker..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          {/* Session type */}
+          <View style={styles.sessionTypeRow}>
+            {[{ key: 'video', icon: 'videocam', label: 'Video' }, { key: 'in_person', icon: 'pin', label: 'In person' }].map((opt: any) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.sessionTypeChip,
+                  { borderColor: theme.colors.primary, backgroundColor: 'transparent' },
+                  selectedType === opt.key && { backgroundColor: theme.colors.primary }
+                ]}
+                onPress={() => setSelectedType(opt.key)}
+              >
+                <Ionicons name={opt.icon as any} size={16} color={selectedType === opt.key ? '#fff' : theme.colors.primary} />
+                <Text style={[styles.sessionTypeChipText, { color: selectedType === opt.key ? '#fff' : theme.colors.primary }]}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          {/* Support Workers List */}
-          {filteredSupportWorkers.map((supportWorker) => (
-            <TouchableOpacity
-              key={supportWorker.id}
-              style={[styles.supportWorkerCard, { backgroundColor: theme.colors.surface }]}
-              onPress={() => handleSelectSupportWorker(supportWorker.id)}
-            >
-              {/* Support Worker Avatar and Info */}
-              <View style={styles.avatarContainer}>
-                <Image
-                  source={{ uri: supportWorker.avatar }}
-                  style={styles.avatar}
-                />
-                <View style={styles.supportWorkerInfo}>
-                  <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
-                    {supportWorker.name}
-                  </Text>
-                  <Text style={[styles.supportWorkerTitle, { color: theme.colors.textSecondary }]}>
-                    {supportWorker.title}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Support Worker Specialties */}
-              <View style={styles.specialtiesContainer}>
-              {supportWorker.specialties.map((specialty: string) => (
-                <Text key={specialty} style={styles.specialtyText}>
-                  {specialty}
-                </Text>
-              ))}
-              </View>
-
-              {/* Selection Prompt */}
-              <Text style={[styles.selectText, { color: theme.colors.text }]}>Select Support Worker</Text>
-            </TouchableOpacity>
-          ))}
-
-          {/* Empty State when no support workers derived yet */}
-          {filteredSupportWorkers.length === 0 && (
-            <View style={[styles.emptyWorkersContainer, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="people-outline" size={48} color={theme.colors.textSecondary} style={{ marginBottom: 12 }} />
-              <Text style={[styles.emptyWorkersTitle, { color: theme.colors.text }]}>No Support Workers Available</Text>
-              <Text style={[styles.emptyWorkersSubtitle, { color: theme.colors.textSecondary }]}>
-                Support workers appear once appointments are populated or the system seeds profiles. Retry or check back later.
-              </Text>
+          {/* Day selector */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 12 }}>
+            {days.map((d) => (
               <TouchableOpacity
-                style={[styles.refreshButton, { backgroundColor: theme.colors.primary }]}
-                onPress={fetchSupportWorkers}
-                activeOpacity={0.85}
+                key={d.iso}
+                style={[
+                  styles.dayChip,
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+                  selectedDate === d.iso && { backgroundColor: theme.colors.primary }
+                ]}
+                onPress={() => { setSelectedDate(d.iso); setSelectedTime(null); }}
               >
-                <Text style={[styles.refreshButtonText, { color: theme.colors.surface }]}>Retry Load</Text>
-                <Ionicons name="reload" size={18} color={theme.colors.surface} style={{ marginLeft: 6 }} />
+                <Text style={[styles.dayChipWeekday, { color: selectedDate === d.iso ? '#fff' : theme.colors.textSecondary }]}>{d.weekday}</Text>
+                <Text style={[styles.dayChipLabel, { color: selectedDate === d.iso ? '#fff' : theme.colors.text }]}>{d.label}</Text>
               </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Time slots */}
+          <View style={styles.timeGrid}>
+            {timeSlots.map((t) => {
+              const disabled = !selectedDate || isPastSlot(selectedDate, t);
+              const active = selectedTime === t;
+              const textColor = active ? '#fff' : (disabled ? theme.colors.textSecondary : theme.colors.text);
+              return (
+                <TouchableOpacity
+                  key={t}
+                  disabled={disabled}
+                  onPress={() => setSelectedTime(t)}
+                  style={[
+                    styles.timeSlot,
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, width: slotWidth },
+                    active && { backgroundColor: theme.colors.primary },
+                    disabled && { opacity: 0.4 }
+                  ]}
+                >
+                  <Text style={[styles.timeSlotText, { color: textColor, textAlign: 'center', lineHeight: scaledFontSize(16) }]} numberOfLines={2}>{t.replace(' ', '\n')}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {selectedDate && selectedTime && (
+            <View style={{ paddingHorizontal: 16, marginTop: 8, marginBottom: 4 }}>
+              <Text style={{ color: theme.colors.textSecondary, fontSize: scaledFontSize(12), textAlign: 'center' }}>
+                Selected: {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, {selectedTime} {selectedType === 'in_person' ? '(In person)' : '(Video)'}
+              </Text>
             </View>
           )}
+
+          {/* Continue button */}
+          <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+            <TouchableOpacity
+              disabled={!selectedDate || !selectedTime}
+              onPress={handleContinue}
+              style={[styles.primaryButton, { backgroundColor: theme.colors.primary, opacity: (!selectedDate || !selectedTime) ? 0.5 : 1 }]}
+            >
+              <Text style={styles.buttonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -555,18 +556,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  supportWorkerCard: {
-    // backgroundColor moved to theme.colors.surface via inline override
-    borderRadius: 10,
-    padding: 16,
-    marginHorizontal: 15,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   header: {
     flexDirection: "row",
@@ -706,111 +695,65 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
 
     marginHorizontal: 8,
   },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    // backgroundColor moved to theme via inline override
-    margin: 15,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: scaledFontSize(16),
-    // color moved to theme via inline override
-  },
-  supportWorkerName: {
-    fontSize: scaledFontSize(18),
-    fontWeight: "600",
-    // color moved to theme via inline override
-    marginBottom: 4,
-  },
-  supportWorkerNameHeading: {
-    fontSize: scaledFontSize(20),
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  supportWorkerTitle: {
-    fontSize: scaledFontSize(14),
-    // color moved to theme via inline override
-    marginBottom: 0,
-  },
-  specialtiesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 16,
-    gap: 8,
-  },
-  specialtyText: {
-    backgroundColor: "#d0cad8ff",
-    color: "#333333",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    fontSize: scaledFontSize(12),
-    fontWeight: "500",
-  },
-  selectText: {
-    // color moved to theme via inline override
-    fontWeight: "600",
-    textAlign: "center",
-    fontSize: scaledFontSize(14),
-  },
-  emptyWorkersContainer: {
-    borderRadius: 12,
-    padding: 24,
-    marginHorizontal: 15,
-    marginTop: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  emptyWorkersTitle: {
-    fontSize: scaledFontSize(16),
-    fontWeight: '600',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyWorkersSubtitle: {
-    fontSize: scaledFontSize(14),
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  refreshButton: {
+  sessionTypeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 24,
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 8,
   },
-  refreshButtonText: {
-    fontSize: scaledFontSize(14),
+  sessionTypeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    backgroundColor: '#00000000',
+  },
+  sessionTypeChipText: {
+    marginLeft: 6,
     fontWeight: '600',
   },
-  avatarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
+  dayChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+    minWidth: 64,
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+  dayChipWeekday: {
+    fontSize: scaledFontSize(12),
   },
-  supportWorkerInfo: {
-    flex: 1,
+  dayChipLabel: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    marginTop: 12,
+  },
+  timeSlot: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    margin: 6,
+    backgroundColor: '#FFFFFF',
+  },
+  timeSlotText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
   },
   contentContainer: {
     flex: 1,
