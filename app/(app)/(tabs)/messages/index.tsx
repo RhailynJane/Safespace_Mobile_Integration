@@ -45,8 +45,10 @@ export default function MessagesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
+  const [messageFilter, setMessageFilter] = useState<"all" | "unread" | "read">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [sendbirdStatus, setSendbirdStatus] = useState<string>("Initializing...");
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -142,41 +144,49 @@ export default function MessagesScreen() {
 
   // Focus reload moved below after loadConversations definition
 
-  // Filter conversations based on search query
+  // Filter conversations based on search query and message filter
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredConversations(conversations);
-      return;
+    let filtered = conversations;
+    
+    // First apply message filter (all/unread/read)
+    if (messageFilter === "unread") {
+      filtered = filtered.filter(conv => conv.unread_count > 0);
+    } else if (messageFilter === "read") {
+      filtered = filtered.filter(conv => conv.unread_count === 0);
     }
-
-    const filtered = conversations.filter(conversation => {
+    // "all" shows everything, so no filtering needed
+    
+    // Then apply search query if present
+    if (searchQuery.trim()) {
       const searchLower = searchQuery.toLowerCase().trim();
       
-      // Search in participant names
-      const participantNames = conversation.participants
-        .filter(p => p.clerk_user_id !== userId) // Exclude current user
-        .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
-      
-      const hasMatchingParticipant = participantNames.some(name => 
-        name.includes(searchLower)
-      );
+      filtered = filtered.filter(conversation => {
+        // Search in participant names
+        const participantNames = conversation.participants
+          .filter(p => p.clerk_user_id !== userId) // Exclude current user
+          .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
+        
+        const hasMatchingParticipant = participantNames.some(name => 
+          name.includes(searchLower)
+        );
 
-      // Search in conversation title
-      const hasMatchingTitle = conversation.title?.toLowerCase().includes(searchLower);
+        // Search in conversation title
+        const hasMatchingTitle = conversation.title?.toLowerCase().includes(searchLower);
 
-      // Search in last message
-      const hasMatchingLastMessage = conversation.last_message?.toLowerCase().includes(searchLower);
+        // Search in last message
+        const hasMatchingLastMessage = conversation.last_message?.toLowerCase().includes(searchLower);
 
-      // Search in participant emails
-      const hasMatchingEmail = conversation.participants.some(p => 
-        p.email?.toLowerCase().includes(searchLower)
-      );
+        // Search in participant emails
+        const hasMatchingEmail = conversation.participants.some(p => 
+          p.email?.toLowerCase().includes(searchLower)
+        );
 
-      return hasMatchingParticipant || hasMatchingTitle || hasMatchingLastMessage || hasMatchingEmail;
-    });
+        return hasMatchingParticipant || hasMatchingTitle || hasMatchingLastMessage || hasMatchingEmail;
+      });
+    }
 
     setFilteredConversations(filtered);
-  }, [searchQuery, conversations, userId]);
+  }, [searchQuery, conversations, userId, messageFilter]);
 
   const loadConversations = async () => {
     if (!userId) {
@@ -190,6 +200,12 @@ export default function MessagesScreen() {
     try {
       setLoading(true);
       console.log(`💬 Loading conversations for user: ${userId}`);
+      
+      // Load online users for presence status
+      const onlineData = await convex.query(api.presence.onlineUsers, { sinceMs: 5 * 60 * 1000 }); // 5 minutes
+      const onlineSet = new Set<string>((onlineData || []).map((p: any) => String(p.userId)));
+      setOnlineUsers(onlineSet);
+      
       // Use enriched query (includes participants metadata + lastMessage + unreadCount)
       const convs = await convex.query(api.conversations.listForUserEnriched, {} as any);
       const mapped: Conversation[] = (convs as any[]).map((c: any) => ({
@@ -206,8 +222,8 @@ export default function MessagesScreen() {
           last_name: p.lastName || '',
           email: '',
           profile_image_url: p.imageUrl || '',
-          online: false,
-          presence: 'offline',
+          online: onlineSet.has(p.userId),
+          presence: onlineSet.has(p.userId) ? 'online' : 'offline',
           last_active_at: '',
           id: p.userId,
         })),
@@ -241,6 +257,11 @@ export default function MessagesScreen() {
     if (!isFocused || !userId) return;
     const poll = async () => {
       try {
+        // Refresh online users
+        const onlineData = await convex.query(api.presence.onlineUsers, { sinceMs: 5 * 60 * 1000 });
+        const onlineSet = new Set<string>((onlineData || []).map((p: any) => String(p.userId)));
+        setOnlineUsers(onlineSet);
+        
         const convs = await convex.query(api.conversations.listForUserEnriched, {} as any);
         const mapped: Conversation[] = (convs as any[]).map((c: any) => ({
           id: c._id,
@@ -256,32 +277,20 @@ export default function MessagesScreen() {
             last_name: p.lastName || '',
             email: '',
             profile_image_url: p.imageUrl || '',
-            online: false,
-            presence: 'offline',
+            online: onlineSet.has(p.userId),
+            presence: onlineSet.has(p.userId) ? 'online' : 'offline',
             last_active_at: '',
             id: p.userId,
           })),
         }));
         setConversations(mapped);
-        setFilteredConversations(() => {
-          if (!searchQuery.trim()) return mapped;
-          return mapped.filter((c) => {
-            const searchLower = searchQuery.toLowerCase().trim();
-            const participantNames = c.participants
-              .filter(p => p.clerk_user_id !== userId)
-              .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
-            return participantNames.some(name => name.includes(searchLower)) ||
-              c.title?.toLowerCase().includes(searchLower) ||
-              c.last_message?.toLowerCase().includes(searchLower);
-          });
-        });
       } catch (e) {
         console.log('Convex poll failed', e);
       }
     };
     const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
-  }, [isFocused, userId, searchQuery, convex]);
+  }, [isFocused, userId, convex]);
 
   // Helpers
   const getUserInitials = (first?: string, last?: string) => {
@@ -372,6 +381,81 @@ export default function MessagesScreen() {
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
 
+        {/* Search Bar */}
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
+          <Ionicons
+            name="search"
+            size={20}
+            color={theme.colors.icon}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            testID="messages-search"
+            style={[styles.searchInput, { color: theme.colors.text }]}
+            placeholder="Search messages"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={theme.colors.textSecondary}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Message Filter Chips */}
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              messageFilter === "all" && [styles.filterChipActive, { backgroundColor: theme.colors.primary }],
+              { backgroundColor: messageFilter === "all" ? theme.colors.primary : theme.colors.surface }
+            ]}
+            onPress={() => setMessageFilter("all")}
+          >
+            <Text style={[
+              styles.filterChipText,
+              { color: messageFilter === "all" ? "#FFF" : theme.colors.text }
+            ]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              messageFilter === "unread" && [styles.filterChipActive, { backgroundColor: theme.colors.primary }],
+              { backgroundColor: messageFilter === "unread" ? theme.colors.primary : theme.colors.surface }
+            ]}
+            onPress={() => setMessageFilter("unread")}
+          >
+            <Text style={[
+              styles.filterChipText,
+              { color: messageFilter === "unread" ? "#FFF" : theme.colors.text }
+            ]}>
+              Unread
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              messageFilter === "read" && [styles.filterChipActive, { backgroundColor: theme.colors.primary }],
+              { backgroundColor: messageFilter === "read" ? theme.colors.primary : theme.colors.surface }
+            ]}
+            onPress={() => setMessageFilter("read")}
+          >
+            <Text style={[
+              styles.filterChipText,
+              { color: messageFilter === "read" ? "#FFF" : theme.colors.text }
+            ]}>
+              Read
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Status Modal (also supports confirmations) */}
         <Modal
           visible={statusModalVisible}
@@ -451,51 +535,20 @@ export default function MessagesScreen() {
           </View>
         </Modal>
 
-        {/* New Message Button */}
-        <View>
-          <TouchableOpacity
-            testID="new-message-button"
-            style={styles.newMessageButton}
-            onPress={() => {
-              if (!userId) {
-                showStatusModal('error', 'Authentication Required', 'Please sign in to send messages');
-                return;
-              }
-              router.push("/(app)/(tabs)/messages/new-message");
-            }}
-          >
-            <LinearGradient
-              colors={["#5296EA", "#489EEA", "#459EEA", "#4896EA"]}
-              style={styles.newMessageButtonGradient}
-            >
-              <Text style={[styles.newMessageButtonText, { color: '#FFF' }]}>+ New Message</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons
-            name="search"
-            size={20}
-            color={theme.colors.icon}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            testID="messages-search"
-            style={[styles.searchInput, { color: theme.colors.text }]}
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={theme.colors.textSecondary}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Floating New Message Button */}
+        <TouchableOpacity
+          testID="new-message-button"
+          style={[styles.floatingButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => {
+            if (!userId) {
+              showStatusModal('error', 'Authentication Required', 'Please sign in to send messages');
+              return;
+            }
+            router.push("/(app)/(tabs)/messages/new-message");
+          }}
+        >
+          <Ionicons name="create" size={28} color="#FFF" />
+        </TouchableOpacity>
 
         {/* Search Results Info */}
         {!!searchQuery.trim() && (
@@ -955,6 +1008,42 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   newMessageButtonText: {
     fontSize: scaledFontSize(16),
     fontWeight: "800",
+  },
+  filterContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  filterChipActive: {
+    borderWidth: 0,
+  },
+  filterChipText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: "600",
+  },
+  floatingButton: {
+    position: "absolute",
+    bottom: 120, // Above bottom navigation
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
   },
   initialsAvatar: {
     width: 60,
