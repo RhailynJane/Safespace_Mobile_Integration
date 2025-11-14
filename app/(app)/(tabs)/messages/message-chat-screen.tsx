@@ -274,8 +274,8 @@ export default function ChatScreen() {
   };
 
   const headerHeight = getHeaderHeight();
-  // Use a smaller keyboard offset to avoid excessive gap between input and keyboard
-  const keyboardOffset = Platform.OS === 'ios' ? insets.top + 50 : 0;
+  // Keyboard offset should account for the header height
+  const keyboardOffset = Platform.OS === 'ios' ? headerHeight : 0;
 
   // Track keyboard visibility to adjust bottom spacing only when keyboard is hidden
   useEffect(() => {
@@ -1357,9 +1357,9 @@ export default function ChatScreen() {
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          behavior={Platform.select({ ios: 'padding', android: 'height' })}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}
-          keyboardVerticalOffset={keyboardOffset}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
         >
           {/* Status Modal (also used for confirmations) */}
           <Modal
@@ -2268,34 +2268,6 @@ export default function ChatScreen() {
                       <Ionicons name="image" size={24} color="white" />
                     </View>
                     <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Media</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.attachmentOption}
-                    onPress={() => {
-                      setAttachmentSheetVisible(false);
-                      // Add GIF functionality here if needed
-                    }}
-                  >
-                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#FF9500' }]}>
-                      <Text style={styles.gifText}>GIF</Text>
-                    </View>
-                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>GIF</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.attachmentRow}>
-                  <TouchableOpacity
-                    style={styles.attachmentOption}
-                    onPress={() => {
-                      setAttachmentSheetVisible(false);
-                      // Add mention functionality here if needed
-                    }}
-                  >
-                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#5856D6' }]}>
-                      <Ionicons name="at" size={24} color="white" />
-                    </View>
-                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Mention</Text>
                   </TouchableOpacity>
                 </View>
               </View>
