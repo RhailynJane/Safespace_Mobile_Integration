@@ -135,6 +135,20 @@ export default function PostDetailScreen() {
     return uri;
   };
 
+  // Append size params for consistent avatar rendering
+  const withSizeParams = (uri?: string | null, w = 48, h = 48): string | null => {
+    if (!uri) return null;
+    try {
+      const hasW = /[?&]w=/.test(uri);
+      const hasH = /[?&]h=/.test(uri);
+      if (hasW && hasH) return uri;
+      const sep = uri.includes('?') ? '&' : '?';
+      return `${uri}${sep}fit=crop&w=${w}&h=${h}`;
+    } catch {
+      return uri;
+    }
+  };
+
   /**
    * Load post data when component mounts or postId changes
    */
@@ -149,31 +163,80 @@ export default function PostDetailScreen() {
     try {
       setLoading(true);
       
-      // Load all posts via Convex
-      const allPosts = await convex.query(api.posts.list, { limit: 20 });
+      // Load all posts via Convex (includes author enrichment)
+      const allPosts = await convex.query(api.posts.list, { limit: 50 });
       
       // Find current post
   const currentPost = allPosts.find((p: any) => p._id === postId);
       if (currentPost) {
+        // Prefer enriched author fields from backend
+        const authorName = currentPost.authorName || currentPost.author_name || currentPost.userName || "Community Member";
+        const authorImageUrl = currentPost.authorImage || currentPost.author_image_url || currentPost.profile_image_url || null;
+        const authorId = currentPost.authorId || currentPost.clerk_user_id || currentPost.user_id || null;
+
         setPost({
           id: currentPost._id,
           title: currentPost.title,
           content: currentPost.content,
           category: currentPost.category,
-          author_name: "Community Member",
-          created_at: new Date(currentPost.createdAt).toISOString(),
+          author_name: authorName,
+          authorImageUrl,
+          clerk_user_id: authorId,
+          created_at: new Date(currentPost.createdAt ?? currentPost.created_at ?? Date.now()).toISOString(),
+          reactions: (() => {
+            // Normalize reactions to object {emoji: count}
+            if (currentPost.reactions && typeof currentPost.reactions === 'object' && !Array.isArray(currentPost.reactions)) {
+              return currentPost.reactions;
+            }
+            if (Array.isArray(currentPost.reactionCounts)) {
+              const entries = currentPost.reactionCounts.map((r: any) => [r.e || r.emoji, r.c || r.count]);
+              return Object.fromEntries(entries);
+            }
+            return {};
+          })(),
         });
       }
       
-      // Get related posts (exclude current, take 2)
+      // Compute simple similar posts (category + text overlap)
+      const tokenize = (text: string) => (text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2);
+
+      const currentTokens = tokenize(`${currentPost?.title || ''} ${currentPost?.content || ''}`);
+      const currentSet = new Set(currentTokens);
+
+      const jaccard = (a: Set<string>, b: Set<string>) => {
+        const inter = [...a].filter(x => b.has(x)).length;
+        const uni = new Set([...a, ...b]).size;
+        return uni === 0 ? 0 : inter / uni;
+      };
+
       const related = allPosts
         .filter((p: any) => p._id !== postId)
-        .slice(0, 2)
-        .map((p: any) => ({
+        .map((p: any) => {
+          const tokens = tokenize(`${p.title || ''} ${p.content || ''}`);
+          const set = new Set(tokens);
+          const score = jaccard(currentSet, set) + (p.category === currentPost?.category ? 0.2 : 0);
+          return { p, score };
+        })
+        .sort((a: any, b: any) => b.score - a.score)
+        .slice(0, 3)
+        .map(({ p }: any) => ({
           id: p._id,
           title: p.title,
           content: p.content,
           category: p.category,
+          author_name: p.authorName || p.author_name || 'Community Member',
+          reactions: (() => {
+            if (p.reactions && typeof p.reactions === 'object' && !Array.isArray(p.reactions)) return p.reactions;
+            if (Array.isArray(p.reactionCounts)) {
+              const entries = p.reactionCounts.map((r: any) => [r.e || r.emoji, r.c || r.count]);
+              return Object.fromEntries(entries);
+            }
+            return {};
+          })(),
         }));
       setRelatedPosts(related);
       
@@ -379,9 +442,10 @@ export default function PostDetailScreen() {
               <View style={styles.avatarContainer}>
                 {(() => {
                   // Prefer author image from API if present
-                  const authorImg = normalizeImageUri(
+                  const authorImgRaw = normalizeImageUri(
                     post?.author_image_url || post?.profile_image_url || post?.authorImageUrl
                   );
+                  const authorImg = withSizeParams(authorImgRaw, 48, 48);
                   // Fallback to current user's avatar if they authored this post
                   const authorIdCandidates = [
                     post?.clerk_user_id,
@@ -390,7 +454,7 @@ export default function PostDetailScreen() {
                     post?.user_id,
                   ].filter(Boolean);
                   const isMyPost = authorIdCandidates.includes(user?.id);
-                  const selfImg = normalizeImageUri(profileImage);
+                  const selfImg = withSizeParams(normalizeImageUri(profileImage), 48, 48);
 
                   if (authorImg) {
                     return (
@@ -651,7 +715,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   postCard: {
     // backgroundColor moved to theme.colors.surface via inline override
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 16,
     shadowColor: "grey",
@@ -659,9 +723,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
       width: 2,
       height: 2,
     },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   postHeader: {
     flexDirection: "row",
@@ -701,15 +767,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     // color moved to theme.colors.textSecondary via inline override
   },
   bookmarkButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   categoryBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "#E8F5E9",
+    backgroundColor: "transparent",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 999,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
   },
   categoryText: {
     fontSize: scaledFontSize(12),
@@ -732,8 +802,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   reactionStats: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    paddingVertical: 12,
+    gap: 12,
+    paddingVertical: 14,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     // borderColor moved to theme.colors.borderLight via inline override
@@ -743,17 +813,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   reactionStat: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "#F5F5F5",
-    minWidth: 60,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "transparent",
+    minWidth: 56,
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#3A3F47",
   },
   reactionStatActive: {
-    backgroundColor: "#E8F5E9",
-    borderWidth: 2,
+    backgroundColor: "rgba(76,175,80,0.12)",
+    borderWidth: 1.5,
     borderColor: "#4CAF50",
   },
   reactionStatEmpty: {
@@ -771,14 +843,16 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#999",
   },
   addMoreReactionButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "#F5F5F5",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     minWidth: 40,
     minHeight: 32,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
   },
   addReactionText: {
     fontSize: scaledFontSize(20),
@@ -842,16 +916,18 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   relatedSection: {
     // backgroundColor moved to theme.colors.surface via inline override
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     shadowColor: "grey",
     shadowOffset: {
       width: 2,
       height: 2,
     },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   relatedTitle: {
     fontSize: scaledFontSize(18),
