@@ -573,7 +573,7 @@ export const listForUserEnriched = query({
         .order("desc")
         .first();
 
-      // unread count based on my lastReadAt
+      // unread count based on my lastReadAt (only count messages from OTHER users)
       const mine = participants.find((p: any) => p.userId === userId);
       const lastReadAt = mine?.lastReadAt || 0;
       const unread = await ctx.db
@@ -581,6 +581,8 @@ export const listForUserEnriched = query({
         .withIndex("by_conversation", (q: any) => q.eq("conversationId", c._id))
         .filter((q: any) => q.gt(q.field("createdAt"), lastReadAt))
         .collect();
+      // Filter out messages sent by current user (only count messages from others)
+      const unreadFromOthers = unread.filter((msg: any) => msg.senderId !== userId);
 
       return {
         ...c,
@@ -593,7 +595,7 @@ export const listForUserEnriched = query({
           createdAt: lastMsg.createdAt,
           senderId: lastMsg.senderId,
         } : null,
-        unreadCount: unread.length,
+        unreadCount: unreadFromOthers.length,
       };
     }));
 
