@@ -317,7 +317,7 @@ useEffect(() => {
                 .map((appointment) => (
                   <TouchableOpacity
                     key={appointment.id}
-                    style={styles.appointmentCard}
+                    style={[styles.appointmentCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }]}
                     onPress={() => handleAppointmentPress(appointment.id)}
                     activeOpacity={0.7}
                   >
@@ -325,7 +325,7 @@ useEffect(() => {
                       <View style={styles.workerIconCircle}>
                         <Ionicons name="person" size={20} color="#FFFFFF" />
                       </View>
-                      <Text style={styles.supportWorker}>
+                      <Text style={[styles.supportWorker, { color: theme.colors.text }]}>
                         {appointment.supportWorker}
                       </Text>
                     </View>
@@ -334,15 +334,15 @@ useEffect(() => {
                         <View style={styles.detailIconCircle}>
                           <Ionicons name="calendar-outline" size={16} color="#4CAF50" />
                         </View>
-                        <Text style={styles.detailText}>{appointment.date}</Text>
+                        <Text style={[styles.detailText, { color: theme.colors.text }]}>{appointment.date}</Text>
                       </View>
                       <View style={styles.detailRow}>
                         <View style={styles.detailIconCircle}>
                           <Ionicons name="time-outline" size={16} color="#FF9800" />
                         </View>
-                        <Text style={styles.detailText}>{appointment.time}</Text>
+                        <Text style={[styles.detailText, { color: theme.colors.text }]}>{appointment.time}</Text>
                       </View>
-                      <View style={styles.sessionTypeBadge}>
+                      <View style={[styles.sessionTypeBadge, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F3E5F5' }]}>
                         <Ionicons name="videocam" size={14} color="#9C27B0" />
                         <Text style={styles.sessionTypeText}>{appointment.type}</Text>
                       </View>
@@ -351,9 +351,9 @@ useEffect(() => {
                 ))
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="calendar-outline" size={56} color="#E0E0E0" />
-                <Text style={styles.emptyStateTitle}>No upcoming appointments</Text>
-                <Text style={styles.emptyStateSubtitle}>Book a session to get started</Text>
+                <Ionicons name="calendar-outline" size={56} color={theme.isDark ? '#444' : '#E0E0E0'} />
+                <Text style={[styles.emptyStateTitle, { color: theme.colors.textSecondary }]}>No upcoming appointments</Text>
+                <Text style={[styles.emptyStateSubtitle, { color: theme.colors.textSecondary }]}>Book a session to get started</Text>
               </View>
             )
           ) : appointments.filter((a) => a.status === "past").length > 0 ? (
@@ -576,7 +576,6 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     padding: 16,
   },
   appointmentCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
@@ -585,9 +584,10 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
   },
   pastAppointmentCard: {
-    backgroundColor: '#F5F5F5',
+    opacity: 0.7,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -609,7 +609,6 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
   supportWorker: {
     fontSize: scaledFontSize(17),
     fontWeight: "700",
-    color: '#000',
     flex: 1,
   },
   appointmentDetails: {
@@ -630,13 +629,11 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
   },
   detailText: {
     fontSize: scaledFontSize(14),
-    color: '#333',
     fontWeight: '500',
   },
   sessionTypeBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: '#F3E5F5',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -657,13 +654,11 @@ const createStyles = (scaledFontSize: (size: number) => number, colors: any) => 
   emptyStateTitle: {
     fontSize: scaledFontSize(18),
     fontWeight: '600',
-    color: '#666',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtitle: {
     fontSize: scaledFontSize(14),
-    color: '#999',
     textAlign: 'center',
   },
   footer: {

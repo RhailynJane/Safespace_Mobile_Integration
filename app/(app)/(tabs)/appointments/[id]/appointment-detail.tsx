@@ -81,7 +81,7 @@ export default function AppointmentList() {
   const convex = useConvex();
 
   // Create dynamic styles with text size scaling
-  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+  const styles = useMemo(() => createStyles(scaledFontSize, theme), [scaledFontSize, theme]);
 
 
 
@@ -518,28 +518,28 @@ const fetchAppointment = useCallback(async () => {
           <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Session Details</Text>
 
           {/* Support Worker Card */}
-          <View style={[styles.workerCard, { backgroundColor: '#FAFAFA' }]}>
+          <View style={[styles.workerCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }]}>
             <View style={styles.workerIconCircle}>
               <Ionicons name="person" size={32} color="#FFFFFF" />
             </View>
             <View style={styles.workerInfo}>
-              <Text style={styles.workerName}>
+              <Text style={[styles.workerName, { color: theme.colors.text }]}>
                 {appointment.supportWorker}
               </Text>
-              <Text style={styles.workerRole}>CMHA Support Worker</Text>
+              <Text style={[styles.workerRole, { color: theme.colors.textSecondary }]}>CMHA Support Worker</Text>
             </View>
           </View>
 
           {/* Appointment Details Card */}
-          <View style={[styles.detailsCard, { backgroundColor: '#FAFAFA' }]}>
+          <View style={[styles.detailsCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }]}>
 
             <View style={styles.detailRow}>
               <View style={styles.detailIconContainer}>
                 <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
               </View>
               <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Date</Text>
-                <Text style={styles.detailValue}>{appointment.date}</Text>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>{appointment.date}</Text>
               </View>
             </View>
             <View style={styles.detailRow}>
@@ -547,8 +547,8 @@ const fetchAppointment = useCallback(async () => {
                 <Ionicons name="time-outline" size={20} color="#FF9800" />
               </View>
               <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Time</Text>
-                <Text style={styles.detailValue}>{appointment.time}</Text>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>{appointment.time}</Text>
               </View>
             </View>
             <View style={styles.detailRow}>
@@ -556,8 +556,8 @@ const fetchAppointment = useCallback(async () => {
                 <Ionicons name="videocam" size={20} color="#9C27B0" />
               </View>
               <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Session Type</Text>
-                <Text style={styles.detailValue}>{appointment.type}</Text>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>{appointment.type}</Text>
               </View>
             </View>
             <View style={styles.detailRow}>
@@ -569,10 +569,10 @@ const fetchAppointment = useCallback(async () => {
                 />
               </View>
               <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Status</Text>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Status</Text>
                 <Text style={[styles.detailValue, styles.statusBadge, {
-                  backgroundColor: appointment.status.toLowerCase() === 'upcoming' ? '#E8F5E9' : '#F5F5F5',
-                  color: appointment.status.toLowerCase() === 'upcoming' ? '#2E7D32' : '#666'
+                  backgroundColor: appointment.status.toLowerCase() === 'upcoming' ? '#E8F5E9' : (theme.isDark ? '#2A2A2A' : '#F5F5F5'),
+                  color: appointment.status.toLowerCase() === 'upcoming' ? '#2E7D32' : theme.colors.textSecondary
                 }]}>
                   {appointment.status}
                 </Text>
@@ -745,7 +745,7 @@ const fetchAppointment = useCallback(async () => {
   );
 }
 
-const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -793,7 +793,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
   },
   workerCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
@@ -804,6 +803,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 3,
+    borderWidth: 1,
   },
   workerIconCircle: {
     width: 44,
@@ -820,15 +820,12 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   workerName: {
     fontSize: scaledFontSize(17),
     fontWeight: '700',
-    color: '#000',
     marginBottom: 2,
   },
   workerRole: {
     fontSize: scaledFontSize(13),
-    color: '#666',
   },
   detailsCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
@@ -837,6 +834,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 3,
+    borderWidth: 1,
   },
   detailRow: {
     flexDirection: 'row',
@@ -857,12 +855,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   detailLabel: {
     fontSize: scaledFontSize(11),
-    color: '#999',
     marginBottom: 2,
   },
   detailValue: {
     fontSize: scaledFontSize(15),
-    color: '#333',
     fontWeight: '600',
   },
   statusBadge: {

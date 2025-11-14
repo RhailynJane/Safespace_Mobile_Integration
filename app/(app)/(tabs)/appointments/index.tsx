@@ -387,15 +387,15 @@ export default function AppointmentsScreen() {
 
           {/* Quick Stats Cards */}
           <View style={styles.statsContainer}>
-            <View style={[styles.statCard, styles.statCardUpcoming]}>
+            <View style={[styles.statCard, { backgroundColor: theme.isDark ? '#2A2A2A' : '#FAFAFA' }]}>
               <Ionicons name="time-outline" size={28} color="#FF9800" />
-              <Text style={styles.statNumber}>{upcomingCount}</Text>
-              <Text style={styles.statLabel}>Upcoming</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{upcomingCount}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Upcoming</Text>
             </View>
-            <View style={[styles.statCard, styles.statCardCompleted]}>
+            <View style={[styles.statCard, { backgroundColor: theme.isDark ? '#2A2A2A' : '#FAFAFA' }]}>
               <Ionicons name="checkmark-circle-outline" size={28} color="#4CAF50" />
-              <Text style={styles.statNumber}>{completedCount}</Text>
-              <Text style={styles.statLabel}>Completed</Text>
+              <Text style={[styles.statNumber, { color: theme.colors.text }]}>{completedCount}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Completed</Text>
             </View>
           </View>
 
@@ -424,34 +424,34 @@ export default function AppointmentsScreen() {
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                 Next Session
               </Text>
-              <View style={styles.nextSessionCard}>
+              <View style={[styles.nextSessionCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }]}>
                 <View style={styles.nextSessionHeader}>
                   <View style={styles.nextSessionIconCircle}>
                     <Ionicons name="person" size={24} color="#FFFFFF" />
                   </View>
                   <View style={styles.nextSessionInfo}>
-                    <Text style={styles.nextSessionWorker}>
+                    <Text style={[styles.nextSessionWorker, { color: theme.colors.text }]}>
                       {nextAppointment.supportWorker}
                     </Text>
-                    <Text style={styles.nextSessionRole}>Support Worker</Text>
+                    <Text style={[styles.nextSessionRole, { color: theme.colors.textSecondary }]}>Support Worker</Text>
                   </View>
                 </View>
                 <View style={styles.nextSessionDetails}>
                   <View style={styles.nextSessionDetailRow}>
-                    <Ionicons name="calendar-outline" size={16} color="#666" />
-                    <Text style={styles.nextSessionDetailText}>
+                    <Ionicons name="calendar-outline" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.nextSessionDetailText, { color: theme.colors.text }]}>
                       {nextAppointment.date}
                     </Text>
                   </View>
                   <View style={styles.nextSessionDetailRow}>
-                    <Ionicons name="time-outline" size={16} color="#666" />
-                    <Text style={styles.nextSessionDetailText}>
+                    <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.nextSessionDetailText, { color: theme.colors.text }]}>
                       {nextAppointment.time}
                     </Text>
                   </View>
                   <View style={styles.nextSessionDetailRow}>
-                    <Ionicons name="videocam" size={16} color="#666" />
-                    <Text style={styles.nextSessionDetailText}>
+                    <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.nextSessionDetailText, { color: theme.colors.text }]}>
                       {nextAppointment.type} Session
                     </Text>
                   </View>
@@ -459,10 +459,10 @@ export default function AppointmentsScreen() {
               </View>
             </View>
           ) : upcomingCount === 0 ? (
-            <View style={styles.emptyStateCard}>
-              <Ionicons name="calendar-outline" size={56} color="#E0E0E0" />
-              <Text style={styles.emptyStateTitle}>No upcoming sessions</Text>
-              <Text style={styles.emptyStateSubtitle}>
+            <View style={[styles.emptyStateCard, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+              <Ionicons name="calendar-outline" size={56} color={theme.isDark ? '#444' : '#E0E0E0'} />
+              <Text style={[styles.emptyStateTitle, { color: theme.colors.textSecondary }]}>No upcoming sessions</Text>
+              <Text style={[styles.emptyStateSubtitle, { color: theme.colors.textSecondary }]}>
                 Book your first session to get started
               </Text>
             </View>
@@ -470,7 +470,7 @@ export default function AppointmentsScreen() {
 
           {/* View All Button */}
           <TouchableOpacity
-            style={styles.viewAllButton}
+            style={[styles.viewAllButton, { backgroundColor: theme.colors.surface, borderColor: '#4CAF50' }]}
             onPress={handleViewScheduled}
           >
             <Text style={styles.viewAllButtonText}>View All Appointments</Text>
@@ -593,22 +593,14 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowRadius: 8,
     elevation: 4,
   },
-  statCardUpcoming: {
-    backgroundColor: '#FAFAFA',
-  },
-  statCardCompleted: {
-    backgroundColor: '#FAFAFA',
-  },
   statNumber: {
     fontSize: scaledFontSize(32),
     fontWeight: '700',
     marginVertical: 8,
-    color: '#000',
   },
   statLabel: {
     fontSize: scaledFontSize(14),
     fontWeight: '600',
-    color: '#666',
   },
   mainActionCard: {
     backgroundColor: '#4CAF50',
@@ -653,7 +645,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     marginBottom: 12,
   },
   nextSessionCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
     shadowColor: '#000',
@@ -661,6 +652,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
   },
   nextSessionHeader: {
     flexDirection: 'row',
@@ -682,12 +674,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   nextSessionWorker: {
     fontSize: scaledFontSize(16),
     fontWeight: '700',
-    color: '#000',
     marginBottom: 4,
   },
   nextSessionRole: {
     fontSize: scaledFontSize(13),
-    color: '#666',
   },
   nextSessionDetails: {
     gap: 10,
@@ -699,11 +689,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   nextSessionDetailText: {
     fontSize: scaledFontSize(14),
     marginLeft: 10,
-    color: '#333',
     fontWeight: '500',
   },
   emptyStateCard: {
-    backgroundColor: '#F5F5F5',
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
@@ -712,22 +700,18 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   emptyStateTitle: {
     fontSize: scaledFontSize(18),
     fontWeight: '600',
-    color: '#666',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtitle: {
     fontSize: scaledFontSize(14),
-    color: '#999',
     textAlign: 'center',
   },
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#4CAF50',
     paddingVertical: 14,
     borderRadius: 12,
     marginBottom: 20,
