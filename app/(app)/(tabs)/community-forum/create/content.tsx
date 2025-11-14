@@ -1,9 +1,6 @@
 /**
- * Enhanced Create Post Screen with Modern UI Design
- * Features improved typography, better spacing, and visual enhancements
- * Uses modal system for user feedback instead of Alert
- * LLM Prompt: Add comprehensive comments to this React Native component.
- * Reference: chat.deepseek.com
+ * Modern Facebook-Style Create Post Screen
+ * Features: Photo upload, feeling/mood selection, privacy toggle, save draft/publish
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -15,10 +12,7 @@ import {
   ScrollView,
   Image,
   TextInput,
-  Switch,
   ActivityIndicator,
-  Dimensions,
-  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -33,8 +27,23 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import avatarEvents from "../../../../../utils/avatarEvents";
 import { makeAbsoluteUrl } from "../../../../../utils/apiBaseUrl";
 import StatusModal from "../../../../../components/StatusModal";
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-const { width } = Dimensions.get("window");
+const MOODS = [
+  { id: "happy", emoji: "😊", label: "Happy" },
+  { id: "excited", emoji: "🤩", label: "Excited" },
+  { id: "grateful", emoji: "🙏", label: "Grateful" },
+  { id: "loved", emoji: "🥰", label: "Loved" },
+  { id: "hopeful", emoji: "😌", label: "Hopeful" },
+  { id: "calm", emoji: "😊", label: "Calm" },
+  { id: "sad", emoji: "😢", label: "Sad" },
+  { id: "anxious", emoji: "😰", label: "Anxious" },
+  { id: "stressed", emoji: "😫", label: "Stressed" },
+  { id: "frustrated", emoji: "😤", label: "Frustrated" },
+  { id: "angry", emoji: "😠", label: "Angry" },
+  { id: "tired", emoji: "😴", label: "Tired" },
+];
 
 export default function CreatePostScreen() {
   const { theme, scaledFontSize } = useTheme();
@@ -46,12 +55,12 @@ export default function CreatePostScreen() {
   const [postContent, setPostContent] = useState("");
   const [postTitle, setPostTitle] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
-  const [isDraft, setIsDraft] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [fadeAnim] = useState(new Animated.Value(0));
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedMood, setSelectedMood] = useState<typeof MOODS[0] | null>(null);
+  const [showMoodPicker, setShowMoodPicker] = useState(false);
 
-  // Direct Convex client (provided at app root)
   const convex = useConvex();
 
   // Modal states
@@ -64,14 +73,6 @@ export default function CreatePostScreen() {
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
 
   const loadProfileImage = useCallback(async () => {
     try {
@@ -160,26 +161,62 @@ export default function CreatePostScreen() {
     setShowSuccessModal(true);
   };
 
+  const pickImage = async () => {
+    if (selectedImages.length >= 3) {
+      showError('Maximum Photos', 'You can only add up to 3 photos');
+      return;
+    }
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showError('Permission Denied', 'We need permission to access your photos');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      // Compress the image
+      const manipResult = await manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 1024 } }],
+        { compress: 0.7, format: SaveFormat.JPEG }
+      );
+      
+      setSelectedImages([...selectedImages, manipResult.uri]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(selectedImages.filter((_, i) => i !== index));
+  };
+
   const handleSaveDraft = async () => {
     if (!user?.id) {
       showError("Sign In Required", "Please sign in to save drafts");
       return;
     }
 
-    if (!postTitle.trim() || !postContent.trim()) {
-      showError("Missing Information", "Please add a title and content for your post");
+    if (!postContent.trim() && !postTitle.trim()) {
+      showError("Missing Information", "Please add a title or content for your post");
       return;
     }
 
     setLoading(true);
     try {
+      const title = postTitle.trim() || postContent.substring(0, 50) + (postContent.length > 50 ? '...' : '');
       const draftResult = await convex.mutation(api.posts.create, {
-        title: postTitle,
+        title,
         content: postContent,
         category: selectedCategory,
         isDraft: true,
       });
-      showSuccess("Your post has been saved as a draft. You can find it in your profile.", () => {
+      showSuccess("Your post has been saved as a draft.", () => {
         router.push("/(app)/(tabs)/community-forum");
       });
     } catch (error) {
@@ -196,15 +233,16 @@ export default function CreatePostScreen() {
       return;
     }
 
-    if (!postTitle.trim() || !postContent.trim()) {
-      showError("Missing Information", "Please add a title and content for your post");
+    if (!postContent.trim() && !postTitle.trim()) {
+      showError("Missing Information", "Please add a title or content for your post");
       return;
     }
 
     setLoading(true);
     try {
+      const title = postTitle.trim() || postContent.substring(0, 50) + (postContent.length > 50 ? '...' : '');
       const publishResult = await convex.mutation(api.posts.create, {
-        title: postTitle,
+        title,
         content: postContent,
         category: selectedCategory,
         isDraft: false,
@@ -248,187 +286,214 @@ export default function CreatePostScreen() {
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <AppHeader title="Create Post" showBack={true} />
+        <AppHeader 
+          title="Create Post" 
+          showBack={true}
+          rightActions={
+            (postContent.trim() || postTitle.trim()) ? (
+              <TouchableOpacity onPress={handlePublish} disabled={loading}>
+                <Text style={[styles.nextButton, loading && styles.nextButtonDisabled]}>
+                  {loading ? "..." : "NEXT"}
+                </Text>
+              </TouchableOpacity>
+            ) : undefined
+          }
+        />
         
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-          <ScrollView 
-            style={styles.scrollView}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Header Section */}
-            <View style={styles.headerSection}>
-              <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-                Share your thoughts with the community
-              </Text>
-              
-              {selectedCategory && (
-                <View style={styles.categoryBadge}>
-                  <Ionicons name="pricetag" size={scaledFontSize(14)} color="#FFFFFF" />
-                  <Text style={styles.categoryText}>{selectedCategory}</Text>
-                </View>
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Author Header - Transparent */}
+          <View style={styles.authorHeader}>
+            <View style={styles.avatar}>
+              {normalizeImageUri(profileImage) ? (
+                <Image 
+                  source={{ uri: normalizeImageUri(profileImage)! }} 
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarText}>{getInitials()}</Text>
               )}
             </View>
+            <View style={styles.authorInfo}>
+              <Text style={[styles.authorName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
+              <TouchableOpacity 
+                style={styles.privacyButton}
+                onPress={() => setIsPrivate(!isPrivate)}
+              >
+                <Ionicons 
+                  name={isPrivate ? "lock-closed" : "earth"} 
+                  size={scaledFontSize(12)} 
+                  color={theme.colors.textSecondary} 
+                />
+                <Text style={[styles.privacyText, { color: theme.colors.textSecondary }]}>
+                  {isPrivate ? "Private" : "Public"}
+                </Text>
+                <Ionicons name="chevron-down" size={scaledFontSize(12)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-            {/* Author Profile */}
-            <View style={styles.authorSection}>
-              <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Author</Text>
-              <View style={[styles.authorCard, { backgroundColor: theme.colors.surface }]}>
-                <View style={styles.authorInfo}>
-                  <View style={styles.avatarContainer}>
-                    <View style={styles.avatar}>
-                      {normalizeImageUri(profileImage) ? (
-                        <Image 
-                          source={{ uri: normalizeImageUri(profileImage)! }} 
-                          style={styles.avatarImage}
-                        />
-                      ) : (
-                        <Text style={styles.avatarText}>{getInitials()}</Text>
-                      )}
-                    </View>
-                  </View>
-                  <View style={styles.authorDetails}>
-                    <Text style={[styles.authorName, { color: theme.colors.text }]}>{getDisplayName()}</Text>
-                    <Text style={[styles.authorRole, { color: theme.colors.textSecondary }]}>Community Member</Text>
-                  </View>
-                </View>
-                <Ionicons name="checkmark-circle" size={scaledFontSize(20)} color="#4CAF50" />
+          {/* Category Badge */}
+          {selectedCategory && (
+            <View style={styles.categoryContainer}>
+              <View style={styles.categoryBadge}>
+                <Ionicons name="pricetag" size={scaledFontSize(14)} color="#7CB9A9" />
+                <Text style={[styles.categoryText, { color: "#7CB9A9" }]}>{selectedCategory}</Text>
               </View>
             </View>
+          )}
 
-            {/* Post Content Section */}
-            <View style={styles.contentSection}>
-              <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Post Details</Text>
+          {/* Content Card */}
+          <View style={[styles.contentCard, { backgroundColor: theme.colors.surface }]}>
+            {/* Post Title Input */}
+            <TextInput
+              style={[styles.titleInput, { color: theme.colors.text }]}
+              placeholder="Post Title"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={postTitle}
+              onChangeText={setPostTitle}
+            />
+
+            {/* Post Content Input */}
+            <TextInput
+              style={[styles.contentInput, { color: theme.colors.text }]}
+              multiline
+              placeholder={`What's on your mind, ${getDisplayName()}?`}
+              placeholderTextColor={theme.colors.textSecondary}
+              value={postContent}
+              onChangeText={setPostContent}
+              textAlignVertical="top"
+            />
+
+            {/* Selected Mood */}
+            {selectedMood && (
+              <View style={styles.selectedMoodContainer}>
+                <View style={styles.selectedMood}>
+                  <Text style={styles.moodEmoji}>{selectedMood.emoji}</Text>
+                  <Text style={[styles.moodText, { color: theme.colors.text }]}>
+                    Feeling {selectedMood.label}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedMood(null)}>
+                  <Ionicons name="close-circle" size={scaledFontSize(20)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Selected Images */}
+            {selectedImages.length > 0 && (
+              <View style={styles.imagesGrid}>
+                {selectedImages.map((uri, index) => (
+                  <View key={index} style={[
+                    styles.imageContainer,
+                    selectedImages.length === 1 && styles.singleImage,
+                    selectedImages.length === 2 && styles.doubleImage,
+                    selectedImages.length === 3 && styles.tripleImage,
+                  ]}>
+                    <Image source={{ uri }} style={styles.selectedImage} />
+                    <TouchableOpacity 
+                      style={styles.removeImageButton}
+                      onPress={() => removeImage(index)}
+                    >
+                      <Ionicons name="close-circle" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Mood Picker Modal */}
+            {showMoodPicker && (
+              <View style={[styles.moodPickerContainer, { backgroundColor: theme.colors.background }]}>
+                <View style={styles.moodPickerHeader}>
+                  <Text style={[styles.moodPickerTitle, { color: theme.colors.text }]}>How are you feeling?</Text>
+                  <TouchableOpacity onPress={() => setShowMoodPicker(false)}>
+                    <Ionicons name="close" size={scaledFontSize(24)} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.moodList} showsVerticalScrollIndicator={false}>
+                  {MOODS.map((mood) => (
+                    <TouchableOpacity
+                      key={mood.id}
+                      style={[styles.moodItem, { borderBottomColor: theme.colors.borderLight }]}
+                      onPress={() => {
+                        setSelectedMood(mood);
+                        setShowMoodPicker(false);
+                      }}
+                    >
+                      <Text style={styles.moodItemEmoji}>{mood.emoji}</Text>
+                      <Text style={[styles.moodItemLabel, { color: theme.colors.text }]}>{mood.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={[styles.actionsContainer, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.actionsTitle, { color: theme.colors.text }]}>Add to your post</Text>
+            <View style={styles.actionsRow}>
+              <TouchableOpacity 
+                style={[styles.actionButton, { borderColor: theme.colors.borderLight }]} 
+                onPress={pickImage}
+                disabled={selectedImages.length >= 3}
+              >
+                <Ionicons name="image" size={scaledFontSize(24)} color="#45BD62" />
+                <Text style={[styles.actionLabel, { color: theme.colors.text }]}>
+                  Photo {selectedImages.length > 0 && `(${selectedImages.length}/3)`}
+                </Text>
+              </TouchableOpacity>
               
-              {/* Title Input */}
-              <View style={styles.inputGroup}>
-                <View style={styles.inputHeader}>
-                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Post Title</Text>
-                  <Text style={[styles.charCount, { color: getCharacterColor(postTitle.length, 100) }]}>
-                    {postTitle.length}/100
-                  </Text>
-                </View>
-                <TextInput
-                  style={[styles.titleInput, { 
-                    backgroundColor: theme.colors.surface,
-                    color: theme.colors.text,
-                    borderColor: theme.colors.borderLight
-                  }]}
-                  placeholder="Give your post a meaningful title..."
-                  placeholderTextColor={theme.colors.textSecondary}
-                  value={postTitle}
-                  onChangeText={setPostTitle}
-                  maxLength={100}
-                />
-              </View>
-
-              {/* Content Input */}
-              <View style={styles.inputGroup}>
-                <View style={styles.inputHeader}>
-                  <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Your Story</Text>
-                  <Text style={[styles.charCount, { color: getCharacterColor(postContent.length, 1000) }]}>
-                    {postContent.length}/1000
-                  </Text>
-                </View>
-                <View style={[styles.contentInputContainer, { 
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.borderLight
-                }]}>
-                  <TextInput
-                    style={[styles.contentInput, { color: theme.colors.text }]}
-                    multiline
-                    placeholder="Share your experiences, ask questions, or offer support to others..."
-                    placeholderTextColor={theme.colors.textSecondary}
-                    value={postContent}
-                    onChangeText={setPostContent}
-                    textAlignVertical="top"
-                    maxLength={1000}
-                  />
-                  <View style={[styles.contentTips, { borderTopColor: theme.colors.borderLight }]}>
-                    <Ionicons name="bulb-outline" size={scaledFontSize(16)} color="#7CB9A9" />
-                    <Text style={styles.tipsText}>
-                      Be authentic and respectful in your sharing
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Privacy Settings */}
-            <View style={styles.settingsSection}>
-              <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Privacy Settings</Text>
-              <View style={[styles.privacyCard, { backgroundColor: theme.colors.surface }]}>
-                <View style={styles.privacyInfo}>
-                  <Ionicons 
-                    name={isPrivate ? "lock-closed" : "earth"} 
-                    size={scaledFontSize(20)} 
-                    color={isPrivate ? "#FF6B6B" : "#4CAF50"} 
-                  />
-                  <View style={styles.privacyTextContainer}>
-                    <Text style={[styles.privacyTitle, { color: theme.colors.text }]}>
-                      {isPrivate ? "Private Post" : "Public Post"}
-                    </Text>
-                    <Text style={[styles.privacyDescription, { color: theme.colors.textSecondary }]}>
-                      {isPrivate 
-                        ? "Only visible to you and support workers" 
-                        : "Visible to all community members"
-                      }
-                    </Text>
-                  </View>
-                </View>
-                <Switch
-                  value={isPrivate}
-                  onValueChange={setIsPrivate}
-                  thumbColor={isPrivate ? "#FF6B6B" : "#FFFFFF"}
-                  trackColor={{ false: "#B0BEC5", true: "#FFCDD2" }}
-                  ios_backgroundColor="#B0BEC5"
-                />
-              </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.actionsSection}>
-              <TouchableOpacity
-                style={[
-                  styles.draftButton,
-                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-                  (loading || !postTitle.trim() || !postContent.trim()) && styles.buttonDisabled
-                ]}
-                onPress={handleSaveDraft}
-                disabled={loading || !postTitle.trim() || !postContent.trim()}
+              <TouchableOpacity 
+                style={[styles.actionButton, { borderColor: theme.colors.borderLight }]} 
+                onPress={() => setShowMoodPicker(true)}
               >
-                {loading ? (
-                  <ActivityIndicator size="small" color={theme.colors.textSecondary} />
-                ) : (
-                  <>
-                    <Ionicons name="save-outline" size={scaledFontSize(20)} color={theme.colors.textSecondary} />
-                    <Text style={[styles.draftButtonText, { color: theme.colors.textSecondary }]}>Save Draft</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.publishButton,
-                  (!postContent.trim() || !postTitle.trim() || loading) && styles.publishButtonDisabled
-                ]}
-                onPress={handlePublish}
-                disabled={!postContent.trim() || !postTitle.trim() || loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="send" size={scaledFontSize(20)} color="#FFFFFF" />
-                    <Text style={styles.publishButtonText}>Publish to Community</Text>
-                  </>
-                )}
+                <Ionicons name="happy" size={scaledFontSize(24)} color="#F7B928" />
+                <Text style={[styles.actionLabel, { color: theme.colors.text }]}>Feeling</Text>
               </TouchableOpacity>
             </View>
+          </View>
 
-            <View style={styles.bottomSpacing} />
-          </ScrollView>
-        </Animated.View>
+          <View style={styles.bottomSpacing} />
+        </ScrollView>
+
+        {/* Footer Buttons */}
+        <View style={[styles.footer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.draftButton,
+              { borderColor: theme.colors.border },
+              (loading || (!postContent.trim() && !postTitle.trim())) && styles.buttonDisabled
+            ]}
+            onPress={handleSaveDraft}
+            disabled={loading || (!postContent.trim() && !postTitle.trim())}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+            ) : (
+              <Text style={[styles.draftButtonText, { color: theme.colors.textSecondary }]}>Save Draft</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.publishButton,
+              ((!postContent.trim() && !postTitle.trim()) || loading) && styles.publishButtonDisabled
+            ]}
+            onPress={handlePublish}
+            disabled={(!postContent.trim() && !postTitle.trim()) || loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.publishButtonText}>Post</Text>
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* Bottom Navigation */}
         <BottomNavigation
@@ -472,88 +537,29 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     backgroundColor: "transparent",
   },
-  content: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
-  
-  // Header Section
-  headerSection: {
-    alignItems: "center",
-    paddingVertical: 24,
-    paddingHorizontal: 10,
-  },
-  headerIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(124, 185, 169, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  mainTitle: {
-    fontSize: scaledFontSize(28),
-    fontWeight: "800",
-    color: "#1A1A1A",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
+  nextButton: {
     fontSize: scaledFontSize(16),
-    textAlign: "center",
-    marginBottom: 16,
-    lineHeight: 22,
-  },
-  categoryBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#7CB9A9",
+    fontWeight: "700",
+    color: "#7CB9A9",
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
   },
-  categoryText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(14),
-    fontWeight: "600",
+  nextButtonDisabled: {
+    opacity: 0.5,
   },
   
-  // Author Section
-  authorSection: {
-    marginBottom: 24,
-  },
-  sectionLabel: {
-    fontSize: scaledFontSize(18),
-    fontWeight: "700",
-    marginBottom: 12,
-  },
-  authorCard: {
+  // Author Header - Transparent
+  authorHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     padding: 16,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  authorInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  avatarContainer: {
-    marginRight: 12,
+    gap: 12,
+    backgroundColor: "transparent",
   },
   avatar: {
     width: 50,
@@ -562,11 +568,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     backgroundColor: "#7CB9A9",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
     overflow: "hidden",
   },
   avatarImage: {
@@ -578,160 +579,234 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(18),
     fontWeight: "bold",
   },
-  authorDetails: {
+  authorInfo: {
     flex: 1,
   },
   authorName: {
     fontSize: scaledFontSize(16),
     fontWeight: "600",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  authorRole: {
-    fontSize: scaledFontSize(14),
+  privacyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+    alignSelf: "flex-start",
+  },
+  privacyText: {
+    fontSize: scaledFontSize(13),
+    fontWeight: "500",
   },
   
-  // Content Section
-  contentSection: {
-    marginBottom: 24,
+  // Category
+  categoryContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputHeader: {
+  categoryBadge: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    backgroundColor: "rgba(124, 185, 169, 0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+    alignSelf: "flex-start",
   },
-  inputLabel: {
-    fontSize: scaledFontSize(16),
+  categoryText: {
+    fontSize: scaledFontSize(14),
     fontWeight: "600",
   },
-  charCount: {
-    fontSize: scaledFontSize(12),
-    fontWeight: "500",
-  },
-  titleInput: {
-    padding: 16,
-    borderRadius: 12,
-    fontSize: scaledFontSize(16),
-    fontWeight: "500",
-    borderWidth: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  contentInputContainer: {
-    borderRadius: 12,
-    borderWidth: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-    overflow: "hidden",
-  },
-  contentInput: {
-    minHeight: 160,
-    padding: 16,
-    fontSize: scaledFontSize(15),
-    lineHeight: 22,
-    textAlignVertical: "top",
-  },
-  contentTips: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    backgroundColor: "rgba(124, 185, 169, 0.05)",
-    borderTopWidth: 1,
-    gap: 8,
-  },
-  tipsText: {
-    fontSize: scaledFontSize(12),
-    color: "#7CB9A9",
-    fontWeight: "500",
-    flex: 1,
-  },
   
-  // Settings Section
-  settingsSection: {
-    marginBottom: 32,
-  },
-  privacyCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  // Content Card
+  contentCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
     padding: 16,
-    borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
-  privacyInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  privacyTextContainer: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  privacyTitle: {
-    fontSize: scaledFontSize(16),
+  titleInput: {
+    fontSize: scaledFontSize(18),
     fontWeight: "600",
-    marginBottom: 2,
+    paddingVertical: 8,
+    marginBottom: 8,
   },
-  privacyDescription: {
-    fontSize: scaledFontSize(14),
-    lineHeight: 18,
+  contentInput: {
+    fontSize: scaledFontSize(16),
+    lineHeight: 24,
+    minHeight: 120,
+    paddingVertical: 8,
   },
   
-  // Actions Section
-  actionsSection: {
-    gap: 12,
-    marginBottom: 40,
+  // Selected Mood
+  selectedMoodContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(124, 185, 169, 0.05)",
   },
-  draftButton: {
+  selectedMood: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  moodEmoji: {
+    fontSize: scaledFontSize(24),
+  },
+  moodText: {
+    fontSize: scaledFontSize(15),
+    fontWeight: "500",
+  },
+  
+  // Images Grid
+  imagesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  imageContainer: {
+    position: "relative",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  singleImage: {
+    width: "100%",
+    height: 250,
+  },
+  doubleImage: {
+    width: "48.5%",
+    height: 180,
+  },
+  tripleImage: {
+    width: "31.5%",
+    height: 120,
+  },
+  selectedImage: {
+    width: "100%",
+    height: "100%",
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderRadius: 12,
+  },
+  
+  // Mood Picker
+  moodPickerContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    maxHeight: 300,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  moodPickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  moodPickerTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: "600",
+  },
+  moodList: {
+    maxHeight: 250,
+  },
+  moodItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    gap: 12,
+    borderBottomWidth: 1,
+  },
+  moodItemEmoji: {
+    fontSize: scaledFontSize(28),
+  },
+  moodItemLabel: {
+    fontSize: scaledFontSize(16),
+    fontWeight: "500",
+  },
+  
+  // Actions
+  actionsContainer: {
+    marginHorizontal: 16,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  actionsTitle: {
+    fontSize: scaledFontSize(15),
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    borderWidth: 2,
+    padding: 12,
+    borderRadius: 8,
     gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+  },
+  actionLabel: {
+    fontSize: scaledFontSize(14),
+    fontWeight: "500",
+  },
+  
+  // Footer
+  footer: {
+    flexDirection: "row",
+    padding: 12,
+    gap: 12,
+    borderTopWidth: 1,
+  },
+  draftButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
   },
   draftButtonText: {
-    fontSize: scaledFontSize(16),
+    fontSize: scaledFontSize(15),
     fontWeight: "600",
   },
   publishButton: {
-    flexDirection: "row",
+    flex: 2,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "#7CB9A9",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#7CB9A9",
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    gap: 8,
-    shadowColor: "#7CB9A9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   publishButtonDisabled: {
     backgroundColor: "#B6D5CF",
-    shadowColor: "#B6D5CF",
   },
   publishButtonText: {
     fontSize: scaledFontSize(16),
@@ -739,7 +814,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#FFFFFF",
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   
   bottomSpacing: {
