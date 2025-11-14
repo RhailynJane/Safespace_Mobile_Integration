@@ -419,7 +419,7 @@ Respond with ONLY the JSON object, no other text.`;
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <AppHeader title="Statistics & AI Insights" showBack={true} />
 
         <ScrollView
@@ -711,7 +711,7 @@ Respond with ONLY the JSON object, no other text.`;
         </ScrollView>
 
         <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
-      </SafeAreaView>
+      </View>
     </CurvedBackground>
   );
 };

@@ -275,7 +275,7 @@ const MoodTrackingScreen: React.FC = () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Header with navigation controls */}
         <AppHeader title="Mood Tracker" showBack={true} />
 
@@ -285,6 +285,26 @@ const MoodTrackingScreen: React.FC = () => {
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
         >
+          {/* View History and Statistics buttons */}
+          <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.lg, gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: theme.isDark ? '#2A2A2A' : '#E8F5E9', flex: 1 }]}
+                onPress={() => router.push('/(app)/mood-tracking/mood-history')}
+              >
+                <Ionicons name="time-outline" size={20} color="#7CB342" />
+                <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>View History</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F3E5F5', flex: 1 }]}
+                onPress={() => router.push('/(app)/mood-tracking/statistics')}
+              >
+                <Ionicons name="stats-chart-outline" size={20} color="#9C27B0" />
+                <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>Statistics</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Mood selection grid (exact 3x3 using FlatList) */}
           <View style={{ paddingHorizontal: Spacing.lg, marginTop: Spacing.lg }}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>How was your day?</Text>
@@ -381,7 +401,7 @@ const MoodTrackingScreen: React.FC = () => {
           activeTab={activeTab}
           onTabPress={handleTabPress}
         />
-      </SafeAreaView>
+      </View>
     </CurvedBackground>
   );
 };
@@ -504,6 +524,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: '#FFF',
     fontWeight: '700',
     fontSize: scaledFontSize(16),
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  actionButtonText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
   },
   sectionSubtitle: {
     fontSize: scaledFontSize(16), // Base size 16px
