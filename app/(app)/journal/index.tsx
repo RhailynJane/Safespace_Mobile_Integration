@@ -220,14 +220,26 @@ export default function JournalScreen() {
               />
             </ScrollView>
 
-            {/* View Journal History Button */}
-            <TouchableOpacity 
-              style={styles.historyButton}
-              onPress={handleViewAllEntries}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.historyButtonText}>View Journal History</Text>
-            </TouchableOpacity>
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.historyButton]}
+                onPress={handleViewAllEntries}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.actionButtonText}>View History</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.statsButton]}
+                onPress={() => router.push("/(app)/journal/journal-stats")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="stats-chart" size={20} color="#FFFFFF" />
+                <Text style={styles.actionButtonText}>Statistics</Text>
+              </TouchableOpacity>
+            </View>
             {/* Bottom spacer to keep button clear of BottomNavigation and allow scroll */}
             <View style={{ height: Spacing.lg }} />
           </View>
@@ -485,16 +497,28 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: 11,
     fontWeight: '600',
   },
-  historyButton: {
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: Spacing.xs,
     marginHorizontal: Spacing.xs,
-    paddingVertical: 16,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
   },
-  historyButtonText: {
+  historyButton: {
+    backgroundColor: Colors.primary,
+  },
+  statsButton: {
+    backgroundColor: '#9C27B0',
+  },
+  actionButtonText: {
     fontSize: scaledFontSize(16),
     fontWeight: '600',
     color: '#FFFFFF',

@@ -584,8 +584,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -594,10 +594,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     elevation: 4,
   },
   statCardUpcoming: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: '#FAFAFA',
   },
   statCardCompleted: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#FAFAFA',
   },
   statNumber: {
     fontSize: scaledFontSize(32),
@@ -612,9 +612,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   mainActionCard: {
     backgroundColor: '#4CAF50',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -655,7 +655,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   nextSessionCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 20,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

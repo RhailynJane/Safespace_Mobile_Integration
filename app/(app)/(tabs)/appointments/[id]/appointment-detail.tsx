@@ -518,7 +518,7 @@ const fetchAppointment = useCallback(async () => {
           <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Session Details</Text>
 
           {/* Support Worker Card */}
-          <View style={styles.workerCard}>
+          <View style={[styles.workerCard, { backgroundColor: '#FAFAFA' }]}>
             <View style={styles.workerIconCircle}>
               <Ionicons name="person" size={32} color="#FFFFFF" />
             </View>
@@ -531,7 +531,7 @@ const fetchAppointment = useCallback(async () => {
           </View>
 
           {/* Appointment Details Card */}
-          <View style={styles.detailsCard}>
+          <View style={[styles.detailsCard, { backgroundColor: '#FAFAFA' }]}>
 
             <View style={styles.detailRow}>
               <View style={styles.detailIconContainer}>
@@ -795,7 +795,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   workerCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -830,8 +830,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   detailsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
+    padding: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
