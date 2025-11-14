@@ -29,6 +29,7 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -183,6 +184,8 @@ export default function PostDetailScreen() {
           authorImageUrl,
           clerk_user_id: authorId,
           created_at: new Date(currentPost.createdAt ?? currentPost.created_at ?? Date.now()).toISOString(),
+          imageUrls: currentPost.imageUrls || [],
+          mood: currentPost.mood || null,
           reactions: (() => {
             // Normalize reactions to object {emoji: count}
             if (currentPost.reactions && typeof currentPost.reactions === 'object' && !Array.isArray(currentPost.reactions)) {
@@ -518,6 +521,32 @@ export default function PostDetailScreen() {
             {/* Post Content Body */}
             <Text style={[styles.postContent, { color: theme.colors.textSecondary }]}>{post.content}</Text>
 
+            {/* Display mood/feeling if present */}
+            {post.mood && (
+              <View style={styles.postMoodContainer}>
+                <Text style={styles.postMoodEmoji}>{post.mood.emoji}</Text>
+                <Text style={[styles.postMoodText, { color: theme.colors.text }]}>
+                  Feeling {post.mood.label}
+                </Text>
+              </View>
+            )}
+
+            {/* Display images if present */}
+            {post.imageUrls && post.imageUrls.length > 0 && (
+              <View style={styles.postImagesGrid}>
+                {post.imageUrls.map((uri: string, index: number) => (
+                  <View key={index} style={[
+                    styles.postImageContainer,
+                    post.imageUrls.length === 1 && styles.postSingleImage,
+                    post.imageUrls.length === 2 && styles.postDoubleImage,
+                    post.imageUrls.length === 3 && styles.postTripleImage,
+                  ]}>
+                    <Image source={{ uri }} style={styles.postImage} />
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* Reaction Statistics Bar */}
             <View style={[styles.reactionStats, { borderColor: theme.colors.borderLight }]}>
               {/* Only show reactions that have been received (count > 0) */}
@@ -798,6 +827,53 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     // color moved to theme.colors.textSecondary via inline override
     lineHeight: 24,
     marginBottom: 20,
+  },
+  postMoodContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(124, 185, 169, 0.1)',
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 8,
+  },
+  postMoodEmoji: {
+    fontSize: scaledFontSize(20),
+  },
+  postMoodText: {
+    fontSize: scaledFontSize(15),
+    fontWeight: '500',
+  },
+  postImagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  postImageContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  postSingleImage: {
+    width: '100%',
+    height: 250,
+  },
+  postDoubleImage: {
+    width: '48.5%',
+    height: 180,
+  },
+  postTripleImage: {
+    width: '31.5%',
+    height: 120,
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   reactionStats: {
     flexDirection: "row",

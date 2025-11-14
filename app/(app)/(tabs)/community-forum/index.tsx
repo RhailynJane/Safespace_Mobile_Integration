@@ -39,14 +39,17 @@ const APP_TIME_ZONE = 'America/New_York';
 
 // Categories for post filtering
 const CATEGORIES = [
-  'Trending',
-  'General Discussion',
-  'Mental Health',
+  'All',
   'Self-Care',
+  'Mindfulness',
+  'Stories',
   'Support',
-  'Resources',
-  'Success Stories',
-  'Bookmark',
+  'Creative',
+  'Therapy',
+  'Stress',
+  'Affirmation',
+  'Awareness',
+  'Bookmarks',
 ];
 
 // Helper: reaction counts now stored as array of { e, c }
@@ -96,7 +99,7 @@ const renderContentWithHashtags = (content: string, styles: any, theme: any) => 
  */
 function useCommunityMainScreenState() {
   // View and navigation state
-  const [selectedCategory, setSelectedCategory] = useState('Trending');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [activeView, setActiveView] = useState<'newsfeed' | 'my-posts'>('newsfeed');
   const [activeTab, setActiveTab] = useState('community-forum');
 
@@ -327,7 +330,7 @@ export default function CommunityMainScreen() {
       setLoading(true);
       
       // Special handling for bookmark category
-      if (selectedCategory === "Bookmark") {
+      if (selectedCategory === "Bookmarks") {
         if (!user?.id) {
           showError("Sign In Required", "Please sign in to view bookmarked posts");
           setPosts([]);
@@ -352,6 +355,8 @@ export default function CommunityMainScreen() {
           user_reaction: p.userReaction || null,
           created_at: new Date(p.createdAt).toISOString(),
           reactionCounts: p.reactionCounts || [],
+          imageUrls: p.imageUrls || [],
+          mood: p.mood || null,
         }));
         
         setPosts(mapped);
@@ -362,14 +367,12 @@ export default function CommunityMainScreen() {
       }
       
       // Load regular posts from Convex
-      console.log('📤 Loading posts via Convex...', { category: selectedCategory });
-      const category = selectedCategory === "Trending" ? undefined : selectedCategory;
+        console.log('📤 Loading posts via Convex...', { category: selectedCategory });
+      const category = (selectedCategory === "All" || selectedCategory === "Bookmarks" || selectedCategory === "Trending") ? undefined : selectedCategory;
       const convexPostsData = await convex.query(api.posts.list, { 
         category: category as any,
         limit: 20 
-      });
-      
-      // Map to UI format
+      });      // Map to UI format
       const mapped = (convexPostsData || []).map((p: any) => ({
         id: p._id,
         title: p.title,
@@ -382,13 +385,15 @@ export default function CommunityMainScreen() {
         user_reaction: p.userReaction || null,
         created_at: new Date(p.createdAt).toISOString(),
         reactionCounts: p.reactionCounts || [],
+        imageUrls: p.imageUrls || [],
+        mood: p.mood || null,
       }));
       
       setPosts(mapped);
       console.log('✅ Convex posts loaded:', mapped.length);
 
       // Load user-specific data if authenticated
-      if (user?.id && selectedCategory !== "Bookmark") {
+      if (user?.id && selectedCategory !== "Bookmarks") {
         await Promise.all([
           loadUserBookmarks(user.id),
           loadUserReactions(user.id, mapped),
@@ -438,6 +443,8 @@ export default function CommunityMainScreen() {
         user_reaction: p.userReaction || null,
         created_at: new Date(p.createdAt).toISOString(),
         reactionCounts: p.reactionCounts || [],
+        imageUrls: p.imageUrls || [],
+        mood: p.mood || null,
       }));
       
       setMyPosts(mapped);
@@ -667,7 +674,7 @@ export default function CommunityMainScreen() {
         console.log('✅ Convex bookmark toggled successfully');
 
       // Refresh posts if currently in bookmark view
-      if (selectedCategory === "Bookmark" && activeView === "newsfeed") {
+      if (selectedCategory === "Bookmarks" && activeView === "newsfeed") {
         loadPosts();
       }
     } catch (error) {
@@ -1209,6 +1216,33 @@ export default function CommunityMainScreen() {
                     <Text style={[styles.postBody,{color:theme.colors.textSecondary}]} numberOfLines={6}>
                       {renderContentWithHashtags(post.content, styles, theme)}
                     </Text>
+                    
+                    {/* Display mood/feeling if present */}
+                    {post.mood && (
+                      <View style={styles.postMoodContainer}>
+                        <Text style={styles.postMoodEmoji}>{post.mood.emoji}</Text>
+                        <Text style={[styles.postMoodText, { color: theme.colors.textSecondary }]}>
+                          Feeling {post.mood.label}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {/* Display images if present */}
+                    {post.imageUrls && post.imageUrls.length > 0 && (
+                      <View style={styles.postImagesGrid}>
+                        {post.imageUrls.map((uri: string, index: number) => (
+                          <View key={index} style={[
+                            styles.postImageContainer,
+                            post.imageUrls.length === 1 && styles.postSingleImage,
+                            post.imageUrls.length === 2 && styles.postDoubleImage,
+                            post.imageUrls.length === 3 && styles.postTripleImage,
+                          ]}>
+                            <Image source={{ uri }} style={styles.postImage} />
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    
                     <View style={styles.postDivider} />
                     {!post.is_draft && (
                       <View style={styles.metricsRow}>
@@ -1645,6 +1679,51 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   hashtag: {
     fontWeight: '600',
+  },
+  postMoodContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(124, 185, 169, 0.1)',
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  postMoodEmoji: {
+    fontSize: 16,
+  },
+  postMoodText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  postImagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  postImageContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  postSingleImage: {
+    width: '100%',
+    height: 200,
+  },
+  postDoubleImage: {
+    width: '48.5%',
+    height: 150,
+  },
+  postTripleImage: {
+    width: '31.5%',
+    height: 100,
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   postDivider: {
     height: 1,

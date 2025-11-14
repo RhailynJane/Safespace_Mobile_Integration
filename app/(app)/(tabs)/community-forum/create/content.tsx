@@ -13,6 +13,10 @@ import {
   Image,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -31,18 +35,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 const MOODS = [
-  { id: "happy", emoji: "😊", label: "Happy" },
-  { id: "excited", emoji: "🤩", label: "Excited" },
-  { id: "grateful", emoji: "🙏", label: "Grateful" },
-  { id: "loved", emoji: "🥰", label: "Loved" },
-  { id: "hopeful", emoji: "😌", label: "Hopeful" },
-  { id: "calm", emoji: "😊", label: "Calm" },
-  { id: "sad", emoji: "😢", label: "Sad" },
-  { id: "anxious", emoji: "😰", label: "Anxious" },
-  { id: "stressed", emoji: "😫", label: "Stressed" },
-  { id: "frustrated", emoji: "😤", label: "Frustrated" },
+  { id: "ecstatic", emoji: "🤩", label: "Ecstatic" },
+  { id: "happy", emoji: "😃", label: "Happy" },
+  { id: "content", emoji: "🙂", label: "Content" },
+  { id: "neutral", emoji: "😐", label: "Neutral" },
+  { id: "displeased", emoji: "😕", label: "Displeased" },
+  { id: "frustrated", emoji: "😖", label: "Frustrated" },
+  { id: "annoyed", emoji: "😒", label: "Annoyed" },
   { id: "angry", emoji: "😠", label: "Angry" },
-  { id: "tired", emoji: "😴", label: "Tired" },
+  { id: "furious", emoji: "🤬", label: "Furious" },
 ];
 
 export default function CreatePostScreen() {
@@ -215,6 +216,12 @@ export default function CreatePostScreen() {
         content: postContent,
         category: selectedCategory,
         isDraft: true,
+        imageUrls: selectedImages.length > 0 ? selectedImages : undefined,
+        mood: selectedMood ? {
+          id: selectedMood.id,
+          emoji: selectedMood.emoji,
+          label: selectedMood.label,
+        } : undefined,
       });
       showSuccess("Your post has been saved as a draft.", () => {
         router.push("/(app)/(tabs)/community-forum");
@@ -246,6 +253,12 @@ export default function CreatePostScreen() {
         content: postContent,
         category: selectedCategory,
         isDraft: false,
+        imageUrls: selectedImages.length > 0 ? selectedImages : undefined,
+        mood: selectedMood ? {
+          id: selectedMood.id,
+          emoji: selectedMood.emoji,
+          label: selectedMood.label,
+        } : undefined,
       });
       const createdId = (publishResult as any)?.postId;
       router.push({
@@ -289,22 +302,20 @@ export default function CreatePostScreen() {
         <AppHeader 
           title="Create Post" 
           showBack={true}
-          rightActions={
-            (postContent.trim() || postTitle.trim()) ? (
-              <TouchableOpacity onPress={handlePublish} disabled={loading}>
-                <Text style={[styles.nextButton, loading && styles.nextButtonDisabled]}>
-                  {loading ? "..." : "NEXT"}
-                </Text>
-              </TouchableOpacity>
-            ) : undefined
-          }
         />
         
-        <ScrollView 
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <ScrollView 
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
           {/* Author Header - Transparent */}
           <View style={styles.authorHeader}>
             <View style={styles.avatar}>
@@ -414,7 +425,11 @@ export default function CreatePostScreen() {
                     <Ionicons name="close" size={scaledFontSize(24)} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={styles.moodList} showsVerticalScrollIndicator={false}>
+                <ScrollView 
+                  style={styles.moodList} 
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                >
                   {MOODS.map((mood) => (
                     <TouchableOpacity
                       key={mood.id}
@@ -458,8 +473,26 @@ export default function CreatePostScreen() {
             </View>
           </View>
 
+          {/* Next Button */}
+          {(postContent.trim() || postTitle.trim()) && (
+            <View style={styles.nextButtonWrapper}>
+              <TouchableOpacity 
+                onPress={handlePublish} 
+                disabled={loading}
+                style={[styles.nextButtonContainer, loading && styles.nextButtonContainerDisabled]}
+              >
+                <Text style={styles.nextButton}>
+                  {loading ? "Publishing..." : "PUBLISH"}
+                </Text>
+                <Ionicons name="arrow-forward" size={scaledFontSize(18)} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.bottomSpacing} />
-        </ScrollView>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
 
         {/* Footer Buttons */}
         <View style={[styles.footer, { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border }]}>
@@ -537,20 +570,45 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     backgroundColor: "transparent",
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 120,
+  },
+  nextButtonWrapper: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  nextButtonContainer: {
+    backgroundColor: "#7CB9A9",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    shadowColor: "#7CB9A9",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  nextButtonContainerDisabled: {
+    backgroundColor: "#B6D5CF",
+    opacity: 0.7,
   },
   nextButton: {
     fontSize: scaledFontSize(16),
     fontWeight: "700",
-    color: "#7CB9A9",
-    paddingHorizontal: 16,
+    color: "#FFFFFF",
   },
   nextButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   
   // Author Header - Transparent
@@ -638,11 +696,13 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
     paddingVertical: 8,
     marginBottom: 8,
+    maxHeight: 100,
   },
   contentInput: {
     fontSize: scaledFontSize(16),
     lineHeight: 24,
     minHeight: 120,
+    maxHeight: 300,
     paddingVertical: 8,
   },
   
@@ -709,7 +769,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   moodPickerContainer: {
     marginTop: 12,
     borderRadius: 12,
-    maxHeight: 300,
+    maxHeight: 350,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E0E0E0",
@@ -727,7 +787,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
   },
   moodList: {
-    maxHeight: 250,
+    maxHeight: 300,
   },
   moodItem: {
     flexDirection: "row",
@@ -818,6 +878,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   
   bottomSpacing: {
-    height: 20,
+    height: 100,
   },
 });

@@ -59,6 +59,12 @@ export default defineSchema({
 		content: v.string(),
 		category: v.optional(v.string()), // Post category (Stress, Support, Stories, etc.)
 		isDraft: v.boolean(),
+		imageUrls: v.optional(v.array(v.string())), // Array of image URIs (max 3)
+		mood: v.optional(v.object({
+			id: v.string(),
+			emoji: v.string(),
+			label: v.string(),
+		})), // Optional mood/feeling
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	})

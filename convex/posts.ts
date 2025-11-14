@@ -217,13 +217,21 @@ export const create = mutation({
     title: v.string(), 
     content: v.string(), 
     category: v.optional(v.string()),
-    isDraft: v.optional(v.boolean()) 
+    isDraft: v.optional(v.boolean()),
+    imageUrls: v.optional(v.array(v.string())),
+    mood: v.optional(v.object({
+      id: v.string(),
+      emoji: v.string(),
+      label: v.string(),
+    })),
   },
   handler: async (ctx: any, args: { 
     title: string; 
     content: string; 
     category?: string;
-    isDraft?: boolean 
+    isDraft?: boolean;
+    imageUrls?: string[];
+    mood?: { id: string; emoji: string; label: string };
   }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
@@ -235,6 +243,8 @@ export const create = mutation({
       content: args.content,
       category: args.category,
       isDraft: !!args.isDraft,
+      imageUrls: args.imageUrls,
+      mood: args.mood,
       createdAt: now,
       updatedAt: now,
     });
@@ -252,6 +262,12 @@ export const update = mutation({
     content: v.optional(v.string()),
     category: v.optional(v.string()),
     isDraft: v.optional(v.boolean()),
+    imageUrls: v.optional(v.array(v.string())),
+    mood: v.optional(v.object({
+      id: v.string(),
+      emoji: v.string(),
+      label: v.string(),
+    })),
   },
   handler: async (ctx: any, args: any) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -269,6 +285,8 @@ export const update = mutation({
     if (args.content !== undefined) updates.content = args.content;
     if (args.category !== undefined) updates.category = args.category;
     if (args.isDraft !== undefined) updates.isDraft = args.isDraft;
+    if (args.imageUrls !== undefined) updates.imageUrls = args.imageUrls;
+    if (args.mood !== undefined) updates.mood = args.mood;
 
     await ctx.db.patch(args.postId, updates);
     return { ok: true } as const;

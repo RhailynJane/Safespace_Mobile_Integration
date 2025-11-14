@@ -47,6 +47,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,6 +55,8 @@ import { useUser } from "@clerk/clerk-expo";
 import { useConvex } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
@@ -63,15 +66,28 @@ import StatusModal from "../../../../components/StatusModal";
 
 // Available categories for post organization and filtering
 const CATEGORIES = [
-  "Stress",
-  "Support",
-  "Stories",
   "Self-Care",
   "Mindfulness",
+  "Stories",
+  "Support",
   "Creative",
   "Therapy",
+  "Stress",
   "Affirmation",
   "Awareness",
+];
+
+// Mood options for post creation
+const MOODS = [
+  { id: '1', emoji: '😁', label: 'Ecstatic' },
+  { id: '2', emoji: '😊', label: 'Happy' },
+  { id: '3', emoji: '😌', label: 'Content' },
+  { id: '4', emoji: '😐', label: 'Neutral' },
+  { id: '5', emoji: '🙁', label: 'Displeased' },
+  { id: '6', emoji: '😤', label: 'Frustrated' },
+  { id: '7', emoji: '😠', label: 'Annoyed' },
+  { id: '8', emoji: '😡', label: 'Angry' },
+  { id: '9', emoji: '🤬', label: 'Furious' },
 ];
 
 /**
@@ -159,6 +175,64 @@ export default function EditPostScreen() {
   };
 
   /**
+   * Handle image selection from device
+   */
+  const handleAddPhoto = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showError("Permission Required", "We need camera roll permissions to add photos.");
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: 3 - selectedImages.length, // Limit based on current selection
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        // Process and compress images
+        const newImages = await Promise.all(
+          result.assets.map(async (asset) => {
+            const manipulatedImage = await manipulateAsync(
+              asset.uri,
+              [{ resize: { width: 1024 } }], // Resize to max 1024px width
+              { 
+                compress: 0.7, // 70% quality
+                format: SaveFormat.JPEG 
+              }
+            );
+            return manipulatedImage.uri;
+          })
+        );
+        
+        setSelectedImages([...selectedImages, ...newImages]);
+      }
+    } catch (error) {
+      console.error("Error selecting images:", error);
+      showError("Error", "Failed to select images. Please try again.");
+    }
+  };
+
+  /**
+   * Remove image from selection
+   */
+  const handleRemoveImage = (index: number) => {
+    setSelectedImages(selectedImages.filter((_, i) => i !== index));
+  };
+
+  /**
+   * Handle mood selection
+   */
+  const handleMoodSelect = (mood: typeof MOODS[0]) => {
+    setSelectedMood(selectedMood?.id === mood.id ? null : mood);
+  };
+
+  /**
    * Handle post save operation
    * Updates the existing post and navigates to My Posts
    */
@@ -184,6 +258,8 @@ export default function EditPostScreen() {
         title: title.trim(),
         content: content.trim(),
         category: (category || "Support").trim(),
+        imageUrls: selectedImages,
+        mood: selectedMood,
         isDraft: false, // Keep as published when editing
       });
 
@@ -243,6 +319,10 @@ export default function EditPostScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // State for images and mood
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedMood, setSelectedMood] = useState<{ id: string; emoji: string; label: string } | null>(null);
+
   useEffect(() => {
     async function fetchPost() {
       if (!postId) return;
@@ -253,6 +333,8 @@ export default function EditPostScreen() {
           setTitle(post.title || "");
           setContent(post.content || "");
           setCategory(post.category || "Support");
+          setSelectedImages(post.imageUrls || []);
+          setSelectedMood(post.mood || null);
         }
       } catch (err) {
         showError("Error", "Could not load post for editing.");
@@ -310,6 +392,79 @@ export default function EditPostScreen() {
               <View style={styles.characterCount}>
                 <Text style={styles.characterCountText}>{`${content.length} characters`}</Text>
               </View>
+
+              {/* Mood Selection */}
+              <Text style={styles.label}>How are you feeling?</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.moodScrollContainer}
+                contentContainerStyle={styles.moodScrollContent}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.moodOption,
+                    !selectedMood && styles.moodOptionSelected
+                  ]}
+                  onPress={() => setSelectedMood(null)}
+                >
+                  <Text style={styles.moodOptionText}>None</Text>
+                </TouchableOpacity>
+                {MOODS.map((mood) => (
+                  <TouchableOpacity
+                    key={mood.id}
+                    style={[
+                      styles.moodOption,
+                      selectedMood?.id === mood.id && styles.moodOptionSelected
+                    ]}
+                    onPress={() => handleMoodSelect(mood)}
+                  >
+                    <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+                    <Text style={styles.moodOptionText}>{mood.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              
+              {/* Image Management */}
+              <Text style={styles.label}>Photos ({selectedImages.length}/3)</Text>
+              <View style={styles.imageManagementContainer}>
+                {/* Add Photo Button */}
+                {selectedImages.length < 3 && (
+                  <TouchableOpacity style={styles.addPhotoButton} onPress={handleAddPhoto}>
+                    <Ionicons name="camera-outline" size={scaledFontSize(24)} color="#7CB9A9" />
+                    <Text style={styles.addPhotoText}>Add Photo</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {/* Selected Images Grid */}
+                {selectedImages.length > 0 && (
+                  <View style={styles.selectedImagesContainer}>
+                    <View style={styles.imagesGrid}>
+                      {selectedImages.map((uri, index) => (
+                        <View 
+                          key={index} 
+                          style={[
+                            styles.imageContainer,
+                            selectedImages.length === 1 && styles.singleImage,
+                            selectedImages.length === 2 && styles.doubleImage,
+                            selectedImages.length >= 3 && styles.tripleImage,
+                          ]}
+                        >
+                          <Image source={{ uri }} style={styles.image} />
+                          {/* Remove button */}
+                          <TouchableOpacity 
+                            style={styles.removeImageButton}
+                            onPress={() => handleRemoveImage(index)}
+                          >
+                            <Ionicons name="close-circle" size={scaledFontSize(24)} color="#FF6B6B" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+
               {/* Action Button */}
               <View style={styles.buttonContainer}>
                 <TouchableOpacity
@@ -512,6 +667,131 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(12),
     color: "#999",
   },
+  
+    // Existing mood display
+    existingMoodContainer: {
+      marginTop: 16,
+    },
+    moodDisplay: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: 'rgba(124, 185, 169, 0.1)',
+      borderRadius: 12,
+      alignSelf: 'flex-start',
+      gap: 8,
+    },
+    moodEmoji: {
+      fontSize: scaledFontSize(20),
+    },
+    moodLabel: {
+      fontSize: scaledFontSize(15),
+      fontWeight: '500',
+    },
+  
+    // Existing images display
+    existingImagesContainer: {
+      marginTop: 16,
+    },
+    imagesGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    imageContainer: {
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    singleImage: {
+      width: '100%',
+      height: 250,
+    },
+    doubleImage: {
+      width: '48.5%',
+      height: 180,
+    },
+    tripleImage: {
+      width: '31.5%',
+      height: 120,
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+  
+    // Mood selection styles
+    moodScrollContainer: {
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    moodScrollContent: {
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    moodOption: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      minWidth: 80,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    moodOptionSelected: {
+      backgroundColor: '#7CB9A9',
+      borderColor: '#7CB9A9',
+    },
+    moodOptionText: {
+      fontSize: scaledFontSize(12),
+      fontWeight: '500',
+      color: '#666',
+      marginTop: 4,
+    },
+  
+    // Image management styles
+    imageManagementContainer: {
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    addPhotoButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: '#7CB9A9',
+      borderStyle: 'dashed',
+      marginBottom: 12,
+      gap: 8,
+    },
+    addPhotoText: {
+      fontSize: scaledFontSize(14),
+      fontWeight: '500',
+      color: '#7CB9A9',
+    },
+    selectedImagesContainer: {
+      marginTop: 8,
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: 12,
+      padding: 2,
+    },
   
   // Button Container - Action button
   buttonContainer: {
