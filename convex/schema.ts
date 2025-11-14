@@ -222,7 +222,8 @@ export default defineSchema({
 	})
 		.index("by_user", ["userId"])
 		.index("by_type", ["activityType"])
-		.index("by_user_and_date", ["userId", "createdAt"]),
+		.index("by_user_and_date", ["userId", "createdAt"])
+		.index("by_user_type", ["userId", "activityType"]),
 
 	// Help & Support content
 	helpSections: defineTable({

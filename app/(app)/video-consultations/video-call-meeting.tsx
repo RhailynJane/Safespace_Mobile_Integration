@@ -78,7 +78,7 @@ export default function VideoCallScreen() {
   // Camera & permissions state
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('front');
-  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraReady, setCameraReady] = useState(true);
   const [cameraRefresh, setCameraRefresh] = useState(0);
   const [showFullCamera, setShowFullCamera] = useState(false);
   const [showCamera, setShowCamera] = useState(true);
@@ -101,14 +101,8 @@ export default function VideoCallScreen() {
 
   // Flip between front/back camera
   const handleFlipCamera = useCallback(() => {
-    // Fully unmount and remount camera to avoid stuck preview on some devices
-    setCameraReady(false);
-    setShowCamera(false);
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
-    setTimeout(() => {
-      setCameraRefresh((prev) => prev + 1);
-      setShowCamera(true);
-    }, 150);
+    setCameraRefresh((prev) => prev + 1);
   }, []);
 
   // Start call duration timer (defined early for use in callbacks)
@@ -259,40 +253,21 @@ export default function VideoCallScreen() {
     };
   }, [initializeCall, sessionIdParam, attachExistingSession]);
 
-  // Add a timeout fallback for camera ready
+  // Ensure camera is ready when permissions are granted
   useEffect(() => {
-    if (isFocused && isCameraOn && permission?.granted && !cameraReady && showCamera) {
-      // Clear any existing timeout
-      if (cameraReadyTimeoutRef.current) {
-        clearTimeout(cameraReadyTimeoutRef.current);
-      }
-      
-      // Set camera as ready after 3 seconds if it hasn't triggered onCameraReady
-      cameraReadyTimeoutRef.current = setTimeout(() => {
-        console.log('Camera ready timeout - forcing ready state');
-        setCameraReady(true);
-      }, 3000);
+    if (isFocused && isCameraOn && permission?.granted && showCamera) {
+      setCameraReady(true);
     }
-    
-    return () => {
-      if (cameraReadyTimeoutRef.current) {
-        clearTimeout(cameraReadyTimeoutRef.current);
-      }
-    };
-  }, [isFocused, isCameraOn, permission?.granted, cameraReady, showCamera]);
+  }, [isFocused, isCameraOn, permission?.granted, showCamera]);
 
   const handleToggleCamera = () => {
     const newState = !isCameraOn;
     setIsCameraOn(newState);
     
     if (newState) {
-      // Reset camera ready state when turning camera back on
-      setCameraReady(false);
-      setShowCamera(false);
-      setTimeout(() => {
-        setCameraRefresh((prev) => prev + 1);
-        setShowCamera(true);
-      }, 120);
+      // Refresh camera when turning it back on
+      setCameraRefresh((prev) => prev + 1);
+      setCameraReady(true);
     }
     
     // Update session settings in Convex
@@ -496,24 +471,6 @@ export default function VideoCallScreen() {
                   {/* Non-clipping rounded border overlay for Android */}
                   {Platform.OS === 'android' && (
                     <View pointerEvents="none" style={styles.previewBorderOverlay} />
-                  )}
-                  {!cameraReady && (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setCameraReady(false);
-                        setShowCamera(false);
-                        setTimeout(() => {
-                          setCameraRefresh(r => r + 1);
-                          setShowCamera(true);
-                        }, 120);
-                      }}
-                      style={[styles.cameraOffOverlay, { position: 'absolute', left: 0, top: 0, zIndex: 10 }]}
-                    >
-                      <Ionicons name="videocam" size={24} color="#FFFFFF" />
-                      <Text style={styles.cameraOffText}>Initializing camera…</Text>
-                      <Text style={[styles.cameraOffText, { fontSize: 10, marginTop: 4 }]}>(tap to refresh)</Text>
-                    </TouchableOpacity>
                   )}
                 </>
               ) : (

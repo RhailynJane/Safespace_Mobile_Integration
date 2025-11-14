@@ -144,7 +144,7 @@ export function addNotificationListeners(
       const body = notification?.request?.content?.body as string | undefined;
       const identifier = notification?.request?.identifier as string | undefined;
       if (!clerkUserId) return;
-      if (!type || (type !== 'mood' && type !== 'journaling')) return;
+      if (!type || (type !== 'mood' && type !== 'journaling' && type !== 'appointment')) return;
       if (identifier && loggedIds.has(identifier)) return; // de-dup
       
       // Log notification to Convex so it appears in notification bell
@@ -168,8 +168,8 @@ export function addNotificationListeners(
             args: {
               userId: clerkUserId,
               type: type,
-              title: title || (type === 'mood' ? 'Mood check-in' : 'Journaling reminder'),
-              message: body || (type === 'mood' ? 'How are you feeling today?' : 'Take a moment to jot your thoughts.'),
+              title: title || (type === 'mood' ? 'Mood check-in' : type === 'journaling' ? 'Journaling reminder' : 'Appointment Reminder'),
+              message: body || (type === 'mood' ? 'How are you feeling today?' : type === 'journaling' ? 'Take a moment to jot your thoughts.' : 'You have an upcoming appointment.'),
             },
             format: 'json',
           })
@@ -212,6 +212,7 @@ export function addNotificationListeners(
           const settings = await settingsAPI.fetchSettings(clerkUserId);
           await scheduleFromSettings(settings);
         }
+        // Note: Appointment reminders are one-time and don't need rescheduling
       } catch (_e) { /* no-op */ }
     });
 
@@ -226,6 +227,7 @@ export function addNotificationListeners(
           const settings = await settingsAPI.fetchSettings(clerkUserId);
           await scheduleFromSettings(settings);
         }
+        // Note: Appointment reminders are one-time and don't need rescheduling
       } catch (_e) { /* no-op */ }
       if (onTap) onTap(data);
     });

@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
 /**
@@ -463,14 +464,15 @@ export const reportQualityIssue = mutation({
 </body>
 </html>`;
 
-      await ctx.scheduler.runAfter(0, "email:sendIssueEmail", {
+      const emailResult = await ctx.scheduler.runAfter(0, internal.email.sendIssueEmail, {
         to,
         subject,
         text,
         html,
       });
+      console.log("📧 Email scheduled for quality issue report to:", to);
     } catch (err) {
-      console.warn("Issue email dispatch skipped/failure:", err);
+      console.error("❌ Issue email dispatch failed:", err);
     }
 
     return { ok: true };

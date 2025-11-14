@@ -21,7 +21,10 @@ export const heartbeat = mutation({
       .unique();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { status, lastSeen: now });
+      // Only update if lastSeen is older than 30 seconds to reduce write conflicts
+      if (now - existing.lastSeen > 30000) {
+        await ctx.db.patch(existing._id, { status, lastSeen: now });
+      }
     } else {
       await ctx.db.insert("presence", { userId, status, lastSeen: now });
     }

@@ -11,13 +11,25 @@ export const recordLogin = mutation({
   handler: async (ctx, { userId }) => {
     const now = Date.now();
 
-    // Record activity log
-    await ctx.db.insert("activities", {
-      userId,
-      activityType: "login",
-      metadata: { timestamp: now },
-      createdAt: now,
-    });
+    // Check for recent login activity (within last 5 minutes) to avoid write conflicts
+    const recentLogin = await ctx.db
+      .query("activities")
+      .withIndex("by_user_and_date", (q) => q.eq("userId", userId))
+      .filter((q) => 
+        q.eq(q.field("activityType"), "login") && 
+        q.gt(q.field("createdAt"), now - 5 * 60 * 1000)
+      )
+      .first();
+    
+    if (!recentLogin) {
+      // Record activity log only if no recent login
+      await ctx.db.insert("activities", {
+        userId,
+        activityType: "login",
+        metadata: { timestamp: now },
+        createdAt: now,
+      });
+    }
 
     // Update presence status
     const existingPresence = await ctx.db
@@ -26,10 +38,13 @@ export const recordLogin = mutation({
       .first();
 
     if (existingPresence) {
-      await ctx.db.patch(existingPresence._id, {
-        status: "online",
-        lastSeen: now,
-      });
+      // Only update if lastSeen is older than 10 seconds to reduce write conflicts
+      if (now - existingPresence.lastSeen > 10000) {
+        await ctx.db.patch(existingPresence._id, {
+          status: "online",
+          lastSeen: now,
+        });
+      }
     } else {
       await ctx.db.insert("presence", {
         userId,
