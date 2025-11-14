@@ -394,6 +394,16 @@ export const AppHeader = ({
       show: true,
     },
     {
+      icon: "megaphone",
+      title: "Announcements",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/announcements");
+      },
+      disabled: false,
+      show: true,
+    },
+    {
       icon: "help-circle",
       title: "Crisis Support",
       onPress: () => {
