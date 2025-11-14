@@ -163,6 +163,10 @@ export default function ChatScreen() {
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('smileys');
   const emojiScrollRef = useRef<ScrollView>(null);
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const [editingMessageText, setEditingMessageText] = useState("");
+    const [messageActionSheetVisible, setMessageActionSheetVisible] = useState(false);
+    const [selectedMessage, setSelectedMessage] = useState<ExtendedMessage | null>(null);
   const [statusModalVisible, setStatusModalVisible] = useState(false);
   const [statusModalData, setStatusModalData] = useState({
     type: 'info' as 'success' | 'error' | 'info',
@@ -663,6 +667,12 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = async () => {
+        // If editing, save the edit instead
+        if (editingMessageId) {
+          await saveEditedMessage();
+          return;
+        }
+
     if (newMessage.trim() === "" || sending || !userId || !conversationId) {
       return;
     }
@@ -697,6 +707,77 @@ export default function ChatScreen() {
   const handleEmojiSelect = (emoji: string) => {
     setNewMessage(prev => prev + emoji);
     setEmojiPickerVisible(false);
+  };
+
+  // Handle long press on message to show action sheet
+  const handleMessageLongPress = (message: ExtendedMessage) => {
+    // Only allow editing/deleting own messages
+    // Allow editing only for text messages, but allow deleting for all message types
+    if (message.sender.clerk_user_id === userId) {
+      setSelectedMessage(message);
+      setMessageActionSheetVisible(true);
+    }
+  };
+
+  // Handle edit message
+  const handleEditMessage = () => {
+    if (selectedMessage) {
+      setEditingMessageId(selectedMessage.id);
+      setEditingMessageText(selectedMessage.message_text);
+      setNewMessage(selectedMessage.message_text);
+      setMessageActionSheetVisible(false);
+    }
+  };
+
+  // Handle delete message
+  const handleDeleteMessage = async () => {
+    if (!selectedMessage) return;
+    setMessageActionSheetVisible(false);
+    
+    showConfirm(
+      'Delete Message',
+      'Are you sure you want to delete this message?',
+      async () => {
+        try {
+          await convex.mutation(api.conversations.deleteMessage, {
+            messageId: selectedMessage.id as any,
+          });
+          showStatusModal('success', 'Deleted', 'Message deleted successfully');
+        } catch (error: any) {
+          console.error('Delete message error:', error);
+          showStatusModal('error', 'Error', error.message || 'Failed to delete message');
+        }
+      }
+    );
+  };
+
+  // Cancel editing
+  const cancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingMessageText("");
+    setNewMessage("");
+  };
+
+  // Save edited message
+  const saveEditedMessage = async () => {
+    if (!editingMessageId || !newMessage.trim()) return;
+    
+    try {
+      setSending(true);
+      await convex.mutation(api.conversations.updateMessage, {
+        messageId: editingMessageId as any,
+        newText: newMessage.trim(),
+      });
+      setEditingMessageId(null);
+      setEditingMessageText("");
+      setNewMessage("");
+      showStatusModal('success', 'Updated', 'Message updated successfully');
+    } catch (error: any) {
+      console.error('Update message error:', error);
+      showStatusModal('error', 'Error', error.message || 'Failed to update message');
+    } finally {
+      setSending(false);
+    }
   };
 
   // Handle voice recording (start/stop) - simplified and fixed structure
@@ -894,21 +975,24 @@ export default function ChatScreen() {
   // Download file to local storage and share
   const downloadAndShareFile = async (remoteUri: string, fileName: string) => {
     try {
-      console.log("ðŸ“¥ Starting download:", { remoteUri, fileName });
+      console.log("Starting download:", { remoteUri, fileName });
       setDownloading(true);
       const resolvedUri = resolveRemoteUri(remoteUri);
       const urlWithoutParams = resolvedUri.split("?")[0];
-      const fileExtension = (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
+      // Extract extension from filename only, not the full URL path
+      const pathname = (urlWithoutParams ?? "").split('/').pop() || '';
+      const parts = pathname.split('.');
+      const fileExtension = (parts.length > 1 && parts[parts.length - 1]) ? parts[parts.length - 1]!.toLowerCase() : 'file';
       const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
       const baseName = safeFileName.replace(/\.[^/.]+$/, ""); // remove existing extension if present
 
       // Use legacy API shim to avoid runtime deprecation errors (SDK 54): download into cache directory
       const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
-      const fileUri = `${cacheDir}${baseName}.${fileExtension}`;
-      console.log("ðŸ“¥ Downloading to:", fileUri);
+      const fileUri = `${cacheDir}download_${Date.now()}.${fileExtension}`;
+      console.log("📥 Downloading to:", fileUri);
       await FSLegacy.downloadAsync(resolvedUri, fileUri);
 
-      console.log("âœ… Download complete, opening share sheet");
+      console.log("✅ Download complete, opening share sheet");
 
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
@@ -917,14 +1001,14 @@ export default function ChatScreen() {
           dialogTitle: `Share ${fileName}`,
           UTI: getUTI(fileExtension),
         });
-        console.log("âœ… Share sheet closed");
+        console.log("✓ Share sheet closed");
       } else {
-        console.log("âš ï¸ Sharing not available, opening in browser");
+        console.log("⚠️ Sharing not available, opening in browser");
         // Fallback: open in browser quietly
         await WebBrowser.openBrowserAsync(remoteUri);
       }
     } catch (error) {
-      console.error("âŒ Download error:", error);
+      console.error("❌ Download error:", error);
       setFileErrorMessage("Unable to download or share the file. Please try again.");
       setFileErrorModalVisible(true);
     } finally {
@@ -954,28 +1038,31 @@ export default function ChatScreen() {
 
   // Ensure we share a local file: download remote HTTP(S) URIs to cache first
   const shareUriEnsuringLocal = async (uri: string, fallbackName = `share_${Date.now()}`) => {
-    console.log("ðŸ“¤ shareUriEnsuringLocal called with:", uri);
+    console.log("📤 shareUriEnsuringLocal called with:", uri);
     const canShare = await Sharing.isAvailableAsync();
     if (!canShare) {
-      console.log("âš ï¸ Sharing not available on this device");
+      console.log("⚠️ Sharing not available on this device");
       return false;
     }
     try {
       let localUri = uri;
       let ext = 'file';
       if (uri.startsWith('http')) {
-        console.log("ðŸ“¥ Remote URI detected, downloading first...");
+        console.log("📤 Remote URI detected, downloading first...");
         const resolved = resolveRemoteUri(uri);
         const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
-        ext = (withoutParams.split('.').pop() || 'file').toLowerCase();
+        // Extract extension from URL path, not the full URL (avoid domain extensions)
+        const pathname = withoutParams.split('/').pop() || '';
+        const parts = pathname.split('.');
+        ext = (parts.length > 1 && parts[parts.length - 1]) ? parts[parts.length - 1]!.toLowerCase() : 'file';
         const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
-        const destUri = `${cacheDir}${fallbackName}.${ext}`;
-        console.log("ðŸ“¥ Downloading to:", destUri);
+        const destUri = `${cacheDir}share_${Date.now()}.${ext}`;
+        console.log("📤 Downloading to:", destUri);
         await FSLegacy.downloadAsync(resolved, destUri);
         localUri = destUri;
-        console.log("âœ… Download complete:", localUri);
+        console.log("✓ Download complete:", localUri);
       }
-      console.log("ðŸ“¤ Opening share sheet for:", localUri);
+      console.log("📤 Opening share sheet for:", localUri);
       await Sharing.shareAsync(localUri, { mimeType: getMimeType(ext) });
       console.log("âœ… Share sheet closed");
       return true;
@@ -987,12 +1074,12 @@ export default function ChatScreen() {
 
   // Save image to gallery
   const saveImageToGallery = async (imageUri: string) => {
-    console.log("ðŸ’¾ saveImageToGallery called with:", imageUri);
+    console.log("📼 saveImageToGallery called with:", imageUri);
     try {
       setDownloading(true);
       // Expo Go limitation: cannot grant full media access; fallback to share
       if (Constants?.appOwnership === 'expo') {
-        console.log("â„¹ï¸ Running in Expo Go, using share fallback for gallery save");
+        console.log("🧏‍♂️ Running in Expo Go, using share fallback for gallery save");
         const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
         if (!shared) {
           setFileErrorMessage("Saving to gallery isn't supported in Expo Go. Shared instead.");
@@ -1002,12 +1089,12 @@ export default function ChatScreen() {
       }
       // Request permissions; if not available or rejected, fallback to share sheet
       try {
-        console.log("ðŸ” Requesting media library permissions...");
+        console.log("🔐 Requesting media library permissions...");
         // Request only photo permission to avoid AUDIO manifest requirement on Android 13+
         const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
-        console.log("ðŸ” Permission status:", status);
+        console.log("🔐 Permission status:", status);
         if (status !== "granted") {
-          console.log("âš ï¸ Permission denied, falling back to share");
+          console.log("⚠️ Permission denied, falling back to share");
           const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
           if (shared) return;
           setFileErrorMessage("Cannot save without media permissions.");
@@ -1015,7 +1102,7 @@ export default function ChatScreen() {
           return;
         }
       } catch (_permErr) {
-        console.error("âš ï¸ Permission request error:", _permErr);
+        console.error("⚠️ Permission request error:", _permErr);
         // Some Android setups (Expo Go) will reject if manifest lacks permissions.
         // Gracefully fallback to share sheet.
         const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
@@ -1028,26 +1115,29 @@ export default function ChatScreen() {
       let finalUri = imageUri;
       // If remote, download to a writable cache path
       if (imageUri.startsWith("http")) {
-        console.log("ðŸ“¥ Remote image, downloading first...");
+        console.log("📤 Remote image, downloading first...");
         const resolved = resolveRemoteUri(imageUri);
         const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
-        const ext = (withoutParams.split('.').pop() || 'jpg').toLowerCase();
+        // Extract extension from URL path, not the full URL (avoid domain extensions)
+        const pathname = withoutParams.split('/').pop() || '';
+        const parts = pathname.split('.');
+        const ext = (parts.length > 1 && parts[parts.length - 1]) ? parts[parts.length - 1]!.toLowerCase() : 'jpg';
         const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
         const destUri = `${cacheDir}image_${Date.now()}.${ext}`;
         await FSLegacy.downloadAsync(resolved, destUri);
         finalUri = destUri;
-        console.log("âœ… Downloaded to:", finalUri);
+        console.log("✓ Downloaded to:", finalUri);
       }
 
-      console.log("ðŸ’¾ Creating media library asset...");
+      console.log("📼 Creating media library asset...");
       const asset = await MediaLibrary.createAssetAsync(finalUri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-      console.log("âœ… Image saved to gallery!");
+      console.log("✓ Image saved to gallery!");
     } catch (error) {
-      console.error("âŒ Save image error:", error);
+      console.error("❌ Save image error:", error);
       // Final fallback: try share if gallery save failed
       try {
-        console.log("âš ï¸ Gallery save failed, trying share fallback...");
+        console.log("⚠️ Gallery save failed, trying share fallback...");
         const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
         if (shared) return;
       } catch (_e2) {
@@ -1458,6 +1548,47 @@ export default function ChatScreen() {
             </View>
           </Modal>
 
+        {/* Message Action Sheet */}
+        <Modal
+          visible={messageActionSheetVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setMessageActionSheetVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.attachmentModalOverlay}
+            activeOpacity={1}
+            onPress={() => setMessageActionSheetVisible(false)}
+          >
+            <View style={[styles.attachmentSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.messageActionGrid}>
+                {/* Only show Edit option for text messages */}
+                {selectedMessage?.message_type === 'text' && (
+                  <TouchableOpacity
+                    style={styles.messageActionOption}
+                    onPress={handleEditMessage}
+                  >
+                    <View style={[styles.messageActionIconCircle, { backgroundColor: '#007AFF' }]}>
+                      <Ionicons name="create-outline" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Edit</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.messageActionOption}
+                  onPress={handleDeleteMessage}
+                >
+                  <View style={[styles.messageActionIconCircle, { backgroundColor: '#FF3B30' }]}>
+                    <Ionicons name="trash-outline" size={24} color="white" />
+                  </View>
+                  <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
           {/* Fixed Header with dynamic height based on screen size */}
           <View style={[styles.headerWrapper, { height: headerHeight }]}>
             <View style={styles.header}>
@@ -1588,21 +1719,7 @@ export default function ChatScreen() {
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onLongPress={() => {
-                      // Allow deleting only own messages
-                      if (!myMessage) return;
-                      showConfirm(
-                        'Delete message',
-                        'Are you sure you want to delete this message?',
-                        async () => {
-                          try {
-                            await convex.mutation(api.conversations.deleteMessage, { messageId: item.id as any });
-                            setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
-                          } catch (_e) {
-                            showStatusModal('error', 'Delete failed', 'Please try again.');
-                          }
-                        },
-                        { confirmText: 'Delete', cancelText: 'Cancel' }
-                      );
+                      handleMessageLongPress(item);
                     }}
                   >
                     <View style={[styles.messageBubble, bubbleStyle]}>
@@ -1686,6 +1803,19 @@ export default function ChatScreen() {
             </TouchableOpacity>
           )}
 
+          {/* Editing Mode Banner - positioned above input */}
+          {editingMessageId && (
+            <View style={[styles.editingBanner, { backgroundColor: isDarkMode ? '#3A3B3C' : '#E8F4FD' }]}>
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+              <Text style={[styles.editingText, { color: theme.colors.text }]}>
+                Editing message
+              </Text>
+              <TouchableOpacity onPress={cancelEdit} style={styles.editingCloseButton}>
+                <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Message Input - Compact row with + button and text input */}
           <View style={[
             styles.bottomInputSection, 
@@ -1695,13 +1825,15 @@ export default function ChatScreen() {
               paddingBottom: Math.max(insets.bottom || 0, 8),
             }
           ]}>
-            {/* Plus button to open attachment sheet */}
-            <TouchableOpacity
-              style={styles.plusButton}
-              onPress={() => setAttachmentSheetVisible(true)}
-            >
-              <Ionicons name="add" size={24} color={theme.colors.primary} />
-            </TouchableOpacity>
+            {/* Plus button to open attachment sheet - hide when editing */}
+            {!editingMessageId && (
+              <TouchableOpacity
+                style={styles.plusButton}
+                onPress={() => setAttachmentSheetVisible(true)}
+              >
+                <Ionicons name="add" size={24} color={theme.colors.primary} />
+              </TouchableOpacity>
+            )}
 
             <View style={[
               styles.compactInputWrapper,
@@ -1712,7 +1844,7 @@ export default function ChatScreen() {
             ]}>
               <TextInput
                 style={[styles.compactTextInput, { color: theme.colors.text }]}
-                placeholder="Write a message..."
+                placeholder={editingMessageId ? "Edit message..." : "Write a message..."}
                 value={newMessage}
                 onChangeText={(text) => {
                   setNewMessage(text);
@@ -1728,16 +1860,19 @@ export default function ChatScreen() {
               />
             </View>
 
-            <TouchableOpacity
-              style={styles.micButton}
-              onPress={handleMicPress}
-            >
-              <Ionicons 
-                name={isRecording ? "stop-circle" : "mic"} 
-                size={24} 
-                color={isRecording ? "#FF0000" : theme.colors.primary} 
-              />
-            </TouchableOpacity>
+            {/* Mic button - hide when editing */}
+            {!editingMessageId && (
+              <TouchableOpacity
+                style={styles.micButton}
+                onPress={handleMicPress}
+              >
+                <Ionicons 
+                  name={isRecording ? "stop-circle" : "mic"} 
+                  size={24} 
+                  color={isRecording ? "#FF0000" : theme.colors.primary} 
+                />
+              </TouchableOpacity>
+            )}
 
             {(newMessage.trim() !== "" || pendingFiles.length > 0 || !!pendingRecordingUri) && (
               <TouchableOpacity
@@ -3279,6 +3414,41 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   confirmButtonText: {
     fontSize: scaledFontSize(16),
     fontWeight: '600',
+  },
+  editingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  editingText: {
+    flex: 1,
+    fontSize: scaledFontSize(14),
+    fontWeight: '500',
+  },
+  editingCloseButton: {
+    padding: 4,
+  },
+  messageActionGrid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+    paddingVertical: 10,
+  },
+  messageActionOption: {
+    alignItems: 'center',
+    padding: 15,
+  },
+  messageActionIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
 });
 

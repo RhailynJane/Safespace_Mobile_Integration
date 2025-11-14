@@ -379,6 +379,34 @@ export const sendAttachmentFromStorage = mutation({
   }
 });
 
+// Update a message text if the current user is the sender
+export const updateMessage = mutation({
+  args: { 
+    messageId: v.id("messages"),
+    newText: v.string()
+  },
+  handler: async (ctx: any, args: { messageId: string; newText: string }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const userId = identity.subject as string;
+
+    const msg = await ctx.db.get(args.messageId);
+    if (!msg) throw new Error("Message not found");
+
+    // Only the sender can edit their message
+    if (msg.senderId !== userId) {
+      throw new Error("Unauthorized - only the sender can edit this message");
+    }
+
+    await ctx.db.patch(args.messageId, {
+      body: args.newText,
+      updatedAt: Date.now(),
+    });
+    
+    return { ok: true } as const;
+  },
+});
+
 // Delete a message if the current user is the sender or a participant of the conversation
 export const deleteMessage = mutation({
   args: { messageId: v.id("messages") },
