@@ -1116,19 +1116,6 @@ export default function CommunityMainScreen() {
             </View>
           )}
 
-          {/* My Posts Header - Only show in My Posts view */}
-          {activeView === "my-posts" && (
-            <View style={styles.myPostsHeader}>
-              <View style={styles.myPostsHeaderContent}>
-                <Ionicons name="document-text" size={scaledFontSize(24)} color="#7CB9A9" />
-                <Text style={[styles.myPostsTitle, { color: theme.colors.text }]}>My Posts</Text>
-                <Text style={[styles.myPostsSubtitle, { color: theme.colors.textSecondary }]}>
-                  Manage your published posts and drafts
-                </Text>
-              </View>
-            </View>
-          )}
-
           {/* Posts Section - Dynamic content based on current view */}
           <View style={styles.postsSection}>
             {loading ? (
@@ -1177,16 +1164,6 @@ export default function CommunityMainScreen() {
                   {activeView === "my-posts" &&
                     "Create your first post to share with the community!"}
                 </Text>
-                {activeView === "my-posts" && (
-                  <TouchableOpacity
-                    style={styles.createFirstPostButton}
-                    onPress={() => router.push("/(app)/(tabs)/community-forum/create")}
-                  >
-                    <Text style={styles.createFirstPostButtonText}>
-                      Create Your First Post
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </View>
             ) : (
               <>
@@ -1211,13 +1188,22 @@ export default function CommunityMainScreen() {
                         <Text style={[styles.postDate,{color:theme.colors.textSecondary}]}>{formatRelativeTime(post.created_at)}</Text>
                       </View>
                       {post.author_id === user?.id && (
-                        <TouchableOpacity 
-                          style={styles.postTopActions}
-                          onPress={() => router.push(`/(app)/(tabs)/community-forum/edit?id=${post.id}`)}
-                          accessibilityLabel="Edit post"
-                        >
-                          <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
-                        </TouchableOpacity>
+                        <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+                          <TouchableOpacity 
+                            style={styles.postTopActions}
+                            onPress={() => router.push(`/(app)/(tabs)/community-forum/edit?id=${post.id}`)}
+                            accessibilityLabel="Edit post"
+                          >
+                            <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.postTopActions}
+                            onPress={() => handleDeletePost(post.id)}
+                            accessibilityLabel="Delete post"
+                          >
+                            <Ionicons name="trash" size={20} color="#FF1744" />
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
                     <Text style={[styles.postBody,{color:theme.colors.textSecondary}]} numberOfLines={6}>
@@ -1493,27 +1479,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(14),
     fontWeight: "500",
     textAlign: "center",
-  },
-
-  // My Posts Header - Personal posts management section
-  myPostsHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  myPostsHeaderContent: {
-    flex: 1,
-  },
-  myPostsTitle: {
-    fontSize: scaledFontSize(24),
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  myPostsSubtitle: {
-    fontSize: scaledFontSize(14),
-    marginTop: 4,
   },
 
   // Posts Section - Main content area
