@@ -37,7 +37,7 @@
  * Reference: chat.deepseek.com
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -53,7 +53,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
 import { useConvex } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import type { Id } from "../../../../convex/_generated/dataModel";
+import { Id } from "../../../../convex/_generated/dataModel";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
@@ -66,7 +66,7 @@ const CATEGORIES = [
   "Stress",
   "Support",
   "Stories",
-  "Self Care",
+  "Self-Care",
   "Mindfulness",
   "Creative",
   "Therapy",
@@ -98,9 +98,10 @@ export default function EditPostScreen() {
   const [title, setTitle] = useState((initialTitle as string) || ""); // Post title
   const [content, setContent] = useState((initialContent as string) || ""); // Post content
   const [category, setCategory] = useState((initialCategory as string) || "Support"); // Selected category
-  const [isSaving, setIsSaving] = useState(false); // Save as draft loading state
-  const [isPublishing, setIsPublishing] = useState(false); // Publish loading state
+  const [isSaving, setIsSaving] = useState(false); // Save loading state
   const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
+  // Add loading state for initial fetch
+  const [loading, setLoading] = useState(true);
 
   // NOTE: All post operations now go directly through Convex mutations/queries.
 
@@ -115,8 +116,8 @@ export default function EditPostScreen() {
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
 
-  // Treat id as Convex document id (string); legacy numeric IDs deprecated
-  const postId = id as string;
+  // Ensure postId is typed as Convex document ID
+  const postId: Id<"communityPosts"> = id as Id<"communityPosts">;
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -139,6 +140,15 @@ export default function EditPostScreen() {
   };
 
   /**
+   * Handle success modal close - navigate to My Posts
+   */
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    // Navigate to My Posts tab
+    router.push("/(app)/(tabs)/community-forum?tab=my-posts");
+  };
+
+  /**
    * Show confirmation modal for destructive actions
    */
   const showConfirmation = (title: string, message: string, callback: () => void) => {
@@ -150,11 +160,9 @@ export default function EditPostScreen() {
 
   /**
    * Handle post save operation
-   * Supports both draft saving and publishing workflows
-   * 
-   * @param publish - Boolean indicating whether to publish the post
+   * Updates the existing post and navigates to My Posts
    */
-  const handleSave = async (publish: boolean = false) => {
+  const handleSave = async () => {
     // Validate required fields
     if (!title.trim() || !content.trim()) {
       showError("Missing Information", "Please fill in both title and content");
@@ -168,35 +176,23 @@ export default function EditPostScreen() {
     }
 
     try {
-      // Set appropriate loading state
-      if (publish) {
-        setIsPublishing(true);
-      } else {
-        setIsSaving(true);
-      }
+      setIsSaving(true);
 
-      // Convex-only update
+      // Convex-only update - preserve original draft status
       await convex.mutation(api.posts.update, {
-        postId: postId as Id<"communityPosts">,
+        postId,
         title: title.trim(),
         content: content.trim(),
         category: (category || "Support").trim(),
-        isDraft: !publish,
+        isDraft: false, // Keep as published when editing
       });
 
-      // Show success message based on action
-      if (publish) {
-        showSuccess("Post published successfully! It's now visible to the community.");
-      } else {
-        showSuccess("Post updated successfully! Your changes have been saved.");
-      }
+      showSuccess("Post updated successfully!");
     } catch (error) {
       console.error("Error updating post:", error);
       showError("Update Failed", "Failed to update post. Please check your connection and try again.");
     } finally {
-      // Reset loading states
       setIsSaving(false);
-      setIsPublishing(false);
     }
   };
 
@@ -211,7 +207,7 @@ export default function EditPostScreen() {
       async () => {
         try {
             // Convex-only delete
-            await convex.mutation(api.posts.deletePost, { postId: postId as Id<"communityPosts"> });
+            await convex.mutation(api.posts.deletePost, { postId });
           showSuccess("Post deleted successfully!");
           // Navigate to community forum after successful deletion
           setTimeout(() => {
@@ -247,167 +243,107 @@ export default function EditPostScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  useEffect(() => {
+    async function fetchPost() {
+      if (!postId) return;
+      setLoading(true);
+      try {
+        const post = await convex.query(api.posts.getPost, { postId });
+        if (post) {
+          setTitle(post.title || "");
+          setContent(post.content || "");
+          setCategory(post.category || "Support");
+        }
+      } catch (err) {
+        showError("Error", "Could not load post for editing.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPost();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}> 
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Edit Post" showBack={true} />
-
       {/* Main Content Area */}
       <View style={styles.scrollContainer}>
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.content}>
-            <View style={styles.form}>
-              {/* Title Input Section */}
-              <Text style={[styles.label, { color: theme.colors.text }]}>Title</Text>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <View style={styles.content}>
+              <Text style={styles.label}>Title</Text>
+
               <TextInput
-                style={[styles.titleInput, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
+                style={[styles.titleInput, { fontSize: scaledFontSize(18), backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="Enter post title..."
-                placeholderTextColor={theme.colors.textDisabled}
-                maxLength={200}
-                multiline
+                placeholder="Enter your post title"
+                placeholderTextColor={theme.colors.textSecondary}
+                maxLength={100}
               />
-
-              {/* Category Selection Section */}
-              <Text style={[styles.label, { color: theme.colors.text }]}>Category</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.categoriesScroll}
-              >
-                <View style={styles.categoriesContainer}>
-                  {CATEGORIES.map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.categoryButton,
-                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                        category === cat && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-                      ]}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text
-                        style={[
-                          styles.categoryText,
-                          { color: theme.colors.text },
-                          category === cat && { color: "#FFFFFF" },
-                        ]}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-
-              {/* Content Input Section */}
-              <Text style={[styles.label, { color: theme.colors.text }]}>Content</Text>
+              <Text style={styles.label}>Category</Text>
+              <View style={styles.categoriesContainer}>
+                {CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.categoryButton, category === cat && styles.categoryButtonActive]}
+                    onPress={() => setCategory(cat)}
+                  >
+                    <Text style={[styles.categoryText, category === cat && styles.categoryTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.label}>Content</Text>
               <TextInput
-                style={[styles.contentInput, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
+                style={[styles.contentInput, { fontSize: scaledFontSize(16), backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                 value={content}
                 onChangeText={setContent}
-                placeholder="Share your thoughts..."
-                placeholderTextColor={theme.colors.textDisabled}
+                placeholder="Write your post..."
+                placeholderTextColor={theme.colors.textSecondary}
                 multiline
-                textAlignVertical="top"
-                numberOfLines={10}
+                maxLength={1000}
               />
-
-              {/* Character Count Display */}
               <View style={styles.characterCount}>
-                <Text style={[styles.characterCountText, { color: theme.colors.textSecondary }]}>
-                  {content.length} characters
-                </Text>
+                <Text style={styles.characterCountText}>{`${content.length} characters`}</Text>
+              </View>
+              {/* Action Button */}
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, styles.saveButton]}
+                  onPress={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Text style={styles.buttonText}>Saving...</Text>
+                  ) : (
+                    <Text style={styles.buttonText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
-          </View>
-
-          {/* Delete Button Section - Destructive action with warning */}
-          <View style={styles.deleteSection}>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: theme.colors.surface }]}
-              onPress={handleDelete}
-            >
-              <Ionicons name="trash-outline" size={scaledFontSize(20)} color={theme.colors.error} />
-              <Text style={[styles.deleteButtonText, { color: theme.colors.error }]}>Delete Post</Text>
-            </TouchableOpacity>
-            <Text style={[styles.deleteWarning, { color: theme.colors.error }]}>
-              This action cannot be undone
-            </Text>
-          </View>
+          )}
         </ScrollView>
       </View>
-
-      {/* Action Buttons Footer */}
-      <View style={styles.footer}>
-        {/* Save as Draft Button */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.colors.icon }]}
-          onPress={() => handleSave(false)}
-          disabled={isSaving || isPublishing}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="save-outline" size={scaledFontSize(20)} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Save as Draft</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* Publish Button */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.colors.primary }]}
-          onPress={() => handleSave(true)}
-          disabled={isSaving || isPublishing}
-        >
-          {isPublishing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="send-outline" size={scaledFontSize(20)} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Publish</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-
-      {/* Success Modal */}
+      {/* Status and Confirmation Modals */}
       <StatusModal
         visible={showSuccessModal}
-        type="success"
-        title="Success!"
         message={successMessage}
-        onClose={() => {
-          setShowSuccessModal(false);
-          router.back();
-        }}
-        buttonText="Continue"
+        onClose={handleSuccessClose}
+        title="Success"
+        type="success"
       />
-
-      {/* Error Modal */}
       <StatusModal
         visible={showErrorModal}
-        type="error"
-        title={errorTitle}
         message={errorMessage}
         onClose={() => setShowErrorModal(false)}
-        buttonText="OK"
+        title={errorTitle}
+        type="error"
       />
-
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal for Delete */}
       <StatusModal
         visible={showConfirmModal}
         type="info"
@@ -424,6 +360,7 @@ export default function EditPostScreen() {
         }}
         secondaryButtonType="destructive"
       />
+      <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
     </SafeAreaView>
   );
 }
@@ -448,13 +385,14 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   scrollContainer: {
     flex: 1,
-    marginBottom: 140, // Space for footer buttons and bottom nav
+    marginBottom: 80, // Space for bottom nav only
   },
   scrollView: {
     flex: 1,
   },
   content: {
     paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   form: {
     paddingVertical: 20,
@@ -478,7 +416,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#FED7D7",
-    gap: 8,
   },
   deleteButtonText: {
     color: "#C53030",
@@ -540,7 +477,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   categoriesContainer: {
     flexDirection: "row",
-    gap: 8,
+    flexWrap: "wrap",
     paddingHorizontal: 16,
   },
   categoryButton: {
@@ -550,6 +487,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E0E0E0",
+    marginRight: 8,
+    marginBottom: 8,
   },
   categoryButtonActive: {
     backgroundColor: "#7CB9A9",
@@ -574,27 +513,21 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#999",
   },
   
-  // Footer - Fixed action buttons
-  footer: {
-    position: "absolute",
-    bottom: 140, // Above the bottom navigation
-    left: 0,
-    right: 0,
-    flexDirection: "row",
+  // Button Container - Action button
+  buttonContainer: {
     padding: 16,
-    gap: 12,
+    marginTop: 24,
     backgroundColor: "transparent",
-    justifyContent: "center",
+    alignItems: "center",
   },
   button: {
-    flex: 1,
+    minWidth: 200,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
     borderRadius: 12,
-    gap: 8,
   },
   saveButton: {
     backgroundColor: "#666", // Neutral color for draft action

@@ -450,3 +450,28 @@ export const toggleBookmark = mutation({
     }
   },
 });
+
+/**
+ * Get a single post by ID
+ */
+export const getPost = query({
+  args: { postId: v.id("communityPosts") },
+  handler: async (ctx, { postId }) => {
+    const post = await ctx.db.get(postId);
+    if (!post) return null;
+    // Optionally enrich with author/profile info
+    const author = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", post.authorId))
+      .first();
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", post.authorId))
+      .first();
+    return {
+      ...post,
+      authorName: author?.firstName || "Community Member",
+      authorImage: profile?.profileImageUrl || null,
+    };
+  },
+});
