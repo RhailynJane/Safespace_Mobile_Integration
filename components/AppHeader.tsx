@@ -63,6 +63,7 @@ export const AppHeader = ({
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
   const [checkingAssessment, setCheckingAssessment] = useState(true);
+  const [menuKey, setMenuKey] = useState(0);
 
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
@@ -114,6 +115,7 @@ export const AppHeader = ({
     loadProfileImage();
 
     setSideMenuVisible(true);
+    setMenuKey(prev => prev + 1); // Increment key to force ScrollView remount
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 300,
@@ -559,15 +561,23 @@ export const AppHeader = ({
             { 
               opacity: fadeAnim, 
               backgroundColor: theme.colors.surface,
-              paddingTop: Math.max(insets.top, 20) // Use safe area top with minimum 20px
+              paddingTop: Math.max(insets.top, 20),
             }
           ]}>
-            {/* FIXED: Added avatar with initials to side menu header */}
+            {/* Improved side menu header */}
             <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View
                 style={[
                   styles.profileAvatar,
-                  { borderWidth: 2, borderColor: "red" },
+                  { 
+                    borderWidth: 3, 
+                    borderColor: "#4CAF50",
+                    shadowColor: "#4CAF50",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 4,
+                    elevation: 4,
+                  },
                 ]}
               >
                 {profileImage && normalizeImageUri(profileImage) ? (
@@ -589,44 +599,74 @@ export const AppHeader = ({
             </View>
 
             <ScrollView 
+              key={`menu-${menuKey}`}
               style={styles.sideMenuContent}
-              contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 20, 40) }}
+              contentContainerStyle={{ paddingBottom: 100 }}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
             >
-              {sideMenuItems.map((item, index) => (
+              {sideMenuItems.filter(item => item.title !== "Sign Out").map((item, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
                     styles.sideMenuItem,
-                    { borderBottomColor: theme.colors.borderLight },
+                    { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' },
                     item.disabled && styles.sideMenuItemDisabled,
                   ]}
                   onPress={item.onPress}
                   disabled={item.disabled}
                 >
-                  <Ionicons
-                    name={item.icon as any}
-                    size={20}
-                    color={item.disabled ? "#CCCCCC" : theme.colors.icon}
-                  />
+                  <View style={[styles.menuIconCircle, { backgroundColor: theme.isDark ? 'rgba(76,175,80,0.2)' : '#E8F5E9' }]}>
+                    <Ionicons
+                      name={item.icon as any}
+                      size={20}
+                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.sideMenuItemText,
                       { color: theme.colors.text },
                       item.disabled && styles.sideMenuItemTextDisabled,
-                      item.title === "Sign Out" && styles.signOutText,
                     ]}
                   >
                     {item.title}
-                    {item.title === "Sign Out" && isSigningOut && "..."}
                   </Text>
                   {item.badge && (
                     <View style={styles.dueBadge}>
                       <Text style={styles.dueBadgeText}>{item.badge}</Text>
                     </View>
                   )}
+                  <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            
+            {/* Sign Out Button - Absolute positioned at bottom */}
+            <View style={[styles.signOutSection, { 
+              borderTopColor: theme.colors.borderLight, 
+              paddingBottom: Math.max(insets.bottom + 16, 24),
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: theme.colors.surface,
+            }]}>
+              <TouchableOpacity
+                style={[styles.signOutButton, { backgroundColor: theme.isDark ? 'rgba(255,107,107,0.15)' : '#FFEBEE' }]}
+                onPress={confirmSignOut}
+                disabled={isSigningOut}
+              >
+                <Ionicons
+                  name="log-out"
+                  size={20}
+                  color="#FF6B6B"
+                />
+                <Text style={[styles.signOutText, { marginLeft: 12 }]}>
+                  Sign Out{isSigningOut && "..."}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -729,19 +769,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   sideMenu: {
-    // paddingTop removed - now dynamic based on safe area
     width: width * 0.75,
-    // backgroundColor removed - now uses theme.colors.surface
     height: "100%",
   },
-  // FIXED: Updated sideMenuHeader to include avatar
+  // Updated sideMenuHeader with better spacing
   sideMenuHeader: {
     padding: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    // borderBottomColor removed - now uses theme.colors.borderLight
     alignItems: "center",
   },
-  // NEW: Styles for the profile avatar in side menu
+  // Styles for the profile avatar in side menu
   profileAvatar: {
     width: 60,
     height: 60,
@@ -749,7 +787,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#7CB9A9",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   profileAvatarImage: {
     width: 60,
@@ -763,40 +801,61 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 18,
-    fontWeight: "600",
-    // color removed - now uses theme.colors.text
-    marginBottom: 4,
+    fontWeight: "700",
+    marginBottom: 3,
   },
   profileEmail: {
-    fontSize: 14,
-    // color removed - now uses theme.colors.textSecondary
+    fontSize: 12,
   },
   sideMenuContent: {
-    padding: 10,
+    paddingVertical: 4,
   },
   sideMenuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    // borderBottomColor removed - now uses theme.colors.borderLight
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginHorizontal: 10,
+    marginVertical: 2,
+    borderRadius: 10,
+  },
+  menuIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
   },
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
   sideMenuItemText: {
-    fontSize: 16,
-    // color removed - now uses theme.colors.text
-    marginLeft: 15,
+    fontSize: 14,
+    fontWeight: "500",
+    marginLeft: 0,
     flex: 1,
   },
   sideMenuItemTextDisabled: {
     color: "#CCCCCC",
   },
+  signOutSection: {
+    borderTopWidth: 1,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  signOutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
   signOutText: {
     color: "#FF6B6B",
-    fontWeight: "600",
+    fontWeight: "700",
+    fontSize: 15,
   },
   dueBadge: {
     backgroundColor: "#FF6B6B",
