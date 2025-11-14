@@ -9,6 +9,8 @@
  */
 
 import type * as activities from "../activities.js";
+import type * as announcementActions from "../announcementActions.js";
+import type * as announcements from "../announcements.js";
 import type * as appointments from "../appointments.js";
 import type * as assessments from "../assessments.js";
 import type * as auth from "../auth.js";
@@ -29,6 +31,7 @@ import type * as resources from "../resources.js";
 import type * as settings from "../settings.js";
 import type * as storage from "../storage.js";
 import type * as supportWorkers from "../supportWorkers.js";
+import type * as users from "../users.js";
 import type * as videoCallSessions from "../videoCallSessions.js";
 
 import type {
@@ -47,6 +50,8 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
+  announcementActions: typeof announcementActions;
+  announcements: typeof announcements;
   appointments: typeof appointments;
   assessments: typeof assessments;
   auth: typeof auth;
@@ -67,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   storage: typeof storage;
   supportWorkers: typeof supportWorkers;
+  users: typeof users;
   videoCallSessions: typeof videoCallSessions;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

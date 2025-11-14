@@ -9,9 +9,10 @@ export default defineSchema({
 		firstName: v.optional(v.string()),
 		lastName: v.optional(v.string()),
 		imageUrl: v.optional(v.string()),
+		orgId: v.optional(v.string()), // Organization identifier for scoping
 		createdAt: v.number(),
 		updatedAt: v.number(),
-	}).index("by_clerkId", ["clerkId"]),
+	}).index("by_clerkId", ["clerkId"]).index("by_orgId", ["orgId"]),
 	presence: defineTable({
 		userId: v.string(),
 		status: v.string(), // e.g., 'online' | 'away'
@@ -432,4 +433,22 @@ export default defineSchema({
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	}).index("by_name", ["name"]),
+
+		// Announcements (per-organization)
+	announcements: defineTable({
+		orgId: v.string(), // Organization identifier (e.g., 'cmha-calgary')
+		title: v.string(),
+		body: v.string(),
+		visibility: v.optional(v.string()), // 'org' | 'public' (future use)
+		priority: v.optional(v.string()), // Deprecated but kept for backward compatibility
+		active: v.boolean(),
+		createdAt: v.number(),
+		updatedAt: v.optional(v.number()),
+		authorId: v.optional(v.string()), // Clerk user ID of creator (admin)
+		readBy: v.optional(v.array(v.string())), // Array of Clerk user IDs who have read this
+	})
+		.index("by_org_created", ["orgId", "createdAt"]) // list by org ordered by date
+		.index("by_org_active", ["orgId", "active"]) // filter by org + active
+		.index("by_active", ["active"]) // global active list
+		.index("by_createdAt", ["createdAt"]),
 });
