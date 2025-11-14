@@ -30,8 +30,13 @@ import { useConvexActivity } from "../utils/hooks/useConvexActivity";
 import { ConvexReactClient, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
+
+// Responsive sizing based on screen height
+const isSmallDevice = height < 700;
+const isMediumDevice = height >= 700 && height < 800;
+
 const normalizeImageUri = (uri?: string | null) => {
   if (!uri) return null;
   if (uri.startsWith('http')) return uri;
@@ -570,13 +575,13 @@ export const AppHeader = ({
                 style={[
                   styles.profileAvatar,
                   { 
-                    borderWidth: 3, 
+                    borderWidth: 2, 
                     borderColor: "#4CAF50",
                     shadowColor: "#4CAF50",
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 4,
-                    elevation: 4,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 3,
+                    elevation: 3,
                   },
                 ]}
               >
@@ -601,7 +606,7 @@ export const AppHeader = ({
             <ScrollView 
               key={`menu-${menuKey}`}
               style={styles.sideMenuContent}
-              contentContainerStyle={{ paddingBottom: 100 }}
+              contentContainerStyle={{ paddingBottom: isSmallDevice ? 80 : isMediumDevice ? 85 : 90 }}
               showsVerticalScrollIndicator={true}
               bounces={true}
             >
@@ -619,7 +624,7 @@ export const AppHeader = ({
                   <View style={[styles.menuIconCircle, { backgroundColor: theme.isDark ? 'rgba(76,175,80,0.2)' : '#E8F5E9' }]}>
                     <Ionicons
                       name={item.icon as any}
-                      size={20}
+                      size={isSmallDevice ? 16 : isMediumDevice ? 17 : 18}
                       color={item.disabled ? "#CCCCCC" : "#4CAF50"}
                     />
                   </View>
@@ -637,7 +642,7 @@ export const AppHeader = ({
                       <Text style={styles.dueBadgeText}>{item.badge}</Text>
                     </View>
                   )}
-                  <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
+                  <Ionicons name="chevron-forward" size={isSmallDevice ? 13 : 14} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -659,7 +664,7 @@ export const AppHeader = ({
               >
                 <Ionicons
                   name="log-out"
-                  size={20}
+                  size={isSmallDevice ? 16 : isMediumDevice ? 17 : 18}
                   color="#FF6B6B"
                 />
                 <Text style={[styles.signOutText, { marginLeft: 12 }]}>
@@ -774,64 +779,64 @@ const styles = StyleSheet.create({
   },
   // Updated sideMenuHeader with better spacing
   sideMenuHeader: {
-    padding: 20,
-    paddingBottom: 16,
+    padding: isSmallDevice ? 12 : isMediumDevice ? 16 : 20,
+    paddingBottom: isSmallDevice ? 10 : isMediumDevice ? 12 : 16,
     borderBottomWidth: 1,
     alignItems: "center",
   },
   // Styles for the profile avatar in side menu
   profileAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    height: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    borderRadius: isSmallDevice ? 25 : isMediumDevice ? 27.5 : 30,
     backgroundColor: "#7CB9A9",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: isSmallDevice ? 6 : isMediumDevice ? 8 : 10,
   },
   profileAvatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    height: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    borderRadius: isSmallDevice ? 25 : isMediumDevice ? 27.5 : 30,
   },
   profileAvatarText: {
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: isSmallDevice ? 16 : isMediumDevice ? 18 : 20,
     fontWeight: "bold",
   },
   profileName: {
-    fontSize: 18,
+    fontSize: isSmallDevice ? 14 : isMediumDevice ? 16 : 18,
     fontWeight: "700",
-    marginBottom: 3,
+    marginBottom: isSmallDevice ? 2 : isMediumDevice ? 2 : 3,
   },
   profileEmail: {
-    fontSize: 12,
+    fontSize: isSmallDevice ? 10 : isMediumDevice ? 11 : 12,
   },
   sideMenuContent: {
-    paddingVertical: 4,
+    paddingVertical: isSmallDevice ? 2 : 4,
   },
   sideMenuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginHorizontal: 10,
-    marginVertical: 2,
-    borderRadius: 10,
+    paddingVertical: isSmallDevice ? 6 : isMediumDevice ? 7 : 8,
+    paddingHorizontal: isSmallDevice ? 8 : isMediumDevice ? 10 : 12,
+    marginHorizontal: isSmallDevice ? 6 : isMediumDevice ? 8 : 10,
+    marginVertical: isSmallDevice ? 1 : isMediumDevice ? 1.5 : 2,
+    borderRadius: isSmallDevice ? 8 : isMediumDevice ? 9 : 10,
   },
   menuIconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: isSmallDevice ? 26 : isMediumDevice ? 28 : 30,
+    height: isSmallDevice ? 26 : isMediumDevice ? 28 : 30,
+    borderRadius: isSmallDevice ? 13 : isMediumDevice ? 14 : 15,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: isSmallDevice ? 6 : isMediumDevice ? 8 : 10,
   },
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
   sideMenuItemText: {
-    fontSize: 14,
+    fontSize: isSmallDevice ? 12 : isMediumDevice ? 13 : 14,
     fontWeight: "500",
     marginLeft: 0,
     flex: 1,
@@ -841,21 +846,21 @@ const styles = StyleSheet.create({
   },
   signOutSection: {
     borderTopWidth: 1,
-    paddingTop: 16,
-    paddingHorizontal: 16,
+    paddingTop: isSmallDevice ? 10 : isMediumDevice ? 12 : 14,
+    paddingHorizontal: isSmallDevice ? 10 : isMediumDevice ? 12 : 14,
   },
   signOutButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    paddingVertical: isSmallDevice ? 10 : isMediumDevice ? 11 : 12,
+    paddingHorizontal: isSmallDevice ? 14 : isMediumDevice ? 16 : 18,
+    borderRadius: isSmallDevice ? 8 : isMediumDevice ? 9 : 10,
   },
   signOutText: {
     color: "#FF6B6B",
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: isSmallDevice ? 13 : isMediumDevice ? 14 : 15,
   },
   dueBadge: {
     backgroundColor: "#FF6B6B",

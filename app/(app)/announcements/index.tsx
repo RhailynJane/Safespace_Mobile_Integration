@@ -177,7 +177,7 @@ const AnnouncementsScreen: React.FC = () => {
           <FlatList
             data={announcements}
             keyExtractor={(item: any) => item.id}
-            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 200 }}
             renderItem={renderItem}
             showsVerticalScrollIndicator={false}
           />

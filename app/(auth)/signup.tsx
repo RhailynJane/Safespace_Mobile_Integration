@@ -34,6 +34,7 @@ export interface SignupData {
   email: string;
   age: string;
   phoneNumber: string;
+  organization: string;
   password: string;
   confirmPassword: string;
   verificationCode: string;
@@ -55,6 +56,7 @@ export default function SignupScreen() {
     email: "",
     age: "",
     phoneNumber: "",
+    organization: "",
     password: "",
     confirmPassword: "",
     verificationCode: "",

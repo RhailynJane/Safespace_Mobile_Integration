@@ -23,6 +23,7 @@ interface SignupData {
   email: string;
   age: string;
   phoneNumber: string;
+  organization: string;
 }
 
 // Props interface for the PersonalInfoStep component
@@ -148,6 +149,11 @@ export default function PersonalInfoStep({
       } else if (!/^\d{10}$/.test(cleanedPhone)) {
         newErrors.phoneNumber = "Phone number must contain only digits";
       }
+    }
+
+    // Validate organization - required field
+    if (!data.organization) {
+      newErrors.organization = "Please select an organization";
     }
 
     // Update error state and return validation status
@@ -322,6 +328,48 @@ export default function PersonalInfoStep({
           )}
         </View>
 
+        {/* Organization Selection */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Organization</Text>
+          <View style={styles.organizationContainer}>
+            {[
+              { id: 'sait', name: 'Southern Alberta Institute of Technology (SAIT)', icon: 'school-outline' },
+              { id: 'cmha-calgary', name: 'CMHA Calgary', icon: 'heart-outline' },
+              { id: 'unaffiliated', name: 'Unaffiliated', icon: 'person-outline' },
+            ].map((org) => (
+              <TouchableOpacity
+                key={org.id}
+                style={[
+                  styles.organizationOption,
+                  { 
+                    backgroundColor: theme.colors.surface,
+                    borderColor: data.organization === org.id ? theme.colors.primary : theme.colors.borderLight,
+                    borderWidth: data.organization === org.id ? 2 : 1,
+                  }
+                ]}
+                onPress={() => onUpdate({ organization: org.id })}
+              >
+                <Ionicons
+                  name={org.icon as any}
+                  size={24}
+                  color={data.organization === org.id ? theme.colors.primary : theme.colors.icon}
+                />
+                <Text
+                  style={[
+                    styles.organizationText,
+                    { color: data.organization === org.id ? theme.colors.primary : theme.colors.text }
+                  ]}
+                >
+                  {org.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {errors.organization && (
+            <Text style={[styles.errorText, { color: theme.colors.error }]}>{errors.organization}</Text>
+          )}
+        </View>
+
         {/* Continue Button */}
         <TouchableOpacity style={[styles.continueButton, { backgroundColor: theme.colors.primary }]} onPress={handleSubmit}>
           <Text style={styles.continueButtonText}>Continue</Text>
@@ -431,5 +479,27 @@ const styles = StyleSheet.create({
     color: "#FFFFFF", // White text on teal background
     fontSize: 18,
     fontWeight: "600", // Semi-bold for emphasis
+  },
+
+  // Organization selection container
+  organizationContainer: {
+    gap: 12,
+  },
+
+  // Individual organization option card
+  organizationOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+
+  // Organization name text
+  organizationText: {
+    fontSize: 14,
+    fontWeight: "500",
+    flex: 1,
   },
 });
