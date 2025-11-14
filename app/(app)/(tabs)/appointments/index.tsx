@@ -129,26 +129,85 @@ export default function AppointmentsScreen() {
         });
       }
 
-      // Format date to match the list view
+      // Format date to match the list view (parse as YYYY-MM-DD without UTC conversion)
       const formatDate = (iso: string) => {
-        const d = new Date(iso);
+        const [year, month, day] = iso.split('-').map(Number);
+        const d = new Date(year, month - 1, day);
         return d.toLocaleDateString('en-US', {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
         });
       };
 
-      // Upcoming count from same source as list
-      const upcomingCountVal = (upcoming as any[]).length;
-      setUpcomingCount(upcomingCountVal);
+      // Upcoming count aligned with list logic (Mountain Time, exclude past time today)
+      const nowParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Denver',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(new Date());
+      const getPart = (type: string) => {
+        const p = nowParts.find((x) => x.type === type)?.value;
+        return p ? parseInt(p, 10) : 0;
+      };
+      const nowYear = getPart('year');
+      const nowMonth = getPart('month');
+      const nowDay = getPart('day');
+      const nowHour = getPart('hour');
+      const nowMinute = getPart('minute');
 
-      // Completed count mirrors the list logic (exclude cancelled)
-      const completedCountVal = (past as any[])
-        .map((apt: any) => mapAppointmentStatus(apt.status as any, apt.date, apt.time).toLowerCase())
-        .filter((s) => s === 'past').length;
-      setCompletedCount(completedCountVal);
+      const isFutureOrNowMST = (isoDate: string, time: string | undefined) => {
+        const [y, m, d] = isoDate.split('-').map((n) => parseInt(n, 10));
+        const [hh, mm] = (time || '00:00').split(':').map((n) => parseInt(n, 10));
+        if (y > nowYear) return true;
+        if (y < nowYear) return false;
+        if (m > nowMonth) return true;
+        if (m < nowMonth) return false;
+        if (d > nowDay) return true;
+        if (d < nowDay) return false;
+        if (hh > nowHour) return true;
+        if (hh < nowHour) return false;
+        return (mm >= nowMinute);
+      };
 
-      // Next session = first upcoming item (backend should already sort soonest-first)
-      const nextRaw = (upcoming as any[])[0];
+      const upcomingFiltered = (upcoming as any[])
+        .filter((apt: any) => ["scheduled", "confirmed"].includes(apt.status))
+        .filter((apt: any) => isFutureOrNowMST(apt.date, apt.time));
+
+      setUpcomingCount(upcomingFiltered.length);
+
+      // Completed count mirrors the list screen exactly: past (by MST) and not cancelled
+      const isPastMST = (apt: any) => {
+        const [y, m, d] = (apt.date || '').split('-').map((n: string) => parseInt(n, 10));
+        const [hh, mm] = (apt.time || '00:00').split(':').map((n: string) => parseInt(n, 10));
+        if (['completed', 'no_show'].includes(apt.status)) return true;
+        if (['scheduled', 'confirmed'].includes(apt.status)) {
+          // Compare components in Mountain Time
+          if (!y || !m || !d) return false;
+          const np = nowParts;
+          const ny = nowYear, nm = nowMonth, nd = nowDay, nh = nowHour, nmin = nowMinute;
+          if (y < ny) return true;
+          if (y > ny) return false;
+          if (m < nm) return true;
+          if (m > nm) return false;
+          if (d < nd) return true;
+          if (d > nd) return false;
+          if (hh < nh) return true;
+          if (hh > nh) return false;
+          return (mm < nmin);
+        }
+        return false;
+      };
+
+      const completedFiltered = ([...(upcoming as any[]), ...(past as any[])])
+        .filter(isPastMST)
+        .filter((apt: any) => apt.status !== 'cancelled');
+      setCompletedCount(completedFiltered.length);
+
+      // Next session = first filtered upcoming item (already sorted soonest-first by backend)
+      const nextRaw = upcomingFiltered[0];
       if (nextRaw) {
         const mappedNext: Appointment = {
           id: 0 as any,

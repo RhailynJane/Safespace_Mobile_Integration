@@ -86,18 +86,50 @@ export default function BookAppointment() {
     setStatusModalVisible(true);
   }, []);
 
-  // Build next 14 days for quick selection. If all slots for today are past (after 4:30 PM), skip today.
+  // Build next 14 days for quick selection in Mountain Time
   const days = useMemo(() => {
     const list: { iso: string; label: string; weekday: string }[] = [];
+    
+    // Get current time in Mountain Time
     const now = new Date();
-    const includeToday = now.getHours() < 16 || (now.getHours() === 16 && now.getMinutes() < 30);
+    const mountainParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(now);
+    
+    const get = (type: string) => Number(mountainParts.find(p => p.type === type)?.value || 0);
+    const mountainHour = get('hour');
+    const mountainMinute = get('minute');
+    const mountainYear = get('year');
+    const mountainMonth = get('month') - 1; // JavaScript months are 0-indexed
+    const mountainDay = get('day');
+    
+    // Check if it's too late to book for today (after 4:30 PM Mountain Time)
+    const includeToday = mountainHour < 16 || (mountainHour === 16 && mountainMinute < 30);
     const startOffset = includeToday ? 0 : 1;
+    
+    // Create base date in Mountain Time
+    const today = new Date(mountainYear, mountainMonth, mountainDay);
+    
     for (let i = 0; i < 14; i++) {
-      const d = new Date(now);
-      d.setDate(now.getDate() + i + startOffset);
-      const iso = d.toISOString().split('T')[0]!;
-      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const label = d.getDate().toString();
+      const offset = i + startOffset;
+      
+      // Calculate year, month, day by adding offset to today
+      const targetDate = new Date(mountainYear, mountainMonth, mountainDay + offset);
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth() + 1;
+      const day = targetDate.getDate();
+      
+      // Format as YYYY-MM-DD
+      const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
+      // Get weekday from the properly calculated date
+      const weekday = targetDate.toLocaleDateString('en-US', { weekday: 'short' });
+      const label = day.toString();
       list.push({ iso, label, weekday });
     }
     return list;
@@ -136,11 +168,29 @@ export default function BookAppointment() {
 
   const handleContinue = () => {
     if (!selectedDate || !selectedTime) return;
+    
+    // Format the date for display (parse as Mountain Time)
+    const parts = selectedDate.split('-').map(Number);
+    const year = parts[0];
+    const month = parts[1];
+    const day = parts[2];
+    
+    if (!year || !month || !day) return;
+    
+    const dateObj = new Date(year, month - 1, day);
+    const selectedDateDisplay = dateObj.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
     const typeLabel = selectedType === 'in_person' ? 'in-person' : 'video';
     router.push({
       pathname: '/appointments/confirm',
       params: {
         selectedDate: selectedDate,
+        selectedDateDisplay: selectedDateDisplay,
         selectedTime: selectedTime,
         selectedType: typeLabel,
         supportWorkerName: 'Auto-assigned by CMHA',
@@ -433,14 +483,26 @@ export default function BookAppointment() {
             })}
           </View>
 
-          {selectedDate && selectedTime && (
-            <View style={styles.selectionSummary}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={styles.selectionText}>
-                {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, {selectedTime} • {selectedType === 'in_person' ? 'In person' : 'Video'}
-              </Text>
-            </View>
-          )}
+          {selectedDate && selectedTime && (() => {
+            // Parse date as YYYY-MM-DD without UTC conversion
+            const parts = selectedDate.split('-').map(Number);
+            const year = parts[0];
+            const month = parts[1];
+            const day = parts[2];
+            
+            if (!year || !month || !day) return null;
+            
+            const dateObj = new Date(year, month - 1, day);
+            const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            return (
+              <View style={styles.selectionSummary}>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <Text style={styles.selectionText}>
+                  {dateStr}, {selectedTime} • {selectedType === 'in_person' ? 'In person' : 'Video'}
+                </Text>
+              </View>
+            );
+          })()}
 
           {/* Continue button */}
           <TouchableOpacity

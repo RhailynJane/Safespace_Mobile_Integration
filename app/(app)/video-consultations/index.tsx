@@ -32,7 +32,8 @@ const { width } = Dimensions.get("window");
 type Appointment = {
   id: string;
   supportWorker: string;
-  date: string;
+  date: string; // display date
+  isoDate?: string; // YYYY-MM-DD for comparisons
   time: string;
   type: string;
   status: "upcoming" | "past" | "cancelled";
@@ -127,21 +128,16 @@ export default function VideoScreen() {
         })
         .map((apt: any) => {
           try {
-            // Validate and parse date
-            let appointmentDate: Date;
-            if (typeof apt.date === 'string') {
-              appointmentDate = new Date(apt.date);
-            } else if (apt.date instanceof Date) {
-              appointmentDate = apt.date;
-            } else {
-              console.warn('Invalid date format for appointment:', apt.id);
+            // Parse date as YYYY-MM-DD (no timezone conversion)
+            const [year, month, day] = (apt.date || '').split('-').map(Number);
+            
+            if (!year || !month || !day) {
+              console.warn('Invalid date format for appointment:', apt.id, apt.date);
               return null;
             }
 
-            if (isNaN(appointmentDate.getTime())) {
-              console.warn('Invalid date value for appointment:', apt.id, apt.date);
-              return null;
-            }
+            // Create date in local time (not UTC) for display formatting
+            const appointmentDate = new Date(year, month - 1, day);
 
             // Format readable date
             const formattedDate = appointmentDate.toLocaleDateString('en-US', {
@@ -151,21 +147,21 @@ export default function VideoScreen() {
               day: 'numeric'
             });
 
-            // Calculate numeric timestamp for sorting
-            const year = appointmentDate.getUTCFullYear();
-            const month = appointmentDate.getUTCMonth() + 1;
-            const day = appointmentDate.getUTCDate();
-
+            // Calculate numeric timestamp for sorting (no UTC)
             const timeStr: string = apt.time || '00:00:00';
             const [hStr, mStr] = timeStr.split(':');
             const aptHour = parseInt(hStr || '0', 10);
             const aptMinute = parseInt(mStr || '0', 10);
             const aptNumeric = year * 100000000 + month * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
 
+            // ISO date for comparisons
+            const isoDate = `${String(year).padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
             return {
               id: apt.id,
               supportWorker: apt.supportWorker || 'Support Worker',
               date: formattedDate,
+              isoDate,
               time: apt.time || '',
               type: apt.type || 'Video',
               status: 'upcoming', // Backend already filtered to upcoming only
@@ -179,9 +175,40 @@ export default function VideoScreen() {
         })
         .filter((apt: Appointment | null): apt is Appointment => apt !== null);
 
-      // Sort by numeric timestamp and get first one
-      if (transformed.length > 0) {
-        const sorted = [...transformed].sort((a, b) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
+      // Filter out appointments already in the past (Mountain Time), then sort and take first
+      const nowParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Denver',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(new Date());
+      const getPart = (type: string) => {
+        const p = nowParts.find((x) => x.type === type)?.value;
+        return p ? parseInt(p, 10) : 0;
+      };
+      const ny = getPart('year');
+      const nm = getPart('month');
+      const nd = getPart('day');
+      const nh = getPart('hour');
+      const nmin = getPart('minute');
+
+      const isFutureOrNowMST = (iso: string | undefined, time: string | undefined) => {
+        if (!iso) return false;
+        const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
+        const [hh, mm] = (time || '00:00').split(':').map((n) => parseInt(n, 10));
+        if (y > ny) return true; if (y < ny) return false;
+        if (m > nm) return true; if (m < nm) return false;
+        if (d > nd) return true; if (d < nd) return false;
+        if (hh > nh) return true; if (hh < nh) return false;
+        return mm >= nmin;
+      };
+
+      const futureOnly = transformed.filter((t) => isFutureOrNowMST(t.isoDate, t.time));
+      if (futureOnly.length > 0) {
+        const sorted = [...futureOnly].sort((a, b) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
         setUpcoming(sorted[0] ?? null);
       } else {
         setUpcoming(null);
@@ -193,15 +220,41 @@ export default function VideoScreen() {
   }, [convexAppointments]);  
 
   // Check if appointment can be joined (scheduled/confirmed and within time window)
-  // Check if appointment can be joined (scheduled/confirmed and within time window)
   const canJoinAppointment = useCallback((appointment: Appointment | null): boolean => {
     if (!appointment || !appointment.date || !appointment.time) return false;
     if (!["scheduled", "confirmed"].includes(appointment.status)) return false;
     try {
-      const aptDateTime = new Date(`${appointment.date}T${appointment.time}`);
-      if (isNaN(aptDateTime.getTime())) return false;
-      const now = new Date();
-      const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+      // Parse date components (YYYY-MM-DD) from isoDate and time (HH:MM)
+      const [year, month, day] = (appointment.isoDate || '').split('-').map(Number);
+      const [hours, minutes] = appointment.time.split(':').map(Number);
+      
+      // Get current time in Mountain Time using formatToParts
+      const nowParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Denver',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(new Date());
+      
+      const getPart = (type: string) => {
+        const part = nowParts.find(p => p.type === type);
+        return part ? parseInt(part.value, 10) : 0;
+      };
+      
+      const nowYear = getPart('year');
+      const nowMonth = getPart('month');
+      const nowDay = getPart('day');
+      const nowHour = getPart('hour');
+      const nowMinute = getPart('minute');
+      
+      // Create timestamp for appointment and now (in minutes)
+      const aptMinutes = year * 525600 + month * 43800 + day * 1440 + hours * 60 + minutes;
+      const nowMinutes = nowYear * 525600 + nowMonth * 43800 + nowDay * 1440 + nowHour * 60 + nowMinute;
+      
+      const minutesUntilAppointment = aptMinutes - nowMinutes;
       return minutesUntilAppointment >= -60 && minutesUntilAppointment <= 10;
     } catch {
       return false;
@@ -214,14 +267,30 @@ export default function VideoScreen() {
   // Handler for join button
   const handleJoinMeetingWithRestriction = () => {
     if (!upcoming || !upcoming.date || !upcoming.time) return;
-    const aptDateTime = new Date(`${upcoming.date}T${upcoming.time}`);
-    if (isNaN(aptDateTime.getTime())) return;
-    const now = new Date();
-    const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+    // Compute minutes until appointment in Mountain Time using isoDate/time
+    const [y, m, d] = (upcoming.isoDate || '').split('-').map((n) => parseInt(n, 10));
+    const [hh, mm] = (upcoming.time || '00:00').split(':').map((n) => parseInt(n, 10));
+    if (!y || !m || !d) return;
+
+    const nowParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Denver',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(new Date());
+    const getPart = (type: string) => {
+      const p = nowParts.find((x) => x.type === type)?.value;
+      return p ? parseInt(p, 10) : 0;
+    };
+    const ny = getPart('year');
+    const nm = getPart('month');
+    const nd = getPart('day');
+    const nh = getPart('hour');
+    const nmin = getPart('minute');
+    const aptMinutes = y * 525600 + m * 43800 + d * 1440 + hh * 60 + mm;
+    const nowMinutes = ny * 525600 + nm * 43800 + nd * 1440 + nh * 60 + nmin;
+    const minutesUntilAppointment = aptMinutes - nowMinutes;
     if (minutesUntilAppointment > 10) {
-      // Format date/time as MM-DD-YYYY HH:SS
-      const formatted = `${String(aptDateTime.getMonth()+1).padStart(2,'0')}-${String(aptDateTime.getDate()).padStart(2,'0')}-${aptDateTime.getFullYear()} ${String(aptDateTime.getHours()).padStart(2,'0')}:${String(aptDateTime.getMinutes()).padStart(2,'0')}`;
-      setJoinRestrictionMsg(`The date is in ${formatted}. You can join 10 mins before the scheduled appt.`);
+      setJoinRestrictionMsg(`The session is scheduled. You can join 10 mins before the appointment time.`);
       return;
     }
     setJoinRestrictionMsg(null);

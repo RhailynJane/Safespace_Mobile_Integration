@@ -96,7 +96,15 @@ export const getUpcomingAppointments = query({
 		limit: v.optional(v.number())
 	},
 	handler: async (ctx, { userId, limit = 50 }) => {
-		const today = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
+		// Get today's date in Mountain Time (America/Denver)
+		const nowMST = new Date().toLocaleString('en-US', { timeZone: 'America/Denver' });
+		const mstDate = new Date(nowMST);
+		const year = mstDate.getFullYear();
+		const month = String(mstDate.getMonth() + 1).padStart(2, '0');
+		const day = String(mstDate.getDate()).padStart(2, '0');
+		const today = `${year}-${month}-${day}`; // YYYY-MM-DD in Mountain Time
+		
+		console.log(`🔍 getUpcomingAppointments - Today in MST: ${today}, userId: ${userId}`);
 		
 		// Get appointments with upcoming statuses (today or future dates)
 		const appointments = await ctx.db
@@ -119,6 +127,9 @@ export const getUpcomingAppointments = query({
 			return a.time.localeCompare(b.time);
 		});
 
+		console.log(`📊 getUpcomingAppointments - Found ${sorted.length} appointments`);
+		sorted.forEach(apt => console.log(`  - ${apt.date} ${apt.time} (${apt.status})`));
+
 		return sorted.slice(0, limit).map(toClient);
 	},
 });
@@ -133,7 +144,13 @@ export const getPastAppointments = query({
 		limit: v.optional(v.number())
 	},
 	handler: async (ctx, { userId, limit = 50 }) => {
-		const today = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
+		// Get today's date in Mountain Time (America/Denver)
+		const nowMST = new Date().toLocaleString('en-US', { timeZone: 'America/Denver' });
+		const mstDate = new Date(nowMST);
+		const year = mstDate.getFullYear();
+		const month = String(mstDate.getMonth() + 1).padStart(2, '0');
+		const day = String(mstDate.getDate()).padStart(2, '0');
+		const today = `${year}-${month}-${day}`; // YYYY-MM-DD in Mountain Time
 		
 		// Get appointments with past dates (before today)
 		const pastDates = await ctx.db

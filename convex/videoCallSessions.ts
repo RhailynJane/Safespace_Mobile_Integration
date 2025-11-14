@@ -91,12 +91,39 @@ export const endSession = mutation({
       updatedAt: now,
     });
 
-    // If linked to appointment, update appointment status to completed
+    // If linked to appointment, conditionally update appointment status to completed
     if (session.appointmentId) {
-      await ctx.db.patch(session.appointmentId, {
-        status: "completed",
-        updatedAt: now,
-      });
+      try {
+        const apt = await ctx.db.get(session.appointmentId);
+        if (apt && typeof apt.date === 'string' && typeof apt.time === 'string') {
+          // Get current time in Mountain Time components
+          const nowStr = new Date().toLocaleString('en-US', { timeZone: 'America/Denver' });
+          const nowMST = new Date(nowStr);
+          const ny = nowMST.getFullYear();
+          const nm = nowMST.getMonth() + 1;
+          const nd = nowMST.getDate();
+          const nh = nowMST.getHours();
+          const nmin = nowMST.getMinutes();
+
+          // Parse appointment scheduled time components (YYYY-MM-DD and HH:mm)
+          const [y, m, d] = (apt.date as string).split('-').map((n: string) => parseInt(n, 10));
+          const [hh, mm] = (apt.time as string).split(':').map((n: string) => parseInt(n, 10));
+
+          const schedMinutes = y * 525600 + m * 43800 + d * 1440 + hh * 60 + mm;
+          const nowMinutes = ny * 525600 + nm * 43800 + nd * 1440 + nh * 60 + nmin;
+
+          // Only mark completed if the session ended at or after the scheduled start,
+          // and the connected duration was at least 60 seconds
+          if (nowMinutes >= schedMinutes && duration >= 60) {
+            await ctx.db.patch(session.appointmentId, {
+              status: "completed",
+              updatedAt: now,
+            });
+          }
+        }
+      } catch (_e) {
+        // non-blocking safeguard
+      }
     }
 
     return { ok: true, duration };
@@ -438,13 +465,6 @@ export const reportQualityIssue = mutation({
                 <p class="${descriptionClass}">${userDescription}</p>
             </div>
             
-            <p style="color: #333333; line-height: 1.6; margin: 20px 0;">
-                Please review this feedback to help improve the video call experience for future sessions.
-            </p>
-            
-            <center>
-                <a href="${viewDetailsUrl}" class="cta-button">View Session Details</a>
-            </center>
             
             <p style="color: #666666; font-size: 14px; margin-top: 30px; line-height: 1.6;">
                 This report was automatically generated from the Safespace Video mobile app. For technical support or questions, please contact the development team.

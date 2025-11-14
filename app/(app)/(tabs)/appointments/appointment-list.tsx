@@ -131,22 +131,61 @@ const fetchAppointments = useCallback(async () => {
       });
     }
 
-    // Map to UI type and format date neatly
+    // Map to UI type and format date neatly (preserve Mountain Time, don't convert)
     const formatDate = (iso: string) => {
-      const d = new Date(iso);
+      // Parse as YYYY-MM-DD without timezone conversion
+      const [year, month, day] = iso.split('-').map(Number);
+      if (!year || !month || !day) return iso;
+      
+      // Create date in local time (not UTC)
+      const d = new Date(year, month - 1, day);
       return d.toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       });
     };
 
-    // Helper to check if appointment is in the past
+    // Helper to check if appointment is in the past (Mountain Time)
     const isPastAppointment = (apt: any) => {
       // Only completed/no_show, or scheduled/confirmed with date/time in the past
       if (["completed", "no_show"].includes(apt.status)) return true;
       if (["scheduled", "confirmed"].includes(apt.status)) {
         try {
-          const aptDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`);
-          return aptDateTime.getTime() < Date.now();
+          // Parse date components (YYYY-MM-DD) and time (HH:MM)
+          const [year, month, day] = apt.date.split('-').map(Number);
+          const [hours, minutes] = (apt.time || '00:00').split(':').map(Number);
+          
+          // Get current time in Mountain Time using formatToParts
+          const nowParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Denver',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).formatToParts(new Date());
+          
+          const getPart = (type: string) => {
+            const part = nowParts.find(p => p.type === type);
+            return part ? parseInt(part.value, 10) : 0;
+          };
+          
+          const nowYear = getPart('year');
+          const nowMonth = getPart('month');
+          const nowDay = getPart('day');
+          const nowHour = getPart('hour');
+          const nowMinute = getPart('minute');
+          
+          // Compare date/time components
+          if (year < nowYear) return true;
+          if (year > nowYear) return false;
+          if (month < nowMonth) return true;
+          if (month > nowMonth) return false;
+          if (day < nowDay) return true;
+          if (day > nowDay) return false;
+          if (hours < nowHour) return true;
+          if (hours > nowHour) return false;
+          return minutes < nowMinute;
         } catch {
           return false;
         }
@@ -159,8 +198,42 @@ const fetchAppointments = useCallback(async () => {
       .filter((apt: any) => ["scheduled", "confirmed"].includes(apt.status))
       .filter((apt: any) => {
         try {
-          const aptDateTime = new Date(`${apt.date}T${apt.time || '00:00'}`);
-          return aptDateTime.getTime() >= Date.now();
+          // Parse date components (YYYY-MM-DD) and time (HH:MM)
+          const [year, month, day] = apt.date.split('-').map(Number);
+          const [hours, minutes] = (apt.time || '00:00').split(':').map(Number);
+          
+          // Get current time in Mountain Time using formatToParts
+          const nowParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Denver',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).formatToParts(new Date());
+          
+          const getPart = (type: string) => {
+            const part = nowParts.find(p => p.type === type);
+            return part ? parseInt(part.value, 10) : 0;
+          };
+          
+          const nowYear = getPart('year');
+          const nowMonth = getPart('month');
+          const nowDay = getPart('day');
+          const nowHour = getPart('hour');
+          const nowMinute = getPart('minute');
+          
+          // Compare date/time components - return true if appointment is in future
+          if (year > nowYear) return true;
+          if (year < nowYear) return false;
+          if (month > nowMonth) return true;
+          if (month < nowMonth) return false;
+          if (day > nowDay) return true;
+          if (day < nowDay) return false;
+          if (hours > nowHour) return true;
+          if (hours < nowHour) return false;
+          return minutes >= nowMinute;
         } catch {
           return true;
         }
@@ -178,8 +251,10 @@ const fetchAppointments = useCallback(async () => {
       }));
 
     // Past: completed/no_show, or scheduled/confirmed with date/time in past
+    // DO NOT include cancelled appointments
     const mappedPast: Appointment[] = ([...upcoming, ...past] as any[])
       .filter(isPastAppointment)
+      .filter((apt: any) => apt.status !== 'cancelled') // Exclude cancelled
       .map((apt: any) => ({
         id: String(apt.id),
         supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',

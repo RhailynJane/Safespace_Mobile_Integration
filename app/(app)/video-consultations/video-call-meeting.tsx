@@ -253,9 +253,30 @@ export default function VideoCallScreen() {
     };
   }, [initializeCall, sessionIdParam, attachExistingSession]);
 
+  // Request camera permissions on mount
+  useEffect(() => {
+    if (isFocused && !permission?.granted && permission?.canAskAgain) {
+      console.log('Requesting camera permission...');
+      requestCameraPermissionImmediately();
+    }
+  }, [isFocused, permission?.granted, permission?.canAskAgain, requestCameraPermissionImmediately]);
+
+  // Request camera permissions on mount
+  useEffect(() => {
+    if (isFocused && !permission?.granted && permission?.canAskAgain) {
+      console.log('🎥 Requesting camera permission...');
+      requestCameraPermissionImmediately();
+    } else if (permission?.granted) {
+      console.log('✅ Camera permission already granted');
+    } else if (!permission?.canAskAgain) {
+      console.log('⚠️ Camera permission denied - user must enable in settings');
+    }
+  }, [isFocused, permission?.granted, permission?.canAskAgain, requestCameraPermissionImmediately]);
+
   // Ensure camera is ready when permissions are granted
   useEffect(() => {
     if (isFocused && isCameraOn && permission?.granted && showCamera) {
+      console.log('Camera ready - permissions granted');
       setCameraReady(true);
     }
   }, [isFocused, isCameraOn, permission?.granted, showCamera]);
@@ -388,7 +409,7 @@ export default function VideoCallScreen() {
   };
 
   const handleCameraReady = useCallback(() => {
-    console.log('Camera is ready');
+    console.log('✅ Camera is ready and initialized');
     setCameraReady(true);
     if (cameraReadyTimeoutRef.current) {
       clearTimeout(cameraReadyTimeoutRef.current);
@@ -396,9 +417,21 @@ export default function VideoCallScreen() {
   }, []);
 
   const handleCameraError = useCallback((e: any) => {
-    console.log('CameraView onMountError', e?.nativeEvent || e);
-    setCameraReady(false);
-  }, []);
+    console.error('❌ CameraView mount error:', e?.nativeEvent || e);
+    console.log('📊 Camera debug:', { 
+      isCameraOn, 
+      facing, 
+      hasPermission: permission?.granted,
+      isFocused,
+      showCamera,
+      cameraRefresh 
+    });
+    // Try to recover by refreshing camera
+    setTimeout(() => {
+      console.log('🔄 Attempting camera recovery...');
+      setCameraRefresh(prev => prev + 1);
+    }, 1000);
+  }, [isCameraOn, facing, permission?.granted, isFocused, showCamera, cameraRefresh]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#1A1A1A' }}>
@@ -448,7 +481,7 @@ export default function VideoCallScreen() {
               {isFocused && isCameraOn && permission?.granted && showCamera ? (
                 <>
                   <CameraView
-                    style={[styles.camera, { backgroundColor: '#000' }]}
+                    style={{ width: '100%', height: '100%' }}
                     facing={facing}
                     onCameraReady={handleCameraReady}
                     onMountError={handleCameraError}
@@ -577,7 +610,7 @@ export default function VideoCallScreen() {
             <View style={{ flex: 1 }}>
               {isFocused && isCameraOn && permission?.granted ? (
                 <CameraView
-                  style={{ flex: 1, backgroundColor: '#000' }}
+                  style={{ flex: 1 }}
                   facing={facing}
                   onCameraReady={handleCameraReady}
                   onMountError={handleCameraError}

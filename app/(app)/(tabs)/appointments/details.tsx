@@ -381,13 +381,28 @@ export default function BookAppointment() {
   // Available session types
   const SESSION_TYPES = ["Video Call", "Phone Call", "In Person"];
 
-  // Generate dates for the current week (starting from today)
-
+  // Generate dates for the current week (starting from today in Mountain Time)
   const generateCurrentWeekDates = () => {
     const dates = [];
-    const today = new Date();
     const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    // Get current date in Mountain Time
+    const now = new Date();
+    const mountainParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    
+    const get = (type: string) => Number(mountainParts.find(p => p.type === type)?.value || 0);
+    const mountainYear = get('year');
+    const mountainMonth = get('month') - 1; // JavaScript months are 0-indexed
+    const mountainDay = get('day');
+    
+    // Create today's date in Mountain Time
+    const today = new Date(mountainYear, mountainMonth, mountainDay);
     
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
@@ -400,7 +415,10 @@ export default function BookAppointment() {
       
       // Store both display format and ISO format
       const displayDate = `${dayName}, ${monthName} ${dayNumber}, ${year}`;
-      const isoDate = date.toISOString().split('T')[0]; // "2025-10-07"
+      // Format as YYYY-MM-DD in Mountain Time (no UTC conversion)
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const isoDate = `${year}-${month}-${day}`;
       
       dates.push({
         display: displayDate,
