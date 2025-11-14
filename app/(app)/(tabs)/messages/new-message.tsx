@@ -8,30 +8,23 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
   TextInput,
   Image,
   Modal,
-  Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
-import CurvedBackground from "../../../../components/CurvedBackground";
-import { AppHeader } from "../../../../components/AppHeader";
 import { Contact } from "../../../../utils/sendbirdService"; // Keep types only; rely on Convex for actual messaging logic
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
-import { getAvatarSource, getInitials } from "../../../../utils/avatar";
-import { APP_TIME_ZONE } from "../../../../utils/timezone";
-import { useConvex, useQuery } from "convex/react";
+import { getAvatarSource } from "../../../../utils/avatar";
+import { useConvex } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-
-const { width } = Dimensions.get("window");
 
 /**
  * MessagesScreen Component
@@ -43,15 +36,11 @@ export default function NewMessagesScreen() {
   const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
   const { userId, getToken } = useAuth();
   const API_BASE_URL = getApiBaseUrl();
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("messages");
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [newMessageModalVisible, setNewMessageModalVisible] = useState(false);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [conversations, setConversations] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [searching, setSearching] = useState(false);
-  const [filteredConversations, setFilteredConversations] = useState<any[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<Contact[]>([]);
   const [statusModalVisible, setStatusModalVisible] = useState(false);
   const [statusModalData, setStatusModalData] = useState({
     type: 'info' as 'success' | 'error' | 'info',
@@ -62,14 +51,6 @@ export default function NewMessagesScreen() {
   // Shared Convex client
   const convex = useConvex();
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
-
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);
 
@@ -78,72 +59,34 @@ export default function NewMessagesScreen() {
     setStatusModalVisible(true);
   };
 
-  // Live conversations via Convex subscription (enriched)
-  const liveConversations = useQuery(api.conversations.listForUserEnriched as any, {}) as any[] | undefined;
-
+  // Load suggested users on mount
   useEffect(() => {
-    if (liveConversations) {
-      const mapped = (liveConversations || []).map((c: any) => ({
-        id: c._id,
-        title: c.title || 'Conversation',
-        participants: (c.participants || []).map((p: any) => ({
-          clerk_user_id: p.userId,
-          first_name: p.firstName || '',
-          last_name: p.lastName || '',
-          profile_image_url: p.imageUrl || '',
-          online: undefined,
-          last_active_at: undefined,
-          presence: undefined,
-          email: undefined,
-        })),
-        last_message: c.lastMessage?.body || '',
-        last_message_time: c.lastMessage?.createdAt ? new Date(c.lastMessage.createdAt).toISOString() : (c.updatedAt ? new Date(c.updatedAt).toISOString() : ''),
-        unread_count: c.unreadCount || 0,
-      }));
-      setConversations(mapped);
-      setFilteredConversations(mapped);
-      setLoading(false);
-    }
-  }, [liveConversations]);
-
-  useEffect(() => {
-    filterConversations();
-  }, [searchQuery, liveConversations, userId]);
-
-  // Remove legacy initializeMessaging/loadConversations; handled by live subscription above
-
-  const filterConversations = () => {
     if (!searchQuery.trim()) {
-      setFilteredConversations(conversations);
-      return;
+      loadSuggestedUsers();
     }
+  }, []);
 
-    const filtered = conversations.filter(conversation =>
-      matchConversation(conversation, searchQuery, userId || "")
-    );
-
-    setFilteredConversations(filtered);
-  };
-
-  const matchConversation = (conversation: any, query: string, userId: string) => {
-    const searchLower = query.toLowerCase().trim();
-    const otherParticipants = conversation.participants?.filter(
-      (p: any) => p.clerk_user_id?.toString().trim() !== userId?.toString().trim()
-    ) || [];
-
-    const hasMatchingParticipant = otherParticipants.some((p: any) =>
-      `${p.first_name} ${p.last_name}`.toLowerCase().includes(searchLower) ||
-      p.first_name?.toLowerCase().includes(searchLower) ||
-      p.last_name?.toLowerCase().includes(searchLower)
-    );
-
-    const hasMatchingTitle = conversation.title?.toLowerCase().includes(searchLower);
-    const hasMatchingLastMessage = conversation.last_message?.toLowerCase().includes(searchLower);
-    const hasMatchingEmail = otherParticipants.some((p: any) =>
-      p.email?.toLowerCase().includes(searchLower)
-    );
-
-    return hasMatchingParticipant || hasMatchingTitle || hasMatchingLastMessage || hasMatchingEmail;
+  const loadSuggestedUsers = async () => {
+    if (!userId) return;
+    try {
+      const results = await convex.query(api.profiles.searchUsers, { term: '', limit: 20 });
+      const mapped: Contact[] = (results || []).map((r: any) => ({
+        id: r.clerkId,
+        clerk_user_id: r.clerkId,
+        first_name: r.firstName || '',
+        last_name: r.lastName || '',
+        email: r.email || '',
+        profile_image_url: r.imageUrl || '',
+        online: false,
+        last_active_at: '',
+        role: 'user',
+        has_existing_conversation: false,
+      }));
+      setSuggestedUsers(mapped.filter(u => u.clerk_user_id !== userId)); // Exclude self
+    } catch (error) {
+      console.error('Failed to load suggested users:', error);
+      setSuggestedUsers([]);
+    }
   };
 
   /**
@@ -180,11 +123,9 @@ export default function NewMessagesScreen() {
   }, [userId, convex]);
 
   /**
-   * Debounced search for modal
+   * Debounced search
    */
   useEffect(() => {
-    if (!newMessageModalVisible) return;
-
     const timeoutId = setTimeout(() => {
       if (searchQuery.trim()) {
         handleSearchUsers(searchQuery);
@@ -194,75 +135,7 @@ export default function NewMessagesScreen() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, newMessageModalVisible, handleSearchUsers]);
-
-  /**
-   * Get display name for conversation (showing other participants, not current user)
-   */
-  const getDisplayName = (conversation: any) => {
-    if (!userId) {
-      return conversation.title || "Unknown User";
-    }
-
-    // Filter out current user from participants
-    const otherParticipants = conversation.participants?.filter(
-      (p: any) => p.clerk_user_id?.toString().trim() !== userId.toString().trim()
-    ) || [];
-
-    // If there are other participants, show their names
-    if (otherParticipants.length > 0) {
-      const fullNames = otherParticipants
-        .map((p: any) => {
-          const firstName = p.first_name || '';
-          const lastName = p.last_name || '';
-          return `${firstName} ${lastName}`.trim();
-        })
-        .filter((name: string) => name.length > 0) // Remove empty names
-        .join(", ");
-      
-      return fullNames || "Unknown User";
-    }
-
-    // Fallback to conversation title
-    if (conversation.title) {
-      return conversation.title;
-    }
-
-    return "Unknown User";
-  };
-
-  /**
-   * Get avatar for conversation (showing other participants, not current user)
-   */
-  const getAvatarDisplay = (participants: any[]) => {
-    const others = userId
-      ? participants.filter((p: any) => p.clerk_user_id?.toString().trim() !== userId.toString().trim())
-      : participants;
-    const target = others[0] || participants[0];
-    const avatar = getAvatarSource({
-      profileImageUrl: target?.profile_image_url,
-      imageUrl: target?.profile_image_url, // legacy field mapping
-      firstName: target?.first_name,
-      lastName: target?.last_name,
-      email: target?.email,
-      clerkId: target?.clerk_user_id,
-      apiBaseUrl: API_BASE_URL,
-    });
-    return avatar;
-  };
-
-  /**
-   * Check if other participant is online
-   */
-  const isOtherParticipantOnline = (participants: any[]) => {
-    if (!userId) return false;
-
-    const otherParticipants = participants.filter(
-      (p: any) => p.clerk_user_id?.toString().trim() !== userId.toString().trim()
-    );
-
-    return otherParticipants.some((p: any) => p.online === true);
-  };
+  }, [searchQuery, handleSearchUsers]);
 
   /**
    * Start a new conversation with a user
@@ -285,10 +158,9 @@ export default function NewMessagesScreen() {
         return;
       }
 
-      setNewMessageModalVisible(false);
       setSearchQuery("");
       setSearchResults([]);
-      router.push({
+      router.replace({
         pathname: `/(app)/(tabs)/messages/message-chat-screen`,
         params: {
           id: String(conversationId),
@@ -309,100 +181,16 @@ export default function NewMessagesScreen() {
   };
 
   /**
-   * Handles tab navigation between different app sections
-   */
-  const handleTabPress = (tabId: string) => {
-    setActiveTab(tabId);
-    if (tabId === "home") {
-      router.replace("/(app)/(tabs)/home");
-    } else {
-      router.push(`/(app)/(tabs)/${tabId}`);
-    }
-  };
-
-  /**
-   * Clear search and close modal
-   */
-  const handleCloseModal = () => {
-    setNewMessageModalVisible(false);
-    setSearchQuery("");
-    setSearchResults([]);
-  };
-
-  /**
    * Clear search query
    */
   const clearSearch = () => {
     setSearchQuery("");
   };
 
-  const formatTime = (timestamp: string) => {
-    if (!timestamp) return "";
-
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-
-    if (diff < 24 * 60 * 60 * 1000) {
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: APP_TIME_ZONE,
-      });
-    } else {
-      return date.toLocaleDateString([], { month: "short", day: "numeric", timeZone: APP_TIME_ZONE });
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading messages...</Text>
-      </View>
-    );
-  }
-
-  // Moved BottomNavigation component outside of MessagesScreen
-  const BottomNavigation = ({
-    tabs,
-    activeTab,
-    onTabPress,
-  }: {
-    tabs: Array<{ id: string; name: string; icon: string }>;
-    activeTab: string;
-    onTabPress: (tabId: string) => void;
-  }) => (
-    <View style={[bottomNavStyles.container, { backgroundColor: theme.colors.surface }]}>
-      {tabs.map((tab) => (
-        <TouchableOpacity
-          key={tab.id}
-          style={bottomNavStyles.tab}
-          onPress={() => onTabPress(tab.id)}
-        >
-          <Ionicons
-            name={tab.icon as any}
-            size={24}
-            color={activeTab === tab.id ? theme.colors.primary : theme.colors.iconDisabled}
-          />
-          <Text
-            style={[
-              bottomNavStyles.tabText,
-              { color: activeTab === tab.id ? theme.colors.primary : theme.colors.iconDisabled },
-            ]}
-          >
-            {tab.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
   return (
-    <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        {/* Status Modal */}
-        <Modal
+    <>
+      {/* Status Modal */}
+      <Modal
           visible={statusModalVisible}
           transparent
           animationType="fade"
@@ -460,247 +248,146 @@ export default function NewMessagesScreen() {
           </View>
         </Modal>
 
-        <AppHeader 
-          title="Messages" 
-          showBack={true}
-          rightActions={
-            <TouchableOpacity onPress={() => setNewMessageModalVisible(true)}>
-              <Ionicons name="add" size={24} color={theme.colors.icon} />
-            </TouchableOpacity>
-          }
-        />
-
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons
-            name="search"
-            size={20}
-            color={theme.colors.icon}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={[styles.searchInput, { color: theme.colors.text }]}
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={theme.colors.textSecondary}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Search Results Info */}
-        {!!searchQuery.trim() && (
-          <View style={styles.searchResultsInfo}>
-            <Text style={[styles.searchResultsText, { color: theme.colors.textSecondary }]}>
-              {filteredConversations.length === 0 
-                ? "No conversations found" 
-                : `Found ${filteredConversations.length} conversation${filteredConversations.length === 1 ? '' : 's'}`
-              }
-            </Text>
-            <TouchableOpacity onPress={clearSearch}>
-              <Text style={[styles.clearSearchText, { color: theme.colors.primary }]}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Contact List */}
-        <ScrollView style={styles.contactList}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>
-            {searchQuery.trim() ? "Search Results" : "Recent Conversations"}
-          </Text>
-          {filteredConversations.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons 
-                name={searchQuery.trim() ? "search-outline" : "chatbubble-outline"} 
-                size={64} 
-                color={theme.colors.iconDisabled} 
-              />
-              <Text style={[styles.emptyStateText, { color: theme.colors.text }]}>
-                {searchQuery.trim() ? "No conversations found" : "No conversations yet"}
-              </Text>
-              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
-                {searchQuery.trim() 
-                  ? "Try adjusting your search terms" 
-                  : "Start a new conversation by tapping the + button"
-                }
-              </Text>
-            </View>
-          ) : (
-            filteredConversations.map((conversation) => {
-              const avatar = getAvatarDisplay(conversation.participants || []);
-              const displayName = getDisplayName(conversation);
-              const isOnline = isOtherParticipantOnline(conversation.participants || []);
-              const otherParticipant = (conversation.participants || []).find((p: any) => p.clerk_user_id !== userId);
-
-              return (
-                <TouchableOpacity
-                  key={conversation.id}
-                  style={[styles.contactItem, { borderBottomColor: theme.colors.borderLight }]}
-                  onPress={() =>
-                    router.push({
-                      pathname: `../messages/message-chat-screen`,
-                      params: {
-                        id: conversation.id,
-                        title: displayName,
-                        otherClerkId: otherParticipant?.clerk_user_id || "",
-                        initialOnline: isOnline ? "1" : "0",
-                        initialLastActive: otherParticipant?.last_active_at || "",
-                        profileImageUrl: otherParticipant?.profile_image_url || "",
-                        initialPresence: (otherParticipant?.presence as any) || (isOnline ? 'online' : 'offline'),
-                      }
-                    })
-                  }
-                >
-                  <View style={styles.avatarContainer}>
-                    {avatar.type === "image" ? (
-                      <Image
-                        source={{ uri: avatar.value }}
-                        style={styles.contactAvatar}
-                      />
-                    ) : (
-                      <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
-                        <Text style={styles.avatarText}>
-                          {avatar.value}
-                        </Text>
-                      </View>
-                    )}
-                    {isOnline && (
-                      <View style={[styles.onlineIndicator, { backgroundColor: theme.colors.primary, borderColor: theme.colors.surface }]} />
-                    )}
-                  </View>
-                  <View style={styles.contactInfo}>
-                    <Text style={[styles.contactName, { color: theme.colors.text }]}>{displayName}</Text>
-                    <Text style={[styles.contactMessage, { color: theme.colors.textSecondary }]}>
-                      {conversation.last_message || 'No messages yet'}
-                    </Text>
-                  </View>
-                  <View style={styles.timestampContainer}>
-                    <Text style={[styles.timestamp, { color: theme.colors.textSecondary }]}>
-                      {conversation.last_message_time ? 
-                        formatTime(conversation.last_message_time) : ''
-                      }
-                    </Text>
-                    {conversation.unread_count > 0 && (
-                      <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
-                        <Text style={styles.unreadCount}>
-                          {conversation.unread_count}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-
-        {/* New Message Modal */}
-        <Modal
-          visible={newMessageModalVisible}
-          animationType="slide"
-          presentationStyle="pageSheet"
+      {/* New Message Modal */}
+      <Modal
+        visible={true}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <SafeAreaView
+          edges={["top", "left", "right"]}
+          style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}
         >
-          <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.borderLight }] }>
-              <TouchableOpacity onPress={handleCloseModal}>
-                <Ionicons name="close" size={24} color={theme.colors.icon} />
-              </TouchableOpacity>
-              <Text style={[styles.newMessageModalTitle, { color: theme.colors.text }]}>New Message</Text>
-              <View style={{ width: 24 }} />
-            </View>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.colors.borderLight }]}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="close" size={28} color={theme.colors.icon} />
+            </TouchableOpacity>
+            <Text style={[styles.newMessageModalTitle, { color: theme.colors.text }]}>New message</Text>
+            <View style={{ width: 28 }} />
+          </View>
 
-            {/* Search for Users */}
-            <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons
-                name="search"
-                size={20}
-                color={theme.colors.icon}
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={[styles.searchInput, { color: theme.colors.text }]}
-                placeholder="Search by email address..."
-                value={searchQuery}
-                onChangeText={(text) => {
-                  setSearchQuery(text);
-                  // handleSearchUsers will be called via useEffect debounce
-                }}
-                placeholderTextColor={theme.colors.textSecondary}
-                autoFocus={true}
-              />
-            </View>
+          {/* To Field */}
+          <View style={[styles.toFieldContainer, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.borderLight }]}>
+            <Text style={[styles.toLabel, { color: theme.colors.text }]}>To:</Text>
+            <TextInput
+              style={[styles.toInput, { color: theme.colors.text }]}
+              placeholder="Type a name or email address"
+              value={searchQuery}
+              onChangeText={(text) => {
+                setSearchQuery(text);
+              }}
+              placeholderTextColor={theme.colors.textSecondary}
+              autoFocus={true}
+            />
+          </View>
 
+            {/* Suggested Users Section */}
             <ScrollView style={styles.searchResults}>
-              {searching ? (
-                <View style={styles.centered}>
-                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                </View>
-              ) : (
-                <>
-                  {searchResults.length > 0 ? (
-                    searchResults.map((user) => (
-                      <TouchableOpacity
-                        key={user.id}
-                        style={[styles.searchResultItem, { borderBottomColor: theme.colors.borderLight }]}
-                        onPress={() => startNewConversation(user)}
-                      >
-                        <View style={styles.avatarContainer}>
-                          {(() => {
-                            const avatar = getAvatarSource({
-                              profileImageUrl: user.profile_image_url,
-                              imageUrl: user.profile_image_url,
-                              firstName: user.first_name,
-                              lastName: user.last_name,
-                              email: user.email,
-                              clerkId: user.clerk_user_id,
-                              apiBaseUrl: API_BASE_URL,
-                            });
-                            return avatar.type === 'image' ? (
-                              <Image source={{ uri: avatar.value }} style={styles.contactAvatar} />
-                            ) : (
-                              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
-                                <Text style={styles.avatarText}>{avatar.value}</Text>
-                              </View>
-                            );
-                          })()}
-                          {user.online && <View style={[styles.onlineIndicator, { backgroundColor: theme.colors.primary, borderColor: theme.colors.surface }]} />}
-                        </View>
-                        <View style={styles.contactInfo}>
-                          <Text style={[styles.contactName, { color: theme.colors.text }]}>
-                            {user.first_name && user.last_name 
-                              ? `${user.first_name} ${user.last_name}`
-                              : user.email
-                            }
-                          </Text>
-                          <Text style={[styles.contactEmail, { color: theme.colors.textSecondary }]}>{user.email}</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color={theme.colors.icon} />
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    searchQuery.trim() && (
-                      <View style={styles.centered}>
-                        <Text style={[styles.noResultsText, { color: theme.colors.textSecondary }]}>No users found</Text>
+              {!searchQuery.trim() && (
+                <View>
+                  <Text style={[styles.sectionHeader, { color: theme.colors.textSecondary }]}>Suggested</Text>
+                  {suggestedUsers.map((user) => (
+                    <TouchableOpacity
+                      key={user.id}
+                      style={[styles.searchResultItem, { borderBottomColor: theme.colors.borderLight }]}
+                      onPress={() => startNewConversation(user)}
+                    >
+                      <View style={styles.avatarContainer}>
+                        {(() => {
+                          const avatar = getAvatarSource({
+                            profileImageUrl: user.profile_image_url,
+                            imageUrl: user.profile_image_url,
+                            firstName: user.first_name,
+                            lastName: user.last_name,
+                            email: user.email,
+                            clerkId: user.clerk_user_id,
+                            apiBaseUrl: API_BASE_URL,
+                          });
+                          return avatar.type === 'image' ? (
+                            <Image source={{ uri: avatar.value }} style={styles.contactAvatar} />
+                          ) : (
+                            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
+                              <Text style={styles.avatarText}>{avatar.value}</Text>
+                            </View>
+                          );
+                        })()}
+                        {user.online && <View style={[styles.onlineIndicator, { backgroundColor: theme.colors.primary, borderColor: theme.colors.surface }]} />}
                       </View>
-                    )
-                  )}
-                </>
+                      <View style={styles.contactInfo}>
+                        <Text style={[styles.contactName, { color: theme.colors.text }]}>
+                          {user.first_name && user.last_name 
+                            ? `${user.first_name} ${user.last_name}`
+                            : user.email
+                          }
+                        </Text>
+                        <Text style={[styles.contactEmail, { color: theme.colors.textSecondary }]}>{user.email}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               )}
-            </ScrollView>
-          </SafeAreaView>
-        </Modal>
 
-        <BottomNavigation
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabPress={handleTabPress}
-        />
-      </SafeAreaView>
-    </CurvedBackground>
+              {/* Search Results */}
+              {searchQuery.trim() && (
+                <View>
+                  {searching ? (
+                    <View style={styles.centered}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                    </View>
+                  ) : (
+                    <>
+                      {searchResults.length > 0 ? (
+                        searchResults.map((user) => (
+                          <TouchableOpacity
+                            key={user.id}
+                            style={[styles.searchResultItem, { borderBottomColor: theme.colors.borderLight }]}
+                            onPress={() => startNewConversation(user)}
+                          >
+                            <View style={styles.avatarContainer}>
+                              {(() => {
+                                const avatar = getAvatarSource({
+                                  profileImageUrl: user.profile_image_url,
+                                  imageUrl: user.profile_image_url,
+                                  firstName: user.first_name,
+                                  lastName: user.last_name,
+                                  email: user.email,
+                                  clerkId: user.clerk_user_id,
+                                  apiBaseUrl: API_BASE_URL,
+                                });
+                                return avatar.type === 'image' ? (
+                                  <Image source={{ uri: avatar.value }} style={styles.contactAvatar} />
+                                ) : (
+                                  <View style={[styles.avatarPlaceholder, { backgroundColor: theme.colors.primary }]}>
+                                    <Text style={styles.avatarText}>{avatar.value}</Text>
+                                  </View>
+                                );
+                              })()}
+                              {user.online && <View style={[styles.onlineIndicator, { backgroundColor: theme.colors.primary, borderColor: theme.colors.surface }]} />}
+                            </View>
+                            <View style={styles.contactInfo}>
+                              <Text style={[styles.contactName, { color: theme.colors.text }]}>
+                                {user.first_name && user.last_name 
+                                  ? `${user.first_name} ${user.last_name}`
+                                  : user.email
+                                }
+                              </Text>
+                              <Text style={[styles.contactEmail, { color: theme.colors.textSecondary }]}>{user.email}</Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))
+                      ) : (
+                        <View style={styles.centered}>
+                          <Text style={[styles.noResultsText, { color: theme.colors.textSecondary }]}>No users found</Text>
+                        </View>
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    </>
   );
 }
 
@@ -745,6 +432,30 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   searchInput: {
     flex: 1,
     fontSize: scaledFontSize(16),
+  },
+  toFieldContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  toLabel: {
+    fontSize: scaledFontSize(16),
+    fontWeight: "500",
+    marginRight: 12,
+  },
+  toInput: {
+    flex: 1,
+    fontSize: scaledFontSize(16),
+    paddingVertical: 8,
+  },
+  sectionHeader: {
+    fontSize: scaledFontSize(14),
+    fontWeight: "500",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    textTransform: "uppercase",
   },
   clearButton: {
     padding: 4,
@@ -946,32 +657,5 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(17),
     fontWeight: "600",
     letterSpacing: 0.5,
-  },
-});
-
-const bottomNavStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  tab: {
-    alignItems: "center",
-    padding: 8,
-  },
-  tabText: {
-    fontSize: 12,
-    marginTop: 4,
   },
 });

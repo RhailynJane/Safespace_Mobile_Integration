@@ -252,12 +252,12 @@ export default function MessagesScreen() {
 
   // Removed presence polling per request
 
-  // Poll for new messages from Convex every 10 seconds
+  // Poll for new messages and presence from Convex every 10 seconds
   useEffect(() => {
     if (!isFocused || !userId) return;
     const poll = async () => {
       try {
-        // Refresh online users
+        // Refresh online users with a 5-minute window (same as chat screen)
         const onlineData = await convex.query(api.presence.onlineUsers, { sinceMs: 5 * 60 * 1000 });
         const onlineSet = new Set<string>((onlineData || []).map((p: any) => String(p.userId)));
         setOnlineUsers(onlineSet);
@@ -303,22 +303,29 @@ export default function MessagesScreen() {
   };
 
   const getDisplayName = (conversation: Conversation) => {
-    if (conversation.title) return conversation.title;
-    const others = conversation.participants.filter(p => p.clerk_user_id !== userId);
+    // Since Convex already filters out current user, participants should only contain others
+    // Always derive name from participants for 1-on-1 chats to show the other person's name
+    const others = conversation.participants;
+    
     if (others.length === 1) {
       const p = others[0]!; // assert exists since length === 1
       const name = `${p.first_name || ''} ${p.last_name || ''}`.trim();
       return name || p.email || 'Conversation';
     }
+    
+    // For group chats (multiple participants), use title if available
     if (others.length > 1) {
+      if (conversation.title) return conversation.title;
       return others.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email).filter(Boolean).join(', ');
     }
-    return 'Conversation';
+    
+    // Fallback to title or default
+    return conversation.title || 'Conversation';
   };
 
   const getAvatarDisplay = (participants: Participant[]) => {
-    const others = participants.filter(p => p.clerk_user_id !== userId);
-    const display = others[0] || participants[0];
+    // Since Convex already filters out current user, use participants directly
+    const display = participants[0];
     const avatar = getAvatarSource({
       profileImageUrl: display?.profile_image_url,
       imageUrl: display?.profile_image_url,

@@ -136,6 +136,7 @@ export default function ChatScreen() {
   );
   const [attachmentModalVisible, setAttachmentModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
   const [currentAttachment, setCurrentAttachment] =
@@ -157,6 +158,8 @@ export default function ChatScreen() {
   const [pendingRecordingUri, setPendingRecordingUri] = useState<string | null>(null);
   const [pendingRecordingDuration, setPendingRecordingDuration] = useState(0);
   const [pendingFiles, setPendingFiles] = useState<Array<{ uri: string; name: string; size?: number }>>([]);
+  const [showVoiceRecordOverlay, setShowVoiceRecordOverlay] = useState(false);
+  const [showVoiceSendConfirm, setShowVoiceSendConfirm] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('smileys');
   const emojiScrollRef = useRef<ScrollView>(null);
@@ -304,6 +307,28 @@ export default function ChatScreen() {
     })();
   }, []);
 
+  // Initialize contact from params on mount
+  useEffect(() => {
+    if (!otherClerkIdParam) return;
+    
+    // Parse conversationTitle to get first/last name
+    const titleParts = (conversationTitle || '').trim().split(' ');
+    const firstName = titleParts[0] || '';
+    const lastName = titleParts.slice(1).join(' ') || '';
+    
+    setContact({
+      id: otherClerkIdParam,
+      clerk_user_id: otherClerkIdParam,
+      first_name: firstName,
+      last_name: lastName,
+      profile_image_url: profileImageUrlParam || undefined,
+      online: initialOnlineParam === '1',
+      last_active_at: initialLastActiveParam || null,
+      email: '',
+      presence: (initialPresenceParam as any) || (initialOnlineParam === '1' ? 'online' : 'offline'),
+    });
+  }, [otherClerkIdParam, conversationTitle, profileImageUrlParam, initialOnlineParam, initialLastActiveParam, initialPresenceParam]);
+
   // Update user activity via Convex (touch presence)
   const updateUserActivity = useCallback(async () => {
     if (!userId) return;
@@ -377,29 +402,40 @@ export default function ChatScreen() {
   // When live messages are available, update UI and mark-as-read as needed
   // Live subscription removed (could be reintroduced with a Convex subscription hook later)
 
-  // One-time status refresh after mount (no polling)
+  // Poll presence status regularly while focused
   useEffect(() => {
-    if (!isFocused || !contact || !contact.clerk_user_id || contact.clerk_user_id === "unknown") return;
+    if (!isFocused || !otherClerkIdParam || otherClerkIdParam === "unknown") return;
 
     const updateOnlineStatus = async () => {
       try {
-        const row = await convex.query(api.conversations.presenceForUser, { userId: contact.clerk_user_id });
+        const row = await convex.query(api.conversations.presenceForUser, { userId: otherClerkIdParam });
         if (row) {
-          const status = (row.status as 'online' | 'away' | 'offline' | undefined) ?? 'online';
+          const status = (row.status as 'online' | 'away' | 'offline' | undefined) ?? 'offline';
           const lastSeen = row.lastSeen as number | undefined;
           setIsOnline(status === 'online');
           setPresence(status);
           if (lastSeen) {
             setContact((prev) => prev ? { ...prev, online: status === 'online', last_active_at: new Date(lastSeen).toISOString() } : prev);
           }
+        } else {
+          // No presence data, default to offline
+          setIsOnline(false);
+          setPresence('offline');
         }
-      } catch { /* ignore */ }
+      } catch (error) {
+        console.error('Error fetching presence:', error);
+        setIsOnline(false);
+        setPresence('offline');
+      }
     };
 
-    const initialTimeout = setTimeout(updateOnlineStatus, 1500);
-    return () => clearTimeout(initialTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFocused, contact?.clerk_user_id]);
+    // Initial check
+    updateOnlineStatus();
+
+    // Poll every 10 seconds while screen is focused
+    const interval = setInterval(updateOnlineStatus, 10000);
+    return () => clearInterval(interval);
+  }, [isFocused, otherClerkIdParam, convex]);
 
   useEffect(() => {
     // Only auto-scroll if user is near bottom or last message is mine
@@ -665,44 +701,59 @@ export default function ChatScreen() {
 
   // Handle voice recording (start/stop) - simplified and fixed structure
   const handleMicPress = async () => {
+    // Show voice recording overlay
+    setShowVoiceRecordOverlay(true);
+  };
+
+  const startVoiceRecording = async () => {
     try {
       const hasPerm = await ensureMicPermission();
       if (!hasPerm) {
         showStatusModal('error', 'Permission required', 'Please allow microphone access to record voice messages.');
+        setShowVoiceRecordOverlay(false);
         return;
       }
-      if (!isRecording) {
-        // Start recording
-        await Audio.requestPermissionsAsync();
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-        const recording = new Audio.Recording();
-        await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-        await recording.startAsync();
-        audioRecorderRef.current = recording;
-        setIsRecording(true);
-        isRecordingRef.current = true;
-        setRecordingDuration(0);
-        recordingTimerRef.current = setInterval(() => setRecordingDuration(prev => prev + 1), 1000);
-        console.log('🎤 Recording started');
-      } else {
-        // Stop recording
-        const recorder = audioRecorderRef.current;
-        if (recorder) {
-          await recorder.stopAndUnloadAsync();
-          const uri = recorder.getURI();
-          if (uri) {
-            setPendingRecordingUri(uri);
-            setPendingRecordingDuration(recordingDuration);
-            console.log('🎤 Recording saved:', uri);
-          }
-        }
-        setIsRecording(false);
-        isRecordingRef.current = false;
-        if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
-      }
+      // Start recording
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.startAsync();
+      audioRecorderRef.current = recording;
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => setRecordingDuration(prev => prev + 1), 1000);
+      console.log('🎤 Recording started');
     } catch (e: any) {
       console.error('❌ Audio recording error:', e);
       showStatusModal('error', 'Recording Error', e.message || 'Failed to record audio');
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+      setShowVoiceRecordOverlay(false);
+    }
+  };
+
+  const stopVoiceRecording = async () => {
+    try {
+      const recorder = audioRecorderRef.current;
+      if (recorder) {
+        await recorder.stopAndUnloadAsync();
+        const uri = recorder.getURI();
+        if (uri) {
+          setPendingRecordingUri(uri);
+          setPendingRecordingDuration(recordingDuration);
+          console.log('🎤 Recording saved:', uri);
+          // Show confirmation dialog
+          setShowVoiceSendConfirm(true);
+        }
+      }
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    } catch (e: any) {
+      console.error('❌ Stop recording error:', e);
       setIsRecording(false);
       isRecordingRef.current = false;
       if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
@@ -769,6 +820,10 @@ export default function ChatScreen() {
       try { await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }); } catch { /* noop */ }
       setPendingRecordingUri(null);
       setPendingRecordingDuration(0);
+      setRecordingDuration(0);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      audioRecorderRef.current = null;
     }
   };
 
@@ -1631,7 +1686,7 @@ export default function ChatScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Message Input - Single row with icons and text input */}
+          {/* Message Input - Compact row with + button and text input */}
           <View style={[
             styles.bottomInputSection, 
             { 
@@ -1640,130 +1695,48 @@ export default function ChatScreen() {
               paddingBottom: Math.max(insets.bottom || 0, 8),
             }
           ]}>
-            {/* Show expand button when icons are hidden */}
-            {isTyping && (
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => setIsTyping(false)}
-              >
-                <Ionicons name="chevron-forward" size={28} color={theme.colors.primary} />
-              </TouchableOpacity>
-            )}
-
-            {/* Left icons - hide when typing */}
-            {!isTyping && (
-              <>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={takePhoto}
-                >
-                  <Ionicons name="camera" size={28} color={theme.colors.primary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={pickImage}
-                >
-                  <Ionicons name="image" size={28} color={theme.colors.primary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={pickDocument}
-                >
-                  <Ionicons name="document-text" size={28} color={theme.colors.primary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={handleMicPress}
-                >
-                  <Ionicons 
-                    name={isRecording ? "stop-circle" : "mic"} 
-                    size={28} 
-                    color={isRecording ? "#FF0000" : theme.colors.primary} 
-                  />
-                </TouchableOpacity>
-              </>
-            )}
+            {/* Plus button to open attachment sheet */}
+            <TouchableOpacity
+              style={styles.plusButton}
+              onPress={() => setAttachmentSheetVisible(true)}
+            >
+              <Ionicons name="add" size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
 
             <View style={[
-              styles.inputWrapper,
+              styles.compactInputWrapper,
               { 
-                backgroundColor: theme.colors.background,
-                borderColor: isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.15)'
+                backgroundColor: isDarkMode ? '#3A3B3C' : '#F0F2F5',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
               }
             ]}>
-              {/* Pending document chips */}
-              {pendingFiles.length > 0 && !isRecording && !pendingRecordingUri && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pendingFilesScroll} contentContainerStyle={styles.pendingFilesRow}>
-                  {pendingFiles.map((f, idx) => (
-                    <View key={`${f.uri}-${idx}`} style={styles.pendingChip}>
-                      <Ionicons name="document-text" size={16} color="#FFFFFF" style={styles.pendingChipIcon} />
-                      <Text numberOfLines={1} style={styles.pendingChipText}>{f.name}</Text>
-                      <TouchableOpacity style={styles.pendingChipClose} onPress={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}>
-                        <Ionicons name="close" size={14} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
-
-              {(isRecording || pendingRecordingUri) ? (
-                <View style={styles.recordingBar}>
-                  {/* Cancel */}
-                  <TouchableOpacity style={styles.recCircleButton} onPress={cancelPendingRecording}>
-                    <Ionicons name="close" size={18} color="#0B6E8B" />
-                  </TouchableOpacity>
-
-                  {/* Middle pill */}
-                  <View style={styles.recordingPill}>
-                    <View style={styles.pillMeter} />
-                    <Text style={styles.pillTime}>
-                      {isRecording ? `${Math.floor(recordingDuration)}s` : `${Math.max(1, pendingRecordingDuration)}s`}
-                    </Text>
-                  </View>
-
-                  {/* Send */}
-                  <TouchableOpacity style={[styles.recCircleButton, !pendingRecordingUri && { opacity: 0.5 }]} onPress={sendPendingRecording} disabled={!pendingRecordingUri}>
-                    <Ionicons name="send" size={18} color="#0B6E8B" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TextInput
-                  style={[styles.textInput, { color: theme.colors.text }]}
-                  placeholder="Message"
-                  value={newMessage}
-                  onChangeText={(text) => {
-                    setNewMessage(text);
-                    setIsTyping(text.length > 0);
-                  }}
-                  onFocus={() => {
-                    if (newMessage.length > 0) {
-                      setIsTyping(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    if (newMessage.length === 0) {
-                      setIsTyping(false);
-                    }
-                  }}
-                  multiline={true}
-                  maxLength={500}
-                  editable={!sending && !uploading}
-                  placeholderTextColor={theme.colors.textDisabled}
-                  returnKeyType="send"
-                  blurOnSubmit={true}
-                  onSubmitEditing={handleSendMessage}
-                />
-              )}
+              <TextInput
+                style={[styles.compactTextInput, { color: theme.colors.text }]}
+                placeholder="Write a message..."
+                value={newMessage}
+                onChangeText={(text) => {
+                  setNewMessage(text);
+                  setIsTyping(text.length > 0);
+                }}
+                multiline={true}
+                maxLength={500}
+                editable={!sending && !uploading}
+                placeholderTextColor={theme.colors.textSecondary}
+                returnKeyType="send"
+                blurOnSubmit={true}
+                onSubmitEditing={handleSendMessage}
+              />
             </View>
 
             <TouchableOpacity
-              style={styles.iconButton}
-              onPress={handleEmojiPress}
+              style={styles.micButton}
+              onPress={handleMicPress}
             >
-              <Ionicons name="happy-outline" size={28} color={theme.colors.primary} />
+              <Ionicons 
+                name={isRecording ? "stop-circle" : "mic"} 
+                size={24} 
+                color={isRecording ? "#FF0000" : theme.colors.primary} 
+              />
             </TouchableOpacity>
 
             {(newMessage.trim() !== "" || pendingFiles.length > 0 || !!pendingRecordingUri) && (
@@ -2241,6 +2214,228 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </Modal>
         </KeyboardAvoidingView>
+
+        {/* Attachment Bottom Sheet */}
+        <Modal
+          visible={attachmentSheetVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setAttachmentSheetVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.attachmentModalOverlay}
+            activeOpacity={1}
+            onPress={() => setAttachmentSheetVisible(false)}
+          >
+            <View style={[styles.attachmentSheet, { backgroundColor: theme.colors.surface }]}>
+              {/* Attachment Options Grid */}
+              <View style={styles.attachmentGrid}>
+                <View style={styles.attachmentRow}>
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      pickDocument();
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#007AFF' }]}>
+                      <Ionicons name="document-text" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Document</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      takePhoto();
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#FF3B30' }]}>
+                      <Ionicons name="camera" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Camera</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      pickImage();
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#34C759' }]}>
+                      <Ionicons name="image" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Media</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      // Add GIF functionality here if needed
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#FF9500' }]}>
+                      <Text style={styles.gifText}>GIF</Text>
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>GIF</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.attachmentRow}>
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      // Add mention functionality here if needed
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#5856D6' }]}>
+                      <Ionicons name="at" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Mention</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Voice Recording Overlay */}
+        <Modal
+          visible={showVoiceRecordOverlay}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (isRecording) {
+              cancelPendingRecording();
+            }
+            setShowVoiceRecordOverlay(false);
+          }}
+        >
+          <View style={styles.voiceOverlay}>
+            {/* Contact Info */}
+            <View style={styles.voiceContactSection}>
+              <View style={styles.voiceAvatarWrapper}>
+                {contact?.profile_image_url ? (
+                  <OptimizedImage
+                    source={{ uri: resolveRemoteUri(contact.profile_image_url) }}
+                    style={styles.voiceAvatar}
+                    resizeMode="cover"
+                    cache="force-cache"
+                    loaderSize="small"
+                    showErrorIcon={false}
+                  />
+                ) : (
+                  <View style={[styles.voiceAvatar, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.voiceAvatarText}>
+                      {getUserInitials(contact?.first_name, contact?.last_name)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.voiceContactName, { color: theme.colors.text }]}>
+                {conversationTitle}
+              </Text>
+              <Text style={[styles.voiceContactRole, { color: theme.colors.textSecondary }]}>
+                {contact?.email || ''}
+              </Text>
+            </View>
+
+            {/* Cancel Button (top left) */}
+            <TouchableOpacity
+              style={styles.voiceCancelButton}
+              onPress={() => {
+                if (isRecording) {
+                  cancelPendingRecording();
+                }
+                setShowVoiceRecordOverlay(false);
+              }}
+            >
+              <Ionicons name="close" size={28} color={theme.colors.text} />
+            </TouchableOpacity>
+
+            {/* Recording Status */}
+            {isRecording && (
+              <View style={styles.voiceRecordingStatus}>
+                <Text style={[styles.voiceStatusText, { color: '#4A9EFF' }]}>
+                  Release to send
+                </Text>
+                <Text style={[styles.voiceStatusSubtext, { color: theme.colors.textSecondary }]}>
+                  Slide away to cancel
+                </Text>
+                <Text style={[styles.voiceTimer, { color: '#FF0000' }]}>
+                  ● {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+                </Text>
+              </View>
+            )}
+
+            {!isRecording && (
+              <View style={styles.voiceRecordingStatus}>
+                <Text style={[styles.voiceStatusText, { color: theme.colors.text }]}>
+                  Hold to record
+                </Text>
+                <Text style={[styles.voiceStatusSubtext, { color: theme.colors.textSecondary }]}>
+                  Slide away to cancel
+                </Text>
+              </View>
+            )}
+
+            {/* Mic Button */}
+            <View style={styles.voiceMicContainer}>
+              <TouchableOpacity
+                style={[styles.voiceMicButton, { backgroundColor: isRecording ? '#4A9EFF' : '#4A9EFF' }]}
+                onPressIn={startVoiceRecording}
+                onPressOut={stopVoiceRecording}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="mic" size={48} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Voice Send Confirmation */}
+        <Modal
+          visible={showVoiceSendConfirm}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowVoiceSendConfirm(false)}
+        >
+          <View style={styles.confirmOverlay}>
+            <View style={[styles.confirmDialog, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>
+                Send voice message?
+              </Text>
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, { backgroundColor: 'transparent' }]}
+                  onPress={() => {
+                    cancelPendingRecording();
+                    setShowVoiceSendConfirm(false);
+                    setShowVoiceRecordOverlay(false);
+                  }}
+                >
+                  <Text style={[styles.confirmButtonText, { color: theme.colors.textSecondary }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, { backgroundColor: 'transparent' }]}
+                  onPress={async () => {
+                    setShowVoiceSendConfirm(false);
+                    setShowVoiceRecordOverlay(false);
+                    await sendPendingRecording();
+                  }}
+                >
+                  <Text style={[styles.confirmButtonText, { color: '#4A9EFF' }]}>Send</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -2944,6 +3139,174 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Compact input styles
+  plusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  compactInputWrapper: {
+    flex: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginRight: 8,
+    borderWidth: 1,
+  },
+  compactTextInput: {
+    fontSize: scaledFontSize(16),
+    minHeight: 20,
+    maxHeight: 80,
+    textAlignVertical: 'top',
+  },
+  micButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  attachmentGrid: {
+    gap: 20,
+  },
+  attachmentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  attachmentIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentLabel: {
+    fontSize: scaledFontSize(12),
+    fontWeight: '500',
+  },
+  gifText: {
+    color: 'white',
+    fontSize: scaledFontSize(14),
+    fontWeight: 'bold',
+  },
+  // Voice recording overlay styles
+  voiceOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'space-between',
+    paddingVertical: 60,
+  },
+  voiceContactSection: {
+    alignItems: 'center',
+    paddingTop: 40,
+  },
+  voiceAvatarWrapper: {
+    marginBottom: 16,
+  },
+  voiceAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voiceAvatarText: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(28),
+    fontWeight: '600',
+  },
+  voiceContactName: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  voiceContactRole: {
+    fontSize: scaledFontSize(14),
+  },
+  voiceCancelButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voiceRecordingStatus: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  voiceStatusText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '500',
+  },
+  voiceStatusSubtext: {
+    fontSize: scaledFontSize(14),
+  },
+  voiceTimer: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  voiceMicContainer: {
+    alignItems: 'center',
+    paddingBottom: 60,
+  },
+  voiceMicButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmDialog: {
+    borderRadius: 12,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+  },
+  confirmTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 32,
+  },
+  confirmButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  confirmButtonText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
   },
 });
 
