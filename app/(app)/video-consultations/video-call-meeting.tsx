@@ -243,12 +243,15 @@ export default function VideoCallScreen() {
     if (sessionIdParam) attachExistingSession(sessionIdParam);
     initializeCall();
 
+    // Capture ref value at effect creation time
+    const timeoutRef = cameraReadyTimeoutRef;
+    
     return () => {
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      if (cameraReadyTimeoutRef.current) {
-        clearTimeout(cameraReadyTimeoutRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, [initializeCall, sessionIdParam, attachExistingSession]);

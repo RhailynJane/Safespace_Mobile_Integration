@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Modal,
+  Pressable,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -22,7 +25,7 @@ import { useAuth } from "@clerk/clerk-expo";
 
 const { width } = Dimensions.get("window");
 
-type TimeFilter = "All" | "Days" | "Weeks" | "Months" | "Years";
+type TimeFilter = "Day" | "Week" | "Month" | "Year";
 
 interface FreudScore {
   positive: number;
@@ -50,20 +53,20 @@ const StatisticsScreen: React.FC = () => {
   const { theme, scaledFontSize } = useTheme();
   const { userId } = useAuth();
   const [activeTab, setActiveTab] = useState("home");
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("Months");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("Month");
   const [loadingPredictions, setLoadingPredictions] = useState(false);
   const [predictions, setPredictions] = useState<PredictionDay[]>([]);
   const [loadingRiskAnalysis, setLoadingRiskAnalysis] = useState(false);
   const [riskAnalysis, setRiskAnalysis] = useState<RiskAnalysis | null>(null);
+  const [showFreudTooltip, setShowFreudTooltip] = useState(false);
 
   // Calculate days based on time filter
   const getDaysFromFilter = (filter: TimeFilter): number => {
     switch (filter) {
-      case "All": return 365; // 1 year
-      case "Days": return 7;
-      case "Weeks": return 28; // 4 weeks
-      case "Months": return 30;
-      case "Years": return 365;
+      case "Day": return 1;    // last 1 day
+      case "Week": return 7;   // last 7 days
+      case "Month": return 30; // last 30 days
+      case "Year": return 365; // last 365 days
       default: return 30;
     }
   };
@@ -134,6 +137,54 @@ const StatisticsScreen: React.FC = () => {
   }, [moodChartData]);
 
   const freudScore = useMemo(() => calculateFreudScore(), [calculateFreudScore]);
+
+  // Distribution stats for clarity
+  const distributionStats = useMemo(() => {
+    if (!moodChartData?.chartData) return { total: 0, logged: 0, skipped: 0 };
+    const total = moodChartData.chartData.length;
+    const logged = moodChartData.chartData.filter(
+      (d: any) => d.hasMood && d.averageScore !== undefined && d.averageScore !== null
+    ).length;
+    const skipped = Math.max(0, total - logged);
+    return { total, logged, skipped };
+  }, [moodChartData]);
+
+  // Exact date range label derived from data (ISO YYYY-MM-DD strings)
+  const dateRangeLabel = useMemo(() => {
+    try {
+      const dates: string[] = moodChartData?.chartData
+        ?.map((d: any) => d?.date)
+        .filter(Boolean) || [];
+      if (dates.length === 0) return "";
+
+      let min = dates[0] as string;
+      let max = dates[0] as string;
+      for (const iso of dates) {
+        if (iso < min) min = iso;
+        if (iso > max) max = iso;
+      }
+
+      const monthShort = [
+        "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"
+      ];
+      const fmt = (iso: string, withYear: boolean) => {
+        const parts = iso.split("-");
+        const y = parseInt(parts[0] || "0", 10);
+        const m = parseInt(parts[1] || "1", 10);
+        const d = parseInt(parts[2] || "1", 10);
+        const base = `${monthShort[(m || 1) - 1]} ${d}`;
+        return withYear ? `${base}, ${y}` : base;
+      };
+
+      const startYear = (min.split("-")[0] || "");
+      const endYear = (max.split("-")[0] || "");
+      const includeStartYear = startYear !== endYear; // include year on start if spans years
+      // Always include year on end for clarity
+      return `${fmt(min, includeStartYear)} → ${fmt(max, true)}`;
+    } catch {
+      return "";
+    }
+  }, [moodChartData]);
 
   // Generate AI mood predictions using Gemini
   const generatePredictions = async () => {
@@ -255,14 +306,16 @@ Keep confidence realistic (60-85%). Use only these moods: ecstatic, happy, conte
   const moodDistribution = useMemo(() => {
     if (!moodChartData?.chartData) return [];
 
-    const moodsWithScores = moodChartData.chartData.filter(d => d.hasMood && d.averageScore);
-    const total = moodsWithScores.length;
+    const allDays = moodChartData.chartData;
+    const moodsWithScores = allDays.filter(d => d.hasMood && d.averageScore);
+    const total = allDays.length;
     if (total === 0) return [];
 
     const distribution = [
       { label: "Positive", count: 0, color: "#4CAF50" },
       { label: "Neutral", count: 0, color: "#FFC107" },
       { label: "Negative", count: 0, color: "#F44336" },
+      { label: "Skipped", count: total - moodsWithScores.length, color: "#9E9E9E" },
     ];
 
     moodsWithScores.forEach(d => {
@@ -421,7 +474,6 @@ Respond with ONLY the JSON object, no other text.`;
     <CurvedBackground>
       <View style={styles.container}>
         <AppHeader title="Statistics & AI Insights" showBack={true} />
-
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContainer}
@@ -429,7 +481,7 @@ Respond with ONLY the JSON object, no other text.`;
         >
           {/* Time Filter */}
           <View style={styles.filterContainer}>
-            {(["All", "Days", "Weeks", "Months", "Years"] as TimeFilter[]).map((filter) => (
+            {(["Day", "Week", "Month", "Year"] as TimeFilter[]).map((filter) => (
               <TouchableOpacity
                 key={filter}
                 style={[
@@ -454,7 +506,10 @@ Respond with ONLY the JSON object, no other text.`;
           <View style={[styles.card, styles.freudCard]}>
             <View style={styles.freudHeader}>
               <Text style={styles.cardTitle}>Freud Score</Text>
-              <TouchableOpacity style={styles.helpButton}>
+              <TouchableOpacity 
+                style={styles.helpButton}
+                onPress={() => setShowFreudTooltip(true)}
+              >
                 <Ionicons name="help-circle-outline" size={20} color={theme.colors.text} />
               </TouchableOpacity>
             </View>
@@ -548,6 +603,14 @@ Respond with ONLY the JSON object, no other text.`;
                   <Text style={styles.distributionPercentage}>{item.percentage}%</Text>
                 </View>
               ))}
+            </View>
+            <View style={styles.distributionStatsRow}>
+              <Text style={styles.distributionStatsText}>
+                Date Range: {dateRangeLabel || `last ${getDaysFromFilter(timeFilter)} days`}
+              </Text>
+              <Text style={styles.distributionStatsText}>
+                Logged: {distributionStats.logged}   Skipped: {distributionStats.skipped}
+              </Text>
             </View>
           </View>
 
@@ -709,6 +772,94 @@ Respond with ONLY the JSON object, no other text.`;
           {/* Bottom Padding */}
           <View style={{ height: 100 }} />
         </ScrollView>
+
+        {/* Freud Score Tooltip Modal */}
+        <Modal
+          visible={showFreudTooltip}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowFreudTooltip(false)}
+        >
+          <View style={styles.tooltipOverlay}>
+            {/* Backdrop to close on outside tap */}
+            <Pressable style={styles.backdrop} onPress={() => setShowFreudTooltip(false)} />
+
+            {/* Modal Card */}
+            <View style={styles.tooltipContainer}>
+              <View style={styles.tooltipHeader}>
+                <Text style={styles.tooltipTitle}>How Freud Score is Calculated</Text>
+                <TouchableOpacity onPress={() => setShowFreudTooltip(false)}>
+                  <Ionicons name="close-circle" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={styles.tooltipContent}
+                contentContainerStyle={styles.tooltipContentContainer}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+              >
+                <View style={styles.tooltipSection}>
+                  <Text style={styles.tooltipSectionTitle}>Overall Score (0-100)</Text>
+                  <Text style={styles.tooltipText}>
+                    Your overall mental health score is calculated by averaging all mood scores (1-5 scale) 
+                    and converting to a 0-100 scale.
+                  </Text>
+                  <Text style={styles.tooltipFormula}>
+                    Formula: (Average Mood Score / 5) × 100
+                  </Text>
+                </View>
+
+                <View style={styles.tooltipSection}>
+                  <Text style={styles.tooltipSectionTitle}>Positive Percentage</Text>
+                  <Text style={styles.tooltipText}>
+                    Percentage of days where your mood score was 3.5 or higher (content, happy, ecstatic).
+                  </Text>
+                  <Text style={styles.tooltipFormula}>
+                    Current: {freudScore.positive}%
+                  </Text>
+                </View>
+
+                <View style={styles.tooltipSection}>
+                  <Text style={styles.tooltipSectionTitle}>Negative Percentage</Text>
+                  <Text style={styles.tooltipText}>
+                    Percentage of days where your mood score was below 2.5 (frustrated, sad, angry).
+                  </Text>
+                  <Text style={styles.tooltipFormula}>
+                    Current: {freudScore.negative}%
+                  </Text>
+                </View>
+
+                <View style={styles.tooltipSection}>
+                  <Text style={styles.tooltipSectionTitle}>Trend Analysis</Text>
+                  <Text style={styles.tooltipText}>
+                    Compares the first half and second half of your selected time period:
+                  </Text>
+                  <View style={styles.tooltipBulletList}>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>Improving: Second half average is 0.3+ points higher</Text></Text>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>Stable: Change is less than 0.3 points</Text></Text>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>Declining: Second half average is 0.3+ points lower</Text></Text>
+                  </View>
+                  <Text style={styles.tooltipFormula}>
+                    Current Trend: {freudScore.trend}
+                  </Text>
+                </View>
+
+                <View style={[styles.tooltipSection, { borderBottomWidth: 0 }]}>
+                  <Text style={styles.tooltipSectionTitle}>Mood Score Scale</Text>
+                  <View style={styles.tooltipBulletList}>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>5.0: Ecstatic</Text></Text>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>4.0: Happy</Text></Text>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>3.0: Content</Text></Text>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>2.0: Neutral</Text></Text>
+                    <Text style={styles.tooltipBullet}>• <Text style={styles.tooltipBulletText}>1.0 and below: Negative moods</Text></Text>
+                  </View>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
       </View>
@@ -901,6 +1052,15 @@ const createStyles = (scaledFontSize: (size: number) => number, theme: any) =>
       fontSize: scaledFontSize(11),
       color: theme.colors.textSecondary,
     },
+    distributionStatsRow: {
+      marginTop: Spacing.md,
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    distributionStatsText: {
+      fontSize: scaledFontSize(11),
+      color: theme.colors.textSecondary,
+    },
     predictionHeader: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -1063,6 +1223,95 @@ const createStyles = (scaledFontSize: (size: number) => number, theme: any) =>
       fontSize: scaledFontSize(13),
       color: theme.colors.text,
       lineHeight: 20,
+    },
+    // Tooltip Modal Styles
+    tooltipOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: Spacing.lg,
+      position: "relative",
+    },
+    backdrop: {
+      position: "absolute",
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      backgroundColor: "transparent",
+    },
+    tooltipContainer: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      width: "100%",
+      maxWidth: 500,
+      maxHeight: "85%",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 8,
+      overflow: "hidden",
+      flexShrink: 1,
+    },
+    tooltipHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: Spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.isDark ? "#333" : "#E0E0E0",
+    },
+    tooltipTitle: {
+      fontSize: scaledFontSize(18),
+      fontWeight: "700",
+      color: theme.colors.text,
+      flex: 1,
+    },
+    tooltipContent: {
+      padding: Spacing.lg,
+    },
+    tooltipContentContainer: {
+      paddingBottom: Spacing.lg,
+    },
+    tooltipSection: {
+      marginBottom: Spacing.lg,
+      paddingBottom: Spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.isDark ? "#333" : "#E0E0E0",
+    },
+    tooltipSectionTitle: {
+      fontSize: scaledFontSize(16),
+      fontWeight: "600",
+      color: Colors.primary,
+      marginBottom: Spacing.sm,
+    },
+    tooltipText: {
+      fontSize: scaledFontSize(14),
+      color: theme.colors.text,
+      lineHeight: 22,
+      marginBottom: Spacing.sm,
+    },
+    tooltipFormula: {
+      fontSize: scaledFontSize(13),
+      color: theme.colors.textSecondary,
+      fontStyle: "italic",
+      backgroundColor: theme.isDark ? "#2A2A2A" : "#F5F5F5",
+      padding: Spacing.sm,
+      borderRadius: 8,
+      fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    },
+    tooltipBulletList: {
+      marginTop: Spacing.sm,
+      gap: 6,
+    },
+    tooltipBullet: {
+      fontSize: scaledFontSize(14),
+      color: theme.colors.textSecondary,
+    },
+    tooltipBulletText: {
+      color: theme.colors.text,
     },
   });
 

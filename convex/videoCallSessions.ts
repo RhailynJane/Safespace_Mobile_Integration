@@ -106,8 +106,16 @@ export const endSession = mutation({
           const nmin = nowMST.getMinutes();
 
           // Parse appointment scheduled time components (YYYY-MM-DD and HH:mm)
-          const [y, m, d] = (apt.date as string).split('-').map((n: string) => parseInt(n, 10));
-          const [hh, mm] = (apt.time as string).split(':').map((n: string) => parseInt(n, 10));
+          const dateParts = (apt.date as string).split('-').map((n: string) => parseInt(n, 10));
+          const timeParts = (apt.time as string).split(':').map((n: string) => parseInt(n, 10));
+          const y = dateParts[0];
+          const m = dateParts[1];
+          const d = dateParts[2];
+          const hh = timeParts[0];
+          const mm = timeParts[1];
+          
+          // Skip if any component is missing
+          if (!y || !m || !d || hh === undefined || mm === undefined) return;
 
           const schedMinutes = y * 525600 + m * 43800 + d * 1440 + hh * 60 + mm;
           const nowMinutes = ny * 525600 + nm * 43800 + nd * 1440 + nh * 60 + nmin;
