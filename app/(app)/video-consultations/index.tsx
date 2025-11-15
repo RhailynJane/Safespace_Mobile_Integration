@@ -60,6 +60,16 @@ export default function VideoScreen() {
   const activeSession = useQuery(api.videoCallSessions.getActiveSession, {} as any) as any | null;
   const callStats = useQuery(api.videoCallSessions.getCallStats, {} as any) as any | null;
 
+  // Determine user's organization (prefer Convex users table, fallback to Clerk metadata)
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const roleLabel = isSAIT ? 'Peer Support' : 'Support Worker';
+
   // Local Convex client instance
   const providerClient = useConvex();
   // Convex auth readiness check (prevents unauthenticated mutations)
@@ -120,6 +130,12 @@ export default function VideoScreen() {
     }
 
     try {
+      // Helper to rewrite any persisted auto-assigned label to current org
+      const normalizeAutoAssigned = (name: string | undefined) => {
+        if (!name) return name;
+        return name.startsWith('Auto-assigned by ') ? `Auto-assigned by ${isSAIT ? 'SAIT' : 'CMHA'}` : name;
+      };
+
       // Transform appointments - use backend status directly
       const transformed: Appointment[] = convexAppointments
         .filter((apt: any) => {
@@ -159,7 +175,7 @@ export default function VideoScreen() {
 
             return {
               id: apt.id,
-              supportWorker: apt.supportWorker || 'Support Worker',
+              supportWorker: normalizeAutoAssigned(apt.supportWorker) || roleLabel,
               date: formattedDate,
               isoDate,
               time: apt.time || '',
@@ -197,8 +213,13 @@ export default function VideoScreen() {
 
       const isFutureOrNowMST = (iso: string | undefined, time: string | undefined) => {
         if (!iso) return false;
-        const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
-        const [hh, mm] = (time || '00:00').split(':').map((n) => parseInt(n, 10));
+        const parts = iso.split('-').map((n) => parseInt(n, 10));
+        const y = parts[0] || 0;
+        const m = parts[1] || 0;
+        const d = parts[2] || 0;
+        const timeParts = (time || '00:00').split(':').map((n) => parseInt(n, 10));
+        const hh = timeParts[0] || 0;
+        const mm = timeParts[1] || 0;
         if (y > ny) return true; if (y < ny) return false;
         if (m > nm) return true; if (m < nm) return false;
         if (d > nd) return true; if (d < nd) return false;
@@ -217,7 +238,7 @@ export default function VideoScreen() {
       console.error('Error processing appointments for video screen:', e);
       setUpcoming(null);
     }
-  }, [convexAppointments]);  
+  }, [convexAppointments, isSAIT, roleLabel]);  
 
   // Check if appointment can be joined (scheduled/confirmed and within time window)
   const canJoinAppointment = useCallback((appointment: Appointment | null): boolean => {
@@ -225,8 +246,13 @@ export default function VideoScreen() {
     if (!["scheduled", "confirmed"].includes(appointment.status)) return false;
     try {
       // Parse date components (YYYY-MM-DD) from isoDate and time (HH:MM)
-      const [year, month, day] = (appointment.isoDate || '').split('-').map(Number);
-      const [hours, minutes] = appointment.time.split(':').map(Number);
+      const dateParts = (appointment.isoDate || '').split('-').map(Number);
+      const year = dateParts[0] || 0;
+      const month = dateParts[1] || 0;
+      const day = dateParts[2] || 0;
+      const timeParts = appointment.time.split(':').map(Number);
+      const hours = timeParts[0] || 0;
+      const minutes = timeParts[1] || 0;
       
       // Get current time in Mountain Time using formatToParts
       const nowParts = new Intl.DateTimeFormat('en-US', {
@@ -268,8 +294,13 @@ export default function VideoScreen() {
   const handleJoinMeetingWithRestriction = () => {
     if (!upcoming || !upcoming.date || !upcoming.time) return;
     // Compute minutes until appointment in Mountain Time using isoDate/time
-    const [y, m, d] = (upcoming.isoDate || '').split('-').map((n) => parseInt(n, 10));
-    const [hh, mm] = (upcoming.time || '00:00').split(':').map((n) => parseInt(n, 10));
+    const dateParts = (upcoming.isoDate || '').split('-').map((n) => parseInt(n, 10));
+    const y = dateParts[0] || 0;
+    const m = dateParts[1] || 0;
+    const d = dateParts[2] || 0;
+    const timeParts = (upcoming.time || '00:00').split(':').map((n) => parseInt(n, 10));
+    const hh = timeParts[0] || 0;
+    const mm = timeParts[1] || 0;
     if (!y || !m || !d) return;
 
     const nowParts = new Intl.DateTimeFormat('en-US', {

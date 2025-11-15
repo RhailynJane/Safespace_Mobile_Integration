@@ -22,7 +22,7 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { useConvex } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { mapAppointmentStatus } from "../../../../utils/appointmentStatus";
 import { Alert } from "react-native";
@@ -73,6 +73,17 @@ export default function AppointmentsScreen() {
 
   const convex = useConvex();
 
+  // Determine user's organization (prefer Convex users table, fallback to Clerk metadata)
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
+  const roleLabel = isSAIT ? 'Peer Support' : 'Support Worker';
+
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
@@ -95,6 +106,11 @@ export default function AppointmentsScreen() {
     try {
       setLoading(true);
       console.log('📅 Fetching upcoming/past appointments for dashboard...');
+      // Helper to rewrite any persisted auto-assigned label to current org
+      const normalizeAutoAssigned = (name: string | undefined) => {
+        if (!name) return name;
+        return name.startsWith('Auto-assigned by ') ? `Auto-assigned by ${orgShortLabel}` : name;
+      };
 
       const [upcoming, past] = await Promise.all([
         convex.query(api.appointments.getUpcomingAppointments, { userId: user.id }),
@@ -131,7 +147,10 @@ export default function AppointmentsScreen() {
 
       // Format date to match the list view (parse as YYYY-MM-DD without UTC conversion)
       const formatDate = (iso: string) => {
-        const [year, month, day] = iso.split('-').map(Number);
+        const parts = iso.split('-').map(Number);
+        const year = parts[0] || 0;
+        const month = parts[1] || 0;
+        const day = parts[2] || 0;
         const d = new Date(year, month - 1, day);
         return d.toLocaleDateString('en-US', {
           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -159,8 +178,13 @@ export default function AppointmentsScreen() {
       const nowMinute = getPart('minute');
 
       const isFutureOrNowMST = (isoDate: string, time: string | undefined) => {
-        const [y, m, d] = isoDate.split('-').map((n) => parseInt(n, 10));
-        const [hh, mm] = (time || '00:00').split(':').map((n) => parseInt(n, 10));
+        const dateParts = isoDate.split('-').map((n) => parseInt(n, 10));
+        const y = dateParts[0] || 0;
+        const m = dateParts[1] || 0;
+        const d = dateParts[2] || 0;
+        const timeParts = (time || '00:00').split(':').map((n) => parseInt(n, 10));
+        const hh = timeParts[0] || 0;
+        const mm = timeParts[1] || 0;
         if (y > nowYear) return true;
         if (y < nowYear) return false;
         if (m > nowMonth) return true;
@@ -211,7 +235,7 @@ export default function AppointmentsScreen() {
       if (nextRaw) {
         const mappedNext: Appointment = {
           id: 0 as any,
-          supportWorker: nextRaw.supportWorker || nameMap[String(nextRaw.supportWorkerId)] || 'Auto-assigned by CMHA',
+          supportWorker: normalizeAutoAssigned(nextRaw.supportWorker) || nameMap[String(nextRaw.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
           date: formatDate(nextRaw.date),
           time: nextRaw.time || '',
           type: (nextRaw.type || 'video').toString().replace('_', ' '),
@@ -227,7 +251,7 @@ export default function AppointmentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, showStatusModal, convex]);
+  }, [user?.id, showStatusModal, convex, orgShortLabel]);
 
   // Run fetch on mount and when dependencies change
   useEffect(() => {
@@ -468,7 +492,7 @@ export default function AppointmentsScreen() {
               <View style={styles.mainActionTextContainer}>
                 <Text style={styles.mainActionTitle}>Book New Session</Text>
                 <Text style={styles.mainActionSubtitle}>
-                  Connect with a support worker at CMHA
+                  {`Connect with a ${isSAIT ? 'peer support' : 'support worker'} at ${orgShortLabel}`}
                 </Text>
               </View>
               <View style={styles.mainActionIconContainer}>
@@ -492,7 +516,7 @@ export default function AppointmentsScreen() {
                     <Text style={[styles.nextSessionWorker, { color: theme.colors.text }]}>
                       {nextAppointment.supportWorker}
                     </Text>
-                    <Text style={[styles.nextSessionRole, { color: theme.colors.textSecondary }]}>Support Worker</Text>
+                    <Text style={[styles.nextSessionRole, { color: theme.colors.textSecondary }]}>{roleLabel}</Text>
                   </View>
                 </View>
                 <View style={styles.nextSessionDetails}>

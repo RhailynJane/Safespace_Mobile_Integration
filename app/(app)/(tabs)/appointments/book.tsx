@@ -27,6 +27,8 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import StatusModal from "../../../../components/StatusModal";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 // CMHA flow: user is auto-assigned to an available support worker.
 // This screen focuses on selecting date, time and session type (no worker browsing).
 
@@ -43,6 +45,18 @@ import StatusModal from "../../../../components/StatusModal";
 
 export default function BookAppointment() {
   const { theme, scaledFontSize } = useTheme();
+  const { user } = useUser();
+  
+  // Determine user's organization
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
+  
   const windowWidth = Dimensions.get("window").width;
   const COLUMNS = 4;
   const H_MARGIN = 6; // must match styles.timeSlot margin horizontal
@@ -71,7 +85,6 @@ export default function BookAppointment() {
 
   // Clerk authentication hooks
   const { signOut, isSignedIn, getToken } = useAuth();
-  const { user } = useUser();
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -193,7 +206,7 @@ export default function BookAppointment() {
         selectedDateDisplay: selectedDateDisplay,
         selectedTime: selectedTime,
         selectedType: typeLabel,
-        supportWorkerName: 'Auto-assigned by CMHA',
+        supportWorkerName: `Auto-assigned by ${orgShortLabel}`,
         reschedule: isReschedule ? '1' : undefined,
         appointmentId: isReschedule ? appointmentId : undefined,
       },

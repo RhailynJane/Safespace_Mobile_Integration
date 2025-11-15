@@ -41,6 +41,17 @@ interface Appointment {
 
 export default function AppointmentList() {
   const { theme, scaledFontSize } = useTheme();
+  const { user } = useUser();
+  
+  // Determine user's organization
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
   
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -58,7 +69,6 @@ export default function AppointmentList() {
 
   // Clerk authentication hooks
   const { signOut, getToken } = useAuth();
-  const { user } = useUser();
 
   const convex = useConvex();
 
@@ -102,6 +112,12 @@ const fetchAppointments = useCallback(async () => {
     console.log('📅 Processing appointments from Convex for user:', user.id);
     const upcoming = upcomingData;
     const past = pastData;
+
+    // Helper to rewrite any persisted auto-assigned label to current org
+    const normalizeAutoAssigned = (name: string | undefined) => {
+      if (!name) return name;
+      return name.startsWith('Auto-assigned by ') ? `Auto-assigned by ${orgShortLabel}` : name;
+    };
 
     // Build support worker enrichment map for items missing names
     const collectIds = (list: any[]) =>
@@ -240,7 +256,7 @@ const fetchAppointments = useCallback(async () => {
       })
       .map((apt: any) => ({
         id: String(apt.id),
-        supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',
+        supportWorker: normalizeAutoAssigned(apt.supportWorker) || nameMap[String(apt.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
         supportWorkerId: apt.supportWorkerId,
         date: formatDate(apt.date),
         time: apt.time || '',
@@ -257,7 +273,7 @@ const fetchAppointments = useCallback(async () => {
       .filter((apt: any) => apt.status !== 'cancelled') // Exclude cancelled
       .map((apt: any) => ({
         id: String(apt.id),
-        supportWorker: apt.supportWorker || nameMap[String(apt.supportWorkerId)] || 'Auto-assigned by CMHA',
+        supportWorker: normalizeAutoAssigned(apt.supportWorker) || nameMap[String(apt.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
         supportWorkerId: apt.supportWorkerId,
         date: formatDate(apt.date),
         time: apt.time || '',
@@ -277,7 +293,7 @@ const fetchAppointments = useCallback(async () => {
   } finally {
     setLoading(false);
   }
-}, [user?.id, upcomingData, pastData, convex, showStatusModal]);
+}, [user?.id, upcomingData, pastData, convex, showStatusModal, orgShortLabel]);
   
 
 // Run fetch when user id is ready or when data changes
