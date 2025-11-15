@@ -19,16 +19,24 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { assessmentTracker } from "../utils/assessmentTracker";
+import assessmentsApi from "../utils/assessmentsApi";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
-import activityApi from "../utils/activityApi";
-import { getApiBaseUrl, makeAbsoluteUrl } from "../utils/apiBaseUrl";
+import { makeAbsoluteUrl } from "../utils/apiBaseUrl";
 import avatarEvents from "../utils/avatarEvents";
 import notificationEvents from "../utils/notificationEvents";
+import { useNotifications } from "../contexts/NotificationsContext";
+import { useConvexActivity } from "../utils/hooks/useConvexActivity";
+import { ConvexReactClient, useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
+
+// Responsive sizing based on screen height
+const isSmallDevice = height < 700;
+const isMediumDevice = height >= 700 && height < 800;
+
 const normalizeImageUri = (uri?: string | null) => {
   if (!uri) return null;
   if (uri.startsWith('http')) return uri;
@@ -60,9 +68,32 @@ export const AppHeader = ({
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
   const [checkingAssessment, setCheckingAssessment] = useState(true);
+  const [menuKey, setMenuKey] = useState(0);
 
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+  
+  // Use shared notification context instead of duplicate polling
+  const { unreadCount, refreshNotifications } = useNotifications();
+  
+  // Initialize Convex client for activity tracking
+  const [convexClient, setConvexClient] = useState<ConvexReactClient | null>(null);
+  const { recordLogout } = useConvexActivity(convexClient);
+
+  useEffect(() => {
+    const initConvex = async () => {
+      try {
+        const url = await AsyncStorage.getItem('convexUrl');
+        if (url) {
+          const client = new ConvexReactClient(url);
+          setConvexClient(client);
+        }
+      } catch (error) {
+        console.error('❌ Failed to initialize Convex client:', error);
+      }
+    };
+    initConvex();
+  }, []);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -71,8 +102,8 @@ export const AppHeader = ({
     const checkAssessment = async () => {
       if (user?.id) {
         try {
-          const isDue = await assessmentTracker.isAssessmentDue(user.id);
-          setIsAssessmentDue(isDue);
+          const result = await assessmentsApi.isAssessmentDue(user.id);
+          setIsAssessmentDue(result.isDue);
         } catch (error) {
           console.error("Error checking assessment status:", error);
         } finally {
@@ -89,6 +120,7 @@ export const AppHeader = ({
     loadProfileImage();
 
     setSideMenuVisible(true);
+    setMenuKey(prev => prev + 1); // Increment key to force ScrollView remount
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 300,
@@ -113,10 +145,10 @@ export const AppHeader = ({
       setIsSigningOut(true);
       hideSideMenu();
       
-      // Record logout activity
+      // Record logout activity using Convex
       if (user?.id) {
         try {
-          await activityApi.recordLogout(user.id);
+          await recordLogout(user.id);
         } catch (_e) {
           // Continue with logout even if tracking fails
         }
@@ -217,6 +249,25 @@ export const AppHeader = ({
     }
   }, [user?.id, loadProfileImage]);
 
+  // Live profile subscription from Convex: keep avatar in sync with profile personal info
+  const fullProfile = useQuery(
+    api.profiles.getFullProfile,
+    user?.id ? { clerkId: user.id } : "skip"
+  ) as { profileImageUrl?: string } | undefined;
+
+  useEffect(() => {
+    const url = fullProfile?.profileImageUrl;
+    if (url && typeof url === 'string') {
+      const normalized = normalizeImageUri(url);
+      if (normalized && normalized !== profileImage) {
+        setProfileImage(normalized);
+        // Persist for fast startup
+        AsyncStorage.setItem('profileImage', normalized).catch(() => {});
+        AsyncStorage.setItem('profileData', JSON.stringify({ profileImageUrl: normalized })).catch(() => {});
+      }
+    }
+  }, [fullProfile?.profileImageUrl, profileImage]);
+
   useFocusEffect(
     useCallback(() => {
       if (user?.id) {
@@ -277,45 +328,14 @@ export const AppHeader = ({
     );
   };
 
-  // Unread notifications badge
-  const [unreadCount, setUnreadCount] = useState(0);
-  const baseURL = getApiBaseUrl();
-
-  const fetchUnreadCount = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const res = await fetch(`${baseURL}/api/notifications/${user.id}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      const rows = (json.data || []) as Array<{ is_read: boolean }>; 
-      const count = rows.reduce((acc, r) => acc + (r.is_read ? 0 : 1), 0);
-      setUnreadCount(count);
-    } catch (e) {
-      // ignore
-    }
-  }, [user?.id, baseURL]);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchUnreadCount();
-      return () => {};
-    }, [fetchUnreadCount])
-  );
-
-  // Poll for unread count periodically to keep the bell badge fresh
-  useEffect(() => {
-    if (!user?.id) return;
-    const id = setInterval(fetchUnreadCount, 15000); // every 15s
-    return () => clearInterval(id);
-  }, [user?.id, fetchUnreadCount]);
-
-  // React immediately when a push arrives (low-latency badge updates)
+  // Unread notifications badge - now handled by NotificationsContext
+  // No more duplicate polling! Just refresh when push arrives
   useEffect(() => {
     const unsubscribe = notificationEvents.subscribe(() => {
-      fetchUnreadCount();
+      refreshNotifications();
     });
     return () => { unsubscribe(); };
-  }, [fetchUnreadCount]);
+  }, [refreshNotifications]);
 
   // Base menu items
   const baseMenuItems = [
@@ -376,6 +396,16 @@ export const AppHeader = ({
       onPress: () => {
         hideSideMenu();
         router.push("/resources");
+      },
+      disabled: false,
+      show: true,
+    },
+    {
+      icon: "megaphone",
+      title: "Announcements",
+      onPress: () => {
+        hideSideMenu();
+        router.push("/announcements");
       },
       disabled: false,
       show: true,
@@ -498,9 +528,9 @@ export const AppHeader = ({
             <TouchableOpacity onPress={() => router.push("/notifications")} style={{ position: 'relative', padding: 4 }}>
               <Ionicons name="notifications-outline" size={24} color={theme.colors.icon} />
               {unreadCount > 0 && (
-                <View style={[styles.unreadBadge, { backgroundColor: theme.colors.primary }]}>
+                <View style={[styles.unreadBadge, { backgroundColor: '#FF3B30' }]}>
                   <Text style={styles.unreadBadgeText} numberOfLines={1}>
-                    {unreadCount > 9 ? '9+' : String(unreadCount)}
+                    {unreadCount > 99 ? '99+' : String(unreadCount)}
                   </Text>
                 </View>
               )}
@@ -536,15 +566,23 @@ export const AppHeader = ({
             { 
               opacity: fadeAnim, 
               backgroundColor: theme.colors.surface,
-              paddingTop: Math.max(insets.top, 20) // Use safe area top with minimum 20px
+              paddingTop: Math.max(insets.top, 20),
             }
           ]}>
-            {/* FIXED: Added avatar with initials to side menu header */}
+            {/* Improved side menu header */}
             <View style={[styles.sideMenuHeader, { borderBottomColor: theme.colors.borderLight }]}>
               <View
                 style={[
                   styles.profileAvatar,
-                  { borderWidth: 2, borderColor: "red" },
+                  { 
+                    borderWidth: 2, 
+                    borderColor: "#4CAF50",
+                    shadowColor: "#4CAF50",
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 3,
+                    elevation: 3,
+                  },
                 ]}
               >
                 {profileImage && normalizeImageUri(profileImage) ? (
@@ -566,44 +604,74 @@ export const AppHeader = ({
             </View>
 
             <ScrollView 
+              key={`menu-${menuKey}`}
               style={styles.sideMenuContent}
-              contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 20, 40) }}
+              contentContainerStyle={{ paddingBottom: isSmallDevice ? 80 : isMediumDevice ? 85 : 90 }}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
             >
-              {sideMenuItems.map((item, index) => (
+              {sideMenuItems.filter(item => item.title !== "Sign Out").map((item, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
                     styles.sideMenuItem,
-                    { borderBottomColor: theme.colors.borderLight },
+                    { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' },
                     item.disabled && styles.sideMenuItemDisabled,
                   ]}
                   onPress={item.onPress}
                   disabled={item.disabled}
                 >
-                  <Ionicons
-                    name={item.icon as any}
-                    size={20}
-                    color={item.disabled ? "#CCCCCC" : theme.colors.icon}
-                  />
+                  <View style={[styles.menuIconCircle, { backgroundColor: theme.isDark ? 'rgba(76,175,80,0.2)' : '#E8F5E9' }]}>
+                    <Ionicons
+                      name={item.icon as any}
+                      size={isSmallDevice ? 16 : isMediumDevice ? 17 : 18}
+                      color={item.disabled ? "#CCCCCC" : "#4CAF50"}
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.sideMenuItemText,
                       { color: theme.colors.text },
                       item.disabled && styles.sideMenuItemTextDisabled,
-                      item.title === "Sign Out" && styles.signOutText,
                     ]}
                   >
                     {item.title}
-                    {item.title === "Sign Out" && isSigningOut && "..."}
                   </Text>
                   {item.badge && (
                     <View style={styles.dueBadge}>
                       <Text style={styles.dueBadgeText}>{item.badge}</Text>
                     </View>
                   )}
+                  <Ionicons name="chevron-forward" size={isSmallDevice ? 13 : 14} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            
+            {/* Sign Out Button - Absolute positioned at bottom */}
+            <View style={[styles.signOutSection, { 
+              borderTopColor: theme.colors.borderLight, 
+              paddingBottom: Math.max(insets.bottom + 16, 24),
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: theme.colors.surface,
+            }]}>
+              <TouchableOpacity
+                style={[styles.signOutButton, { backgroundColor: theme.isDark ? 'rgba(255,107,107,0.15)' : '#FFEBEE' }]}
+                onPress={confirmSignOut}
+                disabled={isSigningOut}
+              >
+                <Ionicons
+                  name="log-out"
+                  size={isSmallDevice ? 16 : isMediumDevice ? 17 : 18}
+                  color="#FF6B6B"
+                />
+                <Text style={[styles.signOutText, { marginLeft: 12 }]}>
+                  Sign Out{isSigningOut && "..."}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -706,74 +774,93 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   sideMenu: {
-    // paddingTop removed - now dynamic based on safe area
     width: width * 0.75,
-    // backgroundColor removed - now uses theme.colors.surface
     height: "100%",
   },
-  // FIXED: Updated sideMenuHeader to include avatar
+  // Updated sideMenuHeader with better spacing
   sideMenuHeader: {
-    padding: 20,
+    padding: isSmallDevice ? 12 : isMediumDevice ? 16 : 20,
+    paddingBottom: isSmallDevice ? 10 : isMediumDevice ? 12 : 16,
     borderBottomWidth: 1,
-    // borderBottomColor removed - now uses theme.colors.borderLight
     alignItems: "center",
   },
-  // NEW: Styles for the profile avatar in side menu
+  // Styles for the profile avatar in side menu
   profileAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    height: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    borderRadius: isSmallDevice ? 25 : isMediumDevice ? 27.5 : 30,
     backgroundColor: "#7CB9A9",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: isSmallDevice ? 6 : isMediumDevice ? 8 : 10,
   },
   profileAvatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    height: isSmallDevice ? 50 : isMediumDevice ? 55 : 60,
+    borderRadius: isSmallDevice ? 25 : isMediumDevice ? 27.5 : 30,
   },
   profileAvatarText: {
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: isSmallDevice ? 16 : isMediumDevice ? 18 : 20,
     fontWeight: "bold",
   },
   profileName: {
-    fontSize: 18,
-    fontWeight: "600",
-    // color removed - now uses theme.colors.text
-    marginBottom: 4,
+    fontSize: isSmallDevice ? 14 : isMediumDevice ? 16 : 18,
+    fontWeight: "700",
+    marginBottom: isSmallDevice ? 2 : isMediumDevice ? 2 : 3,
   },
   profileEmail: {
-    fontSize: 14,
-    // color removed - now uses theme.colors.textSecondary
+    fontSize: isSmallDevice ? 10 : isMediumDevice ? 11 : 12,
   },
   sideMenuContent: {
-    padding: 10,
+    paddingVertical: isSmallDevice ? 2 : 4,
   },
   sideMenuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    // borderBottomColor removed - now uses theme.colors.borderLight
+    paddingVertical: isSmallDevice ? 6 : isMediumDevice ? 7 : 8,
+    paddingHorizontal: isSmallDevice ? 8 : isMediumDevice ? 10 : 12,
+    marginHorizontal: isSmallDevice ? 6 : isMediumDevice ? 8 : 10,
+    marginVertical: isSmallDevice ? 1 : isMediumDevice ? 1.5 : 2,
+    borderRadius: isSmallDevice ? 8 : isMediumDevice ? 9 : 10,
+  },
+  menuIconCircle: {
+    width: isSmallDevice ? 26 : isMediumDevice ? 28 : 30,
+    height: isSmallDevice ? 26 : isMediumDevice ? 28 : 30,
+    borderRadius: isSmallDevice ? 13 : isMediumDevice ? 14 : 15,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: isSmallDevice ? 6 : isMediumDevice ? 8 : 10,
   },
   sideMenuItemDisabled: {
     opacity: 0.5,
   },
   sideMenuItemText: {
-    fontSize: 16,
-    // color removed - now uses theme.colors.text
-    marginLeft: 15,
+    fontSize: isSmallDevice ? 12 : isMediumDevice ? 13 : 14,
+    fontWeight: "500",
+    marginLeft: 0,
     flex: 1,
   },
   sideMenuItemTextDisabled: {
     color: "#CCCCCC",
   },
+  signOutSection: {
+    borderTopWidth: 1,
+    paddingTop: isSmallDevice ? 10 : isMediumDevice ? 12 : 14,
+    paddingHorizontal: isSmallDevice ? 10 : isMediumDevice ? 12 : 14,
+  },
+  signOutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: isSmallDevice ? 10 : isMediumDevice ? 11 : 12,
+    paddingHorizontal: isSmallDevice ? 14 : isMediumDevice ? 16 : 18,
+    borderRadius: isSmallDevice ? 8 : isMediumDevice ? 9 : 10,
+  },
   signOutText: {
     color: "#FF6B6B",
-    fontWeight: "600",
+    fontWeight: "700",
+    fontSize: isSmallDevice ? 13 : isMediumDevice ? 14 : 15,
   },
   dueBadge: {
     backgroundColor: "#FF6B6B",

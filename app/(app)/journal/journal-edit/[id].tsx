@@ -13,30 +13,37 @@ import {
   ActivityIndicator,
   Modal,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Spacing, Typography } from "../../../../constants/theme";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
-import { journalApi, JournalEntry } from "../../../../utils/journalApi";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
-type EmotionType = "very-sad" | "sad" | "neutral" | "happy" | "very-happy";
+type EmotionType = "ecstatic" | "happy" | "content" | "neutral" | "displeased" | "frustrated" | "annoyed" | "angry" | "furious";
 
 interface EmotionOption {
   id: EmotionType;
   emoji: string;
   label: string;
+  bg: string;
 }
 
+// New 3x3 mood grid
 const emotionOptions: EmotionOption[] = [
-  { id: "very-sad", emoji: "😢", label: "Very Sad" },
-  { id: "sad", emoji: "🙁", label: "Sad" },
-  { id: "neutral", emoji: "😐", label: "Neutral" },
-  { id: "happy", emoji: "🙂", label: "Happy" },
-  { id: "very-happy", emoji: "😄", label: "Very Happy" },
+  { id: "ecstatic", emoji: "🤩", label: "Ecstatic", bg: "#CCE5FF" },
+  { id: "happy", emoji: "😃", label: "Happy", bg: "#FFD1E0" },
+  { id: "content", emoji: "🙂", label: "Content", bg: "#D0E4FF" },
+  { id: "neutral", emoji: "😐", label: "Neutral", bg: "#D5EFDB" },
+  { id: "displeased", emoji: "😕", label: "Displeased", bg: "#FFEDD2" },
+  { id: "frustrated", emoji: "😖", label: "Frustrated", bg: "#DFCFFF" },
+  { id: "annoyed", emoji: "😒", label: "Annoyed", bg: "#FFDEE3" },
+  { id: "angry", emoji: "😠", label: "Angry", bg: "#FFE2CC" },
+  { id: "furious", emoji: "🤬", label: "Furious", bg: "#FFD3D3" },
 ];
 
 const tabs = [
@@ -84,33 +91,43 @@ export default function JournalEditScreen() {
     setModalVisible(false);
   };
 
+  const liveEntry = useQuery(api.journal.getEntry, { id: id as any }) as { entry: any } | null | undefined;
   const fetchEntry = React.useCallback(async () => {
     try {
       setLoading(true);
-      const response = await journalApi.getEntry(id as string);
-      const entry = response.entry;
-      
-      setJournalData({
-        title: entry.title,
-        content: entry.content,
-        emotion: entry.emotion_type as EmotionType,
-        emoji: entry.emoji || "",
-        shareWithSupportWorker: entry.share_with_support_worker,
-      });
-      setCharacterCount(entry.content.length);
+      if (liveEntry && liveEntry.entry) {
+        const entry = liveEntry.entry;
+        setJournalData({
+          title: entry.title,
+          content: entry.content,
+          emotion: entry.emotion_type as EmotionType,
+          emoji: entry.emoji || "",
+          shareWithSupportWorker: entry.share_with_support_worker,
+        });
+        setCharacterCount(entry.content.length);
+      }
     } catch (error) {
       console.error("Error fetching journal entry:", error);
       showStatusModal('error', 'Load Failed', 'Unable to load journal entry. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [liveEntry]);
 
   useEffect(() => {
     if (id) {
       fetchEntry();
     }
   }, [id, fetchEntry]);
+
+  // Refresh entry when returning to this screen (ensures latest Convex state)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (id) {
+        fetchEntry();
+      }
+    }, [id, fetchEntry])
+  );
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -147,6 +164,8 @@ export default function JournalEditScreen() {
     }));
   };
 
+  const updateEntry = useMutation(api.journal.updateEntry);
+
   const handleSave = async () => {
     if (
       !journalData.title.trim() ||
@@ -160,7 +179,8 @@ export default function JournalEditScreen() {
     setSaving(true);
 
     try {
-      await journalApi.updateEntry(id as string, {
+      const response = await updateEntry({
+        id: id as any,
         title: journalData.title.trim(),
         content: journalData.content.trim(),
         emotionType: journalData.emotion || undefined,
@@ -259,10 +279,7 @@ export default function JournalEditScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.createContainer}>
-              <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Edit Journal Entry</Text>
-              <Text style={[styles.pageSubtitle, { color: theme.colors.textSecondary }]}>
-                Update your thoughts and feelings
-              </Text>
+              <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Update your thoughts and feelings</Text>
 
               <View style={styles.fieldContainer}>
                 <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Journal Title *</Text>
@@ -326,12 +343,12 @@ export default function JournalEditScreen() {
                       key={emotion.id}
                       style={[
                         styles.emotionButton,
-                        { backgroundColor: theme.colors.surface },
+                        { backgroundColor: emotion.bg },
                         journalData.emotion === emotion.id && [
                           styles.emotionButtonSelected,
                           { 
                             borderColor: theme.colors.primary,
-                            backgroundColor: theme.colors.primary + '08'
+                            borderWidth: 3
                           }
                         ],
                       ]}
@@ -341,11 +358,8 @@ export default function JournalEditScreen() {
                       <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
                       <Text style={[
                         styles.emotionLabel,
-                        { color: theme.colors.textSecondary },
-                        journalData.emotion === emotion.id && [
-                          styles.emotionLabelSelected,
-                          { color: theme.colors.primary }
-                        ]
+                        { color: theme.isDark ? '#1F1B14' : '#2C2620' },
+                        journalData.emotion === emotion.id && styles.emotionLabelSelected
                       ]}>
                         {emotion.label}
                       </Text>
@@ -460,13 +474,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingTop: Spacing.xl,
   },
   pageTitle: {
-    fontSize: scaledFontSize(24), // Base size 24px
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: Spacing.md,
-  },
-  pageSubtitle: {
-    fontSize: scaledFontSize(14), // Base size 14px
+    fontSize: scaledFontSize(16), // Base size 16px
+    fontWeight: "600",
     textAlign: "center",
     marginBottom: Spacing.xxl,
     color: "#666",
@@ -521,27 +530,30 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     gap: Spacing.md,
   },
   emotionButton: {
-    flex: 1,
-    minWidth: "30%",
-    borderRadius: 12,
-    padding: Spacing.md,
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    padding: Spacing.sm,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: 'transparent',
   },
   emotionButtonSelected: {
     borderColor: Colors.primary,
+    borderWidth: 3,
   },
   emotionEmoji: {
-    fontSize: scaledFontSize(28), // Base size 28px
+    fontSize: scaledFontSize(32), // Base size 32px
     marginBottom: Spacing.xs,
   },
   emotionLabel: {
-    fontSize: scaledFontSize(12), // Base size 12px
+    fontSize: scaledFontSize(11), // Base size 11px
     textAlign: "center",
+    fontWeight: '600',
   },
   emotionLabelSelected: {
-    fontWeight: "600",
+    fontWeight: "700",
   },
   shareContainer: {
     flexDirection: "row",

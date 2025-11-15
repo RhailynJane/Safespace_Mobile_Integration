@@ -52,19 +52,29 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import StatusModal from "../../../components/StatusModal";
-import { 
-  Resource, 
-  fetchAllResourcesWithExternal,
-  fetchResourcesByCategory,
-  searchResources,
-  getDailyAffirmation,
-  getRandomQuote,
-} from "../../../utils/resourcesApi";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useQuery, useAction, useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+
+// Resource interface for Convex
+interface Resource {
+  id: string;
+  title: string;
+  type: 'Affirmation' | 'Quote' | 'Article' | 'Exercise' | 'Guide';
+  duration: string;
+  category: string;
+  content: string;
+  author?: string;
+  image_emoji: string;
+  backgroundColor: string;
+  tags?: string[];
+  isExternal?: boolean;
+}
 
 /**
  * Category interface defining the structure for resource categorization
@@ -128,6 +138,7 @@ const CATEGORIES: Category[] = [
  */
 export default function ResourcesScreen() {
   const { theme, scaledFontSize } = useTheme();
+  const { user } = useUser();
   
   // State management for UI and data
   const [loading, setLoading] = useState(true); // Initial loading state
@@ -143,6 +154,28 @@ export default function ResourcesScreen() {
     title: '',
     message: ''
   }); // Modal configuration
+
+  // Convex actions for external API
+  const getDailyQuoteAction = useAction(api.resources.getDailyQuote);
+  const getDailyAffirmationAction = useAction(api.resources.getDailyAffirmationExternal);
+  const addBookmark = useMutation(api.resources.addBookmark);
+  const removeBookmark = useMutation(api.resources.removeBookmark);
+
+  // Fetch a fresh daily quote on mount to populate Featured (external API)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const quote = await getDailyQuoteAction();
+        if (!cancelled && quote) {
+          setFeaturedResource(quote as Resource);
+        }
+      } catch (_) {
+        // ignore; featured will fall back to first quote/affirmation from DB
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [getDailyQuoteAction]);
 
   /**
    * Create styles dynamically based on text size scaling
@@ -179,37 +212,109 @@ export default function ResourcesScreen() {
     setModalConfig({ type: 'error', title: '', message: '' });
   };
 
-  /**
-   * Load resources on component mount
-   * Fetches initial data and sets up featured content
-   */
-  useEffect(() => {
-    loadResources();
-  }, []);
+  // Live resources component using Convex subscriptions
+  const LiveResources = () => {
+    const liveResources = useQuery(
+      api.resources.listResources,
+      { limit: 100 }
+    ) as { resources: Resource[] } | undefined;
+    const bookmarkIds = useQuery(
+      user?.id ? api.resources.listBookmarkedIds : undefined as any,
+      user?.id ? { userId: user.id } : "skip"
+    ) as { ids: string[] } | undefined;
 
-  /**
-   * Load all resources including external content
-   * Sets featured resource and handles error states
-   */
-  const loadResources = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchAllResourcesWithExternal();
-      setResources(data);
-      
-      // Set first quote or affirmation as featured content
-      const featured = data.find(r => r.type === 'Quote' || r.type === 'Affirmation');
-      setFeaturedResource(featured || null);
-    } catch (error) {
-      console.error("Error loading resources:", error);
-      showModal(
-        'error',
-        'Load Error',
-        'Could not load resources. Please check your connection and try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
+    useEffect(() => {
+      if (liveResources !== undefined) {
+        if (liveResources?.resources) {
+          setResources(liveResources.resources);
+          // Set first quote or affirmation as featured content
+          const featured = liveResources.resources.find((r: Resource) => r.type === 'Quote' || r.type === 'Affirmation');
+          setFeaturedResource(featured || null);
+        } else {
+          setResources([]);
+        }
+        setLoading(false);
+      }
+    }, [liveResources]);
+
+    // Track favorites set locally for quick lookup
+    const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+    useEffect(() => {
+      if (bookmarkIds?.ids) {
+        setFavoriteIds(new Set(bookmarkIds.ids.map(String)));
+      }
+    }, [bookmarkIds?.ids]);
+
+    // Expose helper as property on component (closure alternative)
+    (ResourcesScreen as any)._favoriteIds = favoriteIds;
+
+    return null;
+  };
+
+  // Live category resources component
+  const LiveCategoryResources = ({ category }: { category: string }) => {
+    const liveResources = useQuery(
+      api.resources.listByCategory,
+      { category, limit: 50 }
+    ) as { resources: Resource[] } | undefined;
+    const bookmarkIds = useQuery(
+      user?.id ? api.resources.listBookmarkedIds : undefined as any,
+      user?.id ? { userId: user.id } : "skip"
+    ) as { ids: string[] } | undefined;
+
+    useEffect(() => {
+      if (liveResources !== undefined) {
+        if (liveResources?.resources) {
+          setResources(liveResources.resources);
+        } else {
+          setResources([]);
+        }
+        setLoading(false);
+      }
+    }, [liveResources, category]);
+
+    const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+    useEffect(() => {
+      if (bookmarkIds?.ids) {
+        setFavoriteIds(new Set(bookmarkIds.ids.map(String)));
+      }
+    }, [bookmarkIds?.ids]);
+    (ResourcesScreen as any)._favoriteIds = favoriteIds;
+
+    return null;
+  };
+
+  // Live search results component
+  const LiveSearchResults = ({ query }: { query: string }) => {
+    const searchResults = useQuery(
+      api.resources.search,
+      { query, limit: 50 }
+    ) as { resources: Resource[] } | undefined;
+    const bookmarkIds = useQuery(
+      user?.id ? api.resources.listBookmarkedIds : undefined as any,
+      user?.id ? { userId: user.id } : "skip"
+    ) as { ids: string[] } | undefined;
+
+    useEffect(() => {
+      if (searchResults !== undefined) {
+        if (searchResults?.resources) {
+          setResources(searchResults.resources);
+        } else {
+          setResources([]);
+        }
+        setLoading(false);
+      }
+    }, [searchResults, query]);
+
+    const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+    useEffect(() => {
+      if (bookmarkIds?.ids) {
+        setFavoriteIds(new Set(bookmarkIds.ids.map(String)));
+      }
+    }, [bookmarkIds?.ids]);
+    (ResourcesScreen as any)._favoriteIds = favoriteIds;
+
+    return null;
   };
 
   /**
@@ -218,73 +323,36 @@ export default function ResourcesScreen() {
    */
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadResources();
-    setRefreshing(false);
+    try {
+      // Pull a fresh external daily quote on refresh
+      const quote = await getDailyQuoteAction();
+      if (quote) setFeaturedResource(quote as Resource);
+    } catch (_) {
+      // noop
+    } finally {
+      setTimeout(() => setRefreshing(false), 300);
+    }
   };
 
   /**
    * Handle category filter selection
-   * Toggles category on/off and fetches filtered resources
+   * Toggles category on/off
    * 
    * @param categoryId - The ID of the category to filter by
    */
   const handleCategoryPress = (categoryId: string) => {
     const newCategory = selectedCategory === categoryId ? "" : categoryId;
     setSelectedCategory(newCategory);
-
-    if (newCategory) {
-      // Fetch resources for selected category
-      setLoading(true);
-      fetchResourcesByCategory(newCategory)
-        .then(setResources)
-        .catch(error => {
-          console.error("Error fetching category resources:", error);
-          showModal(
-            'error',
-            'Filter Error',
-            'Could not load resources for this category. Please try again.'
-          );
-        })
-        .finally(() => setLoading(false));
-    } else {
-      // Reset to show all resources
-      loadResources();
-    }
+    setLoading(true);
   };
 
   /**
-   * Handle search functionality with debouncing
-   * Searches resources when query length exceeds 2 characters
-   * Resets to full list when search is cleared
+   * Handle search functionality
+   * Live Convex subscription handles the actual search
    */
   useEffect(() => {
-    if (searchQuery.length > 2) {
-      // Debounce search to avoid excessive API calls
-      const timeoutId = setTimeout(async () => {
-        setLoading(true);
-        try {
-          const searchResults = await searchResources(searchQuery);
-          setResources(searchResults);
-        } catch (error) {
-          console.error("Error searching resources:", error);
-          showModal(
-            'error',
-            'Search Error',
-            'Could not complete search. Please check your connection and try again.'
-          );
-        } finally {
-          setLoading(false);
-        }
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    } else if (searchQuery.length === 0 && selectedCategory === "") {
-      // Reset to all resources when search is cleared and no category selected
-      loadResources();
-    }
-
-    return undefined;
-  }, [searchQuery, selectedCategory]);
+    // No manual search needed - LiveSearchResults component handles it
+  }, [searchQuery]);
 
   /**
    * Handle bottom navigation tab press
@@ -323,14 +391,43 @@ export default function ResourcesScreen() {
     });
   };
 
+  // Toggle favorite (bookmark) for a resource
+  const handleToggleFavorite = async (resource: Resource) => {
+    if (!user?.id) return;
+    const favoriteIds: Set<string> = (ResourcesScreen as any)._favoriteIds || new Set();
+    const isFav = favoriteIds.has(resource.id);
+    try {
+      if (isFav) {
+        await removeBookmark({ userId: user.id, resourceId: resource.id as any });
+        favoriteIds.delete(resource.id);
+      } else {
+        await addBookmark({ userId: user.id, resourceId: resource.id as any });
+        favoriteIds.add(resource.id);
+      }
+      (ResourcesScreen as any)._favoriteIds = new Set(favoriteIds);
+      // Force a re-render by updating resources with same array reference (small hack)
+      setResources((prev) => [...prev]);
+    } catch (_) {
+      // Optionally show modal on failure
+    }
+  };
+
   /**
    * Handle daily affirmation quick action
-   * Fetches and displays a random affirmation
+   * Fetches and displays a random affirmation using Convex action
    */
   const handleDailyAffirmation = async () => {
     try {
-      const affirmation = await getDailyAffirmation();
-      handleResourcePress(affirmation);
+      const affirmation = await getDailyAffirmationAction();
+      if (affirmation) {
+        handleResourcePress(affirmation as Resource);
+      } else {
+        showModal(
+          'error',
+          'Affirmation Error',
+          'Could not load daily affirmation. Please try again.'
+        );
+      }
     } catch (error) {
       console.error("Error getting daily affirmation:", error);
       showModal(
@@ -343,12 +440,20 @@ export default function ResourcesScreen() {
 
   /**
    * Handle random quote quick action
-   * Fetches and displays a random inspirational quote
+   * Fetches and displays a random inspirational quote using Convex action
    */
   const handleRandomQuote = async () => {
     try {
-      const quote = await getRandomQuote();
-      handleResourcePress(quote);
+      const quote = await getDailyQuoteAction();
+      if (quote) {
+        handleResourcePress(quote as Resource);
+      } else {
+        showModal(
+          'error',
+          'Quote Error',
+          'Could not load random quote. Please try again.'
+        );
+      }
     } catch (error) {
       console.error("Error getting random quote:", error);
       showModal(
@@ -361,6 +466,15 @@ export default function ResourcesScreen() {
 
   return (
     <CurvedBackground>
+      {/* Live resources subscriptions */}
+      {searchQuery.length > 2 ? (
+        <LiveSearchResults query={searchQuery} />
+      ) : selectedCategory ? (
+        <LiveCategoryResources category={selectedCategory} />
+      ) : (
+        <LiveResources />
+      )}
+      
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Resources" showBack={true} />
 
@@ -539,13 +653,15 @@ export default function ResourcesScreen() {
                       )}
                     </View>
 
-                    {/* Navigation Chevron */}
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color={theme.colors.icon}
-                      style={styles.resourceChevron}
-                    />
+                    {/* Navigation Chevron (favorite star removed) */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color={theme.colors.icon}
+                        style={styles.resourceChevron}
+                      />
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -754,7 +870,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   resourcesSection: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 100, // Extra padding for bottom navigation
+    paddingBottom: 140, // Extra padding for bottom navigation
   },
   resourcesSectionTitle: {
     fontSize: scaledFontSize(18),

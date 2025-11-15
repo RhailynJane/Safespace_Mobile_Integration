@@ -22,33 +22,34 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { getAvatarSource } from "../../../../utils/avatar";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
-import {
-  messagingService,
-  Conversation,
-  Participant,
-} from "../../../../utils/sendbirdService";
-import activityApi from "../../../../utils/activityApi";
+import { Conversation, Participant } from "../../../../utils/sendbirdService";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import { useRef } from "react";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// Removed hybrid Convex client + hook; using direct Convex queries/mutations
 
 export default function MessagesScreen() {
     // Access isDarkMode and fontScale from useTheme
   const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
   const isFocused = useIsFocused();
-  const { userId } = useAuth(); // Get actual Clerk user ID
+  const { userId, getToken } = useAuth(); // Get actual Clerk user ID
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("messages");
+  const [messageFilter, setMessageFilter] = useState<"all" | "unread" | "read">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [sendbirdStatus, setSendbirdStatus] = useState<string>("Initializing...");
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -58,6 +59,9 @@ export default function MessagesScreen() {
     message: '',
     confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
   });
+  
+  const convex = useConvex();
+  
   // Track conversations marked read in this session to keep unread count at 0
   // Key: conversationId, Value: true if marked read
   const recentlyReadRef = useRef<Record<string, boolean>>({});
@@ -123,34 +127,13 @@ export default function MessagesScreen() {
 
   const initializeMessaging = useCallback(async () => {
     if (!userId) {
-      console.log("❌ No user ID available");
-      setSendbirdStatus("User not authenticated");
       setLoading(false);
       showStatusModal('error', 'Authentication Error', 'Please sign in to access messages');
       return;
     }
-
-    try {
-      const accessToken = process.env.EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN;
-
-      // Add default profile URL to avoid SendBird error
-      const sendbirdInitialized = await messagingService.initializeSendBird(
-        userId,
-        accessToken,
-        "https://ui-avatars.com/api/?name=User&background=666&color=fff&size=60"
-      );
-      setSendbirdStatus(
-        sendbirdInitialized ? "SendBird Connected" : "Using Backend API"
-      );
-
-      await loadConversations();
-    } catch (error) {
-      console.log("Failed to initialize messaging");
-      setSendbirdStatus("Using Backend API");
-      showStatusModal('info', 'Connection Notice', 'Using backend messaging service');
-      await loadConversations();
-    }
-  }, [userId]);
+    // Skip SendBird; rely solely on Convex conversations
+    await loadConversations();
+  }, [userId, convex]);
 
   useEffect(() => {
     initializeMessaging();
@@ -160,52 +143,51 @@ export default function MessagesScreen() {
   // This clears unread counts when user taps a conversation during this session
   // but allows unread counts to show again after app restart
 
-  useFocusEffect(
-    useCallback(() => {
-      console.log("💬 MessagesScreen focused, refreshing conversations");
-      console.log("💬 Current userId:", userId);
-      console.log("💬 Current conversations count:", conversations.length);
-      if (userId) {
-        loadConversations();
-      }
-    }, [userId])
-  );
+  // Focus reload moved below after loadConversations definition
 
-  // Filter conversations based on search query
+  // Filter conversations based on search query and message filter
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredConversations(conversations);
-      return;
+    let filtered = conversations;
+    
+    // First apply message filter (all/unread/read)
+    if (messageFilter === "unread") {
+      filtered = filtered.filter(conv => conv.unread_count > 0);
+    } else if (messageFilter === "read") {
+      filtered = filtered.filter(conv => conv.unread_count === 0);
     }
-
-    const filtered = conversations.filter(conversation => {
+    // "all" shows everything, so no filtering needed
+    
+    // Then apply search query if present
+    if (searchQuery.trim()) {
       const searchLower = searchQuery.toLowerCase().trim();
       
-      // Search in participant names
-      const participantNames = conversation.participants
-        .filter(p => p.clerk_user_id !== userId) // Exclude current user
-        .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
-      
-      const hasMatchingParticipant = participantNames.some(name => 
-        name.includes(searchLower)
-      );
+      filtered = filtered.filter(conversation => {
+        // Search in participant names
+        const participantNames = conversation.participants
+          .filter(p => p.clerk_user_id !== userId) // Exclude current user
+          .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
+        
+        const hasMatchingParticipant = participantNames.some(name => 
+          name.includes(searchLower)
+        );
 
-      // Search in conversation title
-      const hasMatchingTitle = conversation.title?.toLowerCase().includes(searchLower);
+        // Search in conversation title
+        const hasMatchingTitle = conversation.title?.toLowerCase().includes(searchLower);
 
-      // Search in last message
-      const hasMatchingLastMessage = conversation.last_message?.toLowerCase().includes(searchLower);
+        // Search in last message
+        const hasMatchingLastMessage = conversation.last_message?.toLowerCase().includes(searchLower);
 
-      // Search in participant emails
-      const hasMatchingEmail = conversation.participants.some(p => 
-        p.email?.toLowerCase().includes(searchLower)
-      );
+        // Search in participant emails
+        const hasMatchingEmail = conversation.participants.some(p => 
+          p.email?.toLowerCase().includes(searchLower)
+        );
 
-      return hasMatchingParticipant || hasMatchingTitle || hasMatchingLastMessage || hasMatchingEmail;
-    });
+        return hasMatchingParticipant || hasMatchingTitle || hasMatchingLastMessage || hasMatchingEmail;
+      });
+    }
 
     setFilteredConversations(filtered);
-  }, [searchQuery, conversations, userId]);
+  }, [searchQuery, conversations, userId, messageFilter]);
 
   const loadConversations = async () => {
     if (!userId) {
@@ -219,57 +201,36 @@ export default function MessagesScreen() {
     try {
       setLoading(true);
       console.log(`💬 Loading conversations for user: ${userId}`);
-
-      // Add timestamp to prevent caching
-      const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log(`💬 Setting ${result.data.length} conversations`);
-        console.log(`💬 Conversation data:`, JSON.stringify(result.data, null, 2));
-        let convs: Conversation[] = result.data;
-
-        // After conversations load, refresh presence using batch status for other participants
-        try {
-          const otherIds = Array.from(
-            new Set(
-              convs
-                .flatMap((c) => c.participants)
-                .filter((p) => p.clerk_user_id !== userId)
-                .map((p) => p.clerk_user_id)
-                .filter(Boolean)
-            )
-          );
-
-          if (otherIds.length > 0) {
-            const statusMap = await activityApi.statusBatch(otherIds);
-            convs = convs.map((c) => ({
-              ...c,
-              participants: c.participants.map((p) => {
-                if (p.clerk_user_id === userId) return p;
-                const s = statusMap[p.clerk_user_id];
-                return s
-                  ? { ...p, online: !!s.online, presence: s.presence as any, last_active_at: s.last_active_at }
-                  : p;
-              }),
-            }));
-          }
-        } catch (e) {
-          console.log("Presence batch update failed:", e);
-        }
-
-        // Don't suppress unread counts - let backend be the source of truth
-        // Backend's mark-read API will handle clearing unread when conversation is opened
-        setConversations(convs);
-        setFilteredConversations(convs); // Initialize filtered conversations
-      } else {
-        console.log("💬 Failed to load conversations from backend");
-        setConversations([]);
-        setFilteredConversations([]);
-        showStatusModal('error', 'Load Error', 'Failed to load conversations. Please try again.');
-      }
+      
+      // Load online users for presence status
+      const onlineData = await convex.query(api.presence.onlineUsers, { sinceMs: 5 * 60 * 1000 }); // 5 minutes
+      const onlineSet = new Set<string>((onlineData || []).map((p: any) => String(p.userId)));
+      setOnlineUsers(onlineSet);
+      
+      // Use enriched query (includes participants metadata + lastMessage + unreadCount)
+      const convs = await convex.query(api.conversations.listForUserEnriched, {} as any);
+      const mapped: Conversation[] = (convs as any[]).map((c: any) => ({
+        id: c._id,
+        channel_url: '',
+        title: c.title || '',
+        last_message: c.lastMessage?.body || '',
+        unread_count: c.unreadCount || 0,
+        updated_at: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date().toISOString(),
+        conversation_type: 'direct',
+        participants: (c.participants || []).map((p: any) => ({
+          clerk_user_id: p.userId,
+          first_name: p.firstName || '',
+          last_name: p.lastName || '',
+          email: '',
+          profile_image_url: p.imageUrl || '',
+          online: onlineSet.has(p.userId),
+          presence: onlineSet.has(p.userId) ? 'online' : 'offline',
+          last_active_at: '',
+          id: p.userId,
+        })),
+      }));
+      setConversations(mapped);
+      setFilteredConversations(mapped);
     } catch (error) {
       console.error("💬 Error loading conversations:", error);
       setConversations([]);
@@ -281,155 +242,115 @@ export default function MessagesScreen() {
     }
   };
 
+  // Reload when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) {
+        loadConversations();
+      }
+    }, [userId])
+  );
+
   // Removed presence polling per request
 
-  // Poll for new messages and update unread counts every 10 seconds
+  // Poll for new messages and presence from Convex every 10 seconds
   useEffect(() => {
     if (!isFocused || !userId) return;
-    
-    const pollMessages = async () => {
+    const poll = async () => {
       try {
-        console.log('📬 Polling for new messages...');
-        const response = await fetch(
-          `${API_BASE_URL}/api/messages/conversations/${userId}?t=${Date.now()}`
-        );
+        // Refresh online users with a 5-minute window (same as chat screen)
+        const onlineData = await convex.query(api.presence.onlineUsers, { sinceMs: 5 * 60 * 1000 });
+        const onlineSet = new Set<string>((onlineData || []).map((p: any) => String(p.userId)));
+        setOnlineUsers(onlineSet);
         
-        if (response.ok) {
-          const result = await response.json();
-          let freshConvs: Conversation[] = result.data;
-          
-          // Refresh presence for all other participants
-          try {
-            const otherIds = Array.from(
-              new Set(
-                freshConvs
-                  .flatMap((c) => c.participants)
-                  .filter((p) => p.clerk_user_id !== userId)
-                  .map((p) => p.clerk_user_id)
-                  .filter(Boolean)
-              )
-            );
-
-            if (otherIds.length > 0) {
-              const statusMap = await activityApi.statusBatch(otherIds);
-              freshConvs = freshConvs.map((c) => ({
-                ...c,
-                participants: c.participants.map((p) => {
-                  if (p.clerk_user_id === userId) return p;
-                  const s = statusMap[p.clerk_user_id];
-                  return s
-                    ? { ...p, online: !!s.online, presence: s.presence as any, last_active_at: s.last_active_at }
-                    : p;
-                }),
-              }));
-            }
-          } catch (e) {
-            console.log('Presence update during poll failed:', e);
-          }
-          
-          // Don't suppress unread counts - backend is the source of truth
-          // Backend mark-read API handles clearing unread when messages are actually read
-          
-          console.log(`📬 Polled ${freshConvs.length} conversations, unread counts:`, 
-            freshConvs.map(c => ({ id: c.id, unread: c.unread_count }))
-          );
-          
-          // Update conversations with fresh unread counts from backend
-          setConversations(freshConvs);
-          setFilteredConversations((prev) => {
-            // Maintain search filter
-            if (!searchQuery.trim()) return freshConvs;
-            return freshConvs.filter((c) => {
-              const searchLower = searchQuery.toLowerCase().trim();
-              const participantNames = c.participants
-                .filter(p => p.clerk_user_id !== userId)
-                .map(p => `${p.first_name} ${p.last_name}`.toLowerCase());
-              return participantNames.some(name => name.includes(searchLower)) ||
-                c.title?.toLowerCase().includes(searchLower) ||
-                c.last_message?.toLowerCase().includes(searchLower);
-            });
-          });
-        }
+        const convs = await convex.query(api.conversations.listForUserEnriched, {} as any);
+        const mapped: Conversation[] = (convs as any[]).map((c: any) => ({
+          id: c._id,
+          channel_url: '',
+          title: c.title || '',
+          last_message: c.lastMessage?.body || '',
+          unread_count: c.unreadCount || 0,
+          updated_at: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date().toISOString(),
+          conversation_type: 'direct',
+          participants: (c.participants || []).map((p: any) => ({
+            clerk_user_id: p.userId,
+            first_name: p.firstName || '',
+            last_name: p.lastName || '',
+            email: '',
+            profile_image_url: p.imageUrl || '',
+            online: onlineSet.has(p.userId),
+            presence: onlineSet.has(p.userId) ? 'online' : 'offline',
+            last_active_at: '',
+            id: p.userId,
+          })),
+        }));
+        setConversations(mapped);
       } catch (e) {
-        console.log('❌ Error polling messages:', e);
+        console.log('Convex poll failed', e);
       }
     };
-    
-    const pollInterval = setInterval(pollMessages, 10000); // Poll every 10 seconds
-    return () => clearInterval(pollInterval);
-  }, [isFocused, userId, searchQuery]);
+    const interval = setInterval(poll, 10000);
+    return () => clearInterval(interval);
+  }, [isFocused, userId, convex]);
 
-  const onRefresh = () => {
+  // Helpers
+  const getUserInitials = (first?: string, last?: string) => {
+    const f = (first || '').trim();
+    const l = (last || '').trim();
+    if (f && l) return `${f[0]}${l[0]}`.toUpperCase();
+    if (f) return f.slice(0, 2).toUpperCase();
+    if (l) return l.slice(0, 2).toUpperCase();
+    return 'UU';
+  };
+
+  const getDisplayName = (conversation: Conversation) => {
+    // Since Convex already filters out current user, participants should only contain others
+    // Always derive name from participants for 1-on-1 chats to show the other person's name
+    const others = conversation.participants;
+    
+    if (others.length === 1) {
+      const p = others[0]!; // assert exists since length === 1
+      const name = `${p.first_name || ''} ${p.last_name || ''}`.trim();
+      return name || p.email || 'Conversation';
+    }
+    
+    // For group chats (multiple participants), use title if available
+    if (others.length > 1) {
+      if (conversation.title) return conversation.title;
+      return others.map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.email).filter(Boolean).join(', ');
+    }
+    
+    // Fallback to title or default
+    return conversation.title || 'Conversation';
+  };
+
+  const getAvatarDisplay = (participants: Participant[]) => {
+    // Since Convex already filters out current user, use participants directly
+    const display = participants[0];
+    const avatar = getAvatarSource({
+      profileImageUrl: display?.profile_image_url,
+      imageUrl: display?.profile_image_url,
+      firstName: display?.first_name,
+      lastName: display?.last_name,
+      email: display?.email,
+      clerkId: display?.clerk_user_id,
+      apiBaseUrl: API_BASE_URL,
+    });
+    return avatar;
+  };
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadConversations();
+    await loadConversations();
   };
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
-    // Use replace for all tab switches to avoid stacking screens and off-tab renders
-    router.replace(`/(app)/(tabs)/${tabId}`);
-  };
-
-  const getDisplayName = (conversation: Conversation) => {
-    // Filter out current user from participants list
-    const otherParticipants = conversation.participants.filter(
-      (p) => p.clerk_user_id !== userId
-    );
-
-    // If there are other participants, show their FULL names
-    if (otherParticipants.length > 0) {
-      const fullNames = otherParticipants
-        .map((p) => `${p.first_name} ${p.last_name}`.trim())
-        .join(", ");
-      return fullNames;
+    if (tabId === 'home') {
+      router.replace('/(app)/(tabs)/home');
+    } else {
+      router.push(`/(app)/(tabs)/${tabId}`);
     }
-
-    // If no other participants found, fallback to conversation title
-    if (conversation.title) {
-      return conversation.title;
-    }
-
-    return "Unknown User";
-  };
-
-  // Get user initials for avatar
-  const getUserInitials = (firstName?: string, lastName?: string) => {
-    const first = firstName?.charAt(0) || "";
-    const last = lastName?.charAt(0) || "";
-    return `${first}${last}`.toUpperCase() || "U";
-  };
-
-  // Get avatar display (text for initials or URL for image)
-  const getAvatarDisplay = (participants: Participant[]) => {
-    // Get other participants (not current user)
-    const otherParticipants = participants.filter(
-      (p) => p.clerk_user_id !== userId
-    );
-
-    const displayParticipant =
-      otherParticipants.length > 0 ? otherParticipants[0] : participants[0];
-
-    // If profile image exists, return a normalized absolute URL
-    if (displayParticipant?.profile_image_url) {
-      const raw = displayParticipant.profile_image_url;
-      let normalized = raw;
-      if (raw.startsWith('http')) {
-        normalized = raw;
-      } else if (raw.startsWith('/')) {
-        normalized = `${API_BASE_URL}${raw}`;
-      } else if (raw.startsWith('data:image')) {
-        // Use lightweight server endpoint that streams the image instead of embedding base64
-        normalized = `${API_BASE_URL}/api/users/${encodeURIComponent(displayParticipant.clerk_user_id || '')}/profile-image`;
-      }
-      return { type: "image", value: normalized };
-    }
-
-    // Otherwise return initials for text display
-    const initials = getUserInitials(
-      displayParticipant?.first_name,
-      displayParticipant?.last_name
-    );
-    return { type: "text", value: initials };
   };
 
   const formatTime = (timestamp: string) => {
@@ -467,6 +388,81 @@ export default function MessagesScreen() {
     <SafeAreaView testID="messages-screen" style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <CurvedBackground>
         <AppHeader title="Messages" showBack={true} />
+
+        {/* Search Bar */}
+        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
+          <Ionicons
+            name="search"
+            size={20}
+            color={theme.colors.icon}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            testID="messages-search"
+            style={[styles.searchInput, { color: theme.colors.text }]}
+            placeholder="Search messages"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={theme.colors.textSecondary}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Message Filter Chips */}
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              messageFilter === "all" && [styles.filterChipActive, { backgroundColor: theme.colors.primary }],
+              { backgroundColor: messageFilter === "all" ? theme.colors.primary : theme.colors.surface }
+            ]}
+            onPress={() => setMessageFilter("all")}
+          >
+            <Text style={[
+              styles.filterChipText,
+              { color: messageFilter === "all" ? "#FFF" : theme.colors.text }
+            ]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              messageFilter === "unread" && [styles.filterChipActive, { backgroundColor: theme.colors.primary }],
+              { backgroundColor: messageFilter === "unread" ? theme.colors.primary : theme.colors.surface }
+            ]}
+            onPress={() => setMessageFilter("unread")}
+          >
+            <Text style={[
+              styles.filterChipText,
+              { color: messageFilter === "unread" ? "#FFF" : theme.colors.text }
+            ]}>
+              Unread
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              messageFilter === "read" && [styles.filterChipActive, { backgroundColor: theme.colors.primary }],
+              { backgroundColor: messageFilter === "read" ? theme.colors.primary : theme.colors.surface }
+            ]}
+            onPress={() => setMessageFilter("read")}
+          >
+            <Text style={[
+              styles.filterChipText,
+              { color: messageFilter === "read" ? "#FFF" : theme.colors.text }
+            ]}>
+              Read
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Status Modal (also supports confirmations) */}
         <Modal
@@ -547,51 +543,20 @@ export default function MessagesScreen() {
           </View>
         </Modal>
 
-        {/* New Message Button */}
-        <View>
-          <TouchableOpacity
-            testID="new-message-button"
-            style={styles.newMessageButton}
-            onPress={() => {
-              if (!userId) {
-                showStatusModal('error', 'Authentication Required', 'Please sign in to send messages');
-                return;
-              }
-              router.push("../messages/new-message");
-            }}
-          >
-            <LinearGradient
-              colors={["#5296EA", "#489EEA", "#459EEA", "#4896EA"]}
-              style={styles.newMessageButtonGradient}
-            >
-              <Text style={[styles.newMessageButtonText, { color: '#FFF' }]}>+ New Message</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-          <Ionicons
-            name="search"
-            size={20}
-            color={theme.colors.icon}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            testID="messages-search"
-            style={[styles.searchInput, { color: theme.colors.text }]}
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={theme.colors.textSecondary}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color={theme.colors.icon} />
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Floating New Message Button */}
+        <TouchableOpacity
+          testID="new-message-button"
+          style={[styles.floatingButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => {
+            if (!userId) {
+              showStatusModal('error', 'Authentication Required', 'Please sign in to send messages');
+              return;
+            }
+            router.push("/(app)/(tabs)/messages/new-message");
+          }}
+        >
+          <Ionicons name="create" size={28} color="#FFF" />
+        </TouchableOpacity>
 
         {/* Search Results Info */}
         {!!searchQuery.trim() && (
@@ -671,15 +636,13 @@ export default function MessagesScreen() {
                       showStatusModal('error', 'Authentication Required', 'Please sign in to view messages');
                       return;
                     }
-                    // Persistently clear unread via backend mark-read endpoint, and optimistically update UI
+                    // Mark as read in Convex
                     (async () => {
                       try {
-                        await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}/mark-read`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ clerkUserId: userId })
-                        });
-                      } catch (_e) { /* ignore transient errors */ }
+                        await convex.mutation(api.conversations.markRead, { conversationId: conversation.id as any });
+                      } catch (err) {
+                        console.log('Mark read mutation failed', err);
+                      }
                     })();
                     // Mark as read and save to AsyncStorage to persist across tab switches
                     saveReadConversations(conversation.id);
@@ -713,12 +676,13 @@ export default function MessagesScreen() {
                       'This will remove the conversation from your inbox. Continue?',
                       async () => {
                         try {
-                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversation.id}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                          if (res.ok) {
+                          try {
+                            await convex.mutation(api.conversations.deleteConversation, { conversationId: conversation.id as any });
                             setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
                             setFilteredConversations((prev) => prev.filter((c) => c.id !== conversation.id));
                             showStatusModal('success', 'Deleted', 'Conversation removed');
-                          } else {
+                          } catch (err) {
+                            console.log('Delete conversation failed', err);
                             showStatusModal('error', 'Delete failed', 'Unable to delete this conversation');
                           }
                         } catch (_e) {
@@ -1052,6 +1016,42 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   newMessageButtonText: {
     fontSize: scaledFontSize(16),
     fontWeight: "800",
+  },
+  filterContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  filterChipActive: {
+    borderWidth: 0,
+  },
+  filterChipText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: "600",
+  },
+  floatingButton: {
+    position: "absolute",
+    bottom: 120, // Above bottom navigation
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
   },
   initialsAvatar: {
     width: 60,

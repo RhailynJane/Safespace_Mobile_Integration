@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component.
  * Reference: chat.deepseek.com
  */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,48 +13,70 @@ import {
   TextInput,
   ActivityIndicator,
   Switch,
-  Dimensions,
   StatusBar,
   Modal,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-// import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
-import { moodApi } from "../../../utils/moodApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
-
-const { width } = Dimensions.get("window");
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 // Character limit for notes
 const NOTES_MAX_LENGTH = 200;
 
-// Define mood types for type safety
-type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad";
+// Define mood types for type safety - Extended with new mood grid
+type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad" | "ecstatic" | "content" | "displeased" | "frustrated" | "annoyed" | "angry" | "furious";
 
-// Configuration for different mood types with emojis and labels
-const moodConfig = {
+// New 3x3 mood grid inspired by the design
+const moodGrid = [
+  { id: 'ecstatic', label: 'Ecstatic', emoji: '🤩', bg: '#CCE5FF' },
+  { id: 'happy', label: 'Happy', emoji: '😃', bg: '#FFD1E0' },
+  { id: 'content', label: 'Content', emoji: '🙂', bg: '#D0E4FF' },
+  { id: 'neutral', label: 'Neutral', emoji: '😐', bg: '#D5EFDB' },
+  { id: 'displeased', label: 'Displeased', emoji: '😕', bg: '#FFEDD2' },
+  { id: 'frustrated', label: 'Frustrated', emoji: '😖', bg: '#DFCFFF' },
+  { id: 'annoyed', label: 'Annoyed', emoji: '😒', bg: '#FFDEE3' },
+  { id: 'angry', label: 'Angry', emoji: '😠', bg: '#FFE2CC' },
+  { id: 'furious', label: 'Furious', emoji: '🤬', bg: '#FFD3D3' },
+];
+
+// Configuration for different mood types with emojis and labels (kept for backward compatibility)
+const moodConfig: Record<MoodType, { emoji: string; label: string }> = {
   "very-happy": { emoji: "😄", label: "Very Happy" },
-  happy: { emoji: "🙂", label: "Happy" },
+  happy: { emoji: "�", label: "Happy" },
   neutral: { emoji: "😐", label: "Neutral" },
   sad: { emoji: "🙁", label: "Sad" },
   "very-sad": { emoji: "😢", label: "Very Sad" },
+  ecstatic: { emoji: "🤩", label: "Ecstatic" },
+  content: { emoji: "🙂", label: "Content" },
+  displeased: { emoji: "😕", label: "Displeased" },
+  frustrated: { emoji: "😖", label: "Frustrated" },
+  annoyed: { emoji: "😒", label: "Annoyed" },
+  angry: { emoji: "😠", label: "Angry" },
+  furious: { emoji: "🤬", label: "Furious" },
 };
 
-// Predefined list of mood factors for user selection
+// Predefined list of mood factors for user selection - Updated list
 const moodFactors = [
+  "Work",
   "Family",
-  "Health Concerns",
-  "Sleep Quality",
+  "Relationship",
+  "Friends",
+  "Myself",
+  "School",
+  "Coworkers",
+  "Health",
   "Social Interaction",
-  "Financial Stress",
+  "Financial",
   "Physical Activity",
-  "Work/School Stress",
   "Weather",
+  "Sleep",
 ];
 
 // Navigation tabs configuration
@@ -69,7 +91,13 @@ const tabs = [
 export default function MoodLoggingScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
-  const { selectedMood } = useLocalSearchParams<{ selectedMood: MoodType }>();
+  // Extended params include original selection metadata
+  const { selectedMood, selectedId, selectedLabel, selectedEmoji } = useLocalSearchParams<{
+    selectedMood: MoodType;
+    selectedId?: string;
+    selectedLabel?: string;
+    selectedEmoji?: string;
+  }>();
 
   // State for mood data including type, intensity, factors, notes, and sharing
   const [moodData, setMoodData] = useState({
@@ -136,6 +164,15 @@ export default function MoodLoggingScreen() {
     router.replace("../mood-tracking/mood-history");
   };
 
+  // Reload on screen focus to refresh recent moods
+  useFocusEffect(
+    useCallback(() => {
+      // Optional: reload any data needed on return to this screen
+    }, [])
+  );
+
+  const recordMood = useMutation(api.moods.recordMood);
+
   // Handle form submission with API call
   const handleSubmit = async () => {
     if (!user?.id) {
@@ -146,13 +183,14 @@ export default function MoodLoggingScreen() {
     setIsSubmitting(true);
 
     try {
-      // Create mood entry via API
-      await moodApi.createMood({
-        clerkUserId: user.id,
+      // Create mood entry via Convex
+      await recordMood({
+        userId: user.id,
         moodType: moodData.type,
         intensity: moodData.intensity,
         notes: moodData.notes,
         factors: moodData.factors,
+        shareWithSupportWorker: moodData.shareWithSupportWorker,
       });
 
       // Set success message based on sharing status
@@ -233,72 +271,14 @@ export default function MoodLoggingScreen() {
 
         {/* Main Content */}
         <ScrollView contentContainerStyle={styles.scrollContainer}>
-          {/* Mood display section showing selected mood */}
-          <View style={[styles.moodDisplay, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
+          {/* Mood display section showing the original chosen mood (exact label & emoji) */}
+          <View style={styles.moodDisplay}>
             <Text style={styles.moodEmoji}>
-              {moodConfig[moodData.type].emoji}
+              {selectedEmoji || moodConfig[moodData.type].emoji}
             </Text>
             <Text style={[styles.moodLabel, { color: theme.colors.text }]}>
-              {moodConfig[moodData.type].label}
+              {selectedLabel || moodConfig[moodData.type].label}
             </Text>
-          </View>
-
-          {/* Intensity selection section with slider */}
-          <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Intensity (1-5)</Text>
-            <View style={styles.sliderContainer}>
-              <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>1</Text>
-              {/* <Slider
-                style={styles.slider}
-                minimumValue={1}
-                maximumValue={5}
-                step={1}
-                value={moodData.intensity}
-                onValueChange={handleIntensityChange}
-                minimumTrackTintColor={theme.colors.primary}
-                maximumTrackTintColor={theme.isDark ? "#444" : "#E0E0E0"}
-                thumbTintColor={theme.colors.primary}
-              /> */}
-              <Text style={[styles.sliderLabel, { color: theme.colors.textSecondary }]}>5</Text>
-            </View>
-            <Text style={[styles.intensityValue, { color: theme.colors.primary }]}>
-              Current: {moodData.intensity}
-            </Text>
-          </View>
-
-          {/* Mood factors selection section */}
-          <View style={[styles.section, { backgroundColor: theme.colors.surface, shadowColor: theme.isDark ? "#000" : "#000" }]}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              What&apos;s affecting your mood?
-            </Text>
-            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
-              Select all that apply
-            </Text>
-            <View style={styles.factorsContainer}>
-              {moodFactors.map((factor) => (
-                <TouchableOpacity
-                  key={factor}
-                  style={[
-                    styles.factorButton,
-                    { backgroundColor: theme.isDark ? "#2A2A2A" : "#F5F5F5", borderColor: theme.colors.borderLight },
-                    moodData.factors.includes(factor) &&
-                      { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-                  ]}
-                  onPress={() => handleFactorToggle(factor)}
-                >
-                  <Text
-                    style={[
-                      styles.factorText,
-                      { color: theme.colors.textSecondary },
-                      moodData.factors.includes(factor) &&
-                        styles.selectedFactorText,
-                    ]}
-                  >
-                    {factor}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
 
           {/* Notes input section with character counter */}
@@ -431,13 +411,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     marginVertical: 24,
     borderRadius: 16,
     padding: 24,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: 'transparent',
   },
   moodEmoji: {
-    fontSize: scaledFontSize(72), // Base size 72px
+    fontSize: scaledFontSize(112), // Further increased for prominence
     marginBottom: 12,
   },
   moodLabel: {

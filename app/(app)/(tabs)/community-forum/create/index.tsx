@@ -2,7 +2,7 @@
  * LLM Prompt: Add concise comments to this React Native component. 
  * Reference: chat.deepseek.com
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -20,9 +20,11 @@ import Svg, { Path } from 'react-native-svg';
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
+import { useAuth } from "@clerk/clerk-expo";
+// Removed local Convex client; use shared provider elsewhere when needed
 
 const CATEGORIES = [
-  "Self Care",
+  "Self-Care",
   "Mindfulness",
   "Stories",
   "Support",
@@ -35,7 +37,7 @@ const CATEGORIES = [
 
 const getCategoryIcon = (category: string) => {
   switch (category) {
-    case "Self Care":
+    case "Self-Care":
       return require('../../../../../assets/images/self-care.png');
     case "Mindfulness":
       return require('../../../../../assets/images/mindfulness.png');
@@ -59,9 +61,10 @@ const getCategoryIcon = (category: string) => {
 };
 
 export default function SelectCategoryScreen() {
-  const { theme, scaledFontSize } = useTheme();
+  const { theme, scaledFontSize, isDarkMode } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState("");
   const [activeTab, setActiveTab] = useState("community-forum");
+  const { getToken, isSignedIn } = useAuth();
   
   // Modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -71,10 +74,12 @@ export default function SelectCategoryScreen() {
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
+  // No local Convex client needed on this selection screen
+
   const handleContinue = () => {
     if (selectedCategory) {
       router.push({
-        pathname: "/community-forum/create/content",
+        pathname: "/(app)/(tabs)/community-forum/create/content",
         params: { category: selectedCategory },
       });
     } else {
@@ -113,9 +118,11 @@ export default function SelectCategoryScreen() {
           
           {/* Title Section */}
           <View style={styles.titleSection}>
-            <Text style={[styles.mainTitle, { color: theme.colors.text }]}>Add New Post</Text>
+            <View style={styles.titleContainer}>
+              <Text style={[styles.mainTitle, { color: theme.colors.text }]}>Add New Post</Text>
+              <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Select a category to get started</Text>
+            </View>
           </View>
-          <Text style={[styles.subtitle, { color: theme.colors.text }]}>Select post category</Text>
 
           <View style={styles.categoriesContainer}>
             {CATEGORIES.map((category) => (
@@ -123,19 +130,26 @@ export default function SelectCategoryScreen() {
                 key={category}
                 style={[
                   styles.categoryCard,
-                  { backgroundColor: theme.colors.surface },
-                  selectedCategory === category && styles.categoryCardActive,
+                  selectedCategory === category 
+                    ? {
+                        backgroundColor: isDarkMode ? "#2A4A42" : "#E8F5F1",
+                        shadowColor: "#7CB9A9",
+                        shadowOpacity: 0.3,
+                        shadowRadius: 10,
+                        elevation: 6,
+                      }
+                    : { backgroundColor: theme.colors.surface },
                 ]}
                 onPress={() => setSelectedCategory(category)}
               >
-                <View style={styles.categoryIcon}>
-                  <Image
-                    source={getCategoryIcon(category)}
-                    style={styles.iconImage}
-                    resizeMode="contain"
-                  />
-                </View>
+                <Image
+                  source={getCategoryIcon(category)}
+                  style={styles.iconImage}
+                  resizeMode="contain"
+                />
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                   style={[
                     styles.categoryText,
                     { color: theme.colors.textSecondary },
@@ -149,18 +163,18 @@ export default function SelectCategoryScreen() {
           </View>
 
           {/* Continue Button */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[
-                styles.continueButton,
-                !selectedCategory && styles.continueButtonDisabled,
-              ]}
-              onPress={handleContinue}
-              disabled={!selectedCategory}
-            >
-              <Text style={styles.continueButtonText}>Continue</Text>
-            </TouchableOpacity>
-          </View>
+          {selectedCategory && (
+            <View style={styles.floatingButtonContainer}>
+              <TouchableOpacity
+                style={[styles.floatingButton, { backgroundColor: theme.colors.primary }]}
+                onPress={handleContinue}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="arrow-forward" size={24} color="white" />
+                <Text style={styles.floatingButtonText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
 
         {/* Bottom Navigation */}
@@ -204,16 +218,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
   },
   titleSection: {
-    paddingHorizontal: 15,
-    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     alignItems: "center"
   },
+  titleContainer: {
+    alignItems: "center",
+    gap: 8,
+  },
   mainTitle: {
-    fontSize: scaledFontSize(24),
-    fontWeight: "800",
-    // color moved to theme.colors.text via inline override
-    justifyContent: "center",
-    alignItems: "center"
+    fontSize: scaledFontSize(28),
+    fontWeight: "700",
+    textAlign: "center",
+    letterSpacing: 0.5,
   },
   header: {
     flexDirection: "row",
@@ -235,12 +252,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   subtitle: {
     fontSize: scaledFontSize(16),
-    fontWeight: "300",
-    // color moved to theme.colors.text via inline override
-    marginTop: 10,
-    marginBottom: 24,
+    fontWeight: "400",
     textAlign: "center",
-    paddingHorizontal: 20,
+    opacity: 0.8,
+    lineHeight: 22,
   },
   title: {
     fontSize: scaledFontSize(16),
@@ -252,9 +267,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   categoriesContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 20,
-    justifyContent: "center",
-    marginTop: 15,
+    justifyContent: "flex-start",
+    paddingHorizontal: 16,
+    marginBottom: 100,
+    maxWidth: 390,
+    alignSelf: "center",
   },
   iconImage: {
     width: 87,
@@ -262,86 +279,63 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     marginBottom: 8,
   },
   categoryCard: {
-    width: 100,
+    width: "30%",
     height: 150,
-    // backgroundColor moved to theme.colors.surface via inline override
-    borderRadius: 16,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     padding: 12,
-    borderWidth: 0.5,
-    borderColor: "#000",
-    shadowColor: "#999",
+    marginHorizontal: "1.66%",
+    marginVertical: 8,
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: {
-      width: 2,
-      height: 2,
+      width: 0,
+      height: 4,
     },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  categoryCardActive: {
-    width: 100,
-    height: 150,
-    backgroundColor: "#EDE7EC",
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
-    borderWidth: 2,
-    borderColor: "#D36500",
-    shadowColor: "#999",
-    shadowOffset: {
-      width: 2,
-      height: 2,
-    },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  categoryIcon: {
-    marginBottom: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   categoryText: {
     fontSize: scaledFontSize(12),
-    // color moved to theme.colors.textSecondary via inline override
     textAlign: "center",
     fontWeight: "500",
+    marginTop: 4,
+    width: "100%",
   },
   categoryTextActive: {
-    color: "#666",
-    fontWeight: "500",
+    color: "#7CB9A9",
+    fontWeight: "600",
   },
-  footer: {
-    backgroundColor: "transparent",
-    borderTopColor: "#transparent",
-    marginTop: 20,
-  },
-  continueButton: {
-    backgroundColor: "#7CB9A9",
-    paddingVertical: 16,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor:"white",
+  floatingButtonContainer: {
+    position: "absolute",
+    bottom: 100,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginRight: 30,
-    marginLeft: 30,
-    marginBottom: 50,
-    shadowColor: "#999",
+    zIndex: 10,
+  },
+  floatingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 30,
+    shadowColor: "#000",
     shadowOffset: {
-      width: 2,
-      height: 2,
+      width: 0,
+      height: 8,
     },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
+    gap: 8,
   },
-  continueButtonDisabled: {
-    backgroundColor: "#B6D5CF",
-  },
-  continueButtonText: {
-    color: "#000",
-    fontSize: scaledFontSize(16),
-    fontWeight: "800",
+  floatingButtonText: {
+    color: "white",
+    fontSize: scaledFontSize(18),
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });

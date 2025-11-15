@@ -14,11 +14,11 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
-  Image,
   Alert,
 } from "react-native";
+import { Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
@@ -27,6 +27,10 @@ import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import StatusModal from "../../../../components/StatusModal";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+// CMHA flow: user is auto-assigned to an available support worker.
+// This screen focuses on selecting date, time and session type (no worker browsing).
 
 /**
  * BookAppointment Component
@@ -39,28 +43,39 @@ import StatusModal from "../../../../components/StatusModal";
  * Features an elegant curved background and intuitive interface.
  */
 
-interface SupportWorker {
-  id: number;
-  name: string;
-  title: string;
-  avatar: string;
-  specialties: string[];
-  bio?: string;
-  yearsOfExperience?: number;
-  hourlyRate?: number;
-  languagesSpoken?: string[];
-}
-
 export default function BookAppointment() {
   const { theme, scaledFontSize } = useTheme();
+  const { user } = useUser();
+  
+  // Determine user's organization
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
+  
+  const windowWidth = Dimensions.get("window").width;
+  const COLUMNS = 4;
+  const H_MARGIN = 6; // must match styles.timeSlot margin horizontal
+  const PAD_H = 12; // must match styles.timeGrid paddingHorizontal
+  const slotWidth = Math.floor((windowWidth - PAD_H * 2 - H_MARGIN * 2 * COLUMNS) / COLUMNS);
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("appointments");
-  const [searchQuery, setSearchQuery] = useState("");
   const [isSigningOut, setIsSigningOut] = useState(false);
-  // State for support workers
-  const [supportWorkers, setSupportWorkers] = useState<SupportWorker[]>([]);
+  // Booking selections
+  const [selectedType, setSelectedType] = useState<'video' | 'in_person'>('video');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
+  // Get reschedule params if rescheduling
+  const params = useLocalSearchParams();
+  const isReschedule = params.reschedule === '1' || params.reschedule === 'true';
+  const appointmentId = params.appointmentId as string | undefined;
 
   // StatusModal states
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -69,8 +84,7 @@ export default function BookAppointment() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
-  const { user } = useUser();
+  const { signOut, isSignedIn, getToken } = useAuth();
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -85,66 +99,119 @@ export default function BookAppointment() {
     setStatusModalVisible(true);
   }, []);
 
-  /**
-   * Handles navigation to support worker details screen
-   * @param supportWorkerId - ID of the selected support worker
-   */
-  const handleSelectSupportWorker = (supportWorkerId: number) => {
-    router.push(`/appointments/details?supportWorkerId=${supportWorkerId}`);
+  // Build next 14 days for quick selection in Mountain Time
+  const days = useMemo(() => {
+    const list: { iso: string; label: string; weekday: string }[] = [];
+    
+    // Get current time in Mountain Time
+    const now = new Date();
+    const mountainParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).formatToParts(now);
+    
+    const get = (type: string) => Number(mountainParts.find(p => p.type === type)?.value || 0);
+    const mountainHour = get('hour');
+    const mountainMinute = get('minute');
+    const mountainYear = get('year');
+    const mountainMonth = get('month') - 1; // JavaScript months are 0-indexed
+    const mountainDay = get('day');
+    
+    // Check if it's too late to book for today (after 4:30 PM Mountain Time)
+    const includeToday = mountainHour < 16 || (mountainHour === 16 && mountainMinute < 30);
+    const startOffset = includeToday ? 0 : 1;
+    
+    // Create base date in Mountain Time
+    const today = new Date(mountainYear, mountainMonth, mountainDay);
+    
+    for (let i = 0; i < 14; i++) {
+      const offset = i + startOffset;
+      
+      // Calculate year, month, day by adding offset to today
+      const targetDate = new Date(mountainYear, mountainMonth, mountainDay + offset);
+      const year = targetDate.getFullYear();
+      const month = targetDate.getMonth() + 1;
+      const day = targetDate.getDate();
+      
+      // Format as YYYY-MM-DD
+      const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
+      // Get weekday from the properly calculated date
+      const weekday = targetDate.toLocaleDateString('en-US', { weekday: 'short' });
+      const label = day.toString();
+      list.push({ iso, label, weekday });
+    }
+    return list;
+  }, []);
+
+  const timeSlots = [
+    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+    '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
+    '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM',
+    '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+  ];
+
+  const parseTimeTo24h = (time: string) => {
+    const m = time.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return { hour: 0, minute: 0 };
+    let hour = Number(m[1]);
+    const minute = Number(m[2]);
+    const ampm = (m[3] || 'AM').toUpperCase();
+    if (ampm === 'AM') { if (hour === 12) hour = 0; } else { if (hour !== 12) hour += 12; }
+    return { hour, minute };
   };
 
-  // Fetch support workers on mount
-// Fetch support workers on mount
-// (moved below fetchSupportWorkers declaration)
+  const isPastSlot = (isoDate: string, label: string) => {
+    const now = new Date();
+    const [y, m, d] = isoDate.split('-').map(Number);
+    if (!y || !m || !d) return true;
+    const slot = new Date(y, m - 1, d);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (slot.getTime() > today.getTime()) return false;
+    if (slot.getTime() < today.getTime()) return true;
+    const { hour, minute } = parseTimeTo24h(label);
+    if (hour < now.getHours()) return true;
+    if (hour > now.getHours()) return false;
+    return minute <= now.getMinutes();
+  };
 
-/**
- * Fetch support workers from the API
- */
-const fetchSupportWorkers = useCallback(async () => {
-  try {
-    setLoading(true);
+  const handleContinue = () => {
+    if (!selectedDate || !selectedTime) return;
     
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${API_URL}/api/support-workers`);
-    const result = await response.json();
-
-    if (result.success) {
-      // Transform the data to match the component's expected format
-      const transformedData = result.data.map((worker: any) => ({
-        id: worker.id,
-        name: `${worker.first_name} ${worker.last_name}`,
-        title: "Support Worker",
-        avatar: worker.avatar_url || "https://via.placeholder.com/150",
-        specialties: worker.specialization 
-          ? worker.specialization.split(',').map((s: string) => s.trim())
-          : [],
-        bio: worker.bio,
-        yearsOfExperience: worker.years_of_experience,
-        hourlyRate: worker.hourly_rate,
-        languagesSpoken: worker.languages_spoken,
-      }));
-
-      setSupportWorkers(transformedData);
-    } else {
-      showStatusModal('error', 'Error', 'Failed to load support workers');
-    }
-  } catch (error) {
-    console.error('Error fetching support workers:', error);
-    showStatusModal('error', 'Error', 'Unable to fetch support workers. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-}, [showStatusModal]);
-
-// Fetch support workers on mount
-useEffect(() => {
-  fetchSupportWorkers();
-}, [fetchSupportWorkers]);
-
-  // Filter support workers based on search query
-  const filteredSupportWorkers = supportWorkers.filter((sw) =>
-    sw.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    // Format the date for display (parse as Mountain Time)
+    const parts = selectedDate.split('-').map(Number);
+    const year = parts[0];
+    const month = parts[1];
+    const day = parts[2];
+    
+    if (!year || !month || !day) return;
+    
+    const dateObj = new Date(year, month - 1, day);
+    const selectedDateDisplay = dateObj.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const typeLabel = selectedType === 'in_person' ? 'in-person' : 'video';
+    router.push({
+      pathname: '/appointments/confirm',
+      params: {
+        selectedDate: selectedDate,
+        selectedDateDisplay: selectedDateDisplay,
+        selectedTime: selectedTime,
+        selectedType: typeLabel,
+        supportWorkerName: `Auto-assigned by ${orgShortLabel}`,
+        reschedule: isReschedule ? '1' : undefined,
+        appointmentId: isReschedule ? appointmentId : undefined,
+      },
+    } as any);
+  };
 
   // Bottom navigation tabs configuration
   const tabs = [
@@ -329,11 +396,11 @@ useEffect(() => {
     );
   };
 
-  // Show loading indicator if data is being fetched
+  // Show loading indicator if any background work
   if (loading) {
     return (
       <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </CurvedBackground>
     );
   }
@@ -345,109 +412,124 @@ useEffect(() => {
 
         <ScrollView 
           style={{ flex: 1, backgroundColor: theme.colors.background }}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Schedule a session with a support worker
+          {/* Page Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>
+            Book Your Session
+          </Text>
+          
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+            Choose a date and time. A support worker will be assigned automatically.
           </Text>
 
-    {/* Step Indicator - Shows progress through booking process */}
-    <View style={styles.stepsContainer}>
-      <View style={styles.stepRow}>
-        {/* Step 1 - Active (Current Step) */}
-        <View style={[
-          styles.stepCircle, 
-          styles.stepCircleActive,
-          { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }
-        ]}>
-          <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-            1
-          </Text>
-        </View>
-        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-        {/* Step 2 - Inactive */}
-        <View style={[
-          styles.stepCircle,
-          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
-        ]}>
-          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
-        </View>
-        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-        {/* Step 3 - Inactive */}
-        <View style={[
-          styles.stepCircle,
-          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
-        ]}>
-          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
-        </View>
-        <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-        {/* Step 4 - Inactive */}
-        <View style={[
-          styles.stepCircle,
-          { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }
-        ]}>
-          <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>4</Text>
-        </View>
-      </View>
-    </View>
-
-          {/* Search Bar */}
-          <View style={[styles.searchContainer, { backgroundColor: theme.colors.surface }]}>
-            <Ionicons
-              name="search"
-              size={20}
-              color={theme.colors.icon}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.text }]}
-              placeholder="Search support worker..."
-              placeholderTextColor={theme.colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          {/* Session type */}
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Session Type</Text>
+          <View style={styles.sessionTypeRow}>
+            {[{ key: 'video', icon: 'videocam', label: 'Video', color: '#9C27B0' }, { key: 'in_person', icon: 'pin', label: 'In person', color: '#4CAF50' }].map((opt: any) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.sessionTypeCard,
+                  { backgroundColor: selectedType === opt.key ? opt.color : '#F5F5F5' }
+                ]}
+                onPress={() => setSelectedType(opt.key)}
+                activeOpacity={0.8}
+              >
+                <View style={[
+                  styles.sessionIconCircle,
+                  { backgroundColor: selectedType === opt.key ? 'rgba(255,255,255,0.3)' : '#FFF' }
+                ]}>
+                  <Ionicons name={opt.icon as any} size={24} color={selectedType === opt.key ? '#FFF' : opt.color} />
+                </View>
+                <Text style={[styles.sessionTypeLabel, { color: selectedType === opt.key ? '#FFF' : '#333' }]}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          {/* Support Workers List */}
-          {filteredSupportWorkers.map((supportWorker) => (
-            <TouchableOpacity
-              key={supportWorker.id}
-              style={[styles.supportWorkerCard, { backgroundColor: theme.colors.surface }]}
-              onPress={() => handleSelectSupportWorker(supportWorker.id)}
-            >
-              {/* Support Worker Avatar and Info */}
-              <View style={styles.avatarContainer}>
-                <Image
-                  source={{ uri: supportWorker.avatar }}
-                  style={styles.avatar}
-                />
-                <View style={styles.supportWorkerInfo}>
-                  <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
-                    {supportWorker.name}
-                  </Text>
-                  <Text style={[styles.supportWorkerTitle, { color: theme.colors.textSecondary }]}>
-                    {supportWorker.title}
-                  </Text>
-                </View>
-              </View>
+          {/* Day selector */}
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Date</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+            {days.map((d) => (
+              <TouchableOpacity
+                key={d.iso}
+                style={[
+                  styles.dayCard,
+                  selectedDate === d.iso && styles.dayCardSelected
+                ]}
+                onPress={() => { setSelectedDate(d.iso); setSelectedTime(null); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dayWeekday, selectedDate === d.iso && styles.dayWeekdaySelected]}>{d.weekday}</Text>
+                <Text style={[styles.dayNumber, selectedDate === d.iso && styles.dayNumberSelected]}>{d.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
-              {/* Support Worker Specialties */}
-              <View style={styles.specialtiesContainer}>
-              {supportWorker.specialties.map((specialty: string) => (
-                <Text key={specialty} style={styles.specialtyText}>
-                  {specialty}
+          {/* Time slots */}
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Time</Text>
+          <View style={styles.timeGrid}>
+            {timeSlots.map((t) => {
+              const disabled = !selectedDate || isPastSlot(selectedDate, t);
+              const active = selectedTime === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  disabled={disabled}
+                  onPress={() => setSelectedTime(t)}
+                  style={[
+                    styles.timeSlot,
+                    { width: slotWidth },
+                    active && styles.timeSlotActive,
+                    disabled && styles.timeSlotDisabled
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.timeSlotText,
+                    active && styles.timeSlotTextActive,
+                    disabled && styles.timeSlotTextDisabled
+                  ]} numberOfLines={2}>{t.replace(' ', '\n')}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {selectedDate && selectedTime && (() => {
+            // Parse date as YYYY-MM-DD without UTC conversion
+            const parts = selectedDate.split('-').map(Number);
+            const year = parts[0];
+            const month = parts[1];
+            const day = parts[2];
+            
+            if (!year || !month || !day) return null;
+            
+            const dateObj = new Date(year, month - 1, day);
+            const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            return (
+              <View style={styles.selectionSummary}>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <Text style={styles.selectionText}>
+                  {dateStr}, {selectedTime} • {selectedType === 'in_person' ? 'In person' : 'Video'}
                 </Text>
-              ))}
               </View>
+            );
+          })()}
 
-              {/* Selection Prompt */}
-              <Text style={[styles.selectText, { color: theme.colors.text }]}>Select Support Worker</Text>
-            </TouchableOpacity>
-          ))}
+          {/* Continue button */}
+          <TouchableOpacity
+            disabled={!selectedDate || !selectedTime}
+            onPress={handleContinue}
+            style={[
+              styles.continueButton,
+              (!selectedDate || !selectedTime) && styles.continueButtonDisabled
+            ]}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.continueButtonText}>Continue to Confirmation</Text>
+            <Ionicons name="arrow-forward" size={20} color="#FFF" />
+          </TouchableOpacity>
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -541,18 +623,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  supportWorkerCard: {
-    // backgroundColor moved to theme.colors.surface via inline override
-    borderRadius: 10,
-    padding: 16,
-    marginHorizontal: 15,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   header: {
     flexDirection: "row",
@@ -659,6 +729,24 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     textAlign: "center",
     marginTop: 16,
   },
+  pageTitle: {
+    fontSize: scaledFontSize(24),
+    fontWeight: '700',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: scaledFontSize(14),
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  sectionTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+    marginBottom: 12,
+    marginTop: 8,
+  },
   stepsContainer: {
     alignItems: "center",
     marginBottom: 24,
@@ -689,78 +777,177 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   stepConnector: {
     width: 40,
     height: 2,
-
     marginHorizontal: 8,
   },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    // backgroundColor moved to theme via inline override
-    margin: 15,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
+  sessionTypeRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
   },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
+  sessionTypeCard: {
     flex: 1,
-    fontSize: scaledFontSize(16),
-    // color moved to theme via inline override
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  supportWorkerName: {
-    fontSize: scaledFontSize(18),
-    fontWeight: "600",
-    // color moved to theme via inline override
+  sessionIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sessionTypeLabel: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '700',
+  },
+  sessionTypeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    backgroundColor: '#00000000',
+  },
+  sessionTypeChipText: {
+    marginLeft: 6,
+    fontWeight: '600',
+  },
+  dayCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
+    minWidth: 70,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  dayCardSelected: {
+    backgroundColor: '#FF9800',
+  },
+  dayWeekday: {
+    fontSize: scaledFontSize(12),
+    color: '#999',
     marginBottom: 4,
   },
-  supportWorkerNameHeading: {
-    fontSize: scaledFontSize(20),
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 24,
-    textAlign: "center",
+  dayWeekdaySelected: {
+    color: '#FFF',
   },
-  supportWorkerTitle: {
-    fontSize: scaledFontSize(14),
-    // color moved to theme via inline override
-    marginBottom: 0,
+  dayNumber: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '700',
+    color: '#333',
   },
-  specialtiesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  dayNumberSelected: {
+    color: '#FFF',
+  },
+  dayChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+    minWidth: 64,
+  },
+  dayChipWeekday: {
+    fontSize: scaledFontSize(12),
+  },
+  dayChipLabel: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  timeSlot: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  timeSlotActive: {
+    backgroundColor: '#4CAF50',
+  },
+  timeSlotDisabled: {
+    opacity: 0.4,
+  },
+  timeSlotText: {
+    fontSize: scaledFontSize(13),
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    lineHeight: scaledFontSize(16),
+  },
+  timeSlotTextActive: {
+    color: '#FFF',
+  },
+  timeSlotTextDisabled: {
+    color: '#999',
+  },
+  selectionSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     marginBottom: 16,
     gap: 8,
   },
-  specialtyText: {
-    backgroundColor: "#d0cad8ff",
-    color: "#333333",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    fontSize: scaledFontSize(12),
-    fontWeight: "500",
-  },
-  selectText: {
-    // color moved to theme via inline override
-    fontWeight: "600",
-    textAlign: "center",
+  selectionText: {
     fontSize: scaledFontSize(14),
+    color: '#2E7D32',
+    fontWeight: '600',
   },
-  avatarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
+  continueButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+  continueButtonDisabled: {
+    backgroundColor: '#C8E6C9',
+    opacity: 0.6,
   },
-  supportWorkerInfo: {
-    flex: 1,
+  continueButtonText: {
+    color: '#FFF',
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
   },
   contentContainer: {
     flex: 1,

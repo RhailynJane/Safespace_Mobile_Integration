@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { moodApi } from "../../../utils/moodApi"
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -11,21 +11,27 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import Svg, { Line } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { useUser } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { APP_TIME_ZONE } from "../../../utils/timezone";
 import { AppHeader } from "../../../components/AppHeader";
-import { assessmentTracker } from "../../../utils/assessmentTracker";
+import assessmentsApi from "../../../utils/assessmentsApi";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { 
   Resource, 
   fetchAllResourcesWithExternal} from "../../../utils/resourcesApi";
+import { getPersonalizedRecommendations } from "../../../utils/resourceRecommendations";
 import { useTheme } from "../../../contexts/ThemeContext";
 import OptimizedImage from "../../../components/OptimizedImage";
 import React from "react";
+import { useConvexMoods } from "../../../utils/hooks/useConvexMoods";
+import { LiveMoodStats } from "../../../components/LiveMoodStats";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 type MoodEntry = {
   id: string;
@@ -36,12 +42,186 @@ type MoodEntry = {
 };
 
 /**
+ * MoodChartSection Component - Shows mood chart with streaks
+ */
+function MoodChartSection({ userId }: { userId: string }) {
+  const { theme } = useTheme();
+  const chartData = useQuery(api.moods.getMoodChartData, { userId, days: 7 });
+
+  // Mood emoji mapping
+  const getEmojiForMood = (moodType: string) => {
+    const moodMap: Record<string, string> = {
+      "very-happy": "😄", "happy": "🙂", "neutral": "😐", "sad": "🙁", "very-sad": "😢",
+      "ecstatic": "🤩", "content": "🙂", "displeased": "😕", "frustrated": "😖",
+      "annoyed": "😒", "angry": "😠", "furious": "🤬",
+    };
+    return moodMap[moodType] || "😐";
+  };
+
+  if (!chartData) {
+    return (
+      <View style={{ backgroundColor: theme.colors.surface, padding: 20, borderRadius: 12 }}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  const { currentStreak, longestStreak, chartData: moodPoints } = chartData;
+  // Show all 30 days
+  const displayDays = moodPoints;
+  const daysWithMoods = displayDays.filter(d => d.averageScore !== null);
+
+  console.log('[MoodChartSection] Chart data:', { 
+    totalDays: displayDays.length,
+    daysWithMoods: daysWithMoods.length,
+    dates: displayDays.map(d => d.date),
+    scores: displayDays.map(d => d.averageScore)
+  });
+
+  return (
+    <View style={{ backgroundColor: theme.colors.surface, padding: 16, borderRadius: 12, marginTop: 8 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <Text style={{ fontSize: 18, fontWeight: "600", color: theme.colors.text }}>
+          Mood Trends (7 days)
+        </Text>
+        <TouchableOpacity onPress={() => router.push("/(app)/mood-tracking/mood-history")}>
+          <Text style={{ fontSize: 14, color: "#4CAF50", fontWeight: "600" }}>View All</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Streaks Section */}
+      <View style={{ flexDirection: "row", backgroundColor: theme.isDark ? '#2A2A2A' : '#F5F0F5', borderRadius: 12, padding: 12, marginBottom: 16 }}>
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2, marginBottom: 4 }}>Current Streak</Text>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: theme.colors.text }}>{currentStreak} days</Text>
+        </View>
+        <View style={{ width: 1, marginHorizontal: 12, backgroundColor: theme.colors.borderLight }} />
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Ionicons name="trophy-outline" size={16} color={theme.colors.textSecondary} />
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2, marginBottom: 4 }}>Longest Streak</Text>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: theme.colors.text }}>{longestStreak} days</Text>
+        </View>
+      </View>
+
+      {/* Mood Chart */}
+      {displayDays.length > 0 ? (
+        <>
+          <Text style={{ fontSize: 15, fontWeight: "600", marginBottom: 12, color: theme.colors.text }}>Mood Chart</Text>
+          <View style={{ height: 200, marginBottom: 8 }}>
+            {/* Chart Area with bars */}
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', paddingHorizontal: 8, backgroundColor: theme.isDark ? '#1a1a1a' : '#f8f8f8', borderRadius: 8, paddingTop: 20, paddingBottom: 50 }}>
+              {displayDays.map((point, i) => {
+                const score = point.averageScore;
+                const hasMood = score !== null;
+                
+                // Map score (1-5) to bar height percentage
+                const heightPercent = hasMood ? ((score - 1) / 4) * 100 : 5;
+                
+                // Get emoji for the mood
+                const emoji = hasMood && point.mood ? (point.mood.mood_emoji || getEmojiForMood(point.mood.mood_type)) : '';
+                
+                // Get color based on score
+                const getBarColor = (s: number | null) => {
+                  if (s === null) return theme.isDark ? '#2a2a2a' : '#e0e0e0';
+                  if (s >= 4.5) return '#FFD700'; // ecstatic - gold
+                  if (s >= 3.5) return '#FFB74D'; // happy/content - orange
+                  if (s >= 2.5) return '#90CAF9'; // neutral/displeased - blue
+                  if (s >= 1.5) return '#EF9A9A'; // frustrated/annoyed - light red
+                  return '#F48FB1'; // angry/furious - pink
+                };
+                
+                return (
+                  <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', marginHorizontal: 2 }}>
+                    {/* Bar */}
+                    <View style={{
+                      width: '100%',
+                      maxWidth: 35,
+                      height: `${heightPercent}%`,
+                      minHeight: hasMood ? 30 : 5,
+                      backgroundColor: getBarColor(score),
+                      borderRadius: 8,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      opacity: hasMood ? 1 : 0.3,
+                    }}>
+                      {hasMood && emoji && (
+                        <Text style={{ fontSize: 18 }}>{emoji}</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+            
+            {/* Day of week and date labels */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8, paddingHorizontal: 8 }}>
+              {displayDays.map((point, i) => {
+                // Parse date string properly (YYYY-MM-DD)
+                const [year, month, dayStr] = point.date.split('-');
+                const date = new Date(parseInt(year || '2025'), parseInt(month || '1') - 1, parseInt(dayStr || '1'));
+                const day = date.getDate();
+                const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+                
+                // Check if this is today by comparing date strings
+                const todayStr = (() => {
+                  const d = new Date();
+                  const year = d.getFullYear();
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  return `${year}-${month}-${day}`;
+                })();
+                const isToday = point.date === todayStr;
+                
+                return (
+                  <View key={i} style={{ flex: 1, alignItems: 'center', marginHorizontal: 2 }}>
+                    <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginBottom: 2 }}>
+                      {dayOfWeek}
+                    </Text>
+                    <View style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: isToday ? theme.colors.primary : 'transparent',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      <Text style={{ fontSize: 11, color: isToday ? '#fff' : theme.colors.text, fontWeight: isToday ? '700' : '400' }}>
+                        {day}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </>
+      ) : (
+        <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 24, alignItems: "center" }}>
+          <Text style={{ fontSize: 16, color: theme.colors.textSecondary, fontWeight: "500", marginBottom: 4 }}>
+            No mood data yet
+          </Text>
+          <Text style={{ fontSize: 14, color: theme.colors.textDisabled, textAlign: "center" }}>
+            Track your mood to see trends
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
  * HomeScreen Component
  *
  * Main dashboard screen featuring user greeting, quick actions, mood tracking,
  * and resource recommendations. Uses AppHeader for consistent navigation.
  */
 export default function HomeScreen() {
+  // Debug instrumentation to trace render & focus effect executions (remove once stable)
+  const renderCountRef = React.useRef(0);
+  renderCountRef.current += 1;
+  if (renderCountRef.current % 5 === 0) {
+    console.log(`[HomeScreen] Render count: ${renderCountRef.current}`);
+  }
   // In Jest, avoid running asynchronous data fetching to prevent act() warnings and leaks
   const IS_TEST_ENV =
     typeof process !== "undefined" &&
@@ -50,13 +230,32 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(true);
   const [recentMoods, setRecentMoods] = useState<MoodEntry[]>([]);
+  const [recentJournals, setRecentJournals] = useState<any[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState("home");
   const [isAssessmentDue, setIsAssessmentDue] = useState(false);
-const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  // Temporarily disable local Convex client on this screen to stop render loops
+  // We'll rely on REST for moods here; Convex is provided at the app root if needed
+  const convexClient = null;
 
   const { user } = useUser();
+  const { getToken, isSignedIn } = useAuth();
   const { theme, scaledFontSize } = useTheme();
+  
+  // Note: Previously initialized a local Convex client here. Removed to prevent
+  // an infinite update loop traced to a useEffect in this file. We'll revisit
+  // Convex usage on this screen after stabilizing the render cycle.
+
+  // Use Convex moods hook
+  // Convex moods hook – its loading state should NOT gate the entire screen to avoid loops.
+  const {
+    moods: convexMoods,
+    // rename to avoid shadowing 'loading' and reduce confusion
+    loading: convexMoodsLoading,
+    loadRecentMoods,
+    isUsingConvex,
+  } = useConvexMoods(user?.id, convexClient);
 
   // Create styles with scaled font sizes
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -124,9 +323,9 @@ const [profileImage, setProfileImage] = useState<string | null>(null);
   const checkAssessmentStatus = useCallback(async () => {
     try {
       if (user?.id) {
-        const isDue = await assessmentTracker.isAssessmentDue(user.id);
-        setIsAssessmentDue(isDue);
-        console.log("Assessment due status:", isDue);
+        const result = await assessmentsApi.isAssessmentDue(user.id);
+        setIsAssessmentDue(result.isDue);
+        console.log("Assessment due status:", result);
       }
     } catch (error) {
       console.error("Error checking assessment status:", error);
@@ -138,88 +337,49 @@ const [profileImage, setProfileImage] = useState<string | null>(null);
    * Returns emoji representation for mood type
    */
   const getEmojiForMood = (moodType: string) => {
-    switch (moodType) {
-      case "very-happy":
-        return "😄";
-      case "happy":
-        return "🙂";
-      case "neutral":
-        return "😐";
-      case "sad":
-        return "🙁";
-      case "very-sad":
-        return "😢";
-      default:
-        return "😐";
-    }
+    const moodMap: Record<string, string> = {
+      // Original 5 moods
+      "very-happy": "😄",
+      "happy": "🙂",
+      "neutral": "�",
+      "sad": "🙁",
+      "very-sad": "�",
+      // New 9 mood grid
+      "ecstatic": "🤩",
+      "content": "�",
+      "displeased": "😕",
+      "frustrated": "�",
+      "annoyed": "😒",
+      "angry": "�",
+      "furious": "🤬",
+    };
+    return moodMap[moodType] || "😐";
   };
 
-  /**
- * Loads profile image from AsyncStorage and Clerk
- */
-const fetchProfileImage = useCallback(async () => {
-  try {
-    // Priority 1: Check AsyncStorage (set by edit screen)
-    const savedImage = await AsyncStorage.getItem('profileImage');
-    if (savedImage) {
-      console.log('📸 Found profile image in AsyncStorage');
-      
-      // ✅ FIX: If it's base64 (starts with data:image), it's too large - remove it
-      if (savedImage.startsWith('data:image')) {
-        console.warn("⚠️ Removing large base64 image from AsyncStorage to prevent OOM");
-        await AsyncStorage.removeItem("profileImage");
-        // Fall through to use Clerk image
-      } else {
-        setProfileImage(savedImage);
-        return;
-      }
-    }
 
-    // Priority 2: Check profileData in AsyncStorage
-    const savedProfileData = await AsyncStorage.getItem('profileData');
-    if (savedProfileData) {
-      const parsedData = JSON.parse(savedProfileData);
-      if (parsedData.profileImageUrl) {
-        console.log('📸 Found profile image in profileData');
-        setProfileImage(parsedData.profileImageUrl);
-        return;
-      }
-    }
-
-    // Priority 3: Use Clerk user image as fallback
-    if (user?.imageUrl) {
-      console.log('📸 Using Clerk profile image');
-      setProfileImage(user.imageUrl);
-      return;
-    }
-
-    console.log('📸 No profile image found');
-    setProfileImage(null);
-  } catch (error) {
-    console.error('Error loading profile image:', error);
-    setProfileImage(null);
-  }
-}, [user?.imageUrl]);
 
 
   /**
    * Returns label text for mood type
    */
   const getLabelForMood = (moodType: string) => {
-    switch (moodType) {
-      case "very-happy":
-        return "Very Happy";
-      case "happy":
-        return "Happy";
-      case "neutral":
-        return "Neutral";
-      case "sad":
-        return "Sad";
-      case "very-sad":
-        return "Very Sad";
-      default:
-        return "Unknown";
-    }
+    const labelMap: Record<string, string> = {
+      // Original 5 moods
+      "very-happy": "Very Happy",
+      "happy": "Happy",
+      "neutral": "Neutral",
+      "sad": "Sad",
+      "very-sad": "Very Sad",
+      // New 9 mood grid
+      "ecstatic": "Ecstatic",
+      "content": "Content",
+      "displeased": "Displeased",
+      "frustrated": "Frustrated",
+      "annoyed": "Annoyed",
+      "angry": "Angry",
+      "furious": "Furious",
+    };
+    return labelMap[moodType] || "Unknown";
   };
 
   /**
@@ -243,9 +403,17 @@ const fetchProfileImage = useCallback(async () => {
   };
 
   /**
-   * Loads mood data from backend
+   * Loads mood data from backend or Convex
+   * Note: Removed convexMoods from dependencies to prevent infinite loop
    */
   const fetchRecentMoods = useCallback(async () => {
+    // If using Convex hook, moods are already loaded
+    if (isUsingConvex) {
+      setRecentMoods(convexMoods.slice(0, 3));
+      return;
+    }
+    
+    // Fallback to REST API
     try {
       if (user?.id) {
         const data = await moodApi.getRecentMoods(user.id, 3);
@@ -255,59 +423,231 @@ const fetchProfileImage = useCallback(async () => {
       console.log("Error loading mood data:", error);
       setRecentMoods([]);
     }
-  }, [user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isUsingConvex]);
 
   /**
-   * Loads real resources from local API
+   * Loads personalized resources based on user's mood patterns
+   * Note: Journal analysis temporarily disabled due to network issues
    */
   const fetchResources = useCallback(async () => {
     try {
-      // Get all resources and pick 2-3 random ones for recommendations
+      // Get all resources
       const allResources = await fetchAllResourcesWithExternal();
       
-      // Filter for quick, actionable resources (exercises, affirmations, quotes)
-      const recommendedResources = allResources
-        .filter(resource => 
-          resource.type === 'Exercise' || 
-          resource.type === 'Affirmation' || 
-          resource.type === 'Quote'
-        )
-        .sort(() => Math.random() - 0.5) // Shuffle array
-        .slice(0, 3); // Take 3 random ones
+      // Get recent moods for personalization
+      const moodsForAnalysis = isUsingConvex ? convexMoods.slice(0, 7) : recentMoods;
+      
+      // Get personalized recommendations based on mood patterns only
+      const recommendedResources = getPersonalizedRecommendations(
+        allResources,
+        moodsForAnalysis,
+        [], // Journal analysis disabled temporarily
+        3 // Limit to 3 recommendations
+      );
+      
+      console.log('[HomeScreen] Personalized recommendations based on mood:', 
+        recommendedResources.map(r => `${r.title} (${r.category})`)
+      );
       
       setResources(recommendedResources);
     } catch (error) {
       console.error("Error loading resources:", error);
       setResources([]);
     }
-  }, []);
+  }, [isUsingConvex, convexMoods, recentMoods]);
+
+  // NOTE: We intentionally do NOT copy Convex moods into component state to avoid
+  // triggering additional renders. Instead, derive a displayed list below.
+
+  // Separate effect to update resources when moods change
+  // Note: Journal recommendations are currently disabled due to network issues
+  useEffect(() => {
+    if (loading || IS_TEST_ENV) return;
+    
+    const updatePersonalizedResources = async () => {
+      try {
+        const allResources = await fetchAllResourcesWithExternal();
+        
+        // Use convexMoods if available, otherwise use recentMoods state
+        const moodsForAnalysis = isUsingConvex ? convexMoods.slice(0, 7) : recentMoods;
+        
+        // Skip journal analysis for now (empty array)
+        const recommendedResources = getPersonalizedRecommendations(
+          allResources,
+          moodsForAnalysis,
+          [], // Journal recommendations disabled temporarily
+          3
+        );
+        
+        setResources(recommendedResources);
+        console.log('[HomeScreen] Updated personalized recommendations based on moods');
+      } catch (error) {
+        console.error("Error updating resources:", error);
+      }
+    };
+    
+    // Only update if we have mood data
+    if (convexMoods.length > 0 || recentMoods.length > 0) {
+      updatePersonalizedResources();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convexMoods.length, recentMoods.length, isUsingConvex, loading, IS_TEST_ENV]);
 
   useFocusEffect(
     useCallback(() => {
+      console.log('[HomeScreen] useFocusEffect start');
       // In tests, short-circuit async work and render the base UI immediately
       if (IS_TEST_ENV) {
         setLoading(false);
         return () => {};
       }
 
+      let isMounted = true;
+
       const fetchData = async () => {
+        if (!isMounted) return;
         setLoading(true);
+        
         try {
+          // Load profile image
+          const loadProfileImage = async () => {
+            try {
+              const savedImage = await AsyncStorage.getItem('profileImage');
+              if (!isMounted) return;
+              
+              if (savedImage) {
+                if (savedImage.startsWith('data:image')) {
+                  await AsyncStorage.removeItem("profileImage");
+                } else {
+                  if (isMounted) setProfileImage(savedImage);
+                  return;
+                }
+              }
+
+              const savedProfileData = await AsyncStorage.getItem('profileData');
+              if (!isMounted) return;
+              
+              if (savedProfileData) {
+                const parsedData = JSON.parse(savedProfileData);
+                if (parsedData.profileImageUrl) {
+                  if (isMounted) setProfileImage(parsedData.profileImageUrl);
+                  return;
+                }
+              }
+
+              if (user?.imageUrl) {
+                if (isMounted) setProfileImage(user.imageUrl);
+                return;
+              }
+
+              if (isMounted) setProfileImage(null);
+            } catch (error) {
+              console.error('Error loading profile image:', error);
+              if (isMounted) setProfileImage(null);
+            }
+          };
+
+          // Load moods - REST API only (Convex moods are derived directly, not stored)
+          const loadMoods = async () => {
+            if (!isMounted) return;
+            // Only fetch if NOT using Convex
+            if (!isUsingConvex) {
+              try {
+                if (user?.id) {
+                  const data = await moodApi.getRecentMoods(user.id, 7); // Get more moods for analysis
+                  if (isMounted) {
+                    setRecentMoods(data.moods);
+                  }
+                }
+              } catch (error) {
+                console.log("Error loading mood data:", error);
+                if (isMounted) {
+                  setRecentMoods([]);
+                }
+              }
+            }
+          };
+
+          // Load recent journal entries for personalized recommendations
+          // Commented out REST API call - journals will be fetched from Convex instead
+          const loadJournals = async () => {
+            if (!isMounted) return;
+            
+            // For now, skip journal loading to prevent network errors
+            // Will implement Convex journal query instead
+            if (isMounted) {
+              setRecentJournals([]);
+            }
+          };
+
+          // Load resources with personalization
+          const loadResources = async () => {
+            if (!isMounted) return;
+            
+            try {
+              const allResources = await fetchAllResourcesWithExternal();
+              if (!isMounted) return;
+              
+              // Initial load with default/random resources
+              // Will be updated by the separate useEffect when moods/journals are loaded
+              const quickResources = allResources
+                .filter(r => r.type === 'Exercise' || r.type === 'Affirmation' || r.type === 'Quote')
+                .sort(() => Math.random() - 0.5)
+                .slice(0, 3);
+              
+              if (isMounted) {
+                setResources(quickResources);
+              }
+            } catch (error) {
+              console.error("Error loading resources:", error);
+              if (isMounted) {
+                setResources([]);
+              }
+            }
+          };
+
+          // Check assessment status
+          const loadAssessmentStatus = async () => {
+            if (!isMounted) return;
+            
+            try {
+              if (user?.id) {
+                const result = await assessmentsApi.isAssessmentDue(user.id);
+                if (isMounted) {
+                  setIsAssessmentDue(result.isDue);
+                }
+                console.log("Assessment due status:", result);
+              }
+            } catch (error) {
+              console.error("Error checking assessment status:", error);
+              if (isMounted) {
+                setIsAssessmentDue(false);
+              }
+            }
+          };
+          
           await Promise.all([
-            fetchRecentMoods(),
-            fetchResources(),
-            checkAssessmentStatus(),
-            fetchProfileImage(),
+            loadMoods(),
+            loadJournals(),
+            loadAssessmentStatus(),
+            loadProfileImage(),
           ]);
+          
+          // Load resources after moods and journals are fetched
+          await loadResources();
         } finally {
-          setLoading(false);
+          if (isMounted) setLoading(false);
         }
       };
 
       fetchData();
-      // Provide a no-op cleanup function to satisfy the expected return type
-      return () => {};
-    }, [IS_TEST_ENV, fetchRecentMoods, fetchResources, checkAssessmentStatus, fetchProfileImage])
+      
+      return () => {
+        isMounted = false;
+        console.log('[HomeScreen] useFocusEffect cleanup');
+      };
+    }, [IS_TEST_ENV, user?.id, user?.imageUrl, isUsingConvex])
   );
 
   /**
@@ -391,6 +731,16 @@ const fetchProfileImage = useCallback(async () => {
     }
   };
 
+  // Derive moods to display: Convex (real-time) has priority, else REST-fetched recentMoods
+  const displayedRecentMoods = isUsingConvex
+    ? convexMoods.slice(0, 3).map(m => ({
+        id: m._id as any as string, // ensure we have a string id
+        mood_type: m.moodType || m.mood_type || m.type || 'neutral',
+        created_at: m.createdAt || m.created_at || new Date().toISOString(),
+      }))
+    : recentMoods;
+
+  // Only show global loader for initial fetch; ignore convexMoodsLoading to prevent perpetual re-render gating
   if (loading) {
     return (
       <View testID="home-loading" style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
@@ -439,6 +789,8 @@ const fetchProfileImage = useCallback(async () => {
               </TouchableOpacity>
             </View>
 
+           
+
             {/* Pending Assessment Task - Only show if due */}
             {isAssessmentDue && (
               <View style={styles.section}>
@@ -480,6 +832,13 @@ const fetchProfileImage = useCallback(async () => {
                     />
                   </View>
                 </TouchableOpacity>
+              </View>
+            )}
+
+             {/* Mood Chart with Streaks Section */}
+            {user?.id && (
+              <View style={styles.section}>
+                <MoodChartSection userId={user.id} />
               </View>
             )}
 
@@ -533,45 +892,14 @@ const fetchProfileImage = useCallback(async () => {
               </View>
             </View>
 
-            {/* Recent Mood History Section */}
-            <View style={styles.section}>
-              <TouchableOpacity
-                onPress={() => router.push("/mood-history")}
-                style={styles.sectionTitleContainer}
-              >
-                <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Moods</Text>
-              </TouchableOpacity>
-              {recentMoods.length > 0 ? (
-                <View style={[styles.recentMoods, { backgroundColor: theme.colors.surface }]}>
-                  {recentMoods.map((mood) => (
-                    <View key={mood.id} style={[styles.moodItem, { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight }]}>
-                      <Text style={styles.moodEmoji}>
-                        {getEmojiForMood(mood.mood_type)}
-                      </Text>
-                      <View style={styles.moodDetails}>
-                        <Text style={[styles.moodDate, { color: theme.colors.textSecondary }]}>
-                          {formatDate(mood.created_at)}
-                        </Text>
-                        <Text style={[styles.moodText, { color: theme.colors.text }]}>
-                          {getLabelForMood(mood.mood_type)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <View style={[styles.noDataContainer, { backgroundColor: theme.colors.surface }]}>
-                  <Text style={[styles.noDataText, { color: theme.colors.textSecondary }]}>No mood entries yet</Text>
-                  <Text style={[styles.noDataSubtext, { color: theme.colors.textDisabled }]}>
-                    Start tracking your mood to see insights here
-                  </Text>
-                </View>
-              )}
-            </View>
-
             {/* Resources Section */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recommended Resources</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.text, flex: 1 }]}>
+                  Recommended For You
+                </Text>
+                <Ionicons name="sparkles" size={18} color={theme.colors.primary} />
+              </View>
               {resources.length > 0 ? (
                 resources.map((resource) => (
                   <TouchableOpacity
@@ -1023,5 +1351,56 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: 13,
     color: "#757575",
     fontWeight: "500",
+  },
+  statsCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  statsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  statsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 16,
+  },
+  statBox: {
+    alignItems: "center",
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: "700",
+  },
+  statLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  distributionList: {
+    marginTop: 8,
+  },
+  distributionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  distributionMood: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  distributionCount: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

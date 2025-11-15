@@ -28,6 +28,7 @@ export interface HelpSearchResult {
   query: string;
 }
 import { getApiBaseUrl } from './apiBaseUrl';
+import { convexEnabled, getConvexApi, createConvexClientNoAuth, safeQuery, safeMutation } from './convexClient';
 const API_BASE_URL = getApiBaseUrl();
 
 // API Functions remain the same
@@ -64,14 +65,38 @@ export const fetchHelpItems = async (sectionId: string): Promise<HelpItem[]> => 
 };
 
 export const fetchAllHelpData = async (): Promise<HelpSection[]> => {
+  // Convex-first: try to load via Convex if enabled
+  try {
+    if (convexEnabled()) {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      if (api && client && api.help?.allSections) {
+        let convexData = await safeQuery(client, api.help.allSections, {});
+        // If Convex responds but returns an empty array, attempt automatic seed then re-query
+        if (Array.isArray(convexData) && convexData.length === 0 && api.help?.seedDefault) {
+          await safeMutation(client, api.help.seedDefault, {});
+          convexData = await safeQuery(client, api.help.allSections, {});
+        }
+        if (Array.isArray(convexData) && convexData.length > 0) {
+          return convexData as HelpSection[];
+        }
+      }
+    }
+  } catch (e) {
+    // Non-blocking: fall through to REST
+  }
+
+  // REST fallback
   try {
     const response = await fetch(`${API_BASE_URL}/api/help-sections?include=items`);
-    
     if (!response.ok) {
       throw new Error(`Failed to fetch help data: ${response.status}`);
     }
-    
     const data = await response.json();
+    // If REST returns empty array, fall back to rich local defaults
+    if (Array.isArray(data) && data.length === 0) {
+      return getFallbackHelpSectionsWithItems();
+    }
     return data;
   } catch (error) {
     console.error('Error fetching all help data:', error);
@@ -80,13 +105,25 @@ export const fetchAllHelpData = async (): Promise<HelpSection[]> => {
 };
 
 export const searchHelpContent = async (query: string): Promise<HelpItem[]> => {
+  // Convex-first search
+  try {
+    if (convexEnabled()) {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      if (api && client && api.help?.searchHelp) {
+        const res = await safeQuery(client, api.help.searchHelp, { q: query });
+        if (Array.isArray(res)) return res as HelpItem[];
+      }
+    }
+  } catch (_) {
+    // Fall through to REST
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/help/search?q=${encodeURIComponent(query)}`);
-    
     if (!response.ok) {
       throw new Error(`Failed to search help content: ${response.status}`);
     }
-    
     const data = await response.json();
     return data;
   } catch (error) {
@@ -96,6 +133,21 @@ export const searchHelpContent = async (query: string): Promise<HelpItem[]> => {
 };
 
 export const trackHelpSectionView = async (sectionId: string): Promise<void> => {
+  // Convex-first: best effort activity tracking
+  try {
+    if (convexEnabled()) {
+      const api = await getConvexApi();
+      const client = createConvexClientNoAuth();
+      if (api && client && api.help?.trackSectionView) {
+        await safeMutation(client, api.help.trackSectionView, { sectionId });
+        return;
+      }
+    }
+  } catch (_) {
+    // Non-blocking, fall through to REST
+  }
+
+  // REST fallback tracking endpoint (best-effort)
   try {
     await fetch(`${API_BASE_URL}/api/help-sections/${sectionId}/view`, {
       method: 'POST',
@@ -256,7 +308,7 @@ const getFallbackHelpItems = (sectionId: string): HelpItem[] => {
 **Quick Access**
 - Emergency contacts
 - Crisis resources
-- Favorite features
+ 
 
 ### Navigation Tips:
 - Swipe left/right to see different sections
@@ -407,7 +459,6 @@ const getFallbackHelpItems = (sectionId: string): HelpItem[] => {
 
 ### Organization:
 - **Categories**: Anxiety, depression, relationships, self-care, etc.
-- **Favorites**: Save resources for quick access
 
 ### Personalization:
 - Recommendations based on your interests and needs
@@ -415,7 +466,7 @@ const getFallbackHelpItems = (sectionId: string): HelpItem[] => {
 - Progress-tracking for completed resources`,
         type: 'guide',
         sort_order: 5,
-        related_features: ['resources', 'library', 'favorites'],
+        related_features: ['resources', 'library'],
         estimated_read_time: 3,
         last_updated: '2024-01-15',
       },
@@ -795,7 +846,7 @@ A: All your personal data is permanently deleted within 30 days.`,
   return fallbackData[sectionId] || [];
 };
 
-const getFallbackHelpSectionsWithItems = (): HelpSection[] => {
+export const getFallbackHelpSectionsWithItems = (): HelpSection[] => {
   const sections = getFallbackHelpSections();
   return sections.map(section => ({
     ...section,

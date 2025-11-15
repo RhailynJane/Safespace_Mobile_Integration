@@ -14,15 +14,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSignIn, useUser } from "@clerk/clerk-expo";
+import { useSignIn, useUser, useAuth } from "@clerk/clerk-expo";
 import activityApi from "../../utils/activityApi";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 import { useTheme } from "../../contexts/ThemeContext";
+import { completeConvexAuthFlow } from "../../utils/convexAuthSync";
 
 export default function LoginScreen() {
   const { theme } = useTheme();
   const { signIn, setActive, isLoaded } = useSignIn();
   const { user } = useUser();
+  const { getToken } = useAuth();
 
   // Form state management
   const [email, setEmail] = useState("");
@@ -59,7 +61,20 @@ export default function LoginScreen() {
           clerkUserId = user?.id;
         }
         if (clerkUserId) {
-          try { await activityApi.recordLogin(clerkUserId); } catch (_e) { /* ignore */ }
+          try { 
+            await activityApi.recordLogin(clerkUserId);
+            
+            // Sync user to Convex after successful login
+            await completeConvexAuthFlow(getToken, {
+              clerkUserId,
+              email: user?.primaryEmailAddress?.emailAddress,
+              firstName: user?.firstName ?? undefined,
+              lastName: user?.lastName ?? undefined,
+              imageUrl: user?.imageUrl ?? undefined,
+            });
+          } catch (_e) { 
+            console.warn('Non-blocking error during post-login sync:', _e);
+          }
         }
         
         router.replace("/(app)/(tabs)/home");

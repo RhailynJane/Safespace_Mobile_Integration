@@ -20,7 +20,8 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { BlurView } from "expo-blur";
-import { assessmentTracker } from "../../../utils/assessmentTracker";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../contexts/ThemeContext";
 const { width } = Dimensions.get("window");
@@ -52,6 +53,25 @@ export default function PreSurveyScreen() {
   const [activeTab, setActiveTab] = useState("assessment");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const { user } = useUser();
+  const submitAssessment = useMutation(api.assessments.submitAssessment);
+
+  // Live Convex queries for summary (due status, latest assessment, stats)
+  const dueStatus = useQuery(
+    user?.id ? api.assessments.isAssessmentDue : (undefined as any),
+    user?.id ? { userId: user.id } : ("skip" as any)
+  ) as { isDue: boolean; daysUntilDue: number } | undefined;
+  const latest = useQuery(
+    user?.id ? api.assessments.getLatestAssessment : (undefined as any),
+    user?.id ? { userId: user.id } : ("skip" as any)
+  ) as any | null | undefined;
+  const stats = useQuery(
+    user?.id ? api.assessments.getAssessmentStats : (undefined as any),
+    user?.id ? { userId: user.id } : ("skip" as any)
+  ) as { totalAssessments: number; averageScore: number | null; latestScore: number | null; trend: string | null } | undefined;
+  const history = useQuery(
+    user?.id ? api.assessments.getAssessmentHistory : (undefined as any),
+    user?.id ? { userId: user.id, limit: 8 } : ("skip" as any)
+  ) as any[] | undefined;
 
   /**
    * Create styles dynamically based on text size scaling
@@ -111,11 +131,17 @@ export default function PreSurveyScreen() {
 
     try {
       if (user?.id) {
-        await assessmentTracker.submitAssessment(
-          user.id,
-          responses,
-          totalScore
-        );
+        const responseArray = surveyQuestions.map((q) => ({
+          question: q.text,
+          answer: responses[q.id]!,
+        }));
+
+        await submitAssessment({
+          userId: user.id,
+          assessmentType: 'SWEMWBS',
+          responses: responseArray,
+          totalScore,
+        });
         setShowSuccessModal(true);
       } else {
         Alert.alert("Error", "User not found. Please try again.");
@@ -139,6 +165,51 @@ export default function PreSurveyScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
+            {/* Summary Bar: Due status and latest stats */}
+            {user?.id && (
+              <View style={[styles.summaryBar, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+                <View style={styles.summaryItem}>
+                  <Ionicons name={dueStatus?.isDue ? "alert-circle" : "checkmark-circle"} size={18} color={dueStatus?.isDue ? '#FFA000' : theme.colors.primary} />
+                  <Text style={[styles.summaryText, { color: theme.colors.text }]}>
+                    {dueStatus ? (dueStatus.isDue ? 'Assessment due' : `Due in ${dueStatus.daysUntilDue}d`) : 'Checking due status...'}
+                  </Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                  <Ionicons name="speedometer" size={18} color={theme.colors.textSecondary} />
+                  <Text style={[styles.summaryText, { color: theme.colors.text }]}>
+                    {stats?.latestScore != null ? `Last score: ${stats.latestScore}/35` : 'No assessments yet'}
+                  </Text>
+                </View>
+                {stats?.averageScore != null && (
+                  <>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                      <Ionicons name="analytics" size={18} color={theme.colors.textSecondary} />
+                      <Text style={[styles.summaryText, { color: theme.colors.text }]}>Avg: {stats.averageScore}</Text>
+                    </View>
+                  </>
+                )}
+                {stats?.trend && (
+                  <>
+                    <View style={styles.summaryDivider} />
+                    <View style={styles.summaryItem}>
+                      <Ionicons
+                        name={stats.trend === 'improving' ? 'trending-up' : stats.trend === 'declining' ? 'trending-down' : 'remove'}
+                        size={18}
+                        color={stats.trend === 'improving' ? '#2E7D32' : stats.trend === 'declining' ? '#C62828' : theme.colors.textSecondary}
+                      />
+                      <Text style={[styles.summaryText, { color: theme.colors.text }]}>
+                        {stats.trend === 'improving' ? 'Improving' : stats.trend === 'declining' ? 'Declining' : 'Stable'}
+                      </Text>
+                    </View>
+                  </>
+                )}
+                <TouchableOpacity onPress={() => router.push('/(app)/self-assessment/history')}>
+                  <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>View History</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <Text style={[styles.subtitle, { color: theme.colors.text }]}>
               Short Warwick-Edinburgh Mental Wellbeing Scale
             </Text>
@@ -148,6 +219,35 @@ export default function PreSurveyScreen() {
 
             {/* Survey Questions */}
             <View style={styles.questionsContainer}>
+              {/* History sparkline & list (if past assessments) */}
+              {history && history.length > 0 && (
+                <View style={[styles.historyContainer, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+                  <Text style={[styles.historyTitle, { color: theme.colors.text }]}>Your Recent Scores</Text>
+                  <View style={styles.sparklineRow}>
+                    {history.slice().reverse().map((h) => {
+                      const score = (h.totalScore as number) ?? 0;
+                      const normalized = Math.min(1, Math.max(0, (score - 7) / 28));
+                      const height = 16 + Math.round(normalized * 20);
+                      const bg = stats?.trend === 'declining'
+                        ? `rgba(198,40,40,${0.3 + normalized * 0.5})`
+                        : stats?.trend === 'improving'
+                          ? `rgba(46,125,50,${0.3 + normalized * 0.5})`
+                          : `rgba(30,136,229,${0.3 + normalized * 0.5})`;
+                      return (
+                        <View key={h.id} style={[styles.sparkBox, { height, backgroundColor: bg }]} />
+                      );
+                    })}
+                  </View>
+                  {history.slice(0,5).map((h) => (
+                    <View key={h.id} style={styles.historyItem}> 
+                      <Ionicons name="checkmark-circle" size={18} color={theme.colors.primary} style={{ marginRight: 6 }} />
+                      <Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>
+                        {h.completedAt}: {h.totalScore}/35
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
               {surveyQuestions.map((question, index) => (
                 <View 
                   key={question.id} 
@@ -317,6 +417,33 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     paddingHorizontal: 20,
     paddingTop: 20,
   },
+  // Summary bar styles
+  summaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    gap: 12,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
+  summaryText: {
+    fontSize: scaledFontSize(13),
+    fontWeight: '500',
+  },
+  summaryDivider: {
+    width: 1,
+    height: 18,
+    backgroundColor: '#E0E0E0',
+  },
   subtitle: {
     fontSize: scaledFontSize(18),
     fontWeight: "600",
@@ -331,6 +458,35 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   questionsContainer: {
     gap: 25,
+  },
+  historyContainer: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 10,
+    gap: 10,
+  },
+  historyTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+  },
+  sparklineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    marginBottom: 4,
+  },
+  sparkBox: {
+    width: 12,
+    height: 20,
+    borderRadius: 3,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyText: {
+    fontSize: scaledFontSize(12),
   },
   questionBlock: {
     borderRadius: 16,
@@ -418,7 +574,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#FFFFFF",
   },
   bottomPadding: {
-    height: 100,
+    height: 140,
   },
   modalOverlay: {
     flex: 1,

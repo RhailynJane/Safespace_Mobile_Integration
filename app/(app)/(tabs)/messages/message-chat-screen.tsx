@@ -64,8 +64,8 @@ import { useAudioPlayer, RecordingOptions } from 'expo-audio';
 import { Audio } from 'expo-av';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import OptimizedImage from "../../../../components/OptimizedImage";
-import { Message, Participant, messagingService } from "../../../../utils/sendbirdService";
-import activityApi from "../../../../utils/activityApi";
+import { Participant, messagingService } from "../../../../utils/sendbirdService";
+// activityApi removed; using Convex presence queries
 import * as FileSystem from "expo-file-system";
 import * as FSLegacy from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
@@ -76,20 +76,33 @@ import * as MediaLibrary from "expo-media-library";
 import Constants from "expo-constants";
 import { useIsFocused } from "@react-navigation/native";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
+import { useConvex, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Extended Message type to include attachment properties
-interface ExtendedMessage extends Message {
+interface ExtendedMessage {
+  id: string;
+  message_text: string;
+  message_type: 'text' | 'image' | 'file' | 'audio';
+  created_at: string;
+  updated_at?: string;
   attachment_url?: string;
   file_name?: string;
   file_size?: number;
+  sender: {
+    clerk_user_id: string;
+    first_name: string;
+    last_name: string;
+    profile_image_url?: string;
+  };
 }
 
 export default function ChatScreen() {
   const { theme, scaledFontSize, isDarkMode, fontScale } = useTheme();
   const isFocused = useIsFocused();
-  const { userId } = useAuth();
+  const { userId, getToken } = useAuth();
   const params = useLocalSearchParams();
   const conversationId = params.id as string;
   const conversationTitle = params.title as string;
@@ -101,6 +114,11 @@ export default function ChatScreen() {
   const profileImageUrlParam = (params.profileImageUrl as string) || "";
   const API_BASE_URL = getApiBaseUrl();
 
+  // Live subscription with sender metadata (profiles + users)
+  const rawMessages = useQuery(
+    api.conversations.listMessagesWithProfiles as any,
+    conversationId ? { conversationId: conversationId as any, limit: 200 } : (undefined as any)
+  ) as any[] | undefined;
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const lastMessageIdRef = useRef<string | null>(null);
   const lastMarkedAtRef = useRef<number>(0);
@@ -118,6 +136,7 @@ export default function ChatScreen() {
   );
   const [attachmentModalVisible, setAttachmentModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [attachmentSheetVisible, setAttachmentSheetVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
   const [currentAttachment, setCurrentAttachment] =
@@ -139,9 +158,15 @@ export default function ChatScreen() {
   const [pendingRecordingUri, setPendingRecordingUri] = useState<string | null>(null);
   const [pendingRecordingDuration, setPendingRecordingDuration] = useState(0);
   const [pendingFiles, setPendingFiles] = useState<Array<{ uri: string; name: string; size?: number }>>([]);
+  const [showVoiceRecordOverlay, setShowVoiceRecordOverlay] = useState(false);
+  const [showVoiceSendConfirm, setShowVoiceSendConfirm] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('smileys');
   const emojiScrollRef = useRef<ScrollView>(null);
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+    const [editingMessageText, setEditingMessageText] = useState("");
+    const [messageActionSheetVisible, setMessageActionSheetVisible] = useState(false);
+    const [selectedMessage, setSelectedMessage] = useState<ExtendedMessage | null>(null);
   const [statusModalVisible, setStatusModalVisible] = useState(false);
   const [statusModalData, setStatusModalData] = useState({
     type: 'info' as 'success' | 'error' | 'info',
@@ -150,6 +175,9 @@ export default function ChatScreen() {
     confirm: undefined as undefined | { confirmText?: string; cancelText?: string; onConfirm: () => void },
     actions: undefined as undefined | Array<{ label: string; onPress: () => void; variant?: 'default' | 'primary' | 'danger' }>,
   });
+
+  // Shared Convex client from provider
+  const convex = useConvex();
 
   // Don't use the broken useAudioRecorder hook - use AudioModule directly
   const audioRecorderRef = useRef<any>(null);
@@ -250,8 +278,8 @@ export default function ChatScreen() {
   };
 
   const headerHeight = getHeaderHeight();
-  // Use a smaller keyboard offset to avoid excessive gap between input and keyboard
-  const keyboardOffset = Platform.OS === 'ios' ? insets.top + 50 : 0;
+  // Keyboard offset should account for the header height
+  const keyboardOffset = Platform.OS === 'ios' ? headerHeight : 0;
 
   // Track keyboard visibility to adjust bottom spacing only when keyboard is hidden
   useEffect(() => {
@@ -283,19 +311,37 @@ export default function ChatScreen() {
     })();
   }, []);
 
-  // Update user activity
+  // Initialize contact from params on mount
+  useEffect(() => {
+    if (!otherClerkIdParam) return;
+    
+    // Parse conversationTitle to get first/last name
+    const titleParts = (conversationTitle || '').trim().split(' ');
+    const firstName = titleParts[0] || '';
+    const lastName = titleParts.slice(1).join(' ') || '';
+    
+    setContact({
+      id: otherClerkIdParam,
+      clerk_user_id: otherClerkIdParam,
+      first_name: firstName,
+      last_name: lastName,
+      profile_image_url: profileImageUrlParam || undefined,
+      online: initialOnlineParam === '1',
+      last_active_at: initialLastActiveParam || null,
+      email: '',
+      presence: (initialPresenceParam as any) || (initialOnlineParam === '1' ? 'online' : 'offline'),
+    });
+  }, [otherClerkIdParam, conversationTitle, profileImageUrlParam, initialOnlineParam, initialLastActiveParam, initialPresenceParam]);
+
+  // Update user activity via Convex (touch presence)
   const updateUserActivity = useCallback(async () => {
     if (!userId) return;
-
     try {
-      await fetch(`${API_BASE_URL}/api/users/${userId}/activity`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      await convex.mutation(api.conversations.touchActivity, { status: 'online' });
     } catch (error) {
-      console.error("Error updating user activity:", error);
+      console.error('Error updating user activity (Convex):', error);
     }
-  }, [userId, API_BASE_URL]);
+  }, [userId, convex]);
 
   // Get last seen text with persistent online status
   const getLastSeenText = useCallback(
@@ -319,179 +365,81 @@ export default function ChatScreen() {
     []
   );
 
-  // Load messages
-  const loadMessages = useCallback(async () => {
-    if (!conversationId || !userId) {
-      console.log("Missing conversationId or userId");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      console.log(`[${Date.now()}] Loading messages for conversation ${conversationId}`)
-      // Start all non-blocking operations in parallel
-      const startTime = Date.now();
-      
-      // Fire and forget: update activity in background (don't await)
-      updateUserActivity().catch(() => {});
-
-      // Load messages (this is the critical path) - no limit to show all messages
-      const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages?clerkUserId=${userId}&t=${Date.now()}`
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        const loadTime = Date.now() - startTime;
-        console.log(`[${Date.now()}] Loaded ${result.data.length} messages in ${loadTime}ms`);
-        setMessages(result.data);
-
-        // Detect new last message and mark as read when appropriate
-        const latest = result.data[result.data.length - 1];
-        const latestId = latest ? String(latest.id) : null;
-        const prevId = lastMessageIdRef.current;
-        const nowTs = Date.now();
-        const shouldMark =
-          latestId && latestId !== prevId &&
-          // Do not mark if the latest is mine
-          !(latest && latest.sender && latest.sender.clerk_user_id === userId) &&
-          // Throttle mark-as-read to avoid spamming
-          nowTs - lastMarkedAtRef.current > 2000;
-
-        if (shouldMark) {
-          lastMessageIdRef.current = latestId;
-          lastMarkedAtRef.current = nowTs;
-          // Fire-and-forget: mark as read both in SendBird (if enabled) and backend
-          (async () => {
-            try {
-              if (channelUrl && messagingService.isSendBirdEnabled()) {
-                await messagingService.markAsRead(channelUrl);
-              }
-            } catch (_e) { /* ignore SendBird mark-as-read errors */ }
-            try {
-              await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clerkUserId: userId })
-              });
-            } catch (_e) { /* ignore backend mark-read errors */ }
-          })();
-        }
-
-        // Fire and forget: mark as read in background (don't block UI)
-        Promise.all([
-          // SendBird mark as read
-          (async () => {
-            try {
-              if (!didMarkReadRef.current && channelUrl && messagingService.isSendBirdEnabled()) {
-                await messagingService.markAsRead(channelUrl);
-                didMarkReadRef.current = true;
-              }
-            } catch (_e) {
-              // ignore SB errors
-            }
-          })(),
-          // Backend mark as read
-          (async () => {
-            try {
-              if (userId && conversationId) {
-                console.log(`📭 Calling mark-read API for conversation ${conversationId}`);
-                const markResponse = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}/mark-read`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ clerkUserId: userId })
-                });
-                console.log(`✅ Mark-read API responded:`, markResponse.status, markResponse.ok);
-              } else {
-                console.log(`⚠️ Skip mark-read: userId=${userId}, conversationId=${conversationId}`);
-              }
-            } catch (e) {
-              console.log(`❌ Mark-read API failed:`, e);
-            }
-          })()
-        ]).catch(() => {}); // Don't block on mark-read failures
-
-        // Initialize contact from route params if not already set
-        if (!contact && otherClerkIdParam) {
-          const fallbackContact = {
-            id: otherClerkIdParam,
-            clerk_user_id: otherClerkIdParam,
-            first_name: conversationTitle?.split(" ")[0] || "User",
-            last_name: conversationTitle?.split(" ").slice(1).join(" ") || "",
-            email: "",
-            profile_image_url: profileImageUrlParam || undefined,
-            online: initialOnlineParam === "0" ? false : true,
-            last_active_at: initialLastActiveParam || null,
-          };
-          setContact(fallbackContact);
-        }
-      } else {
-        console.error("Failed to load messages:", response.status);
-        showStatusModal('error', 'Load Error', 'Failed to load messages. Please try again.');
-      }
-    } catch (error) {
-      console.error("Error loading messages:", error);
-      showStatusModal('error', 'Connection Error', 'Failed to load messages. Please check your connection.');
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    conversationId,
-    userId,
-    conversationTitle,
-    API_BASE_URL,
-    channelUrl,
-    initialOnlineParam,
-    initialLastActiveParam,
-    otherClerkIdParam,
-    profileImageUrlParam,
-    contact,
-    updateUserActivity,
-  ]);
-
-  // Load messages with fast polling while in the chat screen
+  // Derive live messages when rawMessages changes
   useEffect(() => {
-    if (!isFocused || !conversationId || !userId) return;
+    if (!rawMessages) return;
+    const loaded: ExtendedMessage[] = rawMessages.map((m: any) => ({
+      id: m._id,
+      message_type: m.messageType || 'text',
+      message_text: m.body || '',
+      created_at: m.createdAt ? new Date(m.createdAt).toISOString() : new Date().toISOString(),
+      updated_at: m.updatedAt ? new Date(m.updatedAt).toISOString() : undefined,
+      attachment_url: m.attachmentUrl,
+      file_name: m.fileName,
+      file_size: m.fileSize,
+      sender: {
+        clerk_user_id: m.senderId || 'unknown',
+        first_name: m.senderFirstName || '',
+        last_name: m.senderLastName || '',
+        profile_image_url: m.senderProfileImageUrl || undefined,
+      },
+    }));
+    setMessages(loaded);
+    setLoading(false);
 
-    loadMessages(); // Load immediately
+    // Auto mark read for newest incoming message (throttled)
+    const latest = loaded[loaded.length - 1];
+    const latestId = latest ? String(latest.id) : null;
+    const prevId = lastMessageIdRef.current;
+    const nowTs = Date.now();
+    const shouldMark = latestId && latestId !== prevId && !(latest && latest.sender.clerk_user_id === userId) && nowTs - lastMarkedAtRef.current > 2000;
+    if (shouldMark) {
+      lastMessageIdRef.current = latestId;
+      lastMarkedAtRef.current = nowTs;
+      convex.mutation(api.conversations.markRead, { conversationId: conversationId as any }).catch(() => {});
+    }
+  }, [rawMessages, userId, convex, conversationId]);
 
-    // Poll faster when the user is near the bottom (actively viewing latest)
-    const intervalMs = userNearBottom ? 4000 : 8000; // 4s vs 8s
-    const pollInterval = setInterval(() => {
-      loadMessages();
-    }, intervalMs);
+  // Load messages with fast polling while in the chat screen, unless live subscription is active
+  // Removed polling; live subscription provides updates
 
-    return () => clearInterval(pollInterval);
-  }, [isFocused, conversationId, userId, loadMessages, userNearBottom]);
+  // When live messages are available, update UI and mark-as-read as needed
+  // Live subscription removed (could be reintroduced with a Convex subscription hook later)
 
-  // One-time status refresh after mount (no polling)
+  // Poll presence status regularly while focused
   useEffect(() => {
-    if (!isFocused || !contact || !contact.clerk_user_id || contact.clerk_user_id === "unknown") return;
+    if (!isFocused || !otherClerkIdParam || otherClerkIdParam === "unknown") return;
 
     const updateOnlineStatus = async () => {
       try {
-        const status = await activityApi.status(contact.clerk_user_id);
-        if (status) {
-          const newOnline = !!status.online;
-          const newPresence = (status as any).presence as 'online' | 'away' | 'offline' | undefined;
-          setIsOnline(newOnline);
-          
-          if (newPresence) {
-            setPresence(newPresence);
-          } else {
-            setPresence(newOnline ? 'online' : 'offline');
+        const row = await convex.query(api.conversations.presenceForUser, { userId: otherClerkIdParam });
+        if (row) {
+          const status = (row.status as 'online' | 'away' | 'offline' | undefined) ?? 'offline';
+          const lastSeen = row.lastSeen as number | undefined;
+          setIsOnline(status === 'online');
+          setPresence(status);
+          if (lastSeen) {
+            setContact((prev) => prev ? { ...prev, online: status === 'online', last_active_at: new Date(lastSeen).toISOString() } : prev);
           }
-          setContact((prev) => prev ? { ...prev, online: newOnline, last_active_at: status.last_active_at } : prev);
+        } else {
+          // No presence data, default to offline
+          setIsOnline(false);
+          setPresence('offline');
         }
-      } catch (_e) {
-        // ignore
+      } catch (error) {
+        console.error('Error fetching presence:', error);
+        setIsOnline(false);
+        setPresence('offline');
       }
     };
 
-    const initialTimeout = setTimeout(updateOnlineStatus, 1500);
-    return () => clearTimeout(initialTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFocused, contact?.clerk_user_id]);
+    // Initial check
+    updateOnlineStatus();
+
+    // Poll every 10 seconds while screen is focused
+    const interval = setInterval(updateOnlineStatus, 10000);
+    return () => clearInterval(interval);
+  }, [isFocused, otherClerkIdParam, convex]);
 
   useEffect(() => {
     // Only auto-scroll if user is near bottom or last message is mine
@@ -678,53 +626,36 @@ export default function ChatScreen() {
         // Ignore size check failures; we'll let the server enforce limits
       }
 
-      // Build multipart form data
-      const form = new FormData();
-      form.append("conversationId", String(conversationId));
-      form.append("clerkUserId", String(userId));
-      form.append("messageType", fileType);
+      // Convex direct storage upload
       const finalFileName = `${finalNameBase}.${finalExt}`;
-      form.append(
-        "file",
-        {
-          uri: uploadUri,
-          name: finalFileName,
-          type: finalMime,
-        } as any
-      );
-
-      const res = await fetch(`${API_BASE_URL}/api/messages/upload-attachment`, {
-        method: "POST",
-        // Let React Native set the Content-Type with boundary
-        body: form as any,
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("ðŸ“ Upload failed:", errText);
-        setFileErrorMessage("Failed to upload attachment. Please try again.");
-        setFileErrorModalVisible(true);
-        return;
-      }
-
-      const json = await res.json();
-      console.log('📦 Backend upload response:', json);
-      if (json?.data) {
-        // Optimistically add the new message returned by server
-        console.log('📎 Upload successful, adding message:', { 
-          id: json.data.id, 
-          type: json.data.message_type, 
-          fileName: json.data.file_name,
-          attachmentUrl: json.data.attachment_url 
+      try {
+        const { uploadUrl } = await convex.action(api.storage.generateUploadUrl, {});
+        // Fetch file data as blob
+        const fileResponse = await fetch(uploadUri);
+        const fileBlob = await fileResponse.blob();
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': finalMime },
+          body: fileBlob,
         });
-        setMessages((prev) => {
-          console.log(`📝 Current messages count: ${prev.length}, adding uploaded attachment`);
-          return [...prev, json.data];
+        if (!uploadRes.ok) {
+          console.error('📎 Storage upload failed:', uploadRes.status);
+          showStatusModal('error', 'Upload failed', 'Could not upload file.');
+          return;
+        }
+        const { storageId } = await uploadRes.json();
+        // Create attachment message referencing storage
+        await convex.mutation(api.conversations.sendAttachmentFromStorage, {
+          conversationId: conversationId as any,
+            storageId: storageId,
+            fileName: finalFileName,
+            fileSize: undefined,
+            messageType: fileType === 'image' ? 'image' : 'file',
         });
-        // Optionally refresh to sync ordering/unread states
-        setTimeout(() => loadMessages(), 800);
-      } else {
-        console.warn('⚠️ Upload response missing data:', json);
+  // Live subscription will refresh messages automatically
+      } catch (convexErr) {
+        console.error('📎 Convex upload error:', convexErr);
+        showStatusModal('error', 'Upload failed', 'Unable to upload attachment.');
       }
     } catch (error) {
       console.error("ðŸ“ Upload error:", error);
@@ -736,6 +667,12 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = async () => {
+        // If editing, save the edit instead
+        if (editingMessageId) {
+          await saveEditedMessage();
+          return;
+        }
+
     if (newMessage.trim() === "" || sending || !userId || !conversationId) {
       return;
     }
@@ -747,37 +684,13 @@ export default function ChatScreen() {
       // Update activity when sending message
       await updateUserActivity();
 
-      // Use direct backend API instead of messagingService
-      const response = await fetch(
-        `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clerkUserId: userId,
-            messageText: newMessage,
-            messageType: "text",
-          }),
-        }
-      );
+      // Convex send only
+  await convex.mutation(api.conversations.sendMessage, { conversationId: conversationId as any, body: newMessage.trim(), messageType: 'text' });
 
-      if (response.ok) {
-        const result = await response.json();
-        // console.log("Message sent successfully");
-        console.log('✅ Text message sent, adding to UI:', result.data);
-        setMessages((prev) => {
-          console.log(`📝 Current messages count: ${prev.length}, adding new message`);
-          return [...prev, result.data];
-        });
-        setNewMessage("");
-        setIsTyping(false); // Reset typing state after sending
-
-        // Reload messages to ensure both parties see the same
-        setTimeout(() => loadMessages(), 500);
-      } else {
-        console.error("Failed to send message:", response.status);
-        showStatusModal('error', 'Send Error', 'Failed to send message');
-      }
+      // Optimistic UI: clear input and refresh messages
+      setNewMessage("");
+      setIsTyping(false);
+  // No manual reload needed; subscription updates list
     } catch (error) {
       console.error("Error sending message:", error);
       showStatusModal('error', 'Send Error', 'Failed to send message');
@@ -796,93 +709,135 @@ export default function ChatScreen() {
     setEmojiPickerVisible(false);
   };
 
-  // Handle voice recording (start/stop) - using expo-av Audio.Recording
-  const handleMicPress = async () => {
+  // Handle long press on message to show action sheet
+  const handleMessageLongPress = (message: ExtendedMessage) => {
+    // Only allow editing/deleting own messages
+    // Allow editing only for text messages, but allow deleting for all message types
+    if (message.sender.clerk_user_id === userId) {
+      setSelectedMessage(message);
+      setMessageActionSheetVisible(true);
+    }
+  };
+
+  // Handle edit message
+  const handleEditMessage = () => {
+    if (selectedMessage) {
+      setEditingMessageId(selectedMessage.id);
+      setEditingMessageText(selectedMessage.message_text);
+      setNewMessage(selectedMessage.message_text);
+      setMessageActionSheetVisible(false);
+    }
+  };
+
+  // Handle delete message
+  const handleDeleteMessage = async () => {
+    if (!selectedMessage) return;
+    setMessageActionSheetVisible(false);
+    
+    showConfirm(
+      'Delete Message',
+      'Are you sure you want to delete this message?',
+      async () => {
+        try {
+          await convex.mutation(api.conversations.deleteMessage, {
+            messageId: selectedMessage.id as any,
+          });
+          showStatusModal('success', 'Deleted', 'Message deleted successfully');
+        } catch (error: any) {
+          console.error('Delete message error:', error);
+          showStatusModal('error', 'Error', error.message || 'Failed to delete message');
+        }
+      }
+    );
+  };
+
+  // Cancel editing
+  const cancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingMessageText("");
+    setNewMessage("");
+  };
+
+  // Save edited message
+  const saveEditedMessage = async () => {
+    if (!editingMessageId || !newMessage.trim()) return;
+    
     try {
-      // Ensure microphone permission before attempting to record
+      setSending(true);
+      await convex.mutation(api.conversations.updateMessage, {
+        messageId: editingMessageId as any,
+        newText: newMessage.trim(),
+      });
+      setEditingMessageId(null);
+      setEditingMessageText("");
+      setNewMessage("");
+      showStatusModal('success', 'Updated', 'Message updated successfully');
+    } catch (error: any) {
+      console.error('Update message error:', error);
+      showStatusModal('error', 'Error', error.message || 'Failed to update message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Handle voice recording (start/stop) - simplified and fixed structure
+  const handleMicPress = async () => {
+    // Show voice recording overlay
+    setShowVoiceRecordOverlay(true);
+  };
+
+  const startVoiceRecording = async () => {
+    try {
       const hasPerm = await ensureMicPermission();
       if (!hasPerm) {
         showStatusModal('error', 'Permission required', 'Please allow microphone access to record voice messages.');
+        setShowVoiceRecordOverlay(false);
         return;
       }
-      if (isRecording) {
-        // Stop recording
-        console.log('🎤 Stopping recording...');
-        const recorder = audioRecorderRef.current;
-        if (!recorder) {
-          console.log('❌ No recorder instance');
-          showStatusModal('error', 'Recording Error', 'Recording not initialized.');
-          setIsRecording(false);
-          return;
-        }
-        
-        try {
-          await recorder.stopAndUnloadAsync();
-          const uri = recorder.getURI();
-          console.log('🎤 Recording URI:', uri);
-          
-          if (uri && uri.length > 0) {
-            console.log('🎤 Recording saved:', uri);
-            setPendingRecordingUri(uri);
-            setPendingRecordingDuration(Math.max(1, recordingDuration));
-            audioRecorderRef.current = null;
-          } else {
-            console.log('❌ No URI from recording');
-            showStatusModal('error', 'Recording Error', 'Could not save the recording. Please try again.');
-          }
-        } catch (stopError: any) {
-          console.error('❌ Error stopping:', stopError);
-          showStatusModal('error', 'Recording Error', stopError.message || 'Failed to stop recording');
-        }
-        
-        setIsRecording(false);
-        isRecordingRef.current = false;
-        
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-      } else {
-        // Start recording
-        console.log('🎤 Starting recording...');
-        
-        try {
-          // Request permissions
-          await Audio.requestPermissionsAsync();
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-          });
-          
-          const { recording } = await Audio.Recording.createAsync(
-            Audio.RecordingOptionsPresets.HIGH_QUALITY
-          );
-          
-          audioRecorderRef.current = recording;
-          console.log('🎤 Recording started successfully');
-          
-          setIsRecording(true);
-          isRecordingRef.current = true;
-          setRecordingDuration(0);
-          
-          // Update duration every second
-          recordingTimerRef.current = setInterval(() => {
-            setRecordingDuration(prev => prev + 1);
-          }, 1000);
-        } catch (startError: any) {
-          console.error('❌ Error starting recording:', startError);
-          showStatusModal('error', 'Recording Error', startError.message || 'Failed to start recording');
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Audio recording error:', error);
+      // Start recording
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.startAsync();
+      audioRecorderRef.current = recording;
+      setIsRecording(true);
+      isRecordingRef.current = true;
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => setRecordingDuration(prev => prev + 1), 1000);
+      console.log('🎤 Recording started');
+    } catch (e: any) {
+      console.error('❌ Audio recording error:', e);
+      showStatusModal('error', 'Recording Error', e.message || 'Failed to record audio');
       setIsRecording(false);
       isRecordingRef.current = false;
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+      setShowVoiceRecordOverlay(false);
+    }
+  };
+
+  const stopVoiceRecording = async () => {
+    try {
+      const recorder = audioRecorderRef.current;
+      if (recorder) {
+        await recorder.stopAndUnloadAsync();
+        const uri = recorder.getURI();
+        if (uri) {
+          setPendingRecordingUri(uri);
+          setPendingRecordingDuration(recordingDuration);
+          console.log('🎤 Recording saved:', uri);
+          // Show confirmation dialog
+          setShowVoiceSendConfirm(true);
+        }
       }
-      showStatusModal('error', 'Recording Error', error.message || 'Failed to record audio');
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    } catch (e: any) {
+      console.error('❌ Stop recording error:', e);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     }
   };
 
@@ -946,6 +901,10 @@ export default function ChatScreen() {
       try { await FileSystem.deleteAsync(pendingRecordingUri, { idempotent: true }); } catch { /* noop */ }
       setPendingRecordingUri(null);
       setPendingRecordingDuration(0);
+      setRecordingDuration(0);
+      setIsRecording(false);
+      isRecordingRef.current = false;
+      audioRecorderRef.current = null;
     }
   };
 
@@ -1016,21 +975,24 @@ export default function ChatScreen() {
   // Download file to local storage and share
   const downloadAndShareFile = async (remoteUri: string, fileName: string) => {
     try {
-      console.log("ðŸ“¥ Starting download:", { remoteUri, fileName });
+      console.log("Starting download:", { remoteUri, fileName });
       setDownloading(true);
       const resolvedUri = resolveRemoteUri(remoteUri);
       const urlWithoutParams = resolvedUri.split("?")[0];
-      const fileExtension = (urlWithoutParams ?? "").split(".").pop()?.toLowerCase() || "file";
+      // Extract extension from filename only, not the full URL path
+      const pathname = (urlWithoutParams ?? "").split('/').pop() || '';
+      const parts = pathname.split('.');
+      const fileExtension = (parts.length > 1 && parts[parts.length - 1]) ? parts[parts.length - 1]!.toLowerCase() : 'file';
       const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
       const baseName = safeFileName.replace(/\.[^/.]+$/, ""); // remove existing extension if present
 
       // Use legacy API shim to avoid runtime deprecation errors (SDK 54): download into cache directory
       const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
-      const fileUri = `${cacheDir}${baseName}.${fileExtension}`;
-      console.log("ðŸ“¥ Downloading to:", fileUri);
+      const fileUri = `${cacheDir}download_${Date.now()}.${fileExtension}`;
+      console.log("📥 Downloading to:", fileUri);
       await FSLegacy.downloadAsync(resolvedUri, fileUri);
 
-      console.log("âœ… Download complete, opening share sheet");
+      console.log("✅ Download complete, opening share sheet");
 
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
@@ -1039,14 +1001,14 @@ export default function ChatScreen() {
           dialogTitle: `Share ${fileName}`,
           UTI: getUTI(fileExtension),
         });
-        console.log("âœ… Share sheet closed");
+        console.log("✓ Share sheet closed");
       } else {
-        console.log("âš ï¸ Sharing not available, opening in browser");
+        console.log("⚠️ Sharing not available, opening in browser");
         // Fallback: open in browser quietly
         await WebBrowser.openBrowserAsync(remoteUri);
       }
     } catch (error) {
-      console.error("âŒ Download error:", error);
+      console.error("❌ Download error:", error);
       setFileErrorMessage("Unable to download or share the file. Please try again.");
       setFileErrorModalVisible(true);
     } finally {
@@ -1076,28 +1038,31 @@ export default function ChatScreen() {
 
   // Ensure we share a local file: download remote HTTP(S) URIs to cache first
   const shareUriEnsuringLocal = async (uri: string, fallbackName = `share_${Date.now()}`) => {
-    console.log("ðŸ“¤ shareUriEnsuringLocal called with:", uri);
+    console.log("📤 shareUriEnsuringLocal called with:", uri);
     const canShare = await Sharing.isAvailableAsync();
     if (!canShare) {
-      console.log("âš ï¸ Sharing not available on this device");
+      console.log("⚠️ Sharing not available on this device");
       return false;
     }
     try {
       let localUri = uri;
       let ext = 'file';
       if (uri.startsWith('http')) {
-        console.log("ðŸ“¥ Remote URI detected, downloading first...");
+        console.log("📤 Remote URI detected, downloading first...");
         const resolved = resolveRemoteUri(uri);
         const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
-        ext = (withoutParams.split('.').pop() || 'file').toLowerCase();
+        // Extract extension from URL path, not the full URL (avoid domain extensions)
+        const pathname = withoutParams.split('/').pop() || '';
+        const parts = pathname.split('.');
+        ext = (parts.length > 1 && parts[parts.length - 1]) ? parts[parts.length - 1]!.toLowerCase() : 'file';
         const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
-        const destUri = `${cacheDir}${fallbackName}.${ext}`;
-        console.log("ðŸ“¥ Downloading to:", destUri);
+        const destUri = `${cacheDir}share_${Date.now()}.${ext}`;
+        console.log("📤 Downloading to:", destUri);
         await FSLegacy.downloadAsync(resolved, destUri);
         localUri = destUri;
-        console.log("âœ… Download complete:", localUri);
+        console.log("✓ Download complete:", localUri);
       }
-      console.log("ðŸ“¤ Opening share sheet for:", localUri);
+      console.log("📤 Opening share sheet for:", localUri);
       await Sharing.shareAsync(localUri, { mimeType: getMimeType(ext) });
       console.log("âœ… Share sheet closed");
       return true;
@@ -1109,12 +1074,12 @@ export default function ChatScreen() {
 
   // Save image to gallery
   const saveImageToGallery = async (imageUri: string) => {
-    console.log("ðŸ’¾ saveImageToGallery called with:", imageUri);
+    console.log("📼 saveImageToGallery called with:", imageUri);
     try {
       setDownloading(true);
       // Expo Go limitation: cannot grant full media access; fallback to share
       if (Constants?.appOwnership === 'expo') {
-        console.log("â„¹ï¸ Running in Expo Go, using share fallback for gallery save");
+        console.log("🧏‍♂️ Running in Expo Go, using share fallback for gallery save");
         const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
         if (!shared) {
           setFileErrorMessage("Saving to gallery isn't supported in Expo Go. Shared instead.");
@@ -1124,12 +1089,12 @@ export default function ChatScreen() {
       }
       // Request permissions; if not available or rejected, fallback to share sheet
       try {
-        console.log("ðŸ” Requesting media library permissions...");
+        console.log("🔐 Requesting media library permissions...");
         // Request only photo permission to avoid AUDIO manifest requirement on Android 13+
         const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
-        console.log("ðŸ” Permission status:", status);
+        console.log("🔐 Permission status:", status);
         if (status !== "granted") {
-          console.log("âš ï¸ Permission denied, falling back to share");
+          console.log("⚠️ Permission denied, falling back to share");
           const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
           if (shared) return;
           setFileErrorMessage("Cannot save without media permissions.");
@@ -1137,7 +1102,7 @@ export default function ChatScreen() {
           return;
         }
       } catch (_permErr) {
-        console.error("âš ï¸ Permission request error:", _permErr);
+        console.error("⚠️ Permission request error:", _permErr);
         // Some Android setups (Expo Go) will reject if manifest lacks permissions.
         // Gracefully fallback to share sheet.
         const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
@@ -1150,26 +1115,29 @@ export default function ChatScreen() {
       let finalUri = imageUri;
       // If remote, download to a writable cache path
       if (imageUri.startsWith("http")) {
-        console.log("ðŸ“¥ Remote image, downloading first...");
+        console.log("📤 Remote image, downloading first...");
         const resolved = resolveRemoteUri(imageUri);
         const withoutParams = (resolved.split('?')[0] ?? resolved) as string;
-        const ext = (withoutParams.split('.').pop() || 'jpg').toLowerCase();
+        // Extract extension from URL path, not the full URL (avoid domain extensions)
+        const pathname = withoutParams.split('/').pop() || '';
+        const parts = pathname.split('.');
+        const ext = (parts.length > 1 && parts[parts.length - 1]) ? parts[parts.length - 1]!.toLowerCase() : 'jpg';
         const cacheDir = (FSLegacy as any).cacheDirectory || (FileSystem as any).cacheDirectory || '';
         const destUri = `${cacheDir}image_${Date.now()}.${ext}`;
         await FSLegacy.downloadAsync(resolved, destUri);
         finalUri = destUri;
-        console.log("âœ… Downloaded to:", finalUri);
+        console.log("✓ Downloaded to:", finalUri);
       }
 
-      console.log("ðŸ’¾ Creating media library asset...");
+      console.log("📼 Creating media library asset...");
       const asset = await MediaLibrary.createAssetAsync(finalUri);
       await MediaLibrary.createAlbumAsync("Downloads", asset, false);
-      console.log("âœ… Image saved to gallery!");
+      console.log("✓ Image saved to gallery!");
     } catch (error) {
-      console.error("âŒ Save image error:", error);
+      console.error("❌ Save image error:", error);
       // Final fallback: try share if gallery save failed
       try {
-        console.log("âš ï¸ Gallery save failed, trying share fallback...");
+        console.log("⚠️ Gallery save failed, trying share fallback...");
         const shared = await shareUriEnsuringLocal(imageUri, `image_${Date.now()}`);
         if (shared) return;
       } catch (_e2) {
@@ -1479,9 +1447,9 @@ export default function ChatScreen() {
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
-          behavior={Platform.select({ ios: 'padding', android: 'height' })}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}
-          keyboardVerticalOffset={keyboardOffset}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
         >
           {/* Status Modal (also used for confirmations) */}
           <Modal
@@ -1580,6 +1548,47 @@ export default function ChatScreen() {
             </View>
           </Modal>
 
+        {/* Message Action Sheet */}
+        <Modal
+          visible={messageActionSheetVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setMessageActionSheetVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.attachmentModalOverlay}
+            activeOpacity={1}
+            onPress={() => setMessageActionSheetVisible(false)}
+          >
+            <View style={[styles.attachmentSheet, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.messageActionGrid}>
+                {/* Only show Edit option for text messages */}
+                {selectedMessage?.message_type === 'text' && (
+                  <TouchableOpacity
+                    style={styles.messageActionOption}
+                    onPress={handleEditMessage}
+                  >
+                    <View style={[styles.messageActionIconCircle, { backgroundColor: '#007AFF' }]}>
+                      <Ionicons name="create-outline" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Edit</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.messageActionOption}
+                  onPress={handleDeleteMessage}
+                >
+                  <View style={[styles.messageActionIconCircle, { backgroundColor: '#FF3B30' }]}>
+                    <Ionicons name="trash-outline" size={24} color="white" />
+                  </View>
+                  <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
           {/* Fixed Header with dynamic height based on screen size */}
           <View style={[styles.headerWrapper, { height: headerHeight }]}>
             <View style={styles.header}>
@@ -1641,17 +1650,13 @@ export default function ChatScreen() {
                     if (!conversationId || !userId) return;
                     showConfirm(
                       'Delete conversation',
-                      'This will remove the conversation from your inbox. Continue?',
+                      'This will remove the conversation and all messages. Continue?',
                       async () => {
                         try {
-                          const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${conversationId}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                          if (res.ok) {
-                            router.back();
-                          } else {
-                            showStatusModal('error', 'Delete failed', 'Unable to delete this conversation.');
-                          }
+                          await convex.mutation(api.conversations.deleteConversation, { conversationId: conversationId as any });
+                          router.back();
                         } catch (_e) {
-                          showStatusModal('error', 'Network error', 'Please check your connection and try again.');
+                          showStatusModal('error', 'Delete failed', 'Please try again.');
                         }
                       },
                       { confirmText: 'Delete', cancelText: 'Cancel' }
@@ -1714,25 +1719,7 @@ export default function ChatScreen() {
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onLongPress={() => {
-                      // Allow deleting only own messages
-                      if (!myMessage) return;
-                      showConfirm(
-                        'Delete message',
-                        'Are you sure you want to delete this message?',
-                        async () => {
-                          try {
-                            const res = await fetch(`${API_BASE_URL}/api/messages/conversations/${encodeURIComponent(String(conversationId))}/messages/${encodeURIComponent(String(item.id))}?clerkUserId=${encodeURIComponent(String(userId))}`, { method: 'DELETE' });
-                            if (res.ok) {
-                              setMessages((prev) => prev.filter((m) => String(m.id) !== String(item.id)));
-                            } else {
-                              showStatusModal('error', 'Delete failed', 'Could not delete this message.');
-                            }
-                          } catch (_e) {
-                            showStatusModal('error', 'Network error', 'Please try again.');
-                          }
-                        },
-                        { confirmText: 'Delete', cancelText: 'Cancel' }
-                      );
+                      handleMessageLongPress(item);
                     }}
                   >
                     <View style={[styles.messageBubble, bubbleStyle]}>
@@ -1816,7 +1803,20 @@ export default function ChatScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Message Input - Single row with icons and text input */}
+          {/* Editing Mode Banner - positioned above input */}
+          {editingMessageId && (
+            <View style={[styles.editingBanner, { backgroundColor: isDarkMode ? '#3A3B3C' : '#E8F4FD' }]}>
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+              <Text style={[styles.editingText, { color: theme.colors.text }]}>
+                Editing message
+              </Text>
+              <TouchableOpacity onPress={cancelEdit} style={styles.editingCloseButton}>
+                <Ionicons name="close" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Message Input - Compact row with + button and text input */}
           <View style={[
             styles.bottomInputSection, 
             { 
@@ -1825,131 +1825,54 @@ export default function ChatScreen() {
               paddingBottom: Math.max(insets.bottom || 0, 8),
             }
           ]}>
-            {/* Show expand button when icons are hidden */}
-            {isTyping && (
+            {/* Plus button to open attachment sheet - hide when editing */}
+            {!editingMessageId && (
               <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => setIsTyping(false)}
+                style={styles.plusButton}
+                onPress={() => setAttachmentSheetVisible(true)}
               >
-                <Ionicons name="chevron-forward" size={28} color={theme.colors.primary} />
+                <Ionicons name="add" size={24} color={theme.colors.primary} />
               </TouchableOpacity>
             )}
 
-            {/* Left icons - hide when typing */}
-            {!isTyping && (
-              <>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={takePhoto}
-                >
-                  <Ionicons name="camera" size={28} color={theme.colors.primary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={pickImage}
-                >
-                  <Ionicons name="image" size={28} color={theme.colors.primary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={pickDocument}
-                >
-                  <Ionicons name="document-text" size={28} color={theme.colors.primary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={handleMicPress}
-                >
-                  <Ionicons 
-                    name={isRecording ? "stop-circle" : "mic"} 
-                    size={28} 
-                    color={isRecording ? "#FF0000" : theme.colors.primary} 
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-
             <View style={[
-              styles.inputWrapper,
+              styles.compactInputWrapper,
               { 
-                backgroundColor: theme.colors.background,
-                borderColor: isDarkMode ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.15)'
+                backgroundColor: isDarkMode ? '#3A3B3C' : '#F0F2F5',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'
               }
             ]}>
-              {/* Pending document chips */}
-              {pendingFiles.length > 0 && !isRecording && !pendingRecordingUri && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pendingFilesScroll} contentContainerStyle={styles.pendingFilesRow}>
-                  {pendingFiles.map((f, idx) => (
-                    <View key={`${f.uri}-${idx}`} style={styles.pendingChip}>
-                      <Ionicons name="document-text" size={16} color="#FFFFFF" style={styles.pendingChipIcon} />
-                      <Text numberOfLines={1} style={styles.pendingChipText}>{f.name}</Text>
-                      <TouchableOpacity style={styles.pendingChipClose} onPress={() => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}>
-                        <Ionicons name="close" size={14} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
-
-              {(isRecording || pendingRecordingUri) ? (
-                <View style={styles.recordingBar}>
-                  {/* Cancel */}
-                  <TouchableOpacity style={styles.recCircleButton} onPress={cancelPendingRecording}>
-                    <Ionicons name="close" size={18} color="#0B6E8B" />
-                  </TouchableOpacity>
-
-                  {/* Middle pill */}
-                  <View style={styles.recordingPill}>
-                    <View style={styles.pillMeter} />
-                    <Text style={styles.pillTime}>
-                      {isRecording ? `${Math.floor(recordingDuration)}s` : `${Math.max(1, pendingRecordingDuration)}s`}
-                    </Text>
-                  </View>
-
-                  {/* Send */}
-                  <TouchableOpacity style={[styles.recCircleButton, !pendingRecordingUri && { opacity: 0.5 }]} onPress={sendPendingRecording} disabled={!pendingRecordingUri}>
-                    <Ionicons name="send" size={18} color="#0B6E8B" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TextInput
-                  style={[styles.textInput, { color: theme.colors.text }]}
-                  placeholder="Message"
-                  value={newMessage}
-                  onChangeText={(text) => {
-                    setNewMessage(text);
-                    setIsTyping(text.length > 0);
-                  }}
-                  onFocus={() => {
-                    if (newMessage.length > 0) {
-                      setIsTyping(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    if (newMessage.length === 0) {
-                      setIsTyping(false);
-                    }
-                  }}
-                  multiline={true}
-                  maxLength={500}
-                  editable={!sending && !uploading}
-                  placeholderTextColor={theme.colors.textDisabled}
-                  returnKeyType="send"
-                  blurOnSubmit={true}
-                  onSubmitEditing={handleSendMessage}
-                />
-              )}
+              <TextInput
+                style={[styles.compactTextInput, { color: theme.colors.text }]}
+                placeholder={editingMessageId ? "Edit message..." : "Write a message..."}
+                value={newMessage}
+                onChangeText={(text) => {
+                  setNewMessage(text);
+                  setIsTyping(text.length > 0);
+                }}
+                multiline={true}
+                maxLength={500}
+                editable={!sending && !uploading}
+                placeholderTextColor={theme.colors.textSecondary}
+                returnKeyType="send"
+                blurOnSubmit={true}
+                onSubmitEditing={handleSendMessage}
+              />
             </View>
 
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={handleEmojiPress}
-            >
-              <Ionicons name="happy-outline" size={28} color={theme.colors.primary} />
-            </TouchableOpacity>
+            {/* Mic button - hide when editing */}
+            {!editingMessageId && (
+              <TouchableOpacity
+                style={styles.micButton}
+                onPress={handleMicPress}
+              >
+                <Ionicons 
+                  name={isRecording ? "stop-circle" : "mic"} 
+                  size={24} 
+                  color={isRecording ? "#FF0000" : theme.colors.primary} 
+                />
+              </TouchableOpacity>
+            )}
 
             {(newMessage.trim() !== "" || pendingFiles.length > 0 || !!pendingRecordingUri) && (
               <TouchableOpacity
@@ -2426,6 +2349,200 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </Modal>
         </KeyboardAvoidingView>
+
+        {/* Attachment Bottom Sheet */}
+        <Modal
+          visible={attachmentSheetVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setAttachmentSheetVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.attachmentModalOverlay}
+            activeOpacity={1}
+            onPress={() => setAttachmentSheetVisible(false)}
+          >
+            <View style={[styles.attachmentSheet, { backgroundColor: theme.colors.surface }]}>
+              {/* Attachment Options Grid */}
+              <View style={styles.attachmentGrid}>
+                <View style={styles.attachmentRow}>
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      pickDocument();
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#007AFF' }]}>
+                      <Ionicons name="document-text" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Document</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      takePhoto();
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#FF3B30' }]}>
+                      <Ionicons name="camera" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Camera</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.attachmentOption}
+                    onPress={() => {
+                      setAttachmentSheetVisible(false);
+                      pickImage();
+                    }}
+                  >
+                    <View style={[styles.attachmentIconCircle, { backgroundColor: '#34C759' }]}>
+                      <Ionicons name="image" size={24} color="white" />
+                    </View>
+                    <Text style={[styles.attachmentLabel, { color: theme.colors.text }]}>Media</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Voice Recording Overlay */}
+        <Modal
+          visible={showVoiceRecordOverlay}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (isRecording) {
+              cancelPendingRecording();
+            }
+            setShowVoiceRecordOverlay(false);
+          }}
+        >
+          <View style={styles.voiceOverlay}>
+            {/* Contact Info */}
+            <View style={styles.voiceContactSection}>
+              <View style={styles.voiceAvatarWrapper}>
+                {contact?.profile_image_url ? (
+                  <OptimizedImage
+                    source={{ uri: resolveRemoteUri(contact.profile_image_url) }}
+                    style={styles.voiceAvatar}
+                    resizeMode="cover"
+                    cache="force-cache"
+                    loaderSize="small"
+                    showErrorIcon={false}
+                  />
+                ) : (
+                  <View style={[styles.voiceAvatar, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.voiceAvatarText}>
+                      {getUserInitials(contact?.first_name, contact?.last_name)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.voiceContactName, { color: theme.colors.text }]}>
+                {conversationTitle}
+              </Text>
+              <Text style={[styles.voiceContactRole, { color: theme.colors.textSecondary }]}>
+                {contact?.email || ''}
+              </Text>
+            </View>
+
+            {/* Cancel Button (top left) */}
+            <TouchableOpacity
+              style={styles.voiceCancelButton}
+              onPress={() => {
+                if (isRecording) {
+                  cancelPendingRecording();
+                }
+                setShowVoiceRecordOverlay(false);
+              }}
+            >
+              <Ionicons name="close" size={28} color={theme.colors.text} />
+            </TouchableOpacity>
+
+            {/* Recording Status */}
+            {isRecording && (
+              <View style={styles.voiceRecordingStatus}>
+                <Text style={[styles.voiceStatusText, { color: '#4A9EFF' }]}>
+                  Release to send
+                </Text>
+                <Text style={[styles.voiceStatusSubtext, { color: theme.colors.textSecondary }]}>
+                  Slide away to cancel
+                </Text>
+                <Text style={[styles.voiceTimer, { color: '#FF0000' }]}>
+                  ● {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+                </Text>
+              </View>
+            )}
+
+            {!isRecording && (
+              <View style={styles.voiceRecordingStatus}>
+                <Text style={[styles.voiceStatusText, { color: theme.colors.text }]}>
+                  Hold to record
+                </Text>
+                <Text style={[styles.voiceStatusSubtext, { color: theme.colors.textSecondary }]}>
+                  Slide away to cancel
+                </Text>
+              </View>
+            )}
+
+            {/* Mic Button */}
+            <View style={styles.voiceMicContainer}>
+              <TouchableOpacity
+                style={[styles.voiceMicButton, { backgroundColor: isRecording ? '#4A9EFF' : '#4A9EFF' }]}
+                onPressIn={startVoiceRecording}
+                onPressOut={stopVoiceRecording}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="mic" size={48} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Voice Send Confirmation */}
+        <Modal
+          visible={showVoiceSendConfirm}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowVoiceSendConfirm(false)}
+        >
+          <View style={styles.confirmOverlay}>
+            <View style={[styles.confirmDialog, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.confirmTitle, { color: theme.colors.text }]}>
+                Send voice message?
+              </Text>
+              <View style={styles.confirmActions}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, { backgroundColor: 'transparent' }]}
+                  onPress={() => {
+                    cancelPendingRecording();
+                    setShowVoiceSendConfirm(false);
+                    setShowVoiceRecordOverlay(false);
+                  }}
+                >
+                  <Text style={[styles.confirmButtonText, { color: theme.colors.textSecondary }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmButton, { backgroundColor: 'transparent' }]}
+                  onPress={async () => {
+                    setShowVoiceSendConfirm(false);
+                    setShowVoiceRecordOverlay(false);
+                    await sendPendingRecording();
+                  }}
+                >
+                  <Text style={[styles.confirmButtonText, { color: '#4A9EFF' }]}>Send</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -3129,6 +3246,209 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Compact input styles
+  plusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  compactInputWrapper: {
+    flex: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginRight: 8,
+    borderWidth: 1,
+  },
+  compactTextInput: {
+    fontSize: scaledFontSize(16),
+    minHeight: 20,
+    maxHeight: 80,
+    textAlignVertical: 'top',
+  },
+  micButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+  },
+  attachmentGrid: {
+    gap: 20,
+  },
+  attachmentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  attachmentIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attachmentLabel: {
+    fontSize: scaledFontSize(12),
+    fontWeight: '500',
+  },
+  gifText: {
+    color: 'white',
+    fontSize: scaledFontSize(14),
+    fontWeight: 'bold',
+  },
+  // Voice recording overlay styles
+  voiceOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'space-between',
+    paddingVertical: 60,
+  },
+  voiceContactSection: {
+    alignItems: 'center',
+    paddingTop: 40,
+  },
+  voiceAvatarWrapper: {
+    marginBottom: 16,
+  },
+  voiceAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voiceAvatarText: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(28),
+    fontWeight: '600',
+  },
+  voiceContactName: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  voiceContactRole: {
+    fontSize: scaledFontSize(14),
+  },
+  voiceCancelButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  voiceRecordingStatus: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  voiceStatusText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '500',
+  },
+  voiceStatusSubtext: {
+    fontSize: scaledFontSize(14),
+  },
+  voiceTimer: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  voiceMicContainer: {
+    alignItems: 'center',
+    paddingBottom: 60,
+  },
+  voiceMicButton: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmDialog: {
+    borderRadius: 12,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+  },
+  confirmTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 32,
+  },
+  confirmButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  confirmButtonText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+  },
+  editingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  editingText: {
+    flex: 1,
+    fontSize: scaledFontSize(14),
+    fontWeight: '500',
+  },
+  editingCloseButton: {
+    padding: 4,
+  },
+  messageActionGrid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+    paddingVertical: 10,
+  },
+  messageActionOption: {
+    alignItems: 'center',
+    padding: 15,
+  },
+  messageActionIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
 });
 

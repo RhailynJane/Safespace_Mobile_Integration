@@ -1,7 +1,10 @@
 // utils/userSync.ts
 import type { UserResource as User } from '@clerk/types';
-import { getApiBaseUrl } from './apiBaseUrl';
 
+/**
+ * Sync user to database (Convex handles this now)
+ * This function is deprecated but kept for compatibility
+ */
 export async function syncUserWithDatabase(clerkUser: User, authToken?: string) {
   try {
     const userData = {
@@ -15,47 +18,19 @@ export async function syncUserWithDatabase(clerkUser: User, authToken?: string) 
       created_at: new Date().toISOString(),
     };
 
-    console.log('Syncing user with database:', userData);
-
-    // Validate required fields
-    if (!userData.email) {
-      throw new Error('User email is required');
-    }
-
-  const API_URL = getApiBaseUrl();
-    
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    // Only add authorization if token is provided
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
-
-    const response = await fetch(`${API_URL}/api/sync-user`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        clerkUserId: userData.clerk_user_id,
-        email: userData.email,
-        firstName: userData.first_name,
-        lastName: userData.last_name,
-        phoneNumber: userData.phone_number
-      })
+    console.log('✅ User sync handled by Convex (ConvexUserSync in _layout.tsx):', {
+      clerkId: userData.clerk_user_id,
+      email: userData.email,
+      name: `${userData.first_name} ${userData.last_name}`.trim()
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Response error:', errorText);
-      throw new Error(`Failed to sync user with database: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    return result;
+    // Convex handles user sync via ConvexUserSync component in _layout.tsx
+    // No REST API call needed
+    return { success: true, source: 'convex' };
     
   } catch (error) {
-    console.error('Error syncing user with database:', error);
-    throw error;
+    console.error('Error in userSync:', error);
+    // Don't throw - let Convex handle the sync
+    return { success: false, error };
   }
 }

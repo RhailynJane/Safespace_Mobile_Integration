@@ -1,5 +1,6 @@
 import React from "react";
-import { View, StyleSheet, Dimensions, Text } from "react-native";
+import { View, StyleSheet, Dimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path, Defs, LinearGradient, Stop } from "react-native-svg";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -11,6 +12,8 @@ interface CurvedBackgroundProps {
   // Optional props accepted for testing compatibility
   color?: string;
   curveHeight?: number;
+  // When true, applies top safe-area padding to keep content clear of the notch
+  respectTopSafeArea?: boolean;
 }
 
 /**LLM Prompt: 
@@ -33,8 +36,10 @@ interface CurvedBackgroundProps {
 const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
   children,
   style,
+  respectTopSafeArea = false,
 }) => {
   const { theme, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const g1 = isDarkMode
     ? ["#1a1a1a", "#141414", "#101010"]
     : ["#f8f9fa", "#e9ecef", "#dee2e6"];
@@ -46,7 +51,15 @@ const CurvedBackground: React.FC<CurvedBackgroundProps> = ({
     : ["#e9ecef", "#dee2e6"];
 
   return (
-    <View testID="curved-background" style={[styles.container, { backgroundColor: theme.colors.background }, style]}>
+    <View
+      testID="curved-background"
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background },
+        respectTopSafeArea && { paddingTop: insets.top },
+        style,
+      ]}
+    >
       <Svg
         width={screenWidth}
         height={screenHeight}

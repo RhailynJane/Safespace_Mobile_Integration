@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -6,20 +6,21 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  ActivityIndicator,
+  Dimensions,
 } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
 import { Colors, Spacing, Typography } from "../../../constants/theme";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { AppHeader } from "../../../components/AppHeader";
 import CurvedBackground from "../../../components/CurvedBackground";
-import { journalApi, JournalEntry } from "../../../utils/journalApi";
-import { APP_TIME_ZONE } from "../../../utils/timezone";
-import { useTheme } from "../../../contexts/ThemeContext";
-import StatusModal from "../../../components/StatusModal";
-
+ import { useQuery } from "convex/react";
+ import { api } from "../../../convex/_generated/api";
+ import { useTheme } from "../../../contexts/ThemeContext";
+ import StatusModal from "../../../components/StatusModal";
+ import { LinearGradient } from "expo-linear-gradient";
+ import OptimizedImage from "../../../components/OptimizedImage";
 const tabs = [
   { id: "home", name: "Home", icon: "home" },
   { id: "community-forum", name: "Community", icon: "people" },
@@ -28,11 +29,18 @@ const tabs = [
   { id: "profile", name: "Profile", icon: "person" },
 ];
 
+// Template type from Convex listTemplates
+type JournalTemplate = {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  prompts?: string[];
+};
+
 export default function JournalScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("journal");
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({
@@ -40,6 +48,7 @@ export default function JournalScreen() {
     title: '',
     message: '',
   });
+  const [timeOfDay, setTimeOfDay] = useState<'Morning' | 'Evening'>('Morning');
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -53,29 +62,30 @@ export default function JournalScreen() {
     setModalVisible(false);
   };
 
-  const fetchRecentEntries = React.useCallback(async () => {
-    if (!user?.id) return;
+  // Templates (Quick Journal)
+  const templates = (useQuery(api.journal.listTemplates, {}) as JournalTemplate[] | undefined) ?? [];
 
-    try {
-      setLoading(true);
-      const response = await journalApi.getRecentEntries(user.id, 2);
-      setJournalEntries(response.entries || []);
-    } catch (error) {
-      console.error("Error fetching journal entries:", error);
-      showModal('error', 'Load Failed', 'Unable to load journal entries. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+  // Determine hero card copy and default template based on Morning/Evening
+  const heroCopy = timeOfDay === 'Morning'
+    ? { title: "Let's start your day", subtitle: "Begin with a mindful morning reflection." }
+    : { title: "Unwind your evening", subtitle: "Slow down with a gentle check‑in and reflections." };
 
-  // Add useFocusEffect to fetch data when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user?.id) {
-        fetchRecentEntries();
-      }
-    }, [user?.id, fetchRecentEntries])
-  );
+  const getTemplateIdByName = (name: string) => {
+    const tpl = templates.find(t => t.name.toLowerCase().includes(name));
+    return tpl?.id;
+  };
+
+  // Flexible keyword matcher for quick-card to template mapping
+  const getTemplateIdByKeywords = (...keywords: string[]) => {
+    const tpl = templates.find(t => {
+      const n = t.name.toLowerCase();
+      return keywords.some(k => n.includes(k));
+    });
+    return tpl?.id;
+  };
+  const morningTplId = getTemplateIdByName('gratitude') ?? 1;
+  const eveningTplId = getTemplateIdByName('mood') ?? 2;
+
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -94,18 +104,13 @@ export default function JournalScreen() {
     router.push("/(app)/journal/journal-history");
   };
 
-  const handleEntryPress = (entryId: string) => {
-    router.push(`/(app)/journal/journal-entry/${entryId}`);
+  const handleStartTemplate = (tplId: number) => {
+    router.push({ pathname: "/(app)/journal/journal-create", params: { templateId: String(tplId) } });
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const options: Intl.DateTimeFormatOptions = {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    };
-    return date.toLocaleDateString("en-US", { ...options, timeZone: APP_TIME_ZONE });
+  const handleHeroPress = () => {
+    const nextId = timeOfDay === 'Morning' ? morningTplId : eveningTplId;
+    handleStartTemplate(nextId);
   };
 
   return (
@@ -113,112 +118,130 @@ export default function JournalScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal" showBack={true} showMenu={true} />
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+  <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 140 }]}>
           <View style={styles.content}>
-            <Text style={[styles.subText, { color: theme.colors.textSecondary }]}>
-              Express your thoughts and feelings
-            </Text>
+            <WeekStrip />
 
-            <TouchableOpacity
-              style={[styles.createCard, { backgroundColor: theme.colors.surface }]}
-              onPress={handleCreateJournal}
-            >
-              <View style={styles.createCardContent}>
-                <View style={[styles.iconContainer, { backgroundColor: theme.isDark ? '#FFB74D' : Colors.warning + '20' }]}>
-                  <Ionicons name="book" size={32} color={theme.isDark ? '#FFF3E0' : Colors.warning} />
-                </View>
+            {/* My Journal Header */}
+            <SectionHeader
+              title="My Journal"
+              textColor={theme.colors.text}
+              hintColor={theme.colors.textSecondary}
+            />
 
-                <View style={styles.createTextContainer}>
-                  <Text style={[styles.createTitle, { color: theme.colors.text }]}>Create Journal</Text>
-                  <Text style={[styles.createSubtitle, { color: theme.colors.textSecondary }]}>
-                    Set up a journal based on your current mood & conditions
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.createButton}
-                  onPress={handleCreateJournal}
+            {/* Feature Card + Vertical Time Toggle */}
+            <View style={styles.featureRow}>
+              <TouchableOpacity style={styles.featureCard} onPress={handleHeroPress} activeOpacity={0.9}>
+                <LinearGradient
+                  colors={[theme.isDark ? '#EEA84E' : '#F9C257', theme.isDark ? '#F1B766' : '#FAD58D']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.featureGradient}
                 >
-                  <Ionicons
-                    name="add-circle-outline"
-                    size={28}
-                    color={theme.colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.recentSection}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Recent Journal Entries</Text>
-
-              <View style={[styles.recentContainer, { backgroundColor: theme.isDark ? theme.colors.primary + '20' : Colors.primary + '20' }]}>
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={theme.colors.primary} />
-                    <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading entries...</Text>
+                  <Text style={[styles.featureTitle, { color: '#1F1B14' }]}>{heroCopy.title}</Text>
+                  <Text style={[styles.featureSubtitle, { color: '#3D3426' }]}>{heroCopy.subtitle}</Text>
+                  <View style={styles.sunRow}>
+                    <Ionicons name={timeOfDay === 'Morning' ? 'sunny' : 'moon'} size={48} color="#F57C00" />
+                    <View style={styles.heroImageWrap}>
+                      <OptimizedImage
+                        source={require('../../../assets/images/journal.png')}
+                        style={{ width: 90, height: 90, opacity: 0.9 }}
+                        resizeMode="contain"
+                        accessibilityLabel="Decorative journal"
+                      />
+                    </View>
                   </View>
-                ) : journalEntries.length > 0 ? (
-                  <>
-                    {journalEntries.map((entry) => (
-                      <TouchableOpacity
-                        key={entry.id}
-                        style={[styles.entryCard, { backgroundColor: theme.colors.surface }]}
-                        onPress={() => handleEntryPress(entry.id)}
-                      >
-                        <View style={styles.entryHeader}>
-                          {entry.emoji ? (
-                            <Text style={styles.entryEmoji}>{entry.emoji}</Text>
-                          ) : null}
-                          <View style={styles.entryInfo}>
-                            <Text style={[styles.entryTitle, { color: theme.colors.text }]}>{entry.title}</Text>
-                            <Text style={[styles.entryDate, { color: theme.colors.textSecondary }]}>
-                              {formatDate(entry.created_at)}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={[styles.entryPreview, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-                          {entry.content}
-                        </Text>
-                        {entry.share_with_support_worker && (
-                          <View style={[styles.sharedBadge, { backgroundColor: theme.colors.primary + '20' }]}>
-                            <Ionicons
-                              name="people"
-                              size={12}
-                              color={theme.colors.primary}
-                            />
-                            <Text style={[styles.sharedText, { color: theme.colors.primary }]}>Shared</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+                </LinearGradient>
+              </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.viewAllButton}
-                      onPress={handleViewAllEntries}
-                    >
-                      <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>
-                        View Journal Entries
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <Text style={[styles.noEntriesText, { color: theme.colors.textSecondary }]}>
-                      No entries recorded
-                    </Text>
-
-                    <TouchableOpacity
-                      style={styles.viewAllButton}
-                      onPress={handleViewAllEntries}
-                    >
-                      <Text style={[styles.viewAllText, { color: theme.colors.primary }]}>
-                        View Journal Entries
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
+              <TouchableOpacity
+                style={[styles.verticalPill, { backgroundColor: theme.isDark ? '#BDB4AA' : '#D7CFC7' }]}
+                onPress={() => setTimeOfDay((prev) => (prev === 'Morning' ? 'Evening' : 'Morning'))}
+                activeOpacity={0.8}
+              >
+                <View style={styles.pillLabelWrapper}>
+                  <Text style={[styles.pillLabel, { color: '#2C2620' }]}>{timeOfDay}</Text>
+                </View>
+              </TouchableOpacity>
             </View>
+
+            {/* Quick Journal */}
+            <SectionHeader
+              title="Quick Journal"
+              textColor={theme.colors.text}
+              hintColor={theme.colors.textSecondary}
+            />
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickRow}
+            >
+              {/* Show curated quick cards first, or templates if none */}
+              <QuickCard
+                title="Pause & reflect"
+                subtitle="What are you grateful for today?"
+                color="#E9D5CA"
+                tag="Personal"
+                emoji="🌸"
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('gratitude', 'thanks', 'appreciation') ?? 1)}
+              />
+              <QuickCard
+                title="Set Intentions"
+                subtitle="How do you want to feel?"
+                color="#E3DBFB"
+                tag="Family"
+                emoji="😊"
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('intention', 'intent', 'mood', 'check') ?? 2)}
+              />
+              <QuickCard
+                title="Free Write"
+                subtitle="Let your thoughts flow freely"
+                color="#DFF0E6"
+                tag="Notes"
+                emoji="✍️"
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('free', 'write', 'journal') ?? 3)}
+              />
+              <QuickCard
+                title="Emotions"
+                subtitle="Express how you're feeling"
+                color="#F3EDE5"
+                tag="Mood"
+                emoji="💭"
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('emotion', 'mood') ?? 2)}
+              />
+              <QuickCard
+                title="Daily Goal"
+                subtitle="What do you want to achieve?"
+                color="#FFE8D6"
+                tag="Goals"
+                emoji="🎯"
+                onPress={() => handleStartTemplate(getTemplateIdByKeywords('goal', 'daily', 'intention') ?? 3)}
+              />
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.historyButton]}
+                onPress={handleViewAllEntries}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.actionButtonText}>View History</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.statsButton]}
+                onPress={() => router.push("/(app)/journal/journal-stats")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="stats-chart" size={20} color="#FFFFFF" />
+                <Text style={styles.actionButtonText}>Statistics</Text>
+              </TouchableOpacity>
+            </View>
+            {/* Bottom spacer to keep button clear of BottomNavigation and allow scroll */}
+            <View style={{ height: Spacing.lg }} />
           </View>
         </ScrollView>
 
@@ -241,6 +264,117 @@ export default function JournalScreen() {
   );
 }
 
+// Helper small components
+const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const getCurrentWeek = () => {
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // convert Sun=0 -> 6, Mon=0
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+  return days;
+};
+
+const WeekStrip = () => {
+  const days = getCurrentWeek();
+  const today = new Date();
+  const { theme, scaledFontSize } = useTheme();
+  const styles = createStyles(scaledFontSize);
+  return (
+    <View style={styles.weekStrip}>
+      {daysOfWeek.map((label, idx) => {
+        const d = days[idx]!;
+        const isToday =
+          d.getDate() === today.getDate() &&
+          d.getMonth() === today.getMonth() &&
+          d.getFullYear() === today.getFullYear();
+        return (
+          <View key={label} style={styles.dayItem}>
+            <Text style={[styles.dayLabel, { color: theme.colors.textSecondary }]}>{label}</Text>
+            <View
+              style={[
+                styles.dayCircle,
+                {
+                  backgroundColor: isToday
+                    ? Colors.warning
+                    : theme.colors.surface,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.dayNumber, { color: isToday ? '#1F1B14' : theme.colors.text }]}>
+                {d.getDate()}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
+const SectionHeader = ({
+  title,
+  onSeeAll,
+  textColor,
+  hintColor,
+}: {
+  title: string;
+  onSeeAll?: () => void;
+  textColor: string;
+  hintColor: string;
+}) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.xl, marginBottom: Spacing.lg }}>
+    <Text style={{ fontSize: 22, fontWeight: '700', color: textColor }}>{title}</Text>
+    {onSeeAll ? (
+      <TouchableOpacity onPress={onSeeAll}>
+        <Text style={{ color: hintColor, textDecorationLine: 'underline' }}>See all</Text>
+      </TouchableOpacity>
+    ) : null}
+  </View>
+);
+
+const QuickCard = ({ title, subtitle, color, tag, emoji, onPress }: { title: string; subtitle: string; color: string; tag: string; emoji?: string; onPress: () => void }) => {
+  const { theme, scaledFontSize } = useTheme();
+  const styles = createStyles(scaledFontSize);
+  return (
+    <TouchableOpacity style={[styles.quickCard, { backgroundColor: color }]} onPress={onPress} activeOpacity={0.9}>
+      {emoji && <Text style={styles.quickEmoji}>{emoji}</Text>}
+      <Text style={[styles.quickTitle, { color: theme.isDark ? '#1F1B14' : '#1F1B14' }]} numberOfLines={1}>{title}</Text>
+      <Text style={[styles.quickSubtitle, { color: '#3D3426' }]} numberOfLines={2}>{subtitle}</Text>
+      <View style={styles.quickChipsRow}>
+        <View style={[styles.chip, { backgroundColor: '#FFFFFF' }]}>
+          <Text style={[styles.chipText, { color: '#2C2620' }]}>Today</Text>
+        </View>
+        <View style={[styles.chip, { backgroundColor: '#FFE4E8' }]}>
+          <Text style={[styles.chipText, { color: '#9A4455' }]}>{tag}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const pickTemplateColor = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes('gratitude')) return '#F6E6DB'; // peach
+  if (n.includes('mood')) return '#E8E2FA'; // lavender
+  if (n.includes('free')) return '#DFF0E6'; // mint
+  return '#EDE8E2';
+};
+
+const pickTemplateTag = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes('gratitude')) return 'Personal';
+  if (n.includes('mood')) return 'Family';
+  if (n.includes('free')) return 'Notes';
+  return 'General';
+};
+
 // Styles function that accepts scaledFontSize for dynamic text sizing
 const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
   container: {
@@ -254,131 +388,139 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   content: {
     flex: 1,
-    paddingTop: Spacing.xxl,
+    paddingTop: Spacing.lg,
   },
-  subText: {
-    fontSize: scaledFontSize(16), // Base size 16px
-    textAlign: "center",
-    marginBottom: Spacing.xxl,
-    color: "#666",
+  weekStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xl,
   },
-  createCard: {
-    borderRadius: 16,
-    padding: Spacing.xl,
-    marginBottom: Spacing.xxl,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  dayItem: {
+    alignItems: 'center',
+    width: (Dimensions.get('window').width - Spacing.xl * 2) / 7 - 2,
   },
-  createCardContent: {
-    flexDirection: "row",
-    alignItems: "center",
+  dayLabel: {
+    fontSize: scaledFontSize(11),
+    marginBottom: 6,
   },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: Spacing.lg,
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  createTextContainer: {
+  dayNumber: {
+    fontSize: scaledFontSize(13),
+    fontWeight: '600',
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  featureCard: {
     flex: 1,
-  },
-  createTitle: {
-    fontSize: scaledFontSize(18), // Base size 18px
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  createSubtitle: {
-    fontSize: scaledFontSize(14), // Base size 14px
-    color: "#666",
-  },
-  createButton: {
-    padding: Spacing.sm,
-  },
-  recentSection: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: scaledFontSize(18), // Base size 18px
-    fontWeight: "600",
-    marginBottom: Spacing.lg,
-  },
-  recentContainer: {
-    borderRadius: 16,
-    padding: Spacing.xl,
-    minHeight: 200,
-  },
-  loadingContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.xl,
-  },
-  loadingText: {
-    fontSize: scaledFontSize(14), // Base size 14px
-    marginTop: Spacing.md,
-    color: "#666",
-  },
-  entryCard: {
-    borderRadius: 12,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  entryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  entryEmoji: {
-    fontSize: scaledFontSize(24), // Base size 24px
+    borderRadius: 20,
+    overflow: 'hidden',
     marginRight: Spacing.md,
   },
-  entryInfo: {
-    flex: 1,
+  featureGradient: {
+    padding: Spacing.xl,
+    height: 200,
+    justifyContent: 'space-between',
   },
-  entryTitle: {
-    fontSize: scaledFontSize(16), // Base size 16px
-    fontWeight: "600",
-    marginBottom: 2,
+  featureTitle: {
+    fontSize: 20,
+    fontWeight: '700',
   },
-  entryDate: {
-    fontSize: scaledFontSize(12), // Base size 12px
-    color: "#666",
+  featureSubtitle: {
+    marginTop: 6,
+    fontSize: 13,
   },
-  entryPreview: {
-    fontSize: scaledFontSize(14), // Base size 14px
-    lineHeight: 18,
-    color: "#666",
+  sunRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
   },
-  sharedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
+  heroImageWrap: {
+    marginLeft: 'auto',
+  },
+  verticalPill: {
+    width: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 6,
+  },
+  pillLabelWrapper: {
+    transform: [{ rotate: '-90deg' }],
+  },
+  pillLabel: {
+    fontWeight: '500',
+    fontSize: 11,
+  },
+  quickRow: {
+    paddingVertical: Spacing.sm,
+  },
+  quickCard: {
+    width: 220,
+    padding: Spacing.lg,
+    borderRadius: 16,
+    marginRight: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  quickEmoji: {
+    fontSize: scaledFontSize(24),
+    marginBottom: 8,
+  },
+  quickTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  quickSubtitle: {
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  quickChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: "flex-start",
+    borderRadius: 999,
   },
-  sharedText: {
-    fontSize: scaledFontSize(10), // Base size 10px
-    marginLeft: 4,
+  chipText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
-  noEntriesText: {
-    fontSize: scaledFontSize(14), // Base size 14px
-    textAlign: "center",
-    marginTop: Spacing.huge,
-    marginBottom: Spacing.huge,
-    color: "#666",
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: Spacing.xs,
+    marginHorizontal: Spacing.xs,
   },
-  viewAllButton: {
-    marginTop: Spacing.lg,
-    alignItems: "center",
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
   },
-  viewAllText: {
-    fontSize: scaledFontSize(16), // Base size 16px
-    textDecorationLine: "underline",
+  historyButton: {
+    backgroundColor: Colors.primary,
+  },
+  statsButton: {
+    backgroundColor: '#9C27B0',
+  },
+  actionButtonText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

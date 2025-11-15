@@ -22,9 +22,13 @@ import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useConvex, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { mapAppointmentStatus } from "../../../../utils/appointmentStatus";
 import { Alert } from "react-native";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+// Removed legacy Convex client + hybrid hook; using direct Convex queries
 
 const { width } = Dimensions.get("window");
 
@@ -64,8 +68,21 @@ export default function AppointmentsScreen() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+
+  const convex = useConvex();
+
+  // Determine user's organization (prefer Convex users table, fallback to Clerk metadata)
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
+  const roleLabel = isSAIT ? 'Peer Support' : 'Support Worker';
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -81,101 +98,151 @@ export default function AppointmentsScreen() {
   }, []);
 
   /**
-   * Fetch appointments from API and calculate stats
+   * Fetch appointments using the same source and mapping as the list screen
+   * to keep Upcoming count and Next Session perfectly in sync.
    */
   const fetchAppointments = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
-      console.log('📅 Fetching appointments for dashboard...');
-      
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
-      const result = await response.json();
+      console.log('📅 Fetching upcoming/past appointments for dashboard...');
+      // Helper to rewrite any persisted auto-assigned label to current org
+      const normalizeAutoAssigned = (name: string | undefined) => {
+        if (!name) return name;
+        return name.startsWith('Auto-assigned by ') ? `Auto-assigned by ${orgShortLabel}` : name;
+      };
 
-      console.log('📥 Dashboard appointments response:', result);
+      const [upcoming, past] = await Promise.all([
+        convex.query(api.appointments.getUpcomingAppointments, { userId: user.id }),
+        convex.query(api.appointments.getPastAppointments, { userId: user.id }),
+      ]);
 
-      if (result.success && result.appointments) {
-        // Transform backend data using MST-aware date+time comparison to align with appointment list
-        const transformedAppointments = result.appointments.map((apt: any) => {
-          // Format readable date
-          const appointmentDate = new Date(apt.date);
-          const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          });
+      // Build support worker enrichment map for items missing names
+      const collectIds = (list: any[]) =>
+        list
+          .filter((apt) => !apt.supportWorker && apt.supportWorkerId)
+          .map((apt) => String(apt.supportWorkerId));
 
-          // Extract UTC components from stored date (treat as calendar day)
-          const utcDate = new Date(apt.date);
-          const year = utcDate.getUTCFullYear();
-          const month = utcDate.getUTCMonth();
-          const day = utcDate.getUTCDate();
+      const idsToFetch = Array.from(new Set([
+        ...collectIds(upcoming as any[]),
+        ...collectIds(past as any[]),
+      ]));
 
-          // Current date/time in MST (America/Denver)
-          const mstFormatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Denver',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          });
-          const nowParts = mstFormatter.formatToParts(new Date());
-          const nowYear = parseInt(nowParts.find(p => p.type === 'year')?.value || '0');
-          const nowMonth = (parseInt(nowParts.find(p => p.type === 'month')?.value || '0')) - 1; // zero-based
-          const nowDay = parseInt(nowParts.find(p => p.type === 'day')?.value || '0');
-          const nowHour = parseInt(nowParts.find(p => p.type === 'hour')?.value || '0');
-          const nowMinute = parseInt(nowParts.find(p => p.type === 'minute')?.value || '0');
-
-          // Parse stored appointment time (HH:mm or HH:mm:ss)
-          const timeStr: string = apt.time || '00:00:00';
-          const [hStr, mStr] = timeStr.split(':');
-          const aptHour = parseInt(hStr || '0', 10);
-          const aptMinute = parseInt(mStr || '0', 10);
-
-          // Numeric comparison YYYYMMDDHHMM in MST to classify
-          const nowNumeric = nowYear * 100000000 + (nowMonth + 1) * 1000000 + nowDay * 10000 + nowHour * 100 + nowMinute;
-          const aptNumeric = year * 100000000 + (month + 1) * 1000000 + day * 10000 + aptHour * 100 + aptMinute;
-          const isUpcoming = aptNumeric > nowNumeric;
-
-          return {
-            id: apt.id,
-            supportWorker: apt.supportWorker || 'Support Worker',
-            date: formattedDate,
-            time: apt.time || '',
-            type: apt.type || 'Video',
-            status: apt.status === 'cancelled' ? 'cancelled' :
-                    apt.status === 'completed' ? 'past' :
-                    (isUpcoming ? 'upcoming' : 'past'),
-            // Keep numeric marker for sorting "next" without relying on timezone-shifted Date objects
-            mstNumeric: aptNumeric,
-          };
+      const nameMap: Record<string, string> = {};
+      if (idsToFetch.length > 0) {
+        const results = await Promise.all(
+          idsToFetch.map(async (id) => {
+            try {
+              const worker = await convex.query(api.supportWorkers.getSupportWorker, { workerId: id });
+              return { id, name: worker?.name as string | undefined };
+            } catch {
+              return { id, name: undefined };
+            }
+          })
+        );
+        results.forEach(({ id, name }) => {
+          if (name) nameMap[id] = name;
         });
+      }
 
-        setAppointments(transformedAppointments);
+      // Format date to match the list view (parse as YYYY-MM-DD without UTC conversion)
+      const formatDate = (iso: string) => {
+        const parts = iso.split('-').map(Number);
+        const year = parts[0] || 0;
+        const month = parts[1] || 0;
+        const day = parts[2] || 0;
+        const d = new Date(year, month - 1, day);
+        return d.toLocaleDateString('en-US', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+      };
 
-        // Calculate upcoming and completed counts using unified MST logic
-        const upcoming = transformedAppointments.filter((a: any) => a.status === 'upcoming');
-        const completed = transformedAppointments.filter((a: any) => a.status === 'past');
-        setUpcomingCount(upcoming.length);
-        setCompletedCount(completed.length);
+      // Upcoming count aligned with list logic (Mountain Time, exclude past time today)
+      const nowParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Denver',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(new Date());
+      const getPart = (type: string) => {
+        const p = nowParts.find((x) => x.type === type)?.value;
+        return p ? parseInt(p, 10) : 0;
+      };
+      const nowYear = getPart('year');
+      const nowMonth = getPart('month');
+      const nowDay = getPart('day');
+      const nowHour = getPart('hour');
+      const nowMinute = getPart('minute');
 
-        // Determine the next appointment: the one with the smallest mstNumeric among upcoming
-        if (upcoming.length > 0) {
-          const sorted = [...upcoming].sort((a: any, b: any) => (a.mstNumeric || 0) - (b.mstNumeric || 0));
-          setNextAppointment(sorted[0]);
-        } else {
-          setNextAppointment(null);
+      const isFutureOrNowMST = (isoDate: string, time: string | undefined) => {
+        const dateParts = isoDate.split('-').map((n) => parseInt(n, 10));
+        const y = dateParts[0] || 0;
+        const m = dateParts[1] || 0;
+        const d = dateParts[2] || 0;
+        const timeParts = (time || '00:00').split(':').map((n) => parseInt(n, 10));
+        const hh = timeParts[0] || 0;
+        const mm = timeParts[1] || 0;
+        if (y > nowYear) return true;
+        if (y < nowYear) return false;
+        if (m > nowMonth) return true;
+        if (m < nowMonth) return false;
+        if (d > nowDay) return true;
+        if (d < nowDay) return false;
+        if (hh > nowHour) return true;
+        if (hh < nowHour) return false;
+        return (mm >= nowMinute);
+      };
+
+      const upcomingFiltered = (upcoming as any[])
+        .filter((apt: any) => ["scheduled", "confirmed"].includes(apt.status))
+        .filter((apt: any) => isFutureOrNowMST(apt.date, apt.time));
+
+      setUpcomingCount(upcomingFiltered.length);
+
+      // Completed count mirrors the list screen exactly: past (by MST) and not cancelled
+      const isPastMST = (apt: any) => {
+        const [y, m, d] = (apt.date || '').split('-').map((n: string) => parseInt(n, 10));
+        const [hh, mm] = (apt.time || '00:00').split(':').map((n: string) => parseInt(n, 10));
+        if (['completed', 'no_show'].includes(apt.status)) return true;
+        if (['scheduled', 'confirmed'].includes(apt.status)) {
+          // Compare components in Mountain Time
+          if (!y || !m || !d) return false;
+          const np = nowParts;
+          const ny = nowYear, nm = nowMonth, nd = nowDay, nh = nowHour, nmin = nowMinute;
+          if (y < ny) return true;
+          if (y > ny) return false;
+          if (m < nm) return true;
+          if (m > nm) return false;
+          if (d < nd) return true;
+          if (d > nd) return false;
+          if (hh < nh) return true;
+          if (hh > nh) return false;
+          return (mm < nmin);
         }
+        return false;
+      };
 
-        console.log('✅ Stats calculated (MST unified):', { upcoming: upcoming.length, completed: completed.length });
+      const completedFiltered = ([...(upcoming as any[]), ...(past as any[])])
+        .filter(isPastMST)
+        .filter((apt: any) => apt.status !== 'cancelled');
+      setCompletedCount(completedFiltered.length);
+
+      // Next session = first filtered upcoming item (already sorted soonest-first by backend)
+      const nextRaw = upcomingFiltered[0];
+      if (nextRaw) {
+        const mappedNext: Appointment = {
+          id: 0 as any,
+          supportWorker: normalizeAutoAssigned(nextRaw.supportWorker) || nameMap[String(nextRaw.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
+          date: formatDate(nextRaw.date),
+          time: nextRaw.time || '',
+          type: (nextRaw.type || 'video').toString().replace('_', ' '),
+          status: 'upcoming',
+        };
+        setNextAppointment(mappedNext as any);
       } else {
-        console.warn('⚠️ No appointments found');
-        setAppointments([]);
-        setUpcomingCount(0);
-        setCompletedCount(0);
         setNextAppointment(null);
       }
     } catch (error) {
@@ -184,7 +251,7 @@ export default function AppointmentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, showStatusModal]);
+  }, [user?.id, showStatusModal, convex, orgShortLabel]);
 
   // Run fetch on mount and when dependencies change
   useEffect(() => {
@@ -367,14 +434,14 @@ export default function AppointmentsScreen() {
    * Handles navigation to book appointment screen
    */
   const handleBookAppointment = () => {
-    router.push("../appointments/book");
+    router.push("/(app)/(tabs)/appointments/book");
   };
 
   /**
    * Handles navigation to view scheduled appointments
    */
   const handleViewScheduled = () => {
-    router.push("../appointments/appointment-list");
+    router.push("/(app)/(tabs)/appointments/appointment-list");
   };
 
   // Show loading indicator if data is being fetched
@@ -396,104 +463,102 @@ export default function AppointmentsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Welcome Section with Icons */}
-          <View style={styles.welcomeContainer}>
-            <View style={[styles.iconCircle, { backgroundColor: theme.colors.primary + '20' }]}>
-              <Ionicons name="calendar" size={40} color={theme.colors.primary} />
-            </View>
-            <Text style={[styles.welcomeTitle, { color: theme.colors.text }]}>
-              Manage Your Sessions
-            </Text>
-            <Text style={[styles.welcomeSubtitle, { color: theme.colors.textSecondary }]}>
-              Schedule new appointments or view your upcoming sessions with mental health professionals
-            </Text>
-          </View>
+          {/* Header Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>
+            My Appointments
+          </Text>
 
           {/* Quick Stats Cards */}
           <View style={styles.statsContainer}>
-            <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="time-outline" size={24} color={theme.colors.primary} />
+            <View style={[styles.statCard, { backgroundColor: theme.isDark ? '#2A2A2A' : '#FAFAFA' }]}>
+              <Ionicons name="time-outline" size={28} color="#FF9800" />
               <Text style={[styles.statNumber, { color: theme.colors.text }]}>{upcomingCount}</Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Upcoming</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
-              <Ionicons name="checkmark-circle-outline" size={24} color={theme.colors.primary} />
+            <View style={[styles.statCard, { backgroundColor: theme.isDark ? '#2A2A2A' : '#FAFAFA' }]}>
+              <Ionicons name="checkmark-circle-outline" size={28} color="#4CAF50" />
               <Text style={[styles.statNumber, { color: theme.colors.text }]}>{completedCount}</Text>
               <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>Completed</Text>
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            {/* Primary action button - Book Appointment */}
-            <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={handleBookAppointment}
-            >
-              <Ionicons name="add-circle" size={24} color="#FFFFFF" style={styles.buttonIcon} />
-              <Text style={styles.buttonText}>Book New Appointment</Text>
-            </TouchableOpacity>
+          {/* Main Action Card */}
+          <TouchableOpacity
+            style={styles.mainActionCard}
+            onPress={handleBookAppointment}
+            activeOpacity={0.9}
+          >
+            <View style={styles.mainActionContent}>
+              <View style={styles.mainActionTextContainer}>
+                <Text style={styles.mainActionTitle}>Book New Session</Text>
+                <Text style={styles.mainActionSubtitle}>
+                  {`Connect with a ${isSAIT ? 'peer support' : 'support worker'} at ${orgShortLabel}`}
+                </Text>
+              </View>
+              <View style={styles.mainActionIconContainer}>
+                <Ionicons name="add-circle" size={48} color="#FFFFFF" />
+              </View>
+            </View>
+          </TouchableOpacity>
 
-            {/* Secondary action button - View Scheduled Appointments */}
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
-              onPress={handleViewScheduled}
-            >
-              <Ionicons name="list" size={24} color={theme.colors.primary} style={styles.buttonIcon} />
-              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-                View Scheduled Appointments
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Upcoming Session Preview */}
-          {nextAppointment && (
+          {/* Upcoming Session Card */}
+          {nextAppointment ? (
             <View style={styles.upcomingSection}>
               <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
                 Next Session
               </Text>
-              <View style={[styles.upcomingCard, { backgroundColor: theme.colors.surface }]}>
-                <View style={styles.upcomingHeader}>
-                  <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
-                  <View style={styles.upcomingInfo}>
-                    <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
+              <View style={[styles.nextSessionCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }]}>
+                <View style={styles.nextSessionHeader}>
+                  <View style={styles.nextSessionIconCircle}>
+                    <Ionicons name="person" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.nextSessionInfo}>
+                    <Text style={[styles.nextSessionWorker, { color: theme.colors.text }]}>
                       {nextAppointment.supportWorker}
                     </Text>
-                    <Text style={[styles.upcomingSpecialty, { color: theme.colors.textSecondary }]}>
-                      Support Worker
-                    </Text>
+                    <Text style={[styles.nextSessionRole, { color: theme.colors.textSecondary }]}>{roleLabel}</Text>
                   </View>
                 </View>
-                <View style={styles.upcomingDetails}>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
-                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                      {nextAppointment.date} • {nextAppointment.time}
+                <View style={styles.nextSessionDetails}>
+                  <View style={styles.nextSessionDetailRow}>
+                    <Ionicons name="calendar-outline" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.nextSessionDetailText, { color: theme.colors.text }]}>
+                      {nextAppointment.date}
                     </Text>
                   </View>
-                  <View style={styles.detailRow}>
+                  <View style={styles.nextSessionDetailRow}>
+                    <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
+                    <Text style={[styles.nextSessionDetailText, { color: theme.colors.text }]}>
+                      {nextAppointment.time}
+                    </Text>
+                  </View>
+                  <View style={styles.nextSessionDetailRow}>
                     <Ionicons name="videocam" size={16} color={theme.colors.textSecondary} />
-                    <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
+                    <Text style={[styles.nextSessionDetailText, { color: theme.colors.text }]}>
                       {nextAppointment.type} Session
                     </Text>
                   </View>
                 </View>
               </View>
             </View>
-          )}
-
-          {/* No appointments message */}
-          {!nextAppointment && upcomingCount === 0 && (
-            <View style={styles.emptyState}>
-              <Ionicons name="calendar-outline" size={48} color={theme.colors.iconDisabled} />
-              <Text style={[styles.emptyStateText, { color: theme.colors.textSecondary }]}>
-                No upcoming appointments
-              </Text>
-              <Text style={[styles.emptyStateSubtext, { color: theme.colors.textSecondary }]}>
+          ) : upcomingCount === 0 ? (
+            <View style={[styles.emptyStateCard, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F5F5F5' }]}>
+              <Ionicons name="calendar-outline" size={56} color={theme.isDark ? '#444' : '#E0E0E0'} />
+              <Text style={[styles.emptyStateTitle, { color: theme.colors.textSecondary }]}>No upcoming sessions</Text>
+              <Text style={[styles.emptyStateSubtitle, { color: theme.colors.textSecondary }]}>
                 Book your first session to get started
               </Text>
             </View>
-          )}
+          ) : null}
+
+          {/* View All Button */}
+          <TouchableOpacity
+            style={[styles.viewAllButton, { backgroundColor: theme.colors.surface, borderColor: '#4CAF50' }]}
+            onPress={handleViewScheduled}
+          >
+            <Text style={styles.viewAllButtonText}>View All Appointments</Text>
+            <Ionicons name="arrow-forward" size={20} color="#4CAF50" />
+          </TouchableOpacity>
         </ScrollView>
 
         {/* Side Menu Modal */}
@@ -578,173 +643,167 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 120,
+    paddingHorizontal: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  welcomeContainer: {
-    alignItems: 'center',
-    padding: 24,
-    marginTop: 20,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  welcomeTitle: {
-    fontSize: scaledFontSize(24),
+  pageTitle: {
+    fontSize: scaledFontSize(28),
     fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  welcomeSubtitle: {
-    fontSize: scaledFontSize(16),
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 24,
+    textAlign: "center",
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 20,
+    gap: 12,
   },
   statCard: {
     flex: 1,
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginHorizontal: 6,
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   statNumber: {
-    fontSize: scaledFontSize(24),
+    fontSize: scaledFontSize(32),
     fontWeight: '700',
     marginVertical: 8,
   },
   statLabel: {
     fontSize: scaledFontSize(14),
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: "#4CAF50",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    width: '100%',
+  mainActionCard: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  buttonIcon: {
-    marginRight: 8,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-  },
-  secondaryButton: {
+  mainActionContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: "transparent",
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#4CAF50",
-    width: '100%',
+    justifyContent: 'space-between',
   },
-  secondaryButtonText: {
-    color: "#4CAF50",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
+  mainActionTextContainer: {
+    flex: 1,
+  },
+  mainActionTitle: {
+    fontSize: scaledFontSize(22),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  mainActionSubtitle: {
+    fontSize: scaledFontSize(14),
+    color: '#FFFFFF',
+    opacity: 0.9,
+    lineHeight: 20,
+  },
+  mainActionIconContainer: {
+    marginLeft: 16,
   },
   upcomingSection: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: scaledFontSize(18),
-    fontWeight: '600',
-    marginBottom: 16,
+    fontWeight: '700',
+    marginBottom: 12,
   },
-  upcomingCard: {
+  nextSessionCard: {
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
   },
-  upcomingHeader: {
+  nextSessionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  upcomingInfo: {
+  nextSessionIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#9C27B0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextSessionInfo: {
     marginLeft: 12,
     flex: 1,
   },
-  upcomingTitle: {
+  nextSessionWorker: {
     fontSize: scaledFontSize(16),
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 4,
   },
-  upcomingSpecialty: {
-    fontSize: scaledFontSize(14),
-    color: '#666',
+  nextSessionRole: {
+    fontSize: scaledFontSize(13),
   },
-  upcomingDetails: {
-    gap: 8,
+  nextSessionDetails: {
+    gap: 10,
   },
-  detailRow: {
+  nextSessionDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  detailText: {
+  nextSessionDetailText: {
     fontSize: scaledFontSize(14),
-    marginLeft: 8,
+    marginLeft: 10,
+    fontWeight: '500',
   },
-  emptyState: {
+  emptyStateCard: {
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: scaledFontSize(18),
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: scaledFontSize(14),
+    textAlign: 'center',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginHorizontal: 24,
+    borderWidth: 2,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 20,
   },
-  emptyStateText: {
+  viewAllButtonText: {
     fontSize: scaledFontSize(16),
-    marginTop: 16,
     fontWeight: '600',
-  },
-  emptyStateSubtext: {
-    fontSize: scaledFontSize(14),
-    marginTop: 8,
-    textAlign: 'center',
+    color: '#4CAF50',
+    marginRight: 8,
   },
   modalContainer: {
     flex: 1,

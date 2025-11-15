@@ -29,14 +29,14 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import { useState, useEffect, useMemo } from "react";
-import { communityApi } from "../../../../utils/communityForumApi";
-import { useUser } from "@clerk/clerk-expo";
+import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import avatarEvents from "../../../../utils/avatarEvents";
@@ -44,6 +44,8 @@ import { makeAbsoluteUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 // Available emoji reactions for users to express emotions on posts
 const EMOJI_REACTIONS = ["❤️", "👍", "😊", "😢", "😮", "🔥"];
@@ -55,8 +57,12 @@ export default function PostDetailScreen() {
   const { theme, scaledFontSize } = useTheme();
   // Extract post ID from navigation parameters
   const params = useLocalSearchParams();
-  const postId = parseInt(params.id as string, 10);
+  // Convex document ids are strings; do not parse as number
+  const postId = params.id as string;
   const { user } = useUser();
+  
+  // Use Convex client from provider
+  const convex = useConvex();
   
   // State management for post data and UI interactions
   const [post, setPost] = useState<any>(null); // Current post data
@@ -130,6 +136,20 @@ export default function PostDetailScreen() {
     return uri;
   };
 
+  // Append size params for consistent avatar rendering
+  const withSizeParams = (uri?: string | null, w = 48, h = 48): string | null => {
+    if (!uri) return null;
+    try {
+      const hasW = /[?&]w=/.test(uri);
+      const hasH = /[?&]h=/.test(uri);
+      if (hasW && hasH) return uri;
+      const sep = uri.includes('?') ? '&' : '?';
+      return `${uri}${sep}fit=crop&w=${w}&h=${h}`;
+    } catch {
+      return uri;
+    }
+  };
+
   /**
    * Load post data when component mounts or postId changes
    */
@@ -143,15 +163,85 @@ export default function PostDetailScreen() {
   const loadPostData = async () => {
     try {
       setLoading(true);
-      // Parallel API calls for better performance
-      const [postResponse, relatedResponse] = await Promise.all([
-        communityApi.getPostById(postId),
-        communityApi.getPosts({ limit: 3 })
-      ]);
       
-      setPost(postResponse.post);
-      // Filter out current post and limit to 2 related posts
-      setRelatedPosts(relatedResponse.posts.filter((p: any) => p.id !== postId).slice(0, 2));
+      // Load all posts via Convex (includes author enrichment)
+      const allPosts = await convex.query(api.posts.list, { limit: 50 });
+      
+      // Find current post
+  const currentPost = allPosts.find((p: any) => p._id === postId);
+      if (currentPost) {
+        // Prefer enriched author fields from backend
+        const authorName = currentPost.authorName || currentPost.author_name || currentPost.userName || "Community Member";
+        const authorImageUrl = currentPost.authorImage || currentPost.author_image_url || currentPost.profile_image_url || null;
+        const authorId = currentPost.authorId || currentPost.clerk_user_id || currentPost.user_id || null;
+
+        setPost({
+          id: currentPost._id,
+          title: currentPost.title,
+          content: currentPost.content,
+          category: currentPost.category,
+          author_name: authorName,
+          authorImageUrl,
+          clerk_user_id: authorId,
+          created_at: new Date(currentPost.createdAt ?? currentPost.created_at ?? Date.now()).toISOString(),
+          imageUrls: currentPost.imageUrls || [],
+          mood: currentPost.mood || null,
+          reactions: (() => {
+            // Normalize reactions to object {emoji: count}
+            if (currentPost.reactions && typeof currentPost.reactions === 'object' && !Array.isArray(currentPost.reactions)) {
+              return currentPost.reactions;
+            }
+            if (Array.isArray(currentPost.reactionCounts)) {
+              const entries = currentPost.reactionCounts.map((r: any) => [r.e || r.emoji, r.c || r.count]);
+              return Object.fromEntries(entries);
+            }
+            return {};
+          })(),
+        });
+      }
+      
+      // Compute simple similar posts (category + text overlap)
+      const tokenize = (text: string) => (text || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2);
+
+      const currentTokens = tokenize(`${currentPost?.title || ''} ${currentPost?.content || ''}`);
+      const currentSet = new Set(currentTokens);
+
+      const jaccard = (a: Set<string>, b: Set<string>) => {
+        const inter = [...a].filter(x => b.has(x)).length;
+        const uni = new Set([...a, ...b]).size;
+        return uni === 0 ? 0 : inter / uni;
+      };
+
+      const related = allPosts
+        .filter((p: any) => p._id !== postId)
+        .map((p: any) => {
+          const tokens = tokenize(`${p.title || ''} ${p.content || ''}`);
+          const set = new Set(tokens);
+          const score = jaccard(currentSet, set) + (p.category === currentPost?.category ? 0.2 : 0);
+          return { p, score };
+        })
+        .sort((a: any, b: any) => b.score - a.score)
+        .slice(0, 3)
+        .map(({ p }: any) => ({
+          id: p._id,
+          title: p.title,
+          content: p.content,
+          category: p.category,
+          author_name: p.authorName || p.author_name || 'Community Member',
+          reactions: (() => {
+            if (p.reactions && typeof p.reactions === 'object' && !Array.isArray(p.reactions)) return p.reactions;
+            if (Array.isArray(p.reactionCounts)) {
+              const entries = p.reactionCounts.map((r: any) => [r.e || r.emoji, r.c || r.count]);
+              return Object.fromEntries(entries);
+            }
+            return {};
+          })(),
+        }));
+      setRelatedPosts(related);
       
       // Load user-specific data if authenticated
       if (user?.id) {
@@ -174,8 +264,10 @@ export default function PostDetailScreen() {
     if (!user?.id) return;
     
     try {
-      const response = await communityApi.getUserReaction(postId, user.id);
-      setUserReaction(response.userReaction);
+      const reaction = await convex.query(api.posts.getUserReaction, { 
+        postId: postId as any 
+      });
+      setUserReaction(reaction);
     } catch (error) {
       console.error('Error loading user reaction:', error);
     }
@@ -188,8 +280,9 @@ export default function PostDetailScreen() {
     if (!user?.id) return;
     
     try {
-      const response = await communityApi.getBookmarkedPosts(user.id);
-      const isBookmarked = response.bookmarks?.some((bookmark: any) => bookmark.id === postId);
+      const isBookmarked = await convex.query(api.posts.isBookmarked, { 
+        postId: postId as any 
+      });
       setBookmarked(isBookmarked);
     } catch (error) {
       console.error('Error checking bookmark:', error);
@@ -211,23 +304,16 @@ export default function PostDetailScreen() {
     try {
       setReacting(true);
       
-      // Single API call handles both adding and removing reactions
-      const response = await communityApi.reactToPost(postId, user.id, emoji);
+      console.log('📤 Reacting to post via Convex...');
+      await convex.mutation(api.posts.react, { 
+        postId: postId as any,
+        emoji 
+      });
       
-      // Update local state with new reaction data
-      if (post) {
-        setPost({
-          ...post,
-          reactions: response.reactions,
-          reaction_count: Math.max(0, (post.reaction_count || 0) + response.reactionChange)
-        });
-      }
-      
-      // Update user's current reaction state
-      setUserReaction(response.userReaction);
+      setUserReaction(emoji);
       
       setReactionPickerVisible(false);
-      showSuccess(`Reaction ${response.reactionChange > 0 ? 'added' : 'removed'} successfully!`);
+      showSuccess('Reaction updated successfully!');
     } catch (error) {
       console.error('Error updating reaction:', error);
       showError("Reaction Failed", "Failed to update reaction. Please try again.");
@@ -246,9 +332,11 @@ export default function PostDetailScreen() {
     }
 
     try {
-      const response = await communityApi.toggleBookmark(postId, user.id);
-      setBookmarked(response.bookmarked);
-      showSuccess(response.bookmarked ? "Post bookmarked!" : "Bookmark removed");
+      const result = await convex.mutation(api.posts.toggleBookmark, { 
+        postId: postId as any 
+      });
+      setBookmarked(result.bookmarked);
+      showSuccess(result.bookmarked ? "Post bookmarked!" : "Bookmark removed");
     } catch (error) {
       console.error('Error toggling bookmark:', error);
       showError("Bookmark Failed", "Failed to update bookmark. Please try again.");
@@ -357,9 +445,10 @@ export default function PostDetailScreen() {
               <View style={styles.avatarContainer}>
                 {(() => {
                   // Prefer author image from API if present
-                  const authorImg = normalizeImageUri(
+                  const authorImgRaw = normalizeImageUri(
                     post?.author_image_url || post?.profile_image_url || post?.authorImageUrl
                   );
+                  const authorImg = withSizeParams(authorImgRaw, 48, 48);
                   // Fallback to current user's avatar if they authored this post
                   const authorIdCandidates = [
                     post?.clerk_user_id,
@@ -368,7 +457,7 @@ export default function PostDetailScreen() {
                     post?.user_id,
                   ].filter(Boolean);
                   const isMyPost = authorIdCandidates.includes(user?.id);
-                  const selfImg = normalizeImageUri(profileImage);
+                  const selfImg = withSizeParams(normalizeImageUri(profileImage), 48, 48);
 
                   if (authorImg) {
                     return (
@@ -432,40 +521,61 @@ export default function PostDetailScreen() {
             {/* Post Content Body */}
             <Text style={[styles.postContent, { color: theme.colors.textSecondary }]}>{post.content}</Text>
 
+            {/* Display mood/feeling if present */}
+            {post.mood && (
+              <View style={styles.postMoodContainer}>
+                <Text style={styles.postMoodEmoji}>{post.mood.emoji}</Text>
+                <Text style={[styles.postMoodText, { color: theme.colors.text }]}>
+                  Feeling {post.mood.label}
+                </Text>
+              </View>
+            )}
+
+            {/* Display images if present */}
+            {post.imageUrls && post.imageUrls.length > 0 && (
+              <View style={styles.postImagesGrid}>
+                {post.imageUrls.map((uri: string, index: number) => (
+                  <View key={index} style={[
+                    styles.postImageContainer,
+                    post.imageUrls.length === 1 && styles.postSingleImage,
+                    post.imageUrls.length === 2 && styles.postDoubleImage,
+                    post.imageUrls.length === 3 && styles.postTripleImage,
+                  ]}>
+                    <Image source={{ uri }} style={styles.postImage} />
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* Reaction Statistics Bar */}
             <View style={[styles.reactionStats, { borderColor: theme.colors.borderLight }]}>
-              {Object.entries(allReactions).map(([emoji, count]) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[
-                    styles.reactionStat,
-                    userReaction === emoji && styles.reactionStatActive,
-                    count === 0 && styles.reactionStatEmpty,
-                  ]}
-                  onPress={() => handleReactionPress(emoji)}
-                  disabled={reacting}
-                >
-                  <Text style={styles.reactionStatEmoji}>{emoji}</Text>
-                  <Text style={[
-                    styles.reactionStatCount,
-                    count === 0 && styles.reactionStatCountEmpty
-                  ]}>
-                    {count}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {/* Only show reactions that have been received (count > 0) */}
+              {Object.entries(allReactions)
+                .filter(([_, count]) => count > 0)
+                .map(([emoji, count]) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={[
+                      styles.reactionStat,
+                      userReaction === emoji && styles.reactionStatActive,
+                    ]}
+                    onPress={() => handleReactionPress(emoji)}
+                    disabled={reacting}
+                  >
+                    <Text style={styles.reactionStatEmoji}>{emoji}</Text>
+                    <Text style={styles.reactionStatCount}>
+                      {count}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               
-              {/* Add More Reactions Button */}
+              {/* Add Reaction Button */}
               <TouchableOpacity
                 style={styles.addMoreReactionButton}
                 onPress={() => setReactionPickerVisible(!reactionPickerVisible)}
                 disabled={reacting}
               >
-                <Ionicons 
-                  name="add-circle" 
-                  size={scaledFontSize(20)} 
-                  color={reacting ? "#CCC" : "#4CAF50"} 
-                />
+                <Text style={styles.addReactionText}>+</Text>
               </TouchableOpacity>
             </View>
 
@@ -511,7 +621,7 @@ export default function PostDetailScreen() {
                   style={[styles.relatedPost, { borderTopColor: theme.colors.borderLight }]}
                   onPress={() =>
                     router.push({
-                      pathname: "/community-forum/post-detail",
+                      pathname: "/(app)/(tabs)/community-forum/post-detail",
                       params: { id: relatedPost.id },
                     })
                   }
@@ -634,7 +744,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   postCard: {
     // backgroundColor moved to theme.colors.surface via inline override
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 16,
     shadowColor: "grey",
@@ -642,9 +752,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
       width: 2,
       height: 2,
     },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   postHeader: {
     flexDirection: "row",
@@ -684,15 +796,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     // color moved to theme.colors.textSecondary via inline override
   },
   bookmarkButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   categoryBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "#E8F5E9",
+    backgroundColor: "transparent",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 999,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
   },
   categoryText: {
     fontSize: scaledFontSize(12),
@@ -712,11 +828,58 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     lineHeight: 24,
     marginBottom: 20,
   },
+  postMoodContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(124, 185, 169, 0.1)',
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 8,
+  },
+  postMoodEmoji: {
+    fontSize: scaledFontSize(20),
+  },
+  postMoodText: {
+    fontSize: scaledFontSize(15),
+    fontWeight: '500',
+  },
+  postImagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  postImageContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  postSingleImage: {
+    width: '100%',
+    height: 250,
+  },
+  postDoubleImage: {
+    width: '48.5%',
+    height: 180,
+  },
+  postTripleImage: {
+    width: '31.5%',
+    height: 120,
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
   reactionStats: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    paddingVertical: 12,
+    gap: 12,
+    paddingVertical: 14,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     // borderColor moved to theme.colors.borderLight via inline override
@@ -726,17 +889,19 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   reactionStat: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "#F5F5F5",
-    minWidth: 60,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "transparent",
+    minWidth: 56,
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#3A3F47",
   },
   reactionStatActive: {
-    backgroundColor: "#E8F5E9",
-    borderWidth: 2,
+    backgroundColor: "rgba(76,175,80,0.12)",
+    borderWidth: 1.5,
     borderColor: "#4CAF50",
   },
   reactionStatEmpty: {
@@ -754,12 +919,21 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#999",
   },
   addMoreReactionButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "#F5F5F5",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
+    minWidth: 40,
+    minHeight: 32,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  addReactionText: {
+    fontSize: scaledFontSize(20),
+    fontWeight: "600",
+    color: "#4CAF50",
   },
   userReactionIndicator: {
     backgroundColor: "#E8F5E9",
@@ -818,16 +992,18 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   relatedSection: {
     // backgroundColor moved to theme.colors.surface via inline override
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     shadowColor: "grey",
     shadowOffset: {
       width: 2,
       height: 2,
     },
-    shadowOpacity: 0.75,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
   relatedTitle: {
     fontSize: scaledFontSize(18),

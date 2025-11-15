@@ -37,7 +37,7 @@
  * Reference: chat.deepseek.com
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -47,28 +47,47 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@clerk/clerk-expo";
-import { communityApi } from "../../../../utils/communityForumApi";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import CurvedBackground from "../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+// Removed legacy REST + hybrid Convex hook usage; now using direct Convex client via provider
 
 // Available categories for post organization and filtering
 const CATEGORIES = [
-  "Stress",
-  "Support",
-  "Stories",
-  "Self Care",
+  "Self-Care",
   "Mindfulness",
+  "Stories",
+  "Support",
   "Creative",
   "Therapy",
+  "Stress",
   "Affirmation",
   "Awareness",
+];
+
+// Mood options for post creation
+const MOODS = [
+  { id: '1', emoji: '😁', label: 'Ecstatic' },
+  { id: '2', emoji: '😊', label: 'Happy' },
+  { id: '3', emoji: '😌', label: 'Content' },
+  { id: '4', emoji: '😐', label: 'Neutral' },
+  { id: '5', emoji: '🙁', label: 'Displeased' },
+  { id: '6', emoji: '😤', label: 'Frustrated' },
+  { id: '7', emoji: '😠', label: 'Annoyed' },
+  { id: '8', emoji: '😡', label: 'Angry' },
+  { id: '9', emoji: '🤬', label: 'Furious' },
 ];
 
 /**
@@ -89,14 +108,18 @@ export default function EditPostScreen() {
   } = useLocalSearchParams();
   
   const { user } = useUser();
+  const convex = useConvex();
 
   // Form state management
   const [title, setTitle] = useState((initialTitle as string) || ""); // Post title
   const [content, setContent] = useState((initialContent as string) || ""); // Post content
   const [category, setCategory] = useState((initialCategory as string) || "Support"); // Selected category
-  const [isSaving, setIsSaving] = useState(false); // Save as draft loading state
-  const [isPublishing, setIsPublishing] = useState(false); // Publish loading state
+  const [isSaving, setIsSaving] = useState(false); // Save loading state
   const [activeTab, setActiveTab] = useState("community-forum"); // Bottom navigation active tab
+  // Add loading state for initial fetch
+  const [loading, setLoading] = useState(true);
+
+  // NOTE: All post operations now go directly through Convex mutations/queries.
 
   // Modal states
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -109,7 +132,8 @@ export default function EditPostScreen() {
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmCallback, setConfirmCallback] = useState<(() => void) | null>(null);
 
-  const postId = parseInt(id as string); // Convert post ID to number
+  // Ensure postId is typed as Convex document ID
+  const postId: Id<"communityPosts"> = id as Id<"communityPosts">;
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -132,6 +156,15 @@ export default function EditPostScreen() {
   };
 
   /**
+   * Handle success modal close - navigate to My Posts
+   */
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    // Navigate to My Posts tab
+    router.push("/(app)/(tabs)/community-forum?tab=my-posts");
+  };
+
+  /**
    * Show confirmation modal for destructive actions
    */
   const showConfirmation = (title: string, message: string, callback: () => void) => {
@@ -142,12 +175,68 @@ export default function EditPostScreen() {
   };
 
   /**
-   * Handle post save operation
-   * Supports both draft saving and publishing workflows
-   * 
-   * @param publish - Boolean indicating whether to publish the post
+   * Handle image selection from device
    */
-  const handleSave = async (publish: boolean = false) => {
+  const handleAddPhoto = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showError("Permission Required", "We need camera roll permissions to add photos.");
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        selectionLimit: 3 - selectedImages.length, // Limit based on current selection
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets) {
+        // Process and compress images
+        const newImages = await Promise.all(
+          result.assets.map(async (asset) => {
+            const manipulatedImage = await manipulateAsync(
+              asset.uri,
+              [{ resize: { width: 1024 } }], // Resize to max 1024px width
+              { 
+                compress: 0.7, // 70% quality
+                format: SaveFormat.JPEG 
+              }
+            );
+            return manipulatedImage.uri;
+          })
+        );
+        
+        setSelectedImages([...selectedImages, ...newImages]);
+      }
+    } catch (error) {
+      console.error("Error selecting images:", error);
+      showError("Error", "Failed to select images. Please try again.");
+    }
+  };
+
+  /**
+   * Remove image from selection
+   */
+  const handleRemoveImage = (index: number) => {
+    setSelectedImages(selectedImages.filter((_, i) => i !== index));
+  };
+
+  /**
+   * Handle mood selection
+   */
+  const handleMoodSelect = (mood: typeof MOODS[0]) => {
+    setSelectedMood(selectedMood?.id === mood.id ? null : mood);
+  };
+
+  /**
+   * Handle post save operation
+   * Updates the existing post and navigates to My Posts
+   */
+  const handleSave = async () => {
     // Validate required fields
     if (!title.trim() || !content.trim()) {
       showError("Missing Information", "Please fill in both title and content");
@@ -161,34 +250,25 @@ export default function EditPostScreen() {
     }
 
     try {
-      // Set appropriate loading state
-      if (publish) {
-        setIsPublishing(true);
-      } else {
-        setIsSaving(true);
-      }
+      setIsSaving(true);
 
-      // Update post via API (ensure category is persisted too)
-      await communityApi.updatePost(postId, {
+      // Convex-only update - preserve original draft status
+      await convex.mutation(api.posts.update, {
+        postId,
         title: title.trim(),
         content: content.trim(),
         category: (category || "Support").trim(),
-        isDraft: !publish, // Set draft status based on publish flag
+        imageUrls: selectedImages,
+        mood: selectedMood,
+        isDraft: false, // Keep as published when editing
       });
 
-      // Show success message based on action
-      if (publish) {
-        showSuccess("Post published successfully! It's now visible to the community.");
-      } else {
-        showSuccess("Post updated successfully! Your changes have been saved.");
-      }
+      showSuccess("Post updated successfully!");
     } catch (error) {
       console.error("Error updating post:", error);
       showError("Update Failed", "Failed to update post. Please check your connection and try again.");
     } finally {
-      // Reset loading states
       setIsSaving(false);
-      setIsPublishing(false);
     }
   };
 
@@ -202,7 +282,8 @@ export default function EditPostScreen() {
       "Are you sure you want to delete this post? This action cannot be undone.",
       async () => {
         try {
-          await communityApi.deletePost(postId);
+            // Convex-only delete
+            await convex.mutation(api.posts.deletePost, { postId });
           showSuccess("Post deleted successfully!");
           // Navigate to community forum after successful deletion
           setTimeout(() => {
@@ -238,167 +319,186 @@ export default function EditPostScreen() {
     { id: "profile", name: "Profile", icon: "person" },
   ];
 
+  // State for images and mood
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedMood, setSelectedMood] = useState<{ id: string; emoji: string; label: string } | null>(null);
+
+  useEffect(() => {
+    async function fetchPost() {
+      if (!postId) return;
+      setLoading(true);
+      try {
+        const post = await convex.query(api.posts.getPost, { postId });
+        if (post) {
+          setTitle(post.title || "");
+          setContent(post.content || "");
+          setCategory(post.category || "Support");
+          setSelectedImages(post.imageUrls || []);
+          setSelectedMood(post.mood || null);
+        }
+      } catch (err) {
+        showError("Error", "Could not load post for editing.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPost();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId]);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}> 
       <CurvedBackground style={styles.curvedBackground} />
       <AppHeader title="Edit Post" showBack={true} />
-
       {/* Main Content Area */}
       <View style={styles.scrollContainer}>
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.content}>
-            <View style={styles.form}>
-              {/* Title Input Section */}
-              <Text style={[styles.label, { color: theme.colors.text }]}>Title</Text>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 40 }} />
+          ) : (
+            <View style={styles.content}>
+              <Text style={styles.label}>Title</Text>
+
               <TextInput
-                style={[styles.titleInput, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
+                style={[styles.titleInput, { fontSize: scaledFontSize(18), backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                 value={title}
                 onChangeText={setTitle}
-                placeholder="Enter post title..."
-                placeholderTextColor={theme.colors.textDisabled}
-                maxLength={200}
-                multiline
+                placeholder="Enter your post title"
+                placeholderTextColor={theme.colors.textSecondary}
+                maxLength={100}
               />
-
-              {/* Category Selection Section */}
-              <Text style={[styles.label, { color: theme.colors.text }]}>Category</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.categoriesScroll}
-              >
-                <View style={styles.categoriesContainer}>
-                  {CATEGORIES.map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.categoryButton,
-                        { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                        category === cat && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-                      ]}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text
-                        style={[
-                          styles.categoryText,
-                          { color: theme.colors.text },
-                          category === cat && { color: "#FFFFFF" },
-                        ]}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-
-              {/* Content Input Section */}
-              <Text style={[styles.label, { color: theme.colors.text }]}>Content</Text>
+              <Text style={styles.label}>Category</Text>
+              <View style={styles.categoriesContainer}>
+                {CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.categoryButton, category === cat && styles.categoryButtonActive]}
+                    onPress={() => setCategory(cat)}
+                  >
+                    <Text style={[styles.categoryText, category === cat && styles.categoryTextActive]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.label}>Content</Text>
               <TextInput
-                style={[styles.contentInput, { backgroundColor: theme.colors.surface, color: theme.colors.text }]}
+                style={[styles.contentInput, { fontSize: scaledFontSize(16), backgroundColor: theme.colors.surface, color: theme.colors.text }]}
                 value={content}
                 onChangeText={setContent}
-                placeholder="Share your thoughts..."
-                placeholderTextColor={theme.colors.textDisabled}
+                placeholder="Write your post..."
+                placeholderTextColor={theme.colors.textSecondary}
                 multiline
-                textAlignVertical="top"
-                numberOfLines={10}
+                maxLength={1000}
               />
-
-              {/* Character Count Display */}
               <View style={styles.characterCount}>
-                <Text style={[styles.characterCountText, { color: theme.colors.textSecondary }]}>
-                  {content.length} characters
-                </Text>
+                <Text style={styles.characterCountText}>{`${content.length} characters`}</Text>
+              </View>
+
+              {/* Mood Selection */}
+              <Text style={styles.label}>How are you feeling?</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                style={styles.moodScrollContainer}
+                contentContainerStyle={styles.moodScrollContent}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.moodOption,
+                    !selectedMood && styles.moodOptionSelected
+                  ]}
+                  onPress={() => setSelectedMood(null)}
+                >
+                  <Text style={styles.moodOptionText}>None</Text>
+                </TouchableOpacity>
+                {MOODS.map((mood) => (
+                  <TouchableOpacity
+                    key={mood.id}
+                    style={[
+                      styles.moodOption,
+                      selectedMood?.id === mood.id && styles.moodOptionSelected
+                    ]}
+                    onPress={() => handleMoodSelect(mood)}
+                  >
+                    <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+                    <Text style={styles.moodOptionText}>{mood.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              
+              {/* Image Management */}
+              <Text style={styles.label}>Photos ({selectedImages.length}/3)</Text>
+              <View style={styles.imageManagementContainer}>
+                {/* Add Photo Button */}
+                {selectedImages.length < 3 && (
+                  <TouchableOpacity style={styles.addPhotoButton} onPress={handleAddPhoto}>
+                    <Ionicons name="camera-outline" size={scaledFontSize(24)} color="#7CB9A9" />
+                    <Text style={styles.addPhotoText}>Add Photo</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {/* Selected Images Grid */}
+                {selectedImages.length > 0 && (
+                  <View style={styles.selectedImagesContainer}>
+                    <View style={styles.imagesGrid}>
+                      {selectedImages.map((uri, index) => (
+                        <View 
+                          key={index} 
+                          style={[
+                            styles.imageContainer,
+                            selectedImages.length === 1 && styles.singleImage,
+                            selectedImages.length === 2 && styles.doubleImage,
+                            selectedImages.length >= 3 && styles.tripleImage,
+                          ]}
+                        >
+                          <Image source={{ uri }} style={styles.image} />
+                          {/* Remove button */}
+                          <TouchableOpacity 
+                            style={styles.removeImageButton}
+                            onPress={() => handleRemoveImage(index)}
+                          >
+                            <Ionicons name="close-circle" size={scaledFontSize(24)} color="#FF6B6B" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Action Button */}
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, styles.saveButton]}
+                  onPress={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <Text style={styles.buttonText}>Saving...</Text>
+                  ) : (
+                    <Text style={styles.buttonText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
-          </View>
-
-          {/* Delete Button Section - Destructive action with warning */}
-          <View style={styles.deleteSection}>
-            <TouchableOpacity
-              style={[styles.deleteButton, { backgroundColor: theme.colors.surface }]}
-              onPress={handleDelete}
-            >
-              <Ionicons name="trash-outline" size={scaledFontSize(20)} color={theme.colors.error} />
-              <Text style={[styles.deleteButtonText, { color: theme.colors.error }]}>Delete Post</Text>
-            </TouchableOpacity>
-            <Text style={[styles.deleteWarning, { color: theme.colors.error }]}>
-              This action cannot be undone
-            </Text>
-          </View>
+          )}
         </ScrollView>
       </View>
-
-      {/* Action Buttons Footer */}
-      <View style={styles.footer}>
-        {/* Save as Draft Button */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.colors.icon }]}
-          onPress={() => handleSave(false)}
-          disabled={isSaving || isPublishing}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="save-outline" size={scaledFontSize(20)} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Save as Draft</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* Publish Button */}
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.colors.primary }]}
-          onPress={() => handleSave(true)}
-          disabled={isSaving || isPublishing}
-        >
-          {isPublishing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="send-outline" size={scaledFontSize(20)} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Publish</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Bottom Navigation */}
-      <BottomNavigation
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-      />
-
-      {/* Success Modal */}
+      {/* Status and Confirmation Modals */}
       <StatusModal
         visible={showSuccessModal}
-        type="success"
-        title="Success!"
         message={successMessage}
-        onClose={() => {
-          setShowSuccessModal(false);
-          router.back();
-        }}
-        buttonText="Continue"
+        onClose={handleSuccessClose}
+        title="Success"
+        type="success"
       />
-
-      {/* Error Modal */}
       <StatusModal
         visible={showErrorModal}
-        type="error"
-        title={errorTitle}
         message={errorMessage}
         onClose={() => setShowErrorModal(false)}
-        buttonText="OK"
+        title={errorTitle}
+        type="error"
       />
-
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal for Delete */}
       <StatusModal
         visible={showConfirmModal}
         type="info"
@@ -415,6 +515,7 @@ export default function EditPostScreen() {
         }}
         secondaryButtonType="destructive"
       />
+      <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
     </SafeAreaView>
   );
 }
@@ -439,13 +540,14 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   scrollContainer: {
     flex: 1,
-    marginBottom: 140, // Space for footer buttons and bottom nav
+    marginBottom: 80, // Space for bottom nav only
   },
   scrollView: {
     flex: 1,
   },
   content: {
     paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   form: {
     paddingVertical: 20,
@@ -469,7 +571,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#FED7D7",
-    gap: 8,
   },
   deleteButtonText: {
     color: "#C53030",
@@ -531,7 +632,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   categoriesContainer: {
     flexDirection: "row",
-    gap: 8,
+    flexWrap: "wrap",
     paddingHorizontal: 16,
   },
   categoryButton: {
@@ -541,6 +642,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E0E0E0",
+    marginRight: 8,
+    marginBottom: 8,
   },
   categoryButtonActive: {
     backgroundColor: "#7CB9A9",
@@ -565,27 +668,146 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#999",
   },
   
-  // Footer - Fixed action buttons
-  footer: {
-    position: "absolute",
-    bottom: 140, // Above the bottom navigation
-    left: 0,
-    right: 0,
-    flexDirection: "row",
+    // Existing mood display
+    existingMoodContainer: {
+      marginTop: 16,
+    },
+    moodDisplay: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: 'rgba(124, 185, 169, 0.1)',
+      borderRadius: 12,
+      alignSelf: 'flex-start',
+      gap: 8,
+    },
+    moodEmoji: {
+      fontSize: scaledFontSize(20),
+    },
+    moodLabel: {
+      fontSize: scaledFontSize(15),
+      fontWeight: '500',
+    },
+  
+    // Existing images display
+    existingImagesContainer: {
+      marginTop: 16,
+    },
+    imagesGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    imageContainer: {
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+    singleImage: {
+      width: '100%',
+      height: 250,
+    },
+    doubleImage: {
+      width: '48.5%',
+      height: 180,
+    },
+    tripleImage: {
+      width: '31.5%',
+      height: 120,
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+  
+    // Mood selection styles
+    moodScrollContainer: {
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    moodScrollContent: {
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    moodOption: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      minWidth: 80,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    moodOptionSelected: {
+      backgroundColor: '#7CB9A9',
+      borderColor: '#7CB9A9',
+    },
+    moodOptionText: {
+      fontSize: scaledFontSize(12),
+      fontWeight: '500',
+      color: '#666',
+      marginTop: 4,
+    },
+  
+    // Image management styles
+    imageManagementContainer: {
+      marginTop: 8,
+      marginBottom: 16,
+    },
+    addPhotoButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: '#7CB9A9',
+      borderStyle: 'dashed',
+      marginBottom: 12,
+      gap: 8,
+    },
+    addPhotoText: {
+      fontSize: scaledFontSize(14),
+      fontWeight: '500',
+      color: '#7CB9A9',
+    },
+    selectedImagesContainer: {
+      marginTop: 8,
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: 12,
+      padding: 2,
+    },
+  
+  // Button Container - Action button
+  buttonContainer: {
     padding: 16,
-    gap: 12,
+    marginTop: 24,
     backgroundColor: "transparent",
-    justifyContent: "center",
+    alignItems: "center",
   },
   button: {
-    flex: 1,
+    minWidth: 200,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
     borderRadius: 12,
-    gap: 8,
   },
   saveButton: {
     backgroundColor: "#666", // Neutral color for draft action

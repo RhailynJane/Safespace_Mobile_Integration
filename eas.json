@@ -13,7 +13,7 @@
       },
       "ios": {
         "buildConfiguration": "Debug", 
-        "simulator": false,
+        "simulator": false
       }
     },
     "preview": {
@@ -28,6 +28,10 @@
       },
       "ios": {
         "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Y2F1c2FsLWJyZWFtLTYwLmNsZXJrLmFjY291bnRzLmRldiQ",
+        "EXPO_PUBLIC_CONVEX_URL": "https://formal-pigeon-483.convex.cloud"
       }
     }
   },

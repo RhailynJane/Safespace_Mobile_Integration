@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from "expo-router";
-import { useSignUp } from "@clerk/clerk-expo";
+import { useSignUp, useAuth } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 import PersonalInfoStep from "../../components/PersonalInfoStep";
 import PasswordStep from "../../components/PasswordStep";
@@ -22,6 +22,8 @@ import StatusModal from "../../components/StatusModal";
 import { CaptchaHandler } from "../../utils/captcha-handler";
 import { apiService } from "../../utils/api";
 import { useTheme } from "../../contexts/ThemeContext";
+import { completeConvexAuthFlow } from "../../utils/convexAuthSync";
+import { clerkDiagnostics } from "../../utils/clerkDiagnostics";
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -32,6 +34,7 @@ export interface SignupData {
   email: string;
   age: string;
   phoneNumber: string;
+  organization: string;
   password: string;
   confirmPassword: string;
   verificationCode: string;
@@ -41,6 +44,7 @@ export default function SignupScreen() {
   const { theme } = useTheme();
   // Clerk signup hook
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { getToken } = useAuth();
   const [captchaReady, setCaptchaReady] = useState(false);
 
   // State management for signup process
@@ -52,6 +56,7 @@ export default function SignupScreen() {
     email: "",
     age: "",
     phoneNumber: "",
+    organization: "",
     password: "",
     confirmPassword: "",
     verificationCode: "",
@@ -74,6 +79,9 @@ export default function SignupScreen() {
 
   // Wait for CAPTCHA to be ready (shorter timeout for mobile)
   useEffect(() => {
+    // Check Clerk configuration on mount
+    clerkDiagnostics.checkClerkConfig();
+    
     const timer = setTimeout(
       () => {
         setCaptchaReady(true);
@@ -185,10 +193,27 @@ export default function SignupScreen() {
       }
 
       // Start sign-up process
+      console.log("📝 Creating signup for:", signupData.email);
       await signUp.create(signupPayload);
+      console.log("✅ Signup created successfully");
 
       // Send email verification code
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      console.log("📧 Sending verification email to:", signupData.email);
+      try {
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        console.log("✅ Verification email sent successfully");
+        console.log("📬 Please check your email (including spam folder) for the 6-digit code");
+        clerkDiagnostics.logEmailVerification(signupData.email, true);
+      } catch (emailError: any) {
+        console.error("❌ Failed to send verification email:", emailError);
+        clerkDiagnostics.logEmailVerification(signupData.email, false, emailError);
+        clerkDiagnostics.displayTroubleshooting(emailError);
+        
+        throw new Error(
+          emailError?.errors?.[0]?.message || 
+          "Failed to send verification email. Please check your email address and try again."
+        );
+      }
 
       // Move to verification step
       setCurrentStep("verification");
@@ -290,6 +315,15 @@ export default function SignupScreen() {
             }
           }
 
+          // Sync user to Convex after successful signup (including org if selected)
+          await completeConvexAuthFlow(getToken, {
+            clerkUserId: signUpAttempt.createdUserId!,
+            email: signupData.email,
+            firstName: signupData.firstName,
+            lastName: signupData.lastName,
+            orgId: signupData.organization,
+          });
+
           setCurrentStep("success");
         } catch (syncError) {
           console.error("Failed to sync user with database:", syncError);
@@ -320,13 +354,18 @@ export default function SignupScreen() {
     if (!isLoaded || !signUp) return;
 
     try {
+      console.log("📧 Resending verification code to:", signupData.email);
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      console.log("✅ Verification code resent successfully");
       showErrorModal(
         "Code Sent",
-        "A new verification code has been sent to your email."
+        `A new verification code has been sent to ${signupData.email}. Please check your email (including spam folder).`
       );
     } catch (err: any) {
-      setErrorMessage("Failed to resend code. Please try again.");
+      console.error("❌ Failed to resend code:", err);
+      setErrorMessage(
+        err?.errors?.[0]?.message || "Failed to resend code. Please try again."
+      );
     }
   };
 

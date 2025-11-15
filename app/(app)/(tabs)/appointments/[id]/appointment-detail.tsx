@@ -18,6 +18,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Linking from 'expo-linking';
+import { mapAppointmentStatus } from "../../../../../utils/appointmentStatus";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import BottomNavigation from "../../../../../components/BottomNavigation";
 import CurvedBackground from "../../../../../components/CurvedBackground";
@@ -25,18 +26,22 @@ import { AppHeader } from "../../../../../components/AppHeader";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
+import { useConvex } from "convex/react";
+import { api } from "../../../../../convex/_generated/api";
 
 
 interface Appointment {
-  id: number;
+  id: string;
   supportWorker: string;
   supportWorkerId?: number;
   date: string;
+  originalDate?: string; // Store original date for calculations
   time: string;
   type: string;
   status: string;
   meetingLink?: string;
   notes?: string;
+  cancellationReason?: string;
 }
 
 /**
@@ -71,11 +76,13 @@ export default function AppointmentList() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut } = useAuth();
   const { user } = useUser();
+  // Shared Convex instance
+  const convex = useConvex();
 
   // Create dynamic styles with text size scaling
-  const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
+  const styles = useMemo(() => createStyles(scaledFontSize, theme), [scaledFontSize, theme]);
 
 
 
@@ -90,75 +97,60 @@ const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: 
   setStatusModalVisible(true);
 }, []);
 
-const fetchAppointments = useCallback(async () => {
+const fetchAppointment = useCallback(async () => {
+  if (!id) return;
   try {
     setLoading(true);
-    console.log('📅 Fetching appointment detail for ID:', id, 'User:', user?.id);
-    
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${API_URL}/api/appointments?clerkUserId=${user?.id}`);
-    const result = await response.json();
-
-    console.log('📥 Appointments response:', result);
-
-      if (result.success && result.appointments) {
-        // Transform backend data to frontend format
-        const transformedAppointments = result.appointments.map((apt: any) => {
-          const appointmentDate = new Date(apt.date);
-          const formattedDate = appointmentDate.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          });
-
-          const now = new Date();
-          const isUpcoming = appointmentDate >= now;
-
-          return {
-            id: apt.id,
-            supportWorker: apt.supportWorker || 'Support Worker',
-            supportWorkerId: apt.supportWorkerId || apt.support_worker_id,
-            date: formattedDate,
-            time: apt.time || '',
-            type: apt.type || 'Video',
-            meetingLink: apt.meetingLink || apt.meeting_link, // Handle both formats
-            notes: apt.notes,
-            status: apt.status === 'cancelled' ? 'Cancelled' :
-                    apt.status === 'completed' ? 'Completed' :
-                    isUpcoming ? 'Upcoming' : 'Past'
-          };
-        });
-
-        const foundAppointment = transformedAppointments.find(
-          (apt: Appointment) => apt.id === parseInt(id as string)
-        );
-        
-        if (foundAppointment) {
-          setAppointment(foundAppointment);
-          console.log('✅ Appointment found:', foundAppointment);
-        } else {
-          console.warn('⚠️ Appointment with ID', id, 'not found');
-          setAppointment(null);
-          showStatusModal('error', 'Not Found', 'Appointment not found');
-        }
-      } else {
-        console.warn('⚠️ No appointments found or error:', result);
-        setAppointment(null);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching appointment:', error);
-      showStatusModal('error', 'Error', 'Unable to fetch appointment. Please try again.');
+    console.log('📅 Fetching single appointment via Convex. ID:', id);
+    const result = await convex.query(api.appointments.getAppointment, { appointmentId: id as any });
+    if (!result) {
+      showStatusModal('error', 'Not Found', 'Appointment not found.');
       setAppointment(null);
-    } finally {
-      setLoading(false);
+      return;
     }
-  }, [id, user?.id, showStatusModal]);
+    // Ensure support worker name is populated; enrich from supportWorkers if missing
+    let supportWorkerName: string = result.supportWorker || '';
+    if (!supportWorkerName && result.supportWorkerId) {
+      try {
+        const worker = await convex.query(api.supportWorkers.getSupportWorker, { workerId: String(result.supportWorkerId) });
+        if (worker?.name) supportWorkerName = worker.name;
+      } catch (e) {
+        // ignore enrichment errors and fall back to default placeholder
+      }
+    }
+    // Adapt status labels via utility
+    const mappedStatus = mapAppointmentStatus(result.status as any, result.date, result.time);
+    const readableDate = new Date(result.date).toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    setAppointment({
+      id: result.id as any,
+      supportWorker: supportWorkerName || 'Support Worker',
+      supportWorkerId: result.supportWorkerId,
+      date: readableDate,
+      originalDate: result.date, // Store original date for calculations
+      time: result.time || '',
+      type: result.type || 'Video',
+      meetingLink: result.meetingLink,
+      notes: result.notes,
+      status: mappedStatus,
+      cancellationReason: result.cancellationReason,
+    });
+  } catch (e) {
+    console.error('❌ Error fetching appointment:', e);
+    showStatusModal('error', 'Error', 'Unable to fetch appointment. Please try again.');
+    setAppointment(null);
+  } finally {
+    setLoading(false);
+  }
+}, [id, convex, showStatusModal]);
 
   // Find the appointment based on the ID from the URL
   useEffect(() => {
-    if (user?.id && id) fetchAppointments();
-  }, [user?.id, id, fetchAppointments]);
+    if (user?.id && id) {
+      fetchAppointment();
+    }
+  }, [user?.id, id, fetchAppointment]);
   /**
    * Show status modal with given parameters
    */
@@ -228,8 +220,41 @@ const fetchAppointments = useCallback(async () => {
   /**
    * Handles navigation to video consultation screen
    */
+  // State for join restriction popup
+  const [joinRestrictionMsg, setJoinRestrictionMsg] = useState<string | null>(null);
+
+  // Handler for join session with restriction
   const handleJoinSession = () => {
     if (!appointment) return;
+    // Parse date/time using originalDate (YYYY-MM-DD format from backend)
+    const dateToUse = appointment.originalDate || appointment.date;
+    const aptDateTime = new Date(`${dateToUse}T${appointment.time}`);
+    if (isNaN(aptDateTime.getTime())) {
+      console.error('Failed to parse appointment date/time:', dateToUse, appointment.time);
+      // If parsing fails, allow join anyway
+      router.push({
+        pathname: "/(app)/video-consultations/video-call",
+        params: {
+          appointmentId: String(appointment.id),
+          supportWorkerName: appointment.supportWorker,
+          date: appointment.date,
+          time: appointment.time,
+          meetingLink: appointment.meetingLink || '',
+        },
+      });
+      return;
+    }
+    const now = new Date();
+    const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
+    console.log('Join restriction check:', { minutesUntilAppointment, aptDateTime: aptDateTime.toISOString(), now: now.toISOString() });
+    if (minutesUntilAppointment > 10) {
+      // Format date/time as MM-DD-YYYY HH:SS
+      const formatted = `${String(aptDateTime.getMonth()+1).padStart(2,'0')}-${String(aptDateTime.getDate()).padStart(2,'0')}-${aptDateTime.getFullYear()} ${String(aptDateTime.getHours()).padStart(2,'0')}:${String(aptDateTime.getMinutes()).padStart(2,'0')}`;
+      console.log('Join too early, showing restriction message');
+      setJoinRestrictionMsg(`The date is in ${formatted}. You can join 10 mins before the scheduled appt.`);
+      return;
+    }
+    setJoinRestrictionMsg(null);
     // Route to the pre-join Video Consultation screen
     router.push({
       pathname: "/(app)/video-consultations/video-call",
@@ -247,18 +272,12 @@ const fetchAppointments = useCallback(async () => {
    * Opens reschedule modal
    */
   const handleReschedule = () => {
-    if (!appointment?.supportWorkerId) {
-      // If we don't have the worker id, fall back to the booking flow
-      router.push(`/appointments/book`);
-      return;
-    }
-    // Navigate to details screen in reschedule mode; user selects new date/time there
+    // Navigate to book screen in reschedule mode; user selects new date/time there
     router.push({
-      pathname: '/appointments/details',
+      pathname: '/appointments/book',
       params: {
-        supportWorkerId: String(appointment.supportWorkerId),
         reschedule: '1',
-        appointmentId: String(appointment.id),
+        appointmentId: String(appointment?.id),
       },
     });
   };
@@ -272,29 +291,37 @@ const fetchAppointments = useCallback(async () => {
 
   /**
    * Confirms appointment cancellation
-   * Simulates API call with timeout
+   * Uses optimistic UI: updates immediately, then syncs with server
    */
   const confirmCancel = async () => {
+    if (!appointment) return;
+    
+    // Save previous state for rollback
+    const previousAppointment = { ...appointment };
+    
     try {
+      // Optimistic update
+      setAppointment({ ...appointment, status: 'cancelled', cancellationReason: 'Cancelled by user' });
+      setCancelModalVisible(false);
       setLoading(true);
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/appointments/${id}/cancel`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cancellationReason: 'Cancelled by user' }),
-      });
-      const result = await response.json();
-      if (response.ok && result.success) {
-        setCancelModalVisible(false);
+      try {
+        await convex.mutation(api.appointments.cancelAppointment, {
+          appointmentId: id as any,
+          cancellationReason: 'Cancelled by user',
+        });
         showStatusModal('success', 'Appointment Cancelled', 'Your appointment has been successfully cancelled.');
-        // Update local state optimistically
-        setAppointment(prev => prev ? { ...prev, status: 'Cancelled' } : prev);
         setTimeout(() => router.back(), 1200);
-      } else {
-        showStatusModal('error', 'Cancel Failed', result.error || 'Unable to cancel appointment.');
+      } catch (convexErr: any) {
+        console.error('Cancel error (Convex):', convexErr);
+        setAppointment(previousAppointment);
+        setCancelModalVisible(true);
+        showStatusModal('error', 'Cancel Failed', convexErr?.message || 'Unable to cancel appointment.');
       }
-    } catch (e) {
-      console.error('Cancel error:', e);
+    } catch (error) {
+      console.error('Cancel error:', error);
+      // Rollback on error
+      setAppointment(previousAppointment);
+      setCancelModalVisible(true);
       showStatusModal('error', 'Cancel Failed', 'Unable to cancel appointment. Please try again.');
     } finally {
       setLoading(false);
@@ -497,6 +524,21 @@ const fetchAppointments = useCallback(async () => {
     },
   ];
 
+  // Show loading while fetching appointment
+  if (loading || !appointment) {
+    return (
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          <AppHeader title="Appointment Details" showBack={true} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.textSecondary }]}>Loading appointment...</Text>
+          </View>
+        </SafeAreaView>
+      </CurvedBackground>
+    );
+  }
+
   return (
     <CurvedBackground>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -504,69 +546,147 @@ const fetchAppointments = useCallback(async () => {
 
           <ScrollView 
             style={styles.content}
-            contentContainerStyle={{ paddingBottom: 120 }}
+            contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
             showsVerticalScrollIndicator={false}
           >
-          {/* Appointment Card */}
-          <View style={[styles.appointmentCard, { backgroundColor: theme.colors.surface }]}>
-            <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
-              {appointment.supportWorker}
-            </Text>
+          {/* Page Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Session Details</Text>
 
-            {/* Appointment Details */}
-            <View style={styles.detailRow}>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.icon} />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.date}</Text>
+          {/* Support Worker Card */}
+          <View style={[styles.workerCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }]}>
+            <View style={styles.workerIconCircle}>
+              <Ionicons name="person" size={32} color="#FFFFFF" />
             </View>
-            <View style={styles.detailRow}>
-              <Ionicons name="time-outline" size={20} color={theme.colors.icon} />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.time}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Ionicons name="videocam-outline" size={20} color={theme.colors.icon} />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>{appointment.type} Session</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Ionicons
-                name="information-circle-outline"
-                size={20}
-                color={theme.colors.icon}
-              />
-              <Text style={[styles.detailText, { color: theme.colors.textSecondary }]}>
-                Status: {appointment.status}
+            <View style={styles.workerInfo}>
+              <Text style={[styles.workerName, { color: theme.colors.text }]}>
+                {appointment.supportWorker}
               </Text>
+              <Text style={[styles.workerRole, { color: theme.colors.textSecondary }]}>CMHA Support Worker</Text>
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actions}>
-            {/* Join Session Button */}
-            <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={handleJoinSession}
-            >
-              <Ionicons name="videocam" size={20} color="#FFF" />
-              <Text style={styles.primaryButtonText}>Join Session</Text>
-            </TouchableOpacity>
+          {/* Appointment Details Card */}
+          <View style={[styles.detailsCard, { backgroundColor: theme.colors.surface, borderColor: theme.isDark ? '#444' : '#E0E0E0' }]}>
 
-            {/* Reschedule Button */}
-            <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
-              onPress={handleReschedule}
-            >
-              <Ionicons name="calendar" size={20} color={theme.colors.primary} />
-              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>Reschedule</Text>
-            </TouchableOpacity>
-
-            {/* Cancel Appointment Button */}
-            <TouchableOpacity
-              style={[styles.tertiaryButton, { borderColor: theme.colors.error }]}
-              onPress={handleCancel}
-            >
-              <Ionicons name="close-circle" size={20} color={theme.colors.error} />
-              <Text style={[styles.tertiaryButtonText, { color: theme.colors.error }]}>Cancel Appointment</Text>
-            </TouchableOpacity>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>{appointment.date}</Text>
+              </View>
+            </View>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons name="time-outline" size={20} color="#FF9800" />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>{appointment.time}</Text>
+              </View>
+            </View>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons name="videocam" size={20} color="#9C27B0" />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type</Text>
+                <Text style={[styles.detailValue, { color: theme.colors.text }]}>{appointment.type}</Text>
+              </View>
+            </View>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIconContainer}>
+                <Ionicons
+                  name="information-circle"
+                  size={20}
+                  color="#2196F3"
+                />
+              </View>
+              <View style={styles.detailTextContainer}>
+                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Status</Text>
+                <Text style={[styles.detailValue, styles.statusBadge, {
+                  backgroundColor: appointment.status.toLowerCase() === 'upcoming' ? '#E8F5E9' : (theme.isDark ? '#2A2A2A' : '#F5F5F5'),
+                  color: appointment.status.toLowerCase() === 'upcoming' ? '#2E7D32' : theme.colors.textSecondary
+                }]}>
+                  {appointment.status}
+                </Text>
+              </View>
+            </View>
           </View>
+
+          {/* Action Buttons - Only show for upcoming appointments */}
+          {appointment.status.toLowerCase() !== 'past' && appointment.status.toLowerCase() !== 'cancelled' && (
+            <View style={styles.actions}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Quick Actions</Text>
+            
+              {/* Join Session Button */}
+              <TouchableOpacity
+                style={styles.actionButtonJoin}
+                onPress={handleJoinSession}
+                activeOpacity={0.8}
+              >
+                <View style={styles.actionButtonContent}>
+                  <View style={styles.actionIconCircle}>
+                    <Ionicons name="videocam" size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.actionTextContainer}>
+                    <Text style={styles.actionButtonTitle}>Join Video Session</Text>
+                    <Text style={styles.actionButtonSubtitle}>Start your appointment</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Show join restriction popup if needed */}
+              {joinRestrictionMsg && (
+                <Modal
+                  visible={!!joinRestrictionMsg}
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setJoinRestrictionMsg(null)}
+                >
+                  <View style={styles.modalOverlay}>
+                    <View style={[styles.confirmationModalContent, { backgroundColor: theme.colors.surface }] }>
+                      <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Join Video Session</Text>
+                      <Text style={[styles.modalText, { color: theme.colors.error || '#FF5252' }]}>{joinRestrictionMsg}</Text>
+                      <View style={styles.modalButtons}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, styles.modalCancelButton]}
+                          onPress={() => setJoinRestrictionMsg(null)}
+                        >
+                          <Text style={styles.modalCancelButtonText}>OK</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                </Modal>
+              )}
+
+              {/* Reschedule and Cancel Row */}
+              <View style={styles.actionButtonRow}>
+                {/* Reschedule Button */}
+                <TouchableOpacity
+                  style={styles.actionButtonSecondary}
+                  onPress={handleReschedule}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="calendar" size={20} color="#FF9800" />
+                  <Text style={styles.actionButtonSecondaryText}>Reschedule</Text>
+                </TouchableOpacity>
+
+                {/* Cancel Appointment Button */}
+                <TouchableOpacity
+                  style={styles.actionButtonCancel}
+                  onPress={handleCancel}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close-circle" size={20} color="#F44336" />
+                  <Text style={styles.actionButtonCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Cancel Confirmation Modal */}
           <Modal
@@ -587,7 +707,7 @@ const fetchAppointments = useCallback(async () => {
                   <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Cancel Appointment?</Text>
                   <Text style={[styles.modalText, { color: theme.colors.textSecondary }]}>
                     Are you sure you want to cancel your session with{" "}
-                    {appointment.supportWorker} on {appointment.date}?
+                    {appointment?.supportWorker} on {appointment?.date}?
                   </Text>
                   <View style={styles.modalButtons}>
                     <TouchableOpacity
@@ -685,7 +805,7 @@ const fetchAppointments = useCallback(async () => {
   );
 }
 
-const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.create({
+const createStyles = (scaledFontSize: (size: number) => number, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -697,6 +817,10 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: scaledFontSize(16),
   },
   header: {
     flexDirection: "row",
@@ -719,6 +843,171 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     textAlign: "center",
     marginTop: 16,
   },
+  pageTitle: {
+    fontSize: scaledFontSize(22),
+    fontWeight: '700',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  content: {
+    flex: 1,
+  },
+  workerCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
+  },
+  workerIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#757575',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  workerInfo: {
+    flex: 1,
+  },
+  workerName: {
+    fontSize: scaledFontSize(17),
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  workerRole: {
+    fontSize: scaledFontSize(13),
+  },
+  detailsCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  detailIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  detailTextContainer: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: scaledFontSize(11),
+    marginBottom: 2,
+  },
+  detailValue: {
+    fontSize: scaledFontSize(15),
+    fontWeight: '600',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    overflow: 'hidden',
+  },
+  sectionTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  actions: {
+    marginBottom: 20,
+  },
+  actionButtonJoin: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  actionTextContainer: {
+    flex: 1,
+  },
+  actionButtonTitle: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  actionButtonSubtitle: {
+    fontSize: scaledFontSize(12),
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  actionButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionButtonSecondary: {
+    flex: 1,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionButtonSecondaryText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+    color: '#FF9800',
+  },
+  actionButtonCancel: {
+    flex: 1,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionButtonCancelText: {
+    fontSize: scaledFontSize(14),
+    fontWeight: '600',
+    color: '#F44336',
+  },
   modalContainer: {
     flex: 1,
     flexDirection: "row",
@@ -726,6 +1015,8 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sideMenu: {
     width: "75%",
@@ -790,143 +1081,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#FF6B6B",
     marginTop: 16,
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  appointmentCard: {
-    backgroundColor: "#f1f5f9",
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  supportWorkerName: {
-    fontSize: scaledFontSize(17),
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 10,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: scaledFontSize(13),
-    color: "#666",
-    marginLeft: 12,
-  },
-  actions: {
-    marginBottom: 24,
-  },
-  primaryButton: {
-    backgroundColor: "#4CAF50",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#4CAF50",
-    marginBottom: 12,
-  },
-  secondaryButtonText: {
-    color: "#4CAF50",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  tertiaryButton: {
-    backgroundColor: "transparent",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#F44336",
-  },
-  tertiaryButtonText: {
-    color: "#F44336",
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 24,
-    width: "100%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: scaledFontSize(20),
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 12,
-  },
-  modalText: {
-    fontSize: scaledFontSize(16),
-    color: "#666",
-    marginBottom: 24,
-    lineHeight: 24,
-    textAlign: "center",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  modalButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 6,
-  },
-  modalCancelButton: {
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  modalCancelButtonText: {
-    color: "#666",
-    fontSize: scaledFontSize(14),
-    fontWeight: "600",
-    textAlign: "center",
-    justifyContent: "center",
-    marginTop: 8,
-  },
-  modalConfirmButton: {
-    backgroundColor: "#F44336",
-  },
-  modalConfirmButtonText: {
-    color: "#FFFFFF",
-    fontSize: scaledFontSize(14),
-    fontWeight: "600",
-    textAlign: "center",
-    justifyContent: "center",
-    marginTop: 6,
-  },
   blurContainer: {
     width: "100%",
     height: "100%",
@@ -935,7 +1089,7 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   confirmationModalContent: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     width: "85%",
     maxWidth: 400,
@@ -945,40 +1099,50 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#F8F9FA",
+    backgroundColor: "#FFEBEE",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
   },
-  rescheduleOptions: {
-    width: "100%",
-    marginBottom: 20,
-  },
-  rescheduleHint: {
-    fontSize: scaledFontSize(14),
-    color: "#666",
+  modalTitle: {
+    fontSize: scaledFontSize(22),
+    fontWeight: '700',
     marginBottom: 12,
-    textAlign: "center",
+    textAlign: 'center',
   },
-  timeSlot: {
-    backgroundColor: "#F8F9FA",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    alignItems: "center",
+  modalText: {
+    fontSize: scaledFontSize(15),
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
   },
-  timeSlotText: {
-    fontSize: scaledFontSize(14),
-    color: "#2c3e50",
-    fontWeight: "500",
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
   },
-  selectedTimeSlot: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#4CAF50",
-    borderWidth: 2,
+  modalButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  selectedTimeSlotText: {
-    color: "#2E7D32",
-    fontWeight: "600",
+  modalCancelButton: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  modalCancelButtonText: {
+    color: '#666',
+    fontSize: scaledFontSize(15),
+    fontWeight: '600',
+  },
+  modalConfirmButton: {
+    backgroundColor: '#F44336',
+  },
+  modalConfirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(15),
+    fontWeight: '600',
   },
 });

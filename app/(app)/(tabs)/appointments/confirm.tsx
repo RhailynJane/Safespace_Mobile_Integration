@@ -23,8 +23,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import settingsAPI from "../../../../utils/settingsApi";
+import { useConvex, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import Constants from 'expo-constants';
+// Removed legacy ConvexReactClient and custom hook usage
 
 // Check if running in Expo Go
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -62,6 +64,20 @@ export default function ConfirmAppointment() {
   // Clerk authentication hooks
   const { signOut } = useAuth();
   const { user } = useUser();
+
+  // Shared Convex client from provider
+  const convex = useConvex();
+
+  // Determine user's organization (prefer Convex users table, fallback to Clerk metadata)
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
+  const roleLabel = isSAIT ? 'Peer Support' : 'Support Worker';
 
   // Create dynamic styles
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -151,7 +167,7 @@ export default function ConfirmAppointment() {
    */
   const scheduleAppointmentReminder = useCallback(async (
     appointmentDate: string,
-    appointmentTime: string,
+    appointmentTimeLabel: string,
     workerName: string
   ) => {
     // Skip in Expo Go
@@ -164,7 +180,12 @@ export default function ConfirmAppointment() {
     if (!user?.id) return;
     
     try {
-      const settings = await settingsAPI.fetchSettings(user.id);
+  // Updated to consolidated getSettings API
+  const settings = await convex.query(api.settings.getSettings, { clerkId: user.id });
+      if (!settings) {
+        console.log('⚠️ No settings found; skipping reminder scheduling');
+        return;
+      }
       if (!settings.appointmentReminderEnabled) {
         console.log('📅 Appointment reminders are disabled in settings');
         return;
@@ -173,7 +194,7 @@ export default function ConfirmAppointment() {
       const advanceMinutes = settings.appointmentReminderAdvanceMinutes || 60;
       
       // Parse appointment datetime
-      const { hour, minute } = parseTimeTo24h(appointmentTime);
+  const { hour, minute } = parseTimeTo24h(appointmentTimeLabel);
         const dateParts = appointmentDate.split('-').map(Number);
         const year = dateParts[0];
         const month = dateParts[1];
@@ -208,7 +229,7 @@ export default function ConfirmAppointment() {
           data: {
             type: 'appointment',
             appointmentDate,
-            appointmentTime,
+            appointmentTime: appointmentTimeLabel,
             workerName,
           },
         },
@@ -220,7 +241,7 @@ export default function ConfirmAppointment() {
       console.error('❌ Failed to schedule appointment reminder:', error);
       throw error;
     }
-    }, [user?.id, parseTimeTo24h]);
+  }, [user?.id, parseTimeTo24h, convex]);
 
   /**
    * Show status modal
@@ -236,7 +257,7 @@ export default function ConfirmAppointment() {
    * Create the appointment in the database
    */
   const createAppointment = useCallback(async () => {
-    if (!user?.id || !supportWorkerId || appointmentCreated) {
+    if (!user?.id || appointmentCreated) {
       return;
     }
 
@@ -244,9 +265,7 @@ export default function ConfirmAppointment() {
       setLoading(true);
       console.log('📅 Creating appointment in database...');
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      
-      // Convert session type to match backend format
+      // Map UI session type labels to backend type values
       const sessionTypeMap: { [key: string]: string } = {
         'video call': 'video',
         'video': 'video',
@@ -259,72 +278,30 @@ export default function ConfirmAppointment() {
       const normalizedType = selectedType.toLowerCase();
       const sessionType = sessionTypeMap[normalizedType] || 'video';
 
-      // Normalize time to HH:MM:SS for DB compatibility
-      const normalizedTime = toHHMMSS(selectedTime);
-
-      // Be backward-compatible with different backend schemas
       const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
-      const workerIdInt = parseInt(chosenIdRaw);
-      if (!Number.isFinite(workerIdInt)) {
-        throw new Error(`Invalid support worker id: ${chosenIdRaw}`);
-      }
-      const appointmentData: any = {
-        clerkUserId: user.id,
-        supportWorkerId: workerIdInt,                    // camelCase
-        support_worker_id: workerIdInt,                  // snake_case (Prisma schema)
-        workerId: workerIdInt,                           // legacy schema
-        worker_id: workerIdInt,                          // legacy snake_case
-        supportWorkerName, // helpful on older DBs without support_worker_id column
-        supportWorkerEmail: supportWorkerEmail || undefined,
-        support_worker_email: supportWorkerEmail || undefined,
-        appointmentDate: selectedDate,
-        appointment_date: selectedDate,                  // snake_case alternative
-        appointmentTime: normalizedTime,
-        appointment_time: normalizedTime,                // snake_case alternative
-        time: normalizedTime,                            // some backends expect 'time'
-        sessionType: sessionType,
-        session_type: sessionType,                       // snake_case alternative
-        notes: 'Booked via mobile app',
-        duration: 60
-      };
-
-      console.log('📤 Sending appointment data:', appointmentData);
-
-      const response = await fetch(`${API_URL}/api/appointments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(appointmentData)
-      });
-
-      const result = await response.json();
-      console.log('📥 Create appointment response:', result);
-
-      if (result.success || response.ok) {
+      const workerIdInt = chosenIdRaw ? parseInt(chosenIdRaw) : NaN;
+      const normalizedTime = toHHMMSS(selectedTime); // HH:MM:SS
+      try {
+        const result = await convex.mutation(api.appointments.createAppointment, {
+          userId: user.id,
+          supportWorker: supportWorkerName || `Auto-assigned by ${orgShortLabel}`,
+          supportWorkerId: Number.isFinite(workerIdInt) ? workerIdInt : undefined,
+          date: selectedDate,
+          time: normalizedTime.slice(0,5), // HH:MM
+          type: sessionType,
+          notes: 'Booked via mobile app',
+        });
+        console.log('✅ Convex appointment created:', result);
         setAppointmentCreated(true);
-        setAppointmentId(result.appointment?.id);
-        console.log('✅ Appointment created successfully!');
-        
-        // Schedule appointment reminder notification 1 hour before
+        setAppointmentId(workerIdInt);
         try {
-          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
+          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName || `Auto-assigned by ${orgShortLabel}`);
         } catch (reminderError) {
           console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
-          // Don't fail the whole appointment if reminder scheduling fails
         }
-      } else {
-        console.error('❌ Failed to create appointment:', result);
-        const details = (result && result.details) ? String(result.details) : '';
-        if (details.includes('appointments_worker_id_fkey')) {
-          showStatusModal(
-            'error',
-            'Support worker unavailable',
-            'This support worker isn\'t configured on the server yet (missing worker record). Please select a different support worker for now.'
-          );
-        } else {
-          showStatusModal('error', 'Booking Failed', result.error || 'Failed to create appointment');
-        }
+      } catch (convexError: any) {
+        console.error('❌ Convex appointment creation failed:', convexError);
+        showStatusModal('error', 'Booking Failed', convexError?.message || 'Failed to create appointment');
       }
     } catch (error) {
       console.error('❌ Error creating appointment:', error);
@@ -332,7 +309,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, supportWorkerEmail, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder]);
+    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, convex, orgShortLabel]);
 
     /**
      * Reschedule an existing appointment
@@ -341,30 +318,23 @@ export default function ConfirmAppointment() {
       if (!user?.id || !rescheduleAppointmentId) return;
       try {
         setLoading(true);
-        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
         const normalizedTime = toHHMMSS(selectedTime);
-        const payload = {
-          newDate: selectedDate,
-          newTime: normalizedTime,
-          reason: `Rescheduled via app by user ${user.id}`,
-        };
-        const response = await fetch(`${API_URL}/api/appointments/${rescheduleAppointmentId}/reschedule`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const result = await response.json();
-        if (response.ok && result.success) {
+        try {
+          await convex.mutation(api.appointments.rescheduleAppointment, {
+            appointmentId: rescheduleAppointmentId as any,
+            newDate: selectedDate,
+            newTime: normalizedTime.slice(0,5),
+            reason: `Rescheduled via app by user ${user.id}`,
+          });
           setAppointmentCreated(true);
-          setAppointmentId(result.appointment?.id || Number(rescheduleAppointmentId));
-          // Re-schedule reminder for the new time
+          setAppointmentId(parseInt(rescheduleAppointmentId));
           try {
             await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
           } catch (e) {
             console.warn('⚠️ Failed to schedule reminder after reschedule:', e);
           }
-        } else {
-          showStatusModal('error', 'Reschedule Failed', result.error || 'Unable to reschedule appointment.');
+        } catch (err: any) {
+          showStatusModal('error', 'Reschedule Failed', err?.message || 'Unable to reschedule appointment.');
         }
       } catch (e) {
         console.error('Reschedule error:', e);
@@ -372,7 +342,7 @@ export default function ConfirmAppointment() {
       } finally {
         setLoading(false);
       }
-    }, [user?.id, rescheduleAppointmentId, selectedDate, selectedTime, toHHMMSS, scheduleAppointmentReminder, supportWorkerName, showStatusModal]);
+    }, [user?.id, rescheduleAppointmentId, selectedDate, selectedTime, toHHMMSS, scheduleAppointmentReminder, supportWorkerName, showStatusModal, convex]);
 
   // Create appointment when page loads
   useEffect(() => {
@@ -393,8 +363,8 @@ export default function ConfirmAppointment() {
     if (isReschedule && rescheduleAppointmentId) {
       // Reschedule existing appointment
       rescheduleAppointment();
-    } else if (supportWorkerId) {
-      // Create a new appointment
+    } else {
+      // Create a new appointment (auto-assign support worker)
       createAppointment();
     }
   }, [user?.id, appointmentCreated, isReschedule, rescheduleAppointmentId, supportWorkerId, selectedDate, selectedTime, isPastInMountain, showStatusModal, rescheduleAppointment, createAppointment]);
@@ -442,10 +412,10 @@ export default function ConfirmAppointment() {
   };
 
   // Check if we have the required data
-  if (!supportWorkerName || !selectedDate || !selectedTime) {
+  if (!selectedDate || !selectedTime) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
           <AppHeader title="Confirmation" showBack={true} />
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={64} color={theme.colors.error} />
@@ -581,18 +551,22 @@ export default function ConfirmAppointment() {
   // Show loading while creating appointment
   if (loading) {
     return (
-      <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-          Booking your appointment...
-        </Text>
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+              Booking your appointment...
+            </Text>
+          </View>
+        </SafeAreaView>
       </CurvedBackground>
     );
   }
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Appointment Confirmation" showBack={true} />
 
           <ScrollView 
@@ -600,92 +574,100 @@ export default function ConfirmAppointment() {
             contentContainerStyle={{ paddingBottom: 120 }}
             showsVerticalScrollIndicator={false}
           >
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Schedule a session with a support worker
-          </Text>
 
-          {/* Step Indicator */}
-          <View style={styles.stepsContainer}>
-            <View style={styles.stepRow}>
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>2</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
-                <Text style={[styles.stepNumber, styles.stepNumberActive]}>4</Text>
-              </View>
-            </View>
-          </View>
 
           {/* Confirmation Card */}
           <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
             {/* Success Icon */}
-            <View style={[styles.successIcon, { backgroundColor: theme.colors.successLight || '#E8F5E9' }]}>
-              <Ionicons name="checkmark-circle" size={64} color={theme.colors.success || '#4CAF50'} />
+            <View style={[styles.successIconCircle, { backgroundColor: '#4CAF50' }]}>
+              <Ionicons name="checkmark-circle" size={56} color="#FFFFFF" />
             </View>
 
-            <Text style={[styles.confirmationTitle, { color: theme.colors.primary }]}>
+            <Text style={[styles.confirmationTitle, { color: theme.colors.text }]}>
               {isReschedule ? 'Appointment Rescheduled!' : 'Appointment Booked!'}
             </Text>
             <Text style={[styles.confirmationMessage, { color: theme.colors.textSecondary }]}>
               {isReschedule ? 'Your appointment time has been updated.' : 'Your appointment has been successfully scheduled.'}
             </Text>
 
-            <View style={[styles.appointmentDetails, { backgroundColor: theme.colors.background }]}>
+            <View style={[styles.appointmentDetails, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F5F5F5' }]}>
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {supportWorkerName}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
+                    <Ionicons name="person" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>{roleLabel}</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {supportWorkerName || `Auto-assigned by ${orgShortLabel}`}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {selectedDateDisplay || selectedDate}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
+                    <Ionicons name="calendar" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Date</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {selectedDateDisplay || selectedDate}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {selectedTime}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
+                    <Ionicons name="time" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Time</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {selectedTime}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <View style={styles.detailRow}>
-                <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type:</Text>
-                <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                  {selectedType}
-                </Text>
+                <View style={styles.detailIconContainer}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
+                    <Ionicons name="videocam" size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.detailTextContainer}>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Session Type</Text>
+                    <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                      {selectedType}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => router.replace("/appointments/appointment-list")}
+              style={[styles.primaryButton, { backgroundColor: '#4CAF50' }]}
+              onPress={() => router.replace("/(app)/(tabs)/appointments/appointment-list")}
             >
-              <Text style={styles.buttonText}>View My Appointments</Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="calendar" size={20} color="#FFFFFF" />
+                <Text style={styles.buttonText}>View My Appointments</Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.secondaryButton, { borderColor: theme.colors.primary }]}
+              style={[styles.secondaryButton, { backgroundColor: theme.isDark ? '#2A2A2A' : '#FFFFFF', borderColor: '#4CAF50', borderWidth: 1 }]}
               onPress={() => router.replace("/appointments/book")}
             >
-              <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-                Book Another Appointment
-              </Text>
+              <View style={styles.buttonContent}>
+                <Ionicons name="add-circle" size={20} color="#4CAF50" />
+                <Text style={[styles.secondaryButtonText, { color: '#4CAF50' }]}>
+                  Book Another Appointment
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -798,60 +780,29 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   signOutText: {
     fontWeight: "600",
   },
-  title: {
-    fontSize: scaledFontSize(15),
-    fontWeight: "600",
-    marginBottom: 5,
+  pageTitle: {
+    fontSize: scaledFontSize(24),
+    fontWeight: "bold",
+    marginBottom: 24,
     textAlign: "center",
     marginTop: 16,
   },
-  stepsContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-    marginTop: 16,
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepCircleActive: {},
-  stepNumber: {
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-  },
-  stepNumberActive: {
-    color: "white",
-  },
-  stepConnector: {
-    width: 40,
-    height: 2,
-    marginHorizontal: 8,
-  },
   confirmationCard: {
-    borderRadius: 12,
-    padding: 24,
+    borderRadius: 16,
+    padding: 16,
     marginHorizontal: 15,
-    marginBottom: 24,
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
     alignItems: "center",
   },
-  successIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
@@ -870,30 +821,59 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   appointmentDetails: {
     width: "100%",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     marginBottom: 12,
   },
+  detailIconContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  detailIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  detailTextContainer: {
+    flex: 1,
+  },
   detailLabel: {
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
+    fontSize: scaledFontSize(12),
+    fontWeight: "500",
+    marginBottom: 2,
   },
   detailValue: {
     fontSize: scaledFontSize(16),
-    fontWeight: "500",
+    fontWeight: "600",
   },
   primaryButton: {
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 8,
+    borderRadius: 12,
     width: "100%",
     alignItems: "center",
     marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   buttonText: {
     color: "#FFFFFF",
@@ -901,11 +881,9 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontWeight: "600",
   },
   secondaryButton: {
-    backgroundColor: "transparent",
     paddingVertical: 16,
     paddingHorizontal: 32,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 12,
     width: "100%",
     alignItems: "center",
   },

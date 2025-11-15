@@ -26,6 +26,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 
 /**
  * BookAppointment Component
@@ -39,7 +41,7 @@ import StatusModal from "../../../../components/StatusModal";
  */
 
 interface SupportWorker {
-  id: number;
+  id: string | number;
   name: string;
   title: string;
   avatar: string;
@@ -67,8 +69,11 @@ export default function BookAppointment() {
   const [statusModalMessage, setStatusModalMessage] = useState('');
 
   // Clerk authentication hooks
-  const { signOut, isSignedIn } = useAuth();
+  const { signOut, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+
+  // Use shared Convex client from provider
+  const convex = useConvex();
 
   // Create dynamic styles with text size scaling
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -145,53 +150,40 @@ export default function BookAppointment() {
   }, []);
 
   /**
-   * Fetch support worker details from API
+   * Fetch support worker details from Convex
    */
   const fetchSupportWorker = useCallback(async () => {
+    if (!supportWorkerId) return;
     try {
       setLoading(true);
-      
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/support-workers/${supportWorkerId}`);
-      const result = await response.json();
-
-      if (result.success) {
-        // Transform the data and keep possible FK-friendly identifiers
-        const worker = result.data;
-        const backendWorkerId: number | undefined =
-          (typeof worker.worker_id === 'number' && worker.worker_id) ||
-          (typeof worker.user_id === 'number' && worker.user_id) ||
-          (typeof worker.id === 'number' && worker.id) ||
-          undefined;
-
-        setSupportWorker({
-          id: worker.id,
-          name: `${worker.first_name} ${worker.last_name}`,
-          title: "Support Worker",
-          avatar: worker.avatar_url || "https://via.placeholder.com/150",
-          specialties: worker.specialization 
-            ? worker.specialization.split(',').map((s: string) => s.trim())
-            : [],
-          backendWorkerId,
-          email: worker.email,
-        });
-      } else {
-        showStatusModal('error', 'Error', 'Failed to load support worker details');
+      const worker = await convex.query(api.supportWorkers.getSupportWorker, { workerId: String(supportWorkerId) });
+      if (!worker) {
+        showStatusModal('error', 'Not found', 'Support worker not found');
+        setSupportWorker(null);
+        return;
       }
+      setSupportWorker({
+        id: worker.id,
+        name: worker.name,
+        title: worker.title,
+        avatar: worker.avatar,
+        specialties: worker.specialties || [],
+        backendWorkerId: typeof worker.id === 'number' ? worker.id : undefined,
+        // Email not present in derived worker doc currently
+        email: undefined,
+      });
     } catch (error) {
-      console.error('Error fetching support worker:', error);
+      console.error('Error fetching support worker from Convex:', error);
       showStatusModal('error', 'Error', 'Unable to fetch support worker. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [supportWorkerId, showStatusModal]);
+  }, [supportWorkerId, convex, showStatusModal]);
 
   // Fetch support worker on mount and when id changes
   useEffect(() => {
-    if (supportWorkerId) {
-      fetchSupportWorker();
-    }
-  }, [supportWorkerId, fetchSupportWorker]);
+    fetchSupportWorker();
+  }, [fetchSupportWorker]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -389,13 +381,28 @@ export default function BookAppointment() {
   // Available session types
   const SESSION_TYPES = ["Video Call", "Phone Call", "In Person"];
 
-  // Generate dates for the current week (starting from today)
-
+  // Generate dates for the current week (starting from today in Mountain Time)
   const generateCurrentWeekDates = () => {
     const dates = [];
-    const today = new Date();
     const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    // Get current date in Mountain Time
+    const now = new Date();
+    const mountainParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Denver',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    
+    const get = (type: string) => Number(mountainParts.find(p => p.type === type)?.value || 0);
+    const mountainYear = get('year');
+    const mountainMonth = get('month') - 1; // JavaScript months are 0-indexed
+    const mountainDay = get('day');
+    
+    // Create today's date in Mountain Time
+    const today = new Date(mountainYear, mountainMonth, mountainDay);
     
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
@@ -408,7 +415,10 @@ export default function BookAppointment() {
       
       // Store both display format and ISO format
       const displayDate = `${dayName}, ${monthName} ${dayNumber}, ${year}`;
-      const isoDate = date.toISOString().split('T')[0]; // "2025-10-07"
+      // Format as YYYY-MM-DD in Mountain Time (no UTC conversion)
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const isoDate = `${year}-${month}-${day}`;
       
       dates.push({
         display: displayDate,
@@ -491,47 +501,20 @@ export default function BookAppointment() {
             contentContainerStyle={{ paddingBottom: 120 }}
             showsVerticalScrollIndicator={false}
           >
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Schedule a session with a support worker
+          {/* Page Title */}
+          <Text style={[styles.pageTitle, { color: theme.colors.text }]}>
+            Book Your Session
           </Text>
 
-          {/* Step Indicator - Shows progress through booking process */}
-          <View style={styles.stepsContainer}>
-            <View style={styles.stepRow}>
-              {/* Step 1 - Inactive */}
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>1</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              {/* Step 2 - Active */}
-              <View style={[styles.stepCircle, styles.stepCircleActive, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
-                <Text style={[styles.stepNumber, styles.stepNumberActive]}>
-                  2
-                </Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              {/* Step 3 - Inactive */}
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>3</Text>
-              </View>
-              <View style={[styles.stepConnector, { backgroundColor: theme.colors.border }]} />
-
-              {/* Step 4 - Inactive */}
-              <View style={[styles.stepCircle, { borderColor: theme.colors.primary, backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.stepNumber, { color: theme.colors.primary }]}>4</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Support Worker Card with Avatar and Name */}
-          <View style={[styles.supportWorkerCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.supportWorkerCard, { backgroundColor: '#FAFAFA' }]}>
             <View style={styles.supportWorkerHeader}>
-              <Image
-                source={{ uri: supportWorker.avatar }}
-                style={styles.avatar}
-              />
+              <View style={[styles.avatarCircle, { backgroundColor: '#757575' }]}>
+                <Image
+                  source={{ uri: supportWorker.avatar }}
+                  style={styles.avatar}
+                />
+              </View>
               <View style={styles.supportWorkerInfo}>
                 <Text style={[styles.supportWorkerName, { color: theme.colors.text }]}>
                   {supportWorker.name}
@@ -544,7 +527,7 @@ export default function BookAppointment() {
           </View>
 
           {/* Session Type Selection */}
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Session Type</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Session Type</Text>
           <View style={styles.sessionTypeContainer}>
             {SESSION_TYPES.map((type) => {
               // Determine icon based on session type
@@ -568,23 +551,26 @@ export default function BookAppointment() {
                   key={type}
                   style={[
                     styles.sessionTypeButton,
-                    selectedType === type && styles.sessionTypeButtonSelected,
-                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                    selectedType === type && { borderColor: theme.colors.primary },
+                    { 
+                      backgroundColor: selectedType === type ? '#E3F2FD' : '#F5F5F5'
+                    },
                   ]}
                   onPress={() => setSelectedType(type)}
                 >
-                  <Ionicons
-                    name={iconName as keyof typeof Ionicons.glyphMap}
-                    size={24}
-                    color={selectedType === type ? theme.colors.primary : theme.colors.icon}
-                    style={styles.sessionTypeIcon}
-                  />
+                  <View style={[
+                    styles.sessionTypeIconCircle,
+                    { backgroundColor: selectedType === type ? '#4CAF50' : '#9E9E9E' }
+                  ]}>
+                    <Ionicons
+                      name={iconName as keyof typeof Ionicons.glyphMap}
+                      size={24}
+                      color="#FFFFFF"
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.sessionTypeText,
                       { color: theme.colors.text },
-                      selectedType === type && { color: theme.colors.primary },
                     ]}
                   >
                     {type}
@@ -595,36 +581,37 @@ export default function BookAppointment() {
           </View>
 
           {/* Date and Time Selection */}
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Date and Time</Text>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Date</Text>
 
         {/* Available Dates Card */}
-        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Dates</Text>
+        <View style={[styles.dateCard, { backgroundColor: '#FAFAFA' }]}>
           <View style={styles.datesContainer}>
             {AVAILABLE_DATES.map((dateObj) => (
               <TouchableOpacity
                 key={dateObj.iso}
                 style={[
                   styles.dateItem,
-                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                  selectedDate === dateObj.iso && { borderColor: theme.colors.primary },
+                  { backgroundColor: selectedDate === dateObj.iso ? '#E8F5E9' : '#F5F5F5' },
                 ]}
                 onPress={() => {
                   setSelectedDate(dateObj.iso || null);  // Store ISO: "2025-11-05"
                   setSelectedTime(null);
                 }}
               >
-                <Ionicons
-                  name="calendar"
-                  size={20}
-                  color={selectedDate === dateObj.iso ? theme.colors.primary : theme.colors.icon}
-                  style={styles.dateIcon}
-                />
+                <View style={[
+                  styles.dateIconCircle,
+                  { backgroundColor: selectedDate === dateObj.iso ? '#4CAF50' : '#9E9E9E' }
+                ]}>
+                  <Ionicons
+                    name="calendar"
+                    size={18}
+                    color="#FFFFFF"
+                  />
+                </View>
                 <Text
                   style={[
                     styles.dateText,
                     { color: theme.colors.text },
-                    selectedDate === dateObj.iso && { color: theme.colors.primary },
                   ]}
                 >
                   {dateObj.display}  {/* Show: "Tuesday, November 5, 2025" */}
@@ -637,8 +624,8 @@ export default function BookAppointment() {
           {/* Available Times Card (only shown when date is selected) */}
           {selectedDate ? (
             <>
-              <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-                <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Times</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Time</Text>
+              <View style={[styles.timeCard, { backgroundColor: '#FFFFFF' }]}>
                 <View style={styles.timesContainer}>
                   {AVAILABLE_TIMES.map((time) => {
                     const disabled = isPastInMountain(selectedDate, time);
@@ -647,25 +634,17 @@ export default function BookAppointment() {
                         key={time}
                         style={[
                           styles.timeItem,
-                          { backgroundColor: theme.colors.surface, borderColor: theme.colors.borderLight },
-                          selectedTime === time && { borderColor: theme.colors.primary },
+                          { backgroundColor: selectedTime === time && !disabled ? '#4CAF50' : '#F5F5F5' },
                           disabled && styles.timeItemDisabled,
                         ]}
                         onPress={() => !disabled && setSelectedTime(time)}
                         disabled={disabled}
                         accessibilityState={{ disabled }}
                       >
-                        <Ionicons
-                          name="time"
-                          size={16}
-                          color={disabled ? theme.colors.iconDisabled : (selectedTime === time ? theme.colors.primary : theme.colors.icon)}
-                          style={styles.timeIcon}
-                        />
                         <Text
                           style={[
                             styles.timeText,
-                            { color: disabled ? theme.colors.textSecondary : theme.colors.text },
-                            selectedTime === time && !disabled && { color: theme.colors.primary },
+                            { color: disabled ? theme.colors.textSecondary : (selectedTime === time ? '#FFFFFF' : theme.colors.text) },
                           ]}
                         >
                           {time}
@@ -685,26 +664,29 @@ export default function BookAppointment() {
               }
             </>
           ) : (
-            <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Available Times</Text>
-              <View style={styles.timesContainer}></View>
-              <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
-                Please select available date first
-              </Text>
-            </View>
+            <>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Select Time</Text>
+              <View style={[styles.timeCard, { backgroundColor: '#FFFFFF' }]}>
+                <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                  Please select a date first
+                </Text>
+              </View>
+            </>
           )}
 
           {/* Continue Button (disabled until both date and time are selected) */}
           <TouchableOpacity
             style={[
               styles.continueButton,
-              { backgroundColor: theme.colors.primary },
-              (!selectedDate || !selectedTime) && { backgroundColor: theme.colors.borderLight },
+              { backgroundColor: (!selectedDate || !selectedTime) ? '#E0E0E0' : '#4CAF50' },
             ]}
             onPress={handleContinue}
             disabled={!selectedDate || !selectedTime}
           >
-            <Text style={styles.continueButtonText}>Continue</Text>
+            <View style={styles.buttonContent}>
+              <Text style={[styles.continueButtonText, { color: (!selectedDate || !selectedTime) ? '#9E9E9E' : '#FFFFFF' }]}>Continue</Text>
+              <Ionicons name="arrow-forward" size={20} color={(!selectedDate || !selectedTime) ? '#9E9E9E' : '#FFFFFF'} />
+            </View>
           </TouchableOpacity>
         </ScrollView>
 
@@ -801,16 +783,24 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     zIndex: 1,
   },
   supportWorkerCard: {
-    backgroundColor: "#b7d7b8ff",
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     marginHorizontal: 15,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    backgroundColor: '#757575',
   },
   header: {
     flexDirection: "row",
@@ -909,49 +899,12 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     fontSize: scaledFontSize(16),
     fontWeight: "600",
   },
-  title: {
-    fontSize: scaledFontSize(15),
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 5,
-    textAlign: "center",
-  },
-  stepsContainer: {
-    alignItems: "center",
-    marginBottom: 24,
+  pageTitle: {
+    fontSize: scaledFontSize(24),
+    fontWeight: "bold",
+    marginBottom: 20,
     marginTop: 16,
-  },
-  stepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: "#4CAF50",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "white",
-  },
-  stepCircleActive: {
-    backgroundColor: "#4CAF50",
-  },
-  stepNumber: {
-    fontSize: scaledFontSize(16),
-    color: "#4CAF50",
-    fontWeight: "600",
-  },
-  stepNumberActive: {
-    color: "white",
-  },
-  stepConnector: {
-    width: 40,
-    height: 2,
-    backgroundColor: "#000000",
-    marginHorizontal: 8,
+    textAlign: "center",
   },
   supportWorkerNameHeading: {
     fontSize: scaledFontSize(20),
@@ -968,7 +921,6 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 12,
   },
   supportWorkerInfo: {
     flex: 1,
@@ -984,11 +936,11 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#666",
   },
   sectionTitle: {
-    fontSize: scaledFontSize(15),
-    fontWeight: "600",
+    fontSize: scaledFontSize(16),
+    fontWeight: "bold",
     color: "#333",
-    marginBottom: 10,
-    marginTop: 10,
+    marginBottom: 12,
+    marginTop: 16,
     marginLeft: 16,
   },
   subSectionTitle: {
@@ -1007,22 +959,26 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   },
   sessionTypeButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
+    borderRadius: 12,
     alignItems: "center",
     marginHorizontal: 4,
     justifyContent: "center",
-    backgroundColor: "#F8F9FA",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  sessionTypeButtonSelected: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#4CAF50",
-  },
-  sessionTypeIcon: {
+  sessionTypeIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
+    backgroundColor: '#4CAF50',
   },
   sessionTypeText: {
     fontSize: scaledFontSize(14),
@@ -1033,23 +989,27 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     color: "#2E7D32",
     fontWeight: "600",
   },
-  card: {
-    backgroundColor: "#f1f5f9",
+  dateCard: {
     borderRadius: 12,
-    padding: 20,
+    padding: 12,
     marginHorizontal: 15,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: scaledFontSize(16),
-    fontWeight: "600",
-    color: "#333",
     marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  timeCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 15,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   datesContainer: {
     gap: 10,
@@ -1057,18 +1017,17 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
   dateItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8F9FA",
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 12,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
   },
-  dateItemSelected: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#4CAF50",
-  },
-  dateIcon: {
+  dateIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
+    backgroundColor: '#4CAF50',
   },
   dateText: {
     fontSize: scaledFontSize(14),
@@ -1086,25 +1045,16 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     justifyContent: "space-between",
   },
   timeItem: {
-    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8F9FA",
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
+    justifyContent: "center",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     width: "48%",
     minWidth: 140,
   },
   timeItemDisabled: {
-    opacity: 0.5,
-  },
-  timeItemSelected: {
-    backgroundColor: "#E8F5E9",
-    borderColor: "#4CAF50",
-  },
-  timeIcon: {
-    marginRight: 8,
+    opacity: 0.4,
   },
   timeText: {
     fontSize: scaledFontSize(14),
@@ -1123,20 +1073,24 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     marginHorizontal: 15,
   },
   continueButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 14,
-    borderRadius: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: "center",
     marginTop: 16,
-    marginRight: 50,
-    marginLeft: 50,
+    marginHorizontal: 50,
     marginBottom: 100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  continueButtonDisabled: {
-    backgroundColor: "#C8E6C9",
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   continueButtonText: {
-    color: "#FFFFFF",
     fontSize: scaledFontSize(16),
     fontWeight: "600",
   },

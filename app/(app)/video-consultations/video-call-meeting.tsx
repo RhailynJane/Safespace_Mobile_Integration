@@ -20,7 +20,11 @@ import { useUser } from "@clerk/clerk-expo";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIsFocused } from "@react-navigation/native";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import SendBirdCallService from "../../../lib/sendbird-service";
+import { useConvexVideoSession } from "../../../utils/hooks/useConvexVideoSession";
+import StatusModal from "../../../components/StatusModal";
 
 const { width, height } = Dimensions.get("window");
 
@@ -40,14 +44,26 @@ export default function VideoCallScreen() {
   const params = useLocalSearchParams();
   const supportWorkerId = params.supportWorkerId as string;
   const supportWorkerName = params.supportWorkerName as string || "Support Worker";
+  const sessionIdParam = params.sessionId as string || '';
+  const audioOption = params.audioOption as string || 'phone';
+
+  // Convex whoami — helps detect auth readiness (optional UI use)
+  const whoami = useQuery(api.auth.whoami as any, {} as any) as any;
+
+  // Video session tracking hook
+  const { markConnected, endSession, updateSettings, reportQualityIssue, attachExistingSession, isUsingConvex } = useConvexVideoSession(null);
 
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isMicOn, setIsMicOn] = useState(true);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(audioOption !== 'none');
+  // Chat removed per request
   const [isRaiseHand, setIsRaiseHand] = useState(false);
   const [isEmojiPanelOpen, setIsEmojiPanelOpen] = useState(false);
+  const [isQualityModalOpen, setIsQualityModalOpen] = useState(false);
+  const [qualityIssueText, setQualityIssueText] = useState("");
+  const [qualitySubmitting, setQualitySubmitting] = useState(false);
+  const [qualityFeedback, setQualityFeedback] = useState<string | null>(null);
   const [messages, setMessages] = useState(initialMessages);
-  const [newMessage, setNewMessage] = useState("");
+  // Chat removed
   const [reactions, setReactions] = useState<
     { id: number; emoji: string; position: { x: number; y: number }; opacity: Animated.Value }[]
   >([]);
@@ -62,9 +78,10 @@ export default function VideoCallScreen() {
   // Camera & permissions state
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('front');
-  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraReady, setCameraReady] = useState(true);
   const [cameraRefresh, setCameraRefresh] = useState(0);
   const [showFullCamera, setShowFullCamera] = useState(false);
+  const [showCamera, setShowCamera] = useState(true);
 
   const callDurationInterval = useRef<NodeJS.Timeout | null>(null);
   const cameraReadyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,9 +101,21 @@ export default function VideoCallScreen() {
 
   // Flip between front/back camera
   const handleFlipCamera = useCallback(() => {
-    setCameraReady(false);
     setFacing((prev) => (prev === 'front' ? 'back' : 'front'));
+    setCameraRefresh((prev) => prev + 1);
   }, []);
+
+  // Start call duration timer (defined early for use in callbacks)
+  const startCallTimer = useCallback(() => {
+    // Mark session as connected in Convex
+    if (isUsingConvex && sessionIdParam) {
+      markConnected(sessionIdParam);
+    }
+
+    callDurationInterval.current = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
+  }, [isUsingConvex, sessionIdParam, markConnected]);
 
   // Set up call event listeners (defined before initializeCall for hook deps ordering)
   const setupCallListeners = useCallback((call: any) => {
@@ -104,7 +133,7 @@ export default function VideoCallScreen() {
       setCallStatus("Call Ended");
       setIsCallConnected(false);
       setTimeout(() => {
-        router.back();
+        router.replace("/(app)/video-consultations");
       }, 2000);
     };
 
@@ -115,7 +144,7 @@ export default function VideoCallScreen() {
     call.onRemoteVideoSettingsChanged = () => {
       console.log("Remote video settings changed");
     };
-  }, []);
+  }, [startCallTimer]);
 
   // Initialize SendBird and start call
   const initializeCall = useCallback(async () => {
@@ -152,14 +181,7 @@ export default function VideoCallScreen() {
         [{ text: "OK", onPress: () => router.back() }]
       );
     }
-  }, [isDemoMode, supportWorkerId, user?.id, setupCallListeners]);
-
-  // Start call duration timer
-  const startCallTimer = () => {
-    callDurationInterval.current = setInterval(() => {
-      setCallDuration((prev) => prev + 1);
-    }, 1000);
-  };
+  }, [isDemoMode, supportWorkerId, user?.id, setupCallListeners, startCallTimer]);
 
   // Format call duration
   const formatDuration = (seconds: number) => {
@@ -168,28 +190,24 @@ export default function VideoCallScreen() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleLeaveCall = () => {
-    Alert.alert(
-      "End Call",
-      "Are you sure you want to end this call?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "End Call",
-          style: "destructive",
-          onPress: () => endCall(),
-        },
-      ]
-    );
-  };
+  const [endModalVisible, setEndModalVisible] = useState(false);
+  const handleLeaveCall = () => setEndModalVisible(true);
 
   const endCall = useCallback(async () => {
+    // End session in Convex first
+    if (isUsingConvex && sessionIdParam) {
+      await endSession({
+        sessionIdToEnd: sessionIdParam,
+        endReason: 'user_left',
+      });
+    }
+
     // Demo mode - just go back
     if (isDemoMode) {
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      router.back();
+      router.replace("/(app)/video-consultations");
       return;
     }
 
@@ -199,55 +217,86 @@ export default function VideoCallScreen() {
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      router.back();
+      router.replace("/(app)/video-consultations");
     } catch (error) {
       console.error("Error ending call:", error);
-      router.back();
+      router.replace("/(app)/video-consultations");
     }
-  }, [isDemoMode]);
+  }, [isDemoMode, isUsingConvex, sessionIdParam, endSession]);
+
+  // End session when app goes to background (user left call)
+  useEffect(() => {
+    const sub = (state: string) => {
+      if (state === 'background' || state === 'inactive') {
+        endCall();
+      }
+    };
+    const { AppState } = require('react-native');
+    const subscription = AppState.addEventListener('change', sub);
+    return () => {
+      subscription?.remove?.();
+    };
+  }, [endCall]);
 
   useEffect(() => {
+    // Attach existing session id so updateSettings/reportQualityIssue works
+    if (sessionIdParam) attachExistingSession(sessionIdParam);
     initializeCall();
 
+    // Capture ref value at effect creation time
+    const timeoutRef = cameraReadyTimeoutRef;
+    
     return () => {
       if (callDurationInterval.current) {
         clearInterval(callDurationInterval.current);
       }
-      if (cameraReadyTimeoutRef.current) {
-        clearTimeout(cameraReadyTimeoutRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-  }, [initializeCall]);
+  }, [initializeCall, sessionIdParam, attachExistingSession]);
 
-  // Add a timeout fallback for camera ready
+  // Request camera permissions on mount
   useEffect(() => {
-    if (isFocused && isCameraOn && permission?.granted && !cameraReady) {
-      // Clear any existing timeout
-      if (cameraReadyTimeoutRef.current) {
-        clearTimeout(cameraReadyTimeoutRef.current);
-      }
-      
-      // Set camera as ready after 3 seconds if it hasn't triggered onCameraReady
-      cameraReadyTimeoutRef.current = setTimeout(() => {
-        console.log('Camera ready timeout - forcing ready state');
-        setCameraReady(true);
-      }, 3000);
+    if (isFocused && !permission?.granted && permission?.canAskAgain) {
+      console.log('Requesting camera permission...');
+      requestCameraPermissionImmediately();
     }
-    
-    return () => {
-      if (cameraReadyTimeoutRef.current) {
-        clearTimeout(cameraReadyTimeoutRef.current);
-      }
-    };
-  }, [isFocused, isCameraOn, permission?.granted, cameraReady]);
+  }, [isFocused, permission?.granted, permission?.canAskAgain, requestCameraPermissionImmediately]);
+
+  // Request camera permissions on mount
+  useEffect(() => {
+    if (isFocused && !permission?.granted && permission?.canAskAgain) {
+      console.log('🎥 Requesting camera permission...');
+      requestCameraPermissionImmediately();
+    } else if (permission?.granted) {
+      console.log('✅ Camera permission already granted');
+    } else if (!permission?.canAskAgain) {
+      console.log('⚠️ Camera permission denied - user must enable in settings');
+    }
+  }, [isFocused, permission?.granted, permission?.canAskAgain, requestCameraPermissionImmediately]);
+
+  // Ensure camera is ready when permissions are granted
+  useEffect(() => {
+    if (isFocused && isCameraOn && permission?.granted && showCamera) {
+      console.log('Camera ready - permissions granted');
+      setCameraReady(true);
+    }
+  }, [isFocused, isCameraOn, permission?.granted, showCamera]);
 
   const handleToggleCamera = () => {
     const newState = !isCameraOn;
     setIsCameraOn(newState);
     
     if (newState) {
-      // Reset camera ready state when turning camera back on
-      setCameraReady(false);
+      // Refresh camera when turning it back on
+      setCameraRefresh((prev) => prev + 1);
+      setCameraReady(true);
+    }
+    
+    // Update session settings in Convex
+    if (isUsingConvex && sessionIdParam) {
+      updateSettings({ cameraEnabled: newState });
     }
     
     if (!isDemoMode) {
@@ -259,17 +308,32 @@ export default function VideoCallScreen() {
     const newState = !isMicOn;
     setIsMicOn(newState);
     
+    // Update session settings in Convex
+    if (isUsingConvex && sessionIdParam) {
+      updateSettings({ micEnabled: newState });
+    }
+    
     if (!isDemoMode) {
       SendBirdCallService.toggleAudio(newState);
     }
   };
 
-  const handleToggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-    if (!isChatOpen) {
-      setIsEmojiPanelOpen(false);
+  // Apply initial mic state based on audioOption immediately when session is available
+  useEffect(() => {
+    if (!sessionIdParam) return;
+    try {
+      if (isUsingConvex) {
+        updateSettings({ micEnabled: isMicOn });
+      }
+      if (!isDemoMode) {
+        SendBirdCallService.toggleAudio(isMicOn);
+      }
+    } catch (e) {
+      // no-op: initial mic state propagation is best-effort
     }
-  };
+  }, [sessionIdParam, isUsingConvex, isMicOn, updateSettings, isDemoMode]);
+
+  // Chat removed
 
   const handleToggleRaiseHand = () => {
     setIsRaiseHand(!isRaiseHand);
@@ -277,48 +341,67 @@ export default function VideoCallScreen() {
 
   const handleToggleEmojiPanel = () => {
     setIsEmojiPanelOpen(!isEmojiPanelOpen);
-    if (!isEmojiPanelOpen && isChatOpen) {
-      setIsChatOpen(false);
+  };
+
+  // Quality Issue Reporting Helpers
+  const presetQualityIssues = [
+    "Audio cutting out",
+    "Video freezing",
+    "Echo in audio",
+    "Connection dropped",
+    "Low video quality",
+  ];
+
+  const openQualityModal = () => {
+    setIsQualityModalOpen(true);
+    setQualityFeedback(null);
+    setQualityIssueText("");
+  };
+
+  const submitQualityIssue = async () => {
+    if (!qualityIssueText.trim()) return;
+    setQualitySubmitting(true);
+    try {
+      if (isUsingConvex && sessionIdParam) {
+        await reportQualityIssue(qualityIssueText.trim());
+        setQualityFeedback("Issue reported to support. Thank you!");
+      } else {
+        setQualityFeedback("Issue captured locally (offline mode)");
+      }
+      setTimeout(() => setIsQualityModalOpen(false), 1200);
+    } catch (e) {
+      setQualityFeedback("Failed to report issue");
+    } finally {
+      setQualitySubmitting(false);
     }
   };
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const newMsg = {
-        id: messages.length + 1,
-        text: newMessage,
-        sender: "You",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages([...messages, newMsg]);
-      setNewMessage("");
-    }
-  };
+  // Chat removed
 
   const handleAddReaction = (emoji: string) => {
     const newReaction = {
       id: Date.now(),
       emoji,
       position: {
-        x: Math.random() * (width - 100) + 50,
-        y: Math.random() * (height - 200) + 100,
+        x: Math.random() * (width - 120) + 60,
+        y: Math.random() * (height - 300) + 140,
       },
       opacity: new Animated.Value(1),
     };
     
     setReactions([...reactions, newReaction]);
     
-    Animated.sequence([
-      Animated.timing(newReaction.opacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(newReaction.opacity, {
-        toValue: 0,
-        duration: 2000,
-        useNativeDriver: true,
-      }),
+    const driftX = new Animated.Value(0);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(newReaction.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(newReaction.opacity, { toValue: 0, duration: 2200, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(driftX, { toValue: 15, duration: 800, useNativeDriver: true }),
+        Animated.timing(driftX, { toValue: -10, duration: 800, useNativeDriver: true }),
+        Animated.timing(driftX, { toValue: 0, duration: 800, useNativeDriver: true }),
+      ]),
     ]).start();
     
     setTimeout(() => {
@@ -329,7 +412,7 @@ export default function VideoCallScreen() {
   };
 
   const handleCameraReady = useCallback(() => {
-    console.log('Camera is ready');
+    console.log('✅ Camera is ready and initialized');
     setCameraReady(true);
     if (cameraReadyTimeoutRef.current) {
       clearTimeout(cameraReadyTimeoutRef.current);
@@ -337,9 +420,21 @@ export default function VideoCallScreen() {
   }, []);
 
   const handleCameraError = useCallback((e: any) => {
-    console.log('CameraView onMountError', e?.nativeEvent || e);
-    setCameraReady(false);
-  }, []);
+    console.error('❌ CameraView mount error:', e?.nativeEvent || e);
+    console.log('📊 Camera debug:', { 
+      isCameraOn, 
+      facing, 
+      hasPermission: permission?.granted,
+      isFocused,
+      showCamera,
+      cameraRefresh 
+    });
+    // Try to recover by refreshing camera
+    setTimeout(() => {
+      console.log('🔄 Attempting camera recovery...');
+      setCameraRefresh(prev => prev + 1);
+    }, 1000);
+  }, [isCameraOn, facing, permission?.granted, isFocused, showCamera, cameraRefresh]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#1A1A1A' }}>
@@ -383,13 +478,13 @@ export default function VideoCallScreen() {
               style={[
                 styles.selfVideoPreview,
                 Platform.OS === 'ios' ? styles.previewClipIOS : styles.previewClipAndroid,
-                { bottom: Math.max(insets.bottom, 8) + 110 }
+                { bottom: Math.max(insets.bottom, 8) + 60 }
               ]}
             >
-              {isFocused && isCameraOn && permission?.granted ? (
+              {isFocused && isCameraOn && permission?.granted && showCamera ? (
                 <>
                   <CameraView
-                    style={[styles.camera, { backgroundColor: '#000' }]}
+                    style={{ width: '100%', height: '100%' }}
                     facing={facing}
                     onCameraReady={handleCameraReady}
                     onMountError={handleCameraError}
@@ -413,20 +508,6 @@ export default function VideoCallScreen() {
                   {Platform.OS === 'android' && (
                     <View pointerEvents="none" style={styles.previewBorderOverlay} />
                   )}
-                  {!cameraReady && (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setCameraReady(false);
-                        setCameraRefresh(r => r + 1);
-                      }}
-                      style={[styles.cameraOffOverlay, { position: 'absolute', left: 0, top: 0, zIndex: 10 }]}
-                    >
-                      <Ionicons name="videocam" size={24} color="#FFFFFF" />
-                      <Text style={styles.cameraOffText}>Initializing camera…</Text>
-                      <Text style={[styles.cameraOffText, { fontSize: 10, marginTop: 4 }]}>(tap to refresh)</Text>
-                    </TouchableOpacity>
-                  )}
                 </>
               ) : (
                 <View style={styles.cameraOffOverlay}>
@@ -447,7 +528,10 @@ export default function VideoCallScreen() {
             </View>
 
             {/* Call Status */}
-            <View style={styles.callStatus}>
+            <View style={[
+              styles.callStatus,
+              isCallConnected ? { top: 100 } : { top: 20 }
+            ]}>
               <Text style={styles.callStatusText}>
                 {isCallConnected ? formatDuration(callDuration) : callStatus}
               </Text>
@@ -460,6 +544,14 @@ export default function VideoCallScreen() {
                 <Text style={styles.connectionText}>
                   {permission?.granted ? "Connected to Support Worker" : "Tap to grant camera access"}
                 </Text>
+              </View>
+            )}
+
+            {/* Hand Raised indicator */}
+            {isRaiseHand && (
+              <View style={[styles.connectionBanner, { top: 140, backgroundColor: 'rgba(255, 193, 7, 0.95)' }]}>
+                <Ionicons name="hand-left" size={20} color="#000" />
+                <Text style={[styles.connectionText, { color: '#000' }]}>Hand Raised</Text>
               </View>
             )}
 
@@ -480,6 +572,8 @@ export default function VideoCallScreen() {
                           outputRange: [0, -50],
                         }),
                       },
+                      // slight horizontal drift for a nicer effect
+                      { translateX: reaction.opacity.interpolate({ inputRange: [0, 1], outputRange: [0, 10] }) },
                     ],
                   },
                 ]}
@@ -519,7 +613,7 @@ export default function VideoCallScreen() {
             <View style={{ flex: 1 }}>
               {isFocused && isCameraOn && permission?.granted ? (
                 <CameraView
-                  style={{ flex: 1, backgroundColor: '#000' }}
+                  style={{ flex: 1 }}
                   facing={facing}
                   onCameraReady={handleCameraReady}
                   onMountError={handleCameraError}
@@ -545,71 +639,12 @@ export default function VideoCallScreen() {
           </SafeAreaView>
         </Modal>
 
-        {/* Chat Panel */}
-        {isChatOpen && (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.chatPanelContainer}
-          >
-            <View style={styles.chatPanel}>
-              <View style={styles.chatHeader}>
-                <Text style={styles.chatTitle}>Chat</Text>
-                <TouchableOpacity onPress={handleToggleChat}>
-                  <Ionicons name="close" size={24} color="#333333" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView 
-                style={styles.messagesContainer}
-                contentContainerStyle={{ paddingBottom: 16 }}
-              >
-                {messages.map((message) => (
-                  <View
-                    key={message.id}
-                    style={[
-                      styles.messageBubble,
-                      message.sender === "You" ? styles.myMessage : styles.theirMessage,
-                    ]}
-                  >
-                    <Text style={styles.messageText}>{message.text}</Text>
-                    <Text style={styles.messageTime}>{message.time}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-              <View style={styles.messageInputContainer}>
-                <TextInput
-                  style={styles.messageInput}
-                  placeholder="Type a message..."
-                  value={newMessage}
-                  onChangeText={setNewMessage}
-                  multiline
-                  maxLength={500}
-                />
-                <TouchableOpacity 
-                  style={styles.sendButton}
-                  onPress={handleSendMessage}
-                  disabled={!newMessage.trim()}
-                >
-                  <Ionicons 
-                    name="send" 
-                    size={20} 
-                    color={newMessage.trim() ? "#4CAF50" : "#CCC"} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        )}
+        {/* Chat removed */}
 
         {/* Bottom Controls and Leave Button */}
         <View style={{ backgroundColor: '#2D2D2D', paddingTop: 8, paddingBottom: Math.max(insets.bottom, 8) + 16 }}>
           <View style={styles.controlsRow}>
-            <TouchableOpacity 
-              style={[styles.controlButton, isChatOpen && styles.controlButtonActive]}
-              onPress={handleToggleChat}
-            >
-              <Ionicons name="chatbubble" size={24} color="#FFFFFF" />
-              <Text style={styles.controlText}>Chat</Text>
-            </TouchableOpacity>
+            {/* Chat button removed */}
             <TouchableOpacity 
               style={[styles.controlButton, isRaiseHand && styles.controlButtonActive]}
               onPress={handleToggleRaiseHand}
@@ -650,6 +685,13 @@ export default function VideoCallScreen() {
               />
               <Text style={styles.controlText}>Mic</Text>
             </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.controlButton, isQualityModalOpen && styles.controlButtonActive]}
+              onPress={openQualityModal}
+            >
+              <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
+              <Text style={styles.controlText}>Issue</Text>
+            </TouchableOpacity>
           </View>
           <View style={[styles.leaveButtonContainer, { marginBottom: 8 }]}> 
             <TouchableOpacity 
@@ -662,6 +704,85 @@ export default function VideoCallScreen() {
           </View>
         </View>
       </View>
+
+      {/* Quality Issue Modal */}
+      <Modal
+        visible={isQualityModalOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIsQualityModalOpen(false)}
+      >
+        <View style={styles.qualityModalOverlay}>
+          <View style={styles.qualityModalCard}>
+            <View style={styles.qualityModalHeader}>
+              <Text style={styles.qualityModalTitle}>Report Quality Issue</Text>
+              <TouchableOpacity onPress={() => setIsQualityModalOpen(false)}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.qualityModalSubtitle}>Select an issue or describe briefly.</Text>
+            <View style={styles.qualityPresetContainer}>
+              {presetQualityIssues.map(issue => (
+                <TouchableOpacity
+                  key={issue}
+                  style={[
+                    styles.presetIssueChip,
+                    qualityIssueText === issue && styles.presetIssueChipActive,
+                  ]}
+                  onPress={() => setQualityIssueText(issue)}
+                >
+                  <Text style={[
+                    styles.presetIssueText,
+                    qualityIssueText === issue && styles.presetIssueTextActive,
+                  ]}>{issue}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.qualityInput}
+              placeholder="Describe the issue (optional)"
+              placeholderTextColor="#888"
+              multiline
+              value={qualityIssueText}
+              onChangeText={setQualityIssueText}
+              maxLength={200}
+            />
+            {qualityFeedback && (
+              <Text style={styles.qualityFeedbackText}>{qualityFeedback}</Text>
+            )}
+            <View style={styles.qualityActions}>
+              <TouchableOpacity
+                style={styles.qualityCancelButton}
+                onPress={() => setIsQualityModalOpen(false)}
+                disabled={qualitySubmitting}
+              >
+                <Text style={styles.qualityCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.qualitySubmitButton, !qualityIssueText.trim() && { opacity: 0.5 }]}
+                onPress={submitQualityIssue}
+                disabled={!qualityIssueText.trim() || qualitySubmitting}
+              >
+                <Text style={styles.qualitySubmitText}>{qualitySubmitting ? 'Sending…' : 'Submit'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* End Call Confirmation (StatusModal) */}
+      <StatusModal
+        visible={endModalVisible}
+        type="info"
+        title="End Call?"
+        message="Are you sure you want to end this call?"
+        buttonText="Keep Calling"
+        onClose={() => setEndModalVisible(false)}
+        secondaryButtonText="End Call"
+        secondaryButtonType="destructive"
+        onSecondaryButtonPress={() => { setEndModalVisible(false); endCall(); }}
+      />
+
     </SafeAreaView>
   );
 }
@@ -870,9 +991,10 @@ const styles = StyleSheet.create({
   },
   controlsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    justifyContent: "center",
+    marginBottom: 6,
     flexWrap: "wrap",
+    gap: 8,
   },
   controlButton: {
     alignItems: "center",
@@ -880,7 +1002,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#404040",
     minWidth: 60,
-    marginBottom: 5,
+    marginBottom: 6,
+    marginRight: 8,
   },
   controlButtonActive: {
     backgroundColor: "#4CAF50",
@@ -1028,5 +1151,107 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     padding: 8,
+  },
+  qualityModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  qualityModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+  },
+  qualityModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  qualityModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+  },
+  qualityModalSubtitle: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 10,
+  },
+  qualityPresetContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  presetIssueChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F1F1',
+  },
+  presetIssueChipActive: {
+    backgroundColor: '#4CAF50',
+  },
+  presetIssueText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '600',
+  },
+  presetIssueTextActive: {
+    color: '#FFF',
+  },
+  qualityInput: {
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 10,
+    padding: 10,
+    minHeight: 70,
+    textAlignVertical: 'top',
+    fontSize: 13,
+    color: '#333',
+    backgroundColor: '#FAFAFA',
+    marginBottom: 12,
+  },
+  qualityFeedbackText: {
+    fontSize: 12,
+    color: '#2E7D32',
+    marginBottom: 8,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  qualityActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  qualityCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CCC',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+  },
+  qualityCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+  },
+  qualitySubmitButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+  },
+  qualitySubmitText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
   },
 });

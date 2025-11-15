@@ -14,10 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useSignIn } from "@clerk/clerk-expo";
+import { useSignIn, useAuth } from "@clerk/clerk-expo";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 import StatusModal from "../../components/StatusModal";
 import { useTheme } from "../../contexts/ThemeContext";
+import { sendConvexHeartbeat, createConvexClient } from "../../utils/convexAuthSync";
 
 export default function ResetPasswordScreen() {
   const { theme } = useTheme();
@@ -59,6 +60,7 @@ export default function ResetPasswordScreen() {
   };
 
   const { isLoaded, signIn, setActive } = useSignIn();
+  const { getToken } = useAuth();
 
   const initializeResetPassword = async () => {
     if (!isLoaded || !email) return;
@@ -141,6 +143,14 @@ export default function ResetPasswordScreen() {
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
+        
+        // Send heartbeat to Convex after password reset
+        try {
+          const convexClient = createConvexClient(getToken);
+          await sendConvexHeartbeat(convexClient, 'online');
+        } catch (convexError) {
+          console.warn('⚠️ Failed to sync with Convex after password reset:', convexError);
+        }
         
         showSuccessModal(
           "Password Reset Successful",
