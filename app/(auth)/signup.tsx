@@ -315,12 +315,13 @@ export default function SignupScreen() {
             }
           }
 
-          // Sync user to Convex after successful signup
+          // Sync user to Convex after successful signup (including org if selected)
           await completeConvexAuthFlow(getToken, {
             clerkUserId: signUpAttempt.createdUserId!,
             email: signupData.email,
             firstName: signupData.firstName,
             lastName: signupData.lastName,
+            orgId: signupData.organization,
           });
 
           setCurrentStep("success");

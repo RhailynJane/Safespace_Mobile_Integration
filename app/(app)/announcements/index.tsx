@@ -12,15 +12,46 @@ import { router } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
+// Supported organization ids
+const ORG_IDS = [
+  "cmha-calgary",
+  "cmha-edmonton",
+  "sait",
+  "unaffiliated",
+] as const;
+type OrgId = typeof ORG_IDS[number];
+
+function isOrgId(value: unknown): value is OrgId {
+  return typeof value === "string" && (ORG_IDS as readonly string[]).includes(value);
+}
+
 const AnnouncementsScreen: React.FC = () => {
   const { theme } = useTheme();
   const { userId } = useAuth();
   const { user } = useUser();
 
-  const orgId = useMemo(() => {
-    const meta = (user?.publicMetadata as any) || {};
-    return meta.orgId || "cmha-calgary";
-  }, [user?.publicMetadata]);
+  // Prefer Convex users table org; fall back to Clerk publicMetadata
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId: OrgId = useMemo(() => {
+    let candidate: unknown = undefined;
+    if (typeof myOrgFromConvex === "string" && myOrgFromConvex.length > 0) candidate = myOrgFromConvex;
+    if (candidate === undefined) {
+      const meta = (user?.publicMetadata as any) || {};
+      candidate = meta.orgId;
+    }
+    return isOrgId(candidate) ? candidate : "cmha-calgary";
+  }, [myOrgFromConvex, user?.publicMetadata]);
+
+  // Organization meta - colors and subtitles for small org banners
+  const orgMeta = useMemo<Record<OrgId, { label: string; color: string; subtitle: string }>>(
+    () => ({
+      "cmha-calgary": { label: "CMHA Calgary", color: "#4CAF50", subtitle: "Canadian Mental Health Association - Calgary" },
+      "cmha-edmonton": { label: "CMHA Edmonton", color: "#7CB9A9", subtitle: "Canadian Mental Health Association - Edmonton" },
+      "sait": { label: "SAIT", color: "#0055A4", subtitle: "Southern Alberta Institute of Technology" },
+      "unaffiliated": { label: "Unaffiliated", color: theme.colors.primary, subtitle: "No organization selected" },
+    }),
+    [theme.colors.primary]
+  );
 
   const data = useQuery(api.announcements.listByOrg, orgId ? { orgId, activeOnly: true, limit: 100 } : "skip");
   const seed = useMutation(api.announcements.seedSampleAnnouncements);
@@ -142,6 +173,16 @@ const AnnouncementsScreen: React.FC = () => {
         <AppHeader title="Announcements" showBack />
         
         {/* Stats Header */}
+        {/* Optional org banner: shows org label and short subtitle for clarity */}
+        {orgMeta[orgId] && (
+          <View style={[styles.orgBanner, { backgroundColor: orgMeta[orgId].color }]}> 
+            <Ionicons name="ribbon" size={18} color="#fff" />
+            <View style={{ marginLeft: 10 }}>
+              <Text style={[styles.orgBannerTitle, { color: '#fff' }]}>{orgMeta[orgId].label}</Text>
+              <Text style={[styles.orgBannerSubtitle, { color: 'rgba(255,255,255,0.9)' }]} numberOfLines={1}>{orgMeta[orgId].subtitle}</Text>
+            </View>
+          </View>
+        )}
         <View style={[styles.statsContainer, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.statBox}>
             <Ionicons name="business-outline" size={20} color="#4CAF50" />
@@ -206,6 +247,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+  },
+  orgBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  orgBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  orgBannerSubtitle: {
+    fontSize: 12,
   },
   statBox: { flex: 1, alignItems: "center", gap: 4 },
   statLabel: { fontSize: 11, marginTop: 4 },

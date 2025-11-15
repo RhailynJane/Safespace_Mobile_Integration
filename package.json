@@ -23,6 +23,8 @@
     "test:load": "artillery run testing/performance/load-test-config.js --output testing/performance/report.json",
     "test:load:report": "artillery report testing/performance/report.json --output testing/performance/report.html",
     "convex:dev": "convex dev",
+    "convex:set-org": "node scripts/set-user-org.js",
+    "convex:reseed-announcements": "node scripts/reseed-announcements.js",
     "convex:deploy": "convex deploy",
     "seed:resources": "npx tsx scripts/seedResources.ts",
     "test:apis": "npx tsx scripts/testExternalApis.ts"

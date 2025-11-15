@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const syncCurrentUserOrg = mutation({
@@ -34,5 +34,34 @@ export const syncCurrentUserOrg = mutation({
     });
 
     return { created: true };
+  },
+});
+
+// Admin utility: set a user's org by email
+export const setOrgByEmail = mutation({
+  args: { email: v.string(), orgId: v.string() },
+  handler: async (ctx, { email, orgId }) => {
+    // Note: protect as needed (e.g., restrict to admin users)
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q: any) => q.eq("email", email))
+      .first();
+    if (!user) throw new Error("User not found for email: " + email);
+    await ctx.db.patch(user._id, { orgId, updatedAt: Date.now() });
+    return { ok: true } as const;
+  },
+});
+
+// Get current user's organization from Convex users table
+export const getMyOrg = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const rec = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q: any) => q.eq("clerkId", identity.subject))
+      .first();
+    return rec?.orgId ?? null;
   },
 });

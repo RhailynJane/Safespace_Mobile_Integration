@@ -12,7 +12,7 @@ export default defineSchema({
 		orgId: v.optional(v.string()), // Organization identifier for scoping
 		createdAt: v.number(),
 		updatedAt: v.number(),
-	}).index("by_clerkId", ["clerkId"]).index("by_orgId", ["orgId"]),
+	}).index("by_clerkId", ["clerkId"]).index("by_orgId", ["orgId"]).index("by_email", ["email"]),
 	presence: defineTable({
 		userId: v.string(),
 		status: v.string(), // e.g., 'online' | 'away'
