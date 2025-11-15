@@ -91,7 +91,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     if (contextNotifications && contextNotifications.length >= 0) {
       const mapped: Notification[] = contextNotifications.map((r: any) => ({
-        id: String(r.id),
+        id: r.id, // Keep original ID (don't convert to string)
         title: r.title,
         message: r.message,
         time: r.time,
@@ -143,9 +143,10 @@ export default function NotificationsScreen() {
     );
 
     try {
-  await convex.mutation(api.notifications.markAsRead, { notificationId: id as any });
-      // Show success feedback for the action
-      showStatusModal('success', 'Notification Read', 'Notification marked as read.');
+      // Pass the ID directly without converting to string - Convex expects the original ID type
+      await convex.mutation(api.notifications.markAsRead, { notificationId: id as any });
+      // Refresh notifications from context to ensure sync
+      refreshNotifications();
     } catch (e) {
       console.log('Failed to mark notification as read:', e);
       // Rollback on error
