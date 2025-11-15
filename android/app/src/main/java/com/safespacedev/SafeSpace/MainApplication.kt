@@ -1,4 +1,4 @@
-package com.safespacedev.SafeSpace
+package com.safespace
 
 import android.app.Application
 import android.content.res.Configuration

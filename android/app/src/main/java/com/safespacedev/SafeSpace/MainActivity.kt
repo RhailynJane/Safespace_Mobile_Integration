@@ -1,4 +1,4 @@
-package com.safespacedev.SafeSpace
+package com.safespace
 
 import android.os.Build
 import android.os.Bundle

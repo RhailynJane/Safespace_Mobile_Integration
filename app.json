@@ -57,7 +57,7 @@
       }
     },
     "android": {
-      "package": "com.safespacedev.SafeSpace",
+      "package": "com.safespace",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
