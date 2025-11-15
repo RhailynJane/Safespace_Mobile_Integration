@@ -13,6 +13,7 @@ interface ConvexAuthSyncOptions {
   firstName?: string;
   lastName?: string;
   imageUrl?: string;
+  orgId?: string; // optional organization to set for the user
 }
 
 /**
@@ -133,6 +134,17 @@ export async function completeConvexAuthFlow(
 
   // Sync user data
   await syncUserToConvex(client, options);
+
+  // Optionally sync the organization to Convex users table
+  if (options.orgId) {
+    try {
+      const { api } = await import("../convex/_generated/api");
+      await client.mutation(api.users.syncCurrentUserOrg, { orgId: options.orgId });
+      console.log('✅ User org synced to Convex:', options.orgId);
+    } catch (e) {
+      console.warn('⚠️ Failed to sync org to Convex (non-blocking):', e);
+    }
+  }
 
   // Send initial presence heartbeat
   await sendConvexHeartbeat(client, 'online');

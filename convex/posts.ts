@@ -11,7 +11,18 @@ export const list = query({
   },
   handler: async (ctx: any, args: { limit?: number; category?: string }) => {
     const limit = args.limit ?? 20;
-    
+    // Determine current user's org
+    const identity = await ctx.auth.getUserIdentity();
+    const currentUserId = identity?.subject as string | undefined;
+    let currentOrgId: string | undefined;
+    if (currentUserId) {
+      const me = await ctx.db
+        .query("users")
+        .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", currentUserId))
+        .first();
+      currentOrgId = me?.orgId as string | undefined;
+    }
+
     let q = ctx.db.query("communityPosts");
     
     // Filter by category if provided
@@ -23,9 +34,6 @@ export const list = query({
     
     const rows = await q.order("desc").take(limit);
     const publicRows = rows.filter((p: any) => !p.isDraft);
-
-    const identity = await ctx.auth.getUserIdentity();
-    const currentUserId = identity?.subject as string | undefined;
 
     // Enrich with reaction counts, author info, and current user's reaction
     const enriched = await Promise.all(publicRows.map(async (p: any) => {
@@ -56,15 +64,21 @@ export const list = query({
         .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", p.authorId))
         .first();
 
-      return {
+      const post = {
         ...p,
         reactionCounts, // array of { e, c }
         userReaction,   // emoji or null
         authorName: author?.firstName || "Community Member",
         authorImage: profile?.profileImageUrl || null,
+        authorOrgId: author?.orgId,
       };
+      return post;
     }));
-    return enriched;
+    // Filter to same org, if current org is known
+    const filtered = currentOrgId
+      ? enriched.filter((p: any) => p.authorOrgId === currentOrgId)
+      : enriched;
+    return filtered;
   },
 });
 
@@ -134,6 +148,14 @@ export const bookmarkedPosts = query({
     const userId = identity.subject as string;
     const limit = args.limit ?? 50;
 
+    // Determine current user's org for filtering
+    let currentOrgId: string | undefined;
+    const me = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (qb: any) => qb.eq("clerkId", userId))
+      .first();
+    currentOrgId = me?.orgId as string | undefined;
+
     // Get user's bookmarks
     const bookmarks = await ctx.db
       .query("postBookmarks")
@@ -182,9 +204,13 @@ export const bookmarkedPosts = query({
         userReaction,
         authorName: author?.firstName || "Community Member",
         authorImage: profile?.profileImageUrl || null,
+        authorOrgId: author?.orgId,
       };
     }));
-    return enriched;
+    const filtered = currentOrgId
+      ? enriched.filter((p: any) => p.authorOrgId === currentOrgId)
+      : enriched;
+    return filtered;
   },
 });
 

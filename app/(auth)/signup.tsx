@@ -34,6 +34,7 @@ export interface SignupData {
   email: string;
   age: string;
   phoneNumber: string;
+  organization: string;
   password: string;
   confirmPassword: string;
   verificationCode: string;
@@ -55,6 +56,7 @@ export default function SignupScreen() {
     email: "",
     age: "",
     phoneNumber: "",
+    organization: "",
     password: "",
     confirmPassword: "",
     verificationCode: "",
@@ -313,12 +315,13 @@ export default function SignupScreen() {
             }
           }
 
-          // Sync user to Convex after successful signup
+          // Sync user to Convex after successful signup (including org if selected)
           await completeConvexAuthFlow(getToken, {
             clerkUserId: signUpAttempt.createdUserId!,
             email: signupData.email,
             firstName: signupData.firstName,
             lastName: signupData.lastName,
+            orgId: signupData.organization,
           });
 
           setCurrentStep("success");

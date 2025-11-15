@@ -23,7 +23,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-import { useConvex } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import Constants from 'expo-constants';
 // Removed legacy ConvexReactClient and custom hook usage
@@ -67,6 +67,17 @@ export default function ConfirmAppointment() {
 
   // Shared Convex client from provider
   const convex = useConvex();
+
+  // Determine user's organization (prefer Convex users table, fallback to Clerk metadata)
+  const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  const orgId = useMemo(() => {
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    const meta = (user?.publicMetadata as any) || {};
+    return meta.orgId || 'cmha-calgary';
+  }, [myOrgFromConvex, user?.publicMetadata]);
+  const isSAIT = orgId === 'sait';
+  const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
+  const roleLabel = isSAIT ? 'Peer Support' : 'Support Worker';
 
   // Create dynamic styles
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -273,7 +284,7 @@ export default function ConfirmAppointment() {
       try {
         const result = await convex.mutation(api.appointments.createAppointment, {
           userId: user.id,
-          supportWorker: supportWorkerName || 'Auto-assigned by CMHA',
+          supportWorker: supportWorkerName || `Auto-assigned by ${orgShortLabel}`,
           supportWorkerId: Number.isFinite(workerIdInt) ? workerIdInt : undefined,
           date: selectedDate,
           time: normalizedTime.slice(0,5), // HH:MM
@@ -284,7 +295,7 @@ export default function ConfirmAppointment() {
         setAppointmentCreated(true);
         setAppointmentId(workerIdInt);
         try {
-          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName || 'Auto-assigned by CMHA');
+          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName || `Auto-assigned by ${orgShortLabel}`);
         } catch (reminderError) {
           console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
         }
@@ -298,7 +309,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, convex]);
+    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, convex, orgShortLabel]);
 
     /**
      * Reschedule an existing appointment
@@ -404,7 +415,7 @@ export default function ConfirmAppointment() {
   if (!selectedDate || !selectedTime) {
     return (
       <CurvedBackground>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
           <AppHeader title="Confirmation" showBack={true} />
           <View style={styles.errorContainer}>
             <Ionicons name="alert-circle" size={64} color={theme.colors.error} />
@@ -540,18 +551,22 @@ export default function ConfirmAppointment() {
   // Show loading while creating appointment
   if (loading) {
     return (
-      <CurvedBackground style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={[styles.loadingText, { color: theme.colors.text }]}>
-          Booking your appointment...
-        </Text>
+      <CurvedBackground>
+        <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={[styles.loadingText, { color: theme.colors.text }]}>
+              Booking your appointment...
+            </Text>
+          </View>
+        </SafeAreaView>
       </CurvedBackground>
     );
   }
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <AppHeader title="Appointment Confirmation" showBack={true} />
 
           <ScrollView 
@@ -562,7 +577,7 @@ export default function ConfirmAppointment() {
 
 
           {/* Confirmation Card */}
-          <View style={[styles.confirmationCard, { backgroundColor: '#FAFAFA' }]}>
+          <View style={[styles.confirmationCard, { backgroundColor: theme.colors.surface }]}>
             {/* Success Icon */}
             <View style={[styles.successIconCircle, { backgroundColor: '#4CAF50' }]}>
               <Ionicons name="checkmark-circle" size={56} color="#FFFFFF" />
@@ -575,16 +590,16 @@ export default function ConfirmAppointment() {
               {isReschedule ? 'Your appointment time has been updated.' : 'Your appointment has been successfully scheduled.'}
             </Text>
 
-            <View style={[styles.appointmentDetails, { backgroundColor: '#F5F5F5' }]}>
+            <View style={[styles.appointmentDetails, { backgroundColor: theme.isDark ? '#2A2A2A' : '#F5F5F5' }]}>
               <View style={styles.detailRow}>
                 <View style={styles.detailIconContainer}>
-                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
                     <Ionicons name="person" size={18} color="#FFFFFF" />
                   </View>
                   <View style={styles.detailTextContainer}>
-                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>Support Worker</Text>
+                    <Text style={[styles.detailLabel, { color: theme.colors.textSecondary }]}>{roleLabel}</Text>
                     <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                      {supportWorkerName || 'Auto-assigned by CMHA'}
+                      {supportWorkerName || `Auto-assigned by ${orgShortLabel}`}
                     </Text>
                   </View>
                 </View>
@@ -592,7 +607,7 @@ export default function ConfirmAppointment() {
 
               <View style={styles.detailRow}>
                 <View style={styles.detailIconContainer}>
-                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
                     <Ionicons name="calendar" size={18} color="#FFFFFF" />
                   </View>
                   <View style={styles.detailTextContainer}>
@@ -606,7 +621,7 @@ export default function ConfirmAppointment() {
 
               <View style={styles.detailRow}>
                 <View style={styles.detailIconContainer}>
-                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
                     <Ionicons name="time" size={18} color="#FFFFFF" />
                   </View>
                   <View style={styles.detailTextContainer}>
@@ -620,7 +635,7 @@ export default function ConfirmAppointment() {
 
               <View style={styles.detailRow}>
                 <View style={styles.detailIconContainer}>
-                  <View style={[styles.detailIconCircle, { backgroundColor: '#757575' }]}>
+                  <View style={[styles.detailIconCircle, { backgroundColor: theme.colors.primary }]}>
                     <Ionicons name="videocam" size={18} color="#FFFFFF" />
                   </View>
                   <View style={styles.detailTextContainer}>
@@ -644,7 +659,7 @@ export default function ConfirmAppointment() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.secondaryButton, { backgroundColor: '#FFFFFF', borderColor: '#4CAF50', borderWidth: 1 }]}
+              style={[styles.secondaryButton, { backgroundColor: theme.isDark ? '#2A2A2A' : '#FFFFFF', borderColor: '#4CAF50', borderWidth: 1 }]}
               onPress={() => router.replace("/appointments/book")}
             >
               <View style={styles.buttonContent}>
