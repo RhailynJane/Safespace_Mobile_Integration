@@ -32,15 +32,14 @@ const AnnouncementsScreen: React.FC = () => {
 
   // Prefer Convex users table org; fall back to Clerk publicMetadata
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  // Read org from Clerk public metadata if present
+  const orgFromClerk: unknown = (user?.publicMetadata as any)?.orgId;
+  // UI orgId: prefer Convex value, then Clerk metadata, finally a visual-only default
   const orgId: OrgId = useMemo(() => {
-    let candidate: unknown = undefined;
-    if (typeof myOrgFromConvex === "string" && myOrgFromConvex.length > 0) candidate = myOrgFromConvex;
-    if (candidate === undefined) {
-      const meta = (user?.publicMetadata as any) || {};
-      candidate = meta.orgId;
-    }
-    return isOrgId(candidate) ? candidate : "cmha-calgary";
-  }, [myOrgFromConvex, user?.publicMetadata]);
+    if (isOrgId(myOrgFromConvex)) return myOrgFromConvex;
+    if (isOrgId(orgFromClerk)) return orgFromClerk;
+    return "cmha-calgary";
+  }, [myOrgFromConvex, orgFromClerk]);
 
   // Organization meta - colors and subtitles for small org banners
   const orgMeta = useMemo<Record<OrgId, { label: string; color: string; subtitle: string }>>(
@@ -81,11 +80,15 @@ const AnnouncementsScreen: React.FC = () => {
 
   const announcements = useMemo(() => data?.announcements || [], [data]);
 
+  // Only sync org to Convex when we have a trusted source (Clerk metadata),
+  // and avoid writing the visual fallback ("cmha-calgary") into the DB.
   useEffect(() => {
-    if (userId && orgId) {
-      syncOrg({ orgId }).catch(() => {});
+    if (!userId) return;
+    // If Clerk has a valid org and it differs from what's in Convex, update it.
+    if (isOrgId(orgFromClerk) && orgFromClerk !== myOrgFromConvex) {
+      syncOrg({ orgId: orgFromClerk }).catch(() => {});
     }
-  }, [userId, orgId, syncOrg]);
+  }, [userId, orgFromClerk, myOrgFromConvex, syncOrg]);
 
   useEffect(() => {
     if (userId && orgId && !seeded && data && announcements.length === 0) {
