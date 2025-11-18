@@ -275,12 +275,13 @@ const MoodTrackingScreen: React.FC = () => {
 
   return (
     <CurvedBackground>
-      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+      <View testID="mood-tracking-screen" style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Header with navigation controls */}
         <AppHeader title="Mood Tracker" showBack={true} />
 
         {/* Main scrollable content */}
         <ScrollView 
+          testID="mood-tracking-scroll-view"
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}

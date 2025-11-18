@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test
+    volumes:
+      # Mount source code for live updates during development
+      - .:/app
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+      # Mount test results and coverage
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    # Override default command for different test scenarios
+    # Use docker-compose run test npm test -- <args>
+    stdin_open: true
+    tty: true
+
+  # Service for running tests in watch mode
+  test-watch:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-watch
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:watch
+
+  # Service for running tests with coverage
+  test-coverage:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-coverage
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:coverage

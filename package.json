@@ -14,6 +14,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:docker": "docker-compose -f docker-compose.test.yml up test-coverage",
+    "test:docker:build": "docker-compose -f docker-compose.test.yml build test-coverage",
     "test:e2e": "detox test",
     "test:e2e:build:ios": "detox build --configuration ios.sim.debug",
     "test:e2e:build:android": "detox build --configuration android.emu.debug",

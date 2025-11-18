@@ -184,7 +184,8 @@ export default function PersonalInfoStep({
           <View style={[styles.inputWrapper, { 
             backgroundColor: theme.colors.surface,
             borderColor: theme.colors.borderLight
-          }]}>
+          }]}
+          testID="input-first-name-wrapper">
             <Ionicons
               name="person-outline"
               size={20}
@@ -203,6 +204,7 @@ export default function PersonalInfoStep({
               }}
               autoCapitalize="words" // Capitalize first letter of each word
               maxLength={50}
+              testID="input-first-name"
             />
           </View>
           {/* Show error message if validation fails */}

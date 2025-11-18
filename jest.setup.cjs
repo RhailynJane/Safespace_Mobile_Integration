@@ -4,6 +4,18 @@
 
 require('@testing-library/react-native');
 
+// Ensure Convex URL exists for any code paths that instantiate Convex clients
+process.env.EXPO_PUBLIC_CONVEX_URL = process.env.EXPO_PUBLIC_CONVEX_URL || 'http://localhost:1';
+
+// Mock ConvexHttpClient to avoid initialization errors in tests
+jest.mock('convex/browser', () => ({
+  ConvexHttpClient: jest.fn().mockImplementation(() => ({
+    query: jest.fn().mockResolvedValue(null),
+    mutation: jest.fn().mockResolvedValue(null),
+    action: jest.fn().mockResolvedValue(null),
+  })),
+}));
+
 // Mock Expo winter runtime (Expo 54+)
 global.__ExpoImportMetaRegistry = new Map();
 global.structuredClone = global.structuredClone || ((val) => JSON.parse(JSON.stringify(val)));
@@ -100,6 +112,14 @@ jest.mock('@clerk/clerk-expo', () => {
     attemptFirstFactor: jest.fn(async () => ({ status: 'complete', createdSessionId: 'sess_mock', createdUserId: 'user_mock' })),
   };
 
+  // Stable user object across renders to avoid effect loops
+  const mockUserObj = {
+    id: 'test-user-id',
+    emailAddresses: [{ emailAddress: 'test@example.com' }],
+    firstName: 'Test',
+    lastName: 'User'
+  };
+
   const module = {
     useAuth: () => ({
       isSignedIn: true,
@@ -108,12 +128,7 @@ jest.mock('@clerk/clerk-expo', () => {
       signOut: jest.fn()
     }),
     useUser: () => ({
-      user: {
-        id: 'test-user-id',
-        emailAddresses: [{ emailAddress: 'test@example.com' }],
-        firstName: 'Test',
-        lastName: 'User'
-      }
+      user: mockUserObj,
     }),
     useSignIn: () => ({
       isLoaded: true,
@@ -155,3 +170,41 @@ afterEach(() => {
 
 // Global test timeout
 jest.setTimeout(10000);
+
+// Provide a default mock for Convex useQuery across tests to avoid undefined data issues
+try {
+  const ConvexReact = require('convex/react');
+  if (ConvexReact && typeof ConvexReact.useQuery === 'function') {
+    jest.spyOn(ConvexReact, 'useQuery').mockImplementation((queryFn, args) => {
+      // Return sensible defaults based on argument shape used in app screens
+      if (!args) return undefined;
+      if (args && typeof args === 'object') {
+        if ('clerkId' in args) {
+          return {
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com',
+            phoneNumber: '',
+            location: '',
+            profileImageUrl: '',
+          };
+        }
+        if ('startDate' in args && 'endDate' in args) {
+          return { entries: [] };
+        }
+        if ('userId' in args && 'limit' in args) {
+          return [];
+        }
+        if ('includeDrafts' in args) {
+          return [];
+        }
+        if ('days' in args) {
+          return { totalEntries: 0 };
+        }
+      }
+      return undefined;
+    });
+  }
+} catch (e) {
+  // If convex/react isn't available in a specific environment, ignore
+}

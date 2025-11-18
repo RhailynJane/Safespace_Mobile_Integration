@@ -21,6 +21,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
         {
           "backgroundColor": "#E8E8E8",
         },
+        false,
         undefined,
       ]
     }
@@ -559,7 +560,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
               style={
                 {
                   "alignItems": "center",
-                  "backgroundColor": "#E53935",
+                  "backgroundColor": "#D32F2F",
                   "borderRadius": 16,
                   "elevation": 4,
                   "flexDirection": "row",
@@ -614,7 +615,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     }
                   }
                 >
-                  Call 911
+                  Emergency Services (911)
                 </Text>
                 <Text
                   style={
@@ -625,7 +626,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     }
                   }
                 >
-                  Emergency Services
+                  Life-threatening emergencies
                 </Text>
               </View>
               <View
@@ -673,7 +674,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
               style={
                 {
                   "alignItems": "center",
-                  "backgroundColor": "#4CAF50",
+                  "backgroundColor": "#C62828",
                   "borderRadius": 16,
                   "elevation": 4,
                   "flexDirection": "row",
@@ -707,7 +708,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                   size={24}
                 >
                   <Text>
-                    heart
+                    call
                   </Text>
                 </View>
               </View>
@@ -728,7 +729,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     }
                   }
                 >
-                  Crisis Hotline
+                  International Emergency (112)
                 </Text>
                 <Text
                   style={
@@ -739,7 +740,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     }
                   }
                 >
-                  Call 988
+                  Alternate universal number
                 </Text>
               </View>
               <View
@@ -787,7 +788,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
               style={
                 {
                   "alignItems": "center",
-                  "backgroundColor": "#2196F3",
+                  "backgroundColor": "#1976D2",
                   "borderRadius": 16,
                   "elevation": 4,
                   "flexDirection": "row",
@@ -821,7 +822,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                   size={24}
                 >
                   <Text>
-                    people
+                    call
                   </Text>
                 </View>
               </View>
@@ -842,7 +843,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     }
                   }
                 >
-                  Distress Center
+                  Suicide & Crisis Hotline (988)
                 </Text>
                 <Text
                   style={
@@ -853,7 +854,121 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     }
                   }
                 >
-                  403-266-4357
+                  Mental health emergencies
+                </Text>
+              </View>
+              <View
+                color="#FFFFFF"
+                size={20}
+                style={
+                  {
+                    "opacity": 0.8,
+                  }
+                }
+              >
+                <Text>
+                  chevron-forward
+                </Text>
+              </View>
+            </View>
+            <View
+              accessibilityState={
+                {
+                  "busy": undefined,
+                  "checked": undefined,
+                  "disabled": undefined,
+                  "expanded": undefined,
+                  "selected": undefined,
+                }
+              }
+              accessibilityValue={
+                {
+                  "max": undefined,
+                  "min": undefined,
+                  "now": undefined,
+                  "text": undefined,
+                }
+              }
+              accessible={true}
+              collapsable={false}
+              focusable={true}
+              onClick={[Function]}
+              onResponderGrant={[Function]}
+              onResponderMove={[Function]}
+              onResponderRelease={[Function]}
+              onResponderTerminate={[Function]}
+              onResponderTerminationRequest={[Function]}
+              onStartShouldSetResponder={[Function]}
+              style={
+                {
+                  "alignItems": "center",
+                  "backgroundColor": "#388E3C",
+                  "borderRadius": 16,
+                  "elevation": 4,
+                  "flexDirection": "row",
+                  "marginBottom": 12,
+                  "opacity": 1,
+                  "padding": 20,
+                  "shadowColor": "#000",
+                  "shadowOffset": {
+                    "height": 4,
+                    "width": 0,
+                  },
+                  "shadowOpacity": 0.1,
+                  "shadowRadius": 8,
+                }
+              }
+            >
+              <View
+                style={
+                  {
+                    "alignItems": "center",
+                    "borderRadius": 24,
+                    "height": 48,
+                    "justifyContent": "center",
+                    "marginRight": 16,
+                    "width": 48,
+                  }
+                }
+              >
+                <View
+                  color="#FFFFFF"
+                  size={24}
+                >
+                  <Text>
+                    call
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={
+                  {
+                    "flex": 1,
+                  }
+                }
+              >
+                <Text
+                  style={
+                    {
+                      "color": "#FFFFFF",
+                      "fontSize": 18,
+                      "fontWeight": "600",
+                      "marginBottom": 4,
+                    }
+                  }
+                >
+                  Kids Help Phone (1-800-668-6868)
+                </Text>
+                <Text
+                  style={
+                    {
+                      "color": "#FFFFFF",
+                      "fontSize": 14,
+                      "opacity": 0.9,
+                    }
+                  }
+                >
+                  Youth support 24/7
                 </Text>
               </View>
               <View
@@ -968,7 +1083,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     ]
                   }
                 >
-                  Visit Website
+                  Distress Centre Website
                 </Text>
                 <Text
                   style={
@@ -985,7 +1100,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                     ]
                   }
                 >
-                  distresscentre.com
+                  Find local crisis lines
                 </Text>
               </View>
               <View

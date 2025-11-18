@@ -455,10 +455,11 @@ export default function AppointmentsScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView testID="appointments-screen" style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointments" showBack={true} />
 
         <ScrollView 
+          testID="appointments-scroll-view"
           style={styles.scrollContainer} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}

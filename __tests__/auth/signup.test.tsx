@@ -15,6 +15,8 @@ function fillPersonalInfo() {
   fireEvent.changeText(screen.getByPlaceholderText('Enter your Email Address'), 'john.doe@example.com');
   fireEvent.changeText(screen.getByPlaceholderText('Enter your Age (16+)'), '19');
   fireEvent.changeText(screen.getByPlaceholderText('Enter your Phone Number (10 digits)'), '4031234567');
+  // Select organization (required field)
+  fireEvent.press(screen.getByText('Southern Alberta Institute of Technology (SAIT)'));
 }
 
 function fillPassword(pwd: string, confirm: string = pwd) {
@@ -121,16 +123,16 @@ describe('SignupScreen', () => {
 
     // Arrange Clerk to throw duplicate email error
     clerkModule.__signUpMock.create.mockRejectedValueOnce({
-      errors: [{ message: 'Email address already in use' }],
+      errors: [{ code: 'form_identifier_exists', message: 'Email address already in use' }],
     });
 
     fillPassword('Passw0rd!');
     fireEvent.press(screen.getByText('Create an Account'));
 
-  await screen.findByText('Error');
-  // Message appears in modal and inline error container; accept either by collecting all matches
-  const dupMsgs = await screen.findAllByText('Email address already in use');
-  expect(dupMsgs.length).toBeGreaterThan(0);
+    // Check for the "Email Already Registered" modal title
+    await screen.findByText('Email Already Registered');
+    // Verify the modal message appears
+    expect(screen.getByText(/already associated with an account/i)).toBeTruthy();
   const okButtons = screen.getAllByText('OK');
   fireEvent.press(okButtons[0]);
   });
@@ -181,6 +183,8 @@ describe('SignupScreen', () => {
     fireEvent.changeText(screen.getByPlaceholderText('Enter your Email Address'), 'jane.doe@example.com');
     fireEvent.changeText(screen.getByPlaceholderText('Enter your Age (16+)'), '17');
     fireEvent.changeText(screen.getByPlaceholderText('Enter your Phone Number (10 digits)'), '4032223344');
+    // Select organization (required field)
+    fireEvent.press(screen.getByText('Southern Alberta Institute of Technology (SAIT)'));
 
     fireEvent.press(screen.getByText('Continue'));
     await screen.findByText('Age Requirement');

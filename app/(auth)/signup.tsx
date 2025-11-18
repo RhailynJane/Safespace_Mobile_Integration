@@ -136,8 +136,7 @@ export default function SignupScreen() {
         "Age Requirement",
         "You must be 18 years or older to use SafeSpace. If you're under 18 and need support, please reach out to a trusted adult, school counselor, or contact Kids Help Phone at 1-800-668-6868 (available 24/7) or text CONNECT to 686868."
       );
-      // Reset age field
-      updateSignupData({ age: "" });
+      // Don't proceed if under 18
       return;
     }
 
@@ -230,6 +229,17 @@ export default function SignupScreen() {
           showErrorModal(
             "Weak Password",
             "This password has been found in an online data breach. For your account safety, please use a different, more secure password."
+          );
+          return;
+        }
+        
+        // Handle duplicate email error
+        if (clerkError.code === "form_identifier_exists" || 
+            clerkError.message?.toLowerCase().includes("already exists") ||
+            clerkError.message?.toLowerCase().includes("already in use")) {
+          showErrorModal(
+            "Email Already Registered",
+            "This email address is already associated with an account. Please use a different email or try signing in instead."
           );
           return;
         }

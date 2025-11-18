@@ -20,18 +20,18 @@ describe('CrisisScreen', () => {
   it('displays emergency contact buttons', () => {
     render(<CrisisScreen />);
     
-    expect(screen.getByText('Call 911')).toBeTruthy();
-    expect(screen.getByText('Emergency Services')).toBeTruthy();
-    expect(screen.getByText('Crisis Hotline')).toBeTruthy();
-    expect(screen.getByText('Call 988')).toBeTruthy();
-    expect(screen.getByText('Distress Center')).toBeTruthy();
-    expect(screen.getByText('403-266-4357')).toBeTruthy();
+    expect(screen.getByText('Emergency Services (911)')).toBeTruthy();
+    expect(screen.getByText('Life-threatening emergencies')).toBeTruthy();
+    expect(screen.getByText('Suicide & Crisis Hotline (988)')).toBeTruthy();
+    expect(screen.getByText('Mental health emergencies')).toBeTruthy();
+    expect(screen.getByText('Kids Help Phone (1-800-668-6868)')).toBeTruthy();
+    expect(screen.getByText('Youth support 24/7')).toBeTruthy();
   });
 
   it('handles 911 emergency call', async () => {
     render(<CrisisScreen />);
     
-    const call911Button = screen.getByText('Call 911');
+    const call911Button = screen.getByText('Emergency Services (911)');
     fireEvent.press(call911Button);
     
     await waitFor(() => {
@@ -43,7 +43,7 @@ describe('CrisisScreen', () => {
   it('handles crisis hotline call', async () => {
     render(<CrisisScreen />);
     
-    const crisisButton = screen.getByText('Crisis Hotline');
+    const crisisButton = screen.getByText('Suicide & Crisis Hotline (988)');
     fireEvent.press(crisisButton);
     
     await waitFor(() => {
@@ -52,27 +52,27 @@ describe('CrisisScreen', () => {
     });
   });
 
-  it('handles distress center call', async () => {
+  it('handles kids help phone call', async () => {
     render(<CrisisScreen />);
     
-    const distressButton = screen.getByText('Distress Center');
-    fireEvent.press(distressButton);
+    const kidsHelpButton = screen.getByText('Kids Help Phone (1-800-668-6868)');
+    fireEvent.press(kidsHelpButton);
     
     await waitFor(() => {
-      expect(Linking.canOpenURL).toHaveBeenCalledWith('tel:403-266-4357');
-      expect(Linking.openURL).toHaveBeenCalledWith('tel:403-266-4357');
+      expect(Linking.canOpenURL).toHaveBeenCalledWith('tel:1-800-668-6868');
+      expect(Linking.openURL).toHaveBeenCalledWith('tel:1-800-668-6868');
     });
   });
 
   it('handles website navigation', async () => {
     render(<CrisisScreen />);
     
-    const websiteButton = screen.getByText('Visit Website');
+    const websiteButton = screen.getByText('Distress Centre Website');
     fireEvent.press(websiteButton);
     
     await waitFor(() => {
-      expect(Linking.canOpenURL).toHaveBeenCalledWith('https://distresscentre.com');
-      expect(Linking.openURL).toHaveBeenCalledWith('https://distresscentre.com');
+      expect(Linking.canOpenURL).toHaveBeenCalledWith('https://www.distresscentre.com/');
+      expect(Linking.openURL).toHaveBeenCalledWith('https://www.distresscentre.com/');
     });
   });
 
@@ -81,7 +81,7 @@ describe('CrisisScreen', () => {
     
     render(<CrisisScreen />);
     
-    const call911Button = screen.getByText('Call 911');
+    const call911Button = screen.getByText('Emergency Services (911)');
     fireEvent.press(call911Button);
     
     await waitFor(() => {
@@ -127,7 +127,7 @@ describe('CrisisScreen', () => {
     
     render(<CrisisScreen />);
     
-    const call911Button = screen.getByText('Call 911');
+    const call911Button = screen.getByText('Emergency Services (911)');
     fireEvent.press(call911Button);
     
     await waitFor(() => {
@@ -136,16 +136,19 @@ describe('CrisisScreen', () => {
   });
 
   it('handles call error gracefully', async () => {
+    // Mock canOpenURL to return true, so it tries to call
+    (Linking.canOpenURL as jest.Mock).mockResolvedValue(true);
+    // Mock openURL to throw an error
     (Linking.openURL as jest.Mock).mockRejectedValue(new Error('Call failed'));
     
     render(<CrisisScreen />);
     
-    const call911Button = screen.getByText('Call 911');
+    const call911Button = screen.getByText('Emergency Services (911)');
     fireEvent.press(call911Button);
     
     await waitFor(() => {
-      // The modal shows "Call Not Supported" for device capability errors
-      expect(screen.getByText('Call Not Supported')).toBeTruthy();
+      // The modal shows "Call Failed" for general errors
+      expect(screen.getByText('Call Failed')).toBeTruthy();
     });
   });
 

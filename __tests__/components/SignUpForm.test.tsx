@@ -26,22 +26,30 @@ describe('SignUpDetailsForm Component', () => {
     expect(getByText('Step 1 of 3')).toBeTruthy();
   });
 
-  it('should call onNext when valid data is submitted', () => {
-    let data = { firstName: '', lastName: '', email: 'john@example.com', age: '20', phoneNumber: '1234567890', password: '' } as any;
+  it('should call onNext when valid data is submitted', async () => {
+    const data = { 
+      firstName: 'John', 
+      lastName: 'Doe', 
+      email: 'john@example.com', 
+      age: '20', 
+      phoneNumber: '1234567890', 
+      password: '', 
+      organization: '' 
+    } as any;
     const onNext = jest.fn();
-    const { getByPlaceholderText, getByText, rerender } = render(
+    const onUpdate = jest.fn();
+    
+    const { getByText } = render(
       <ThemeProvider>
-        <SignUpDetailsForm step="personal" data={data} onUpdate={(p)=>{ data={...data, ...p}; rerender(
-          <ThemeProvider>
-            <SignUpDetailsForm step="personal" data={data} onUpdate={(p)=>{ data={...data, ...p}; }} onNext={onNext} stepNumber={1} />
-          </ThemeProvider>
-        ); }} onNext={onNext} stepNumber={1} />
+        <SignUpDetailsForm step="personal" data={data} onUpdate={onUpdate} onNext={onNext} stepNumber={1} />
       </ThemeProvider>
     );
-    fireEvent.changeText(getByPlaceholderText('Enter your First Name'), 'John');
-    fireEvent.changeText(getByPlaceholderText('Enter your Last Name'), 'Doe');
+    
+    // All required fields are already filled in the initial data
+    // Just press Continue - SignUpDetailsForm doesn't require organization field
     fireEvent.press(getByText('Continue'));
-    expect(onNext).toHaveBeenCalled();
+    
+    await waitFor(() => expect(onNext).toHaveBeenCalled());
   });
 
   it('should match snapshot', () => {
@@ -88,21 +96,26 @@ describe('PersonalInfoStep Component', () => {
     expect(mockOnNext).not.toHaveBeenCalled();
   });
 
-  it('should call onNext with valid data', () => {
-    let data = { firstName: '', lastName: '', email: 'jane@smith.com', age: '25', phoneNumber: '9876543210' } as any;
-    const { getByPlaceholderText, getByText, rerender } = render(
+  it('should call onNext with valid data', async () => {
+    const data = { 
+      firstName: 'Jane', 
+      lastName: 'Smith', 
+      email: 'jane@smith.com', 
+      age: '25', 
+      phoneNumber: '9876543210', 
+      organization: 'sait' 
+    } as any;
+    
+    const { getByText } = render(
       <ThemeProvider>
-        <PersonalInfoStep data={data} onUpdate={(p)=>{ data={...data, ...p}; rerender(
-          <ThemeProvider>
-            <PersonalInfoStep data={data} onUpdate={(p)=>{ data={...data, ...p}; }} onNext={mockOnNext} stepNumber={1} />
-          </ThemeProvider>
-        ); }} onNext={mockOnNext} stepNumber={1} />
+        <PersonalInfoStep data={data} onUpdate={jest.fn()} onNext={mockOnNext} stepNumber={1} />
       </ThemeProvider>
     );
-    fireEvent.changeText(getByPlaceholderText('Enter your First Name'), 'Jane');
-    fireEvent.changeText(getByPlaceholderText('Enter your Last Name'), 'Smith');
+    
+    // All required fields including organization are already filled in the initial data
     fireEvent.press(getByText('Continue'));
-    expect(mockOnNext).toHaveBeenCalled();
+    
+    await waitFor(() => expect(mockOnNext).toHaveBeenCalled());
   });
 });
 

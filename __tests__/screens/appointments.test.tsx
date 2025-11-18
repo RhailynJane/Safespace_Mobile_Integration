@@ -4,106 +4,88 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '../test-utils';
+import AppointmentsScreen from '../../app/(app)/(tabs)/appointments/index';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 
-// NOTE: MSW imports commented out - use fetch mocking instead
-// import { http, HttpResponse } from 'msw';
-// import { server } from '../../testing/mocks/server';
+// Mock Convex
+jest.mock('convex/react', () => ({
+  useQuery: jest.fn(() => []),
+  useMutation: jest.fn(() => jest.fn()),
+  useConvex: jest.fn(() => ({
+    query: jest.fn(() => Promise.resolve([])),
+  })),
+  ConvexProvider: ({ children }: { children: React.ReactNode }) => children,
+  ConvexReactClient: jest.fn(),
+}));
 
-describe('Appointments Feature - Functional Tests', () => {
-  describe('Appointment Booking', () => {
-    it('should display available appointment slots', async () => {
-      // TODO: Test slot display
-      expect(true).toBe(true);
+// Mock Clerk
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: jest.fn(),
+  useUser: jest.fn(),
+}));
+
+// Mock router
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+  }),
+}));
+
+describe('Appointments Screen - Main View', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useAuth as jest.Mock).mockReturnValue({
+      userId: 'test-user-id',
+      isSignedIn: true,
+      signOut: jest.fn(),
     });
-
-    it('should allow user to select date and time', async () => {
-      // TODO: Test date/time selection
-      expect(true).toBe(true);
-    });
-
-    it('should book appointment successfully', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 201,
-        json: async () => ({
-          success: true,
-          appointment: {
-            id: 1,
-            therapistName: 'Dr. Test',
-            date: new Date().toISOString(),
-            time: '10:00 AM',
-            status: 'pending',
-            createdAt: new Date().toISOString()
-          }
-        })
-      });
-
-      // TODO: Test booking
-      expect(true).toBe(true);
-    });
-
-    it('should prevent booking in the past', async () => {
-      // TODO: Test date validation
-      expect(true).toBe(true);
-    });
-
-    it('should show confirmation screen after booking', async () => {
-      // TODO: Test confirmation
-      expect(true).toBe(true);
-    });
-  });
-
-  describe('Appointment List', () => {
-    it('should display list of appointments', async () => {
-      // TODO: Test appointment list
-      expect(true).toBe(true);
-    });
-
-    it('should separate upcoming and past appointments', async () => {
-      // TODO: Test appointment filtering
-      expect(true).toBe(true);
-    });
-
-    it('should display appointment details', async () => {
-      // TODO: Test detail view
-      expect(true).toBe(true);
-    });
-
-    it('should show empty state when no appointments exist', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          success: true,
-          appointments: []
-        })
-      });
-
-      // TODO: Test empty state
-      expect(true).toBe(true);
+    (useUser as jest.Mock).mockReturnValue({
+      user: {
+        id: 'test-user-id',
+        firstName: 'John',
+        fullName: 'John Doe',
+        primaryEmailAddress: { emailAddress: 'john@example.com' },
+      },
     });
   });
 
-  describe('Appointment Management', () => {
-    it('should allow cancelling an appointment', async () => {
-      // TODO: Test cancellation
-      expect(true).toBe(true);
+  it('should render the appointments screen with testID', async () => {
+    render(<AppointmentsScreen />);
+    await waitFor(() => {
+      expect(screen.getByTestId('appointments-screen')).toBeTruthy();
     });
+  });
 
-    it('should allow rescheduling an appointment', async () => {
-      // TODO: Test rescheduling
-      expect(true).toBe(true);
+  it('should display the page title "My Appointments"', async () => {
+    render(<AppointmentsScreen />);
+    await waitFor(() => {
+      expect(screen.getByText('My Appointments')).toBeTruthy();
     });
+  });
 
-    it('should display appointment status correctly', async () => {
-      // TODO: Test status display (pending, confirmed, cancelled)
-      expect(true).toBe(true);
+  it('should display upcoming and completed stats cards', async () => {
+    render(<AppointmentsScreen />);
+    await waitFor(() => {
+      expect(screen.getByText('Upcoming')).toBeTruthy();
+      expect(screen.getByText('Completed')).toBeTruthy();
     });
+  });
 
-    it('should send reminder notifications', async () => {
-      // TODO: Test notification trigger
-      expect(true).toBe(true);
+  it('should display the "Book New Session" button', async () => {
+    render(<AppointmentsScreen />);
+    await waitFor(() => {
+      expect(screen.getByText('Book New Session')).toBeTruthy();
+    });
+  });
+
+  it('should display "View All Appointments" button', async () => {
+    render(<AppointmentsScreen />);
+    await waitFor(() => {
+      expect(screen.getByText('View All Appointments')).toBeTruthy();
     });
   });
 });

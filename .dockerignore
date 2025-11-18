@@ -1,0 +1,54 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Testing
+coverage
+test-results
+*.log
+
+# Build outputs
+dist
+build
+.expo
+.expo-shared
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation (optional - remove if you want docs in container)
+*.md
+docs/
+
+# Android/iOS builds
+android/build
+android/.gradle
+ios/build
+ios/Pods
+
+# Misc
+.cache
+tmp
+temp
