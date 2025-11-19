@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">44.44% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>4/9</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">4% </span>
+                <span class="strong">52% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/25</span>
+                <span class='fraction'>13/25</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">44.44% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>4/9</span>
+                <span class='fraction'>9/9</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -209,7 +209,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -238,24 +238,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">10x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1676x</span>
+<span class="cline-any cline-yes">1666x</span>
+<span class="cline-any cline-yes">1666x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1666x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1666x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1666x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -334,7 +334,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">16x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -384,24 +384,24 @@ const CurvedBackground: React.FC&lt;CurvedBackgroundProps&gt; = ({
   respectTopSafeArea = false,
 }) =&gt; {
   const { theme, isDarkMode } = useTheme();
-  const insets = <span class="cstat-no" title="statement not covered" >useSafeAreaInsets();</span>
-  const g1 = <span class="cstat-no" title="statement not covered" >isDarkMode</span>
-    ? ["#1a1a1a", "#141414", "#101010"]
+  const insets = useSafeAreaInsets();
+  const g1 = isDarkMode
+    ? <span class="branch-0 cbranch-no" title="branch not covered" >["#1a1a1a", "#141414", "#101010"]</span>
     : ["#f8f9fa", "#e9ecef", "#dee2e6"];
-  const g2 = <span class="cstat-no" title="statement not covered" >isDarkMode</span>
-    ? ["#161616", "#0f0f0f"]
+  const g2 = isDarkMode
+    ? <span class="branch-0 cbranch-no" title="branch not covered" >["#161616", "#0f0f0f"]</span>
     : ["#f1f3f4", "#ffffff"];
-  const g3 = <span class="cstat-no" title="statement not covered" >isDarkMode</span>
-    ? ["#1a1a1a", "#121212"]
+  const g3 = isDarkMode
+    ? <span class="branch-0 cbranch-no" title="branch not covered" >["#1a1a1a", "#121212"]</span>
     : ["#e9ecef", "#dee2e6"];
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return (</span>
+  return (
     &lt;View
       testID="curved-background"
       style={[
         styles.container,
         { backgroundColor: theme.colors.background },
-        respectTopSafeArea &amp;&amp; { paddingTop: insets.top },
+        respectTopSafeArea &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >{ paddingTop: insets.top },</span>
         style,
       ]}
     &gt;
@@ -414,21 +414,21 @@ const CurvedBackground: React.FC&lt;CurvedBackgroundProps&gt; = ({
         &lt;Defs&gt;
           {/* First gradient - diagonal light gray to medium gray (dark adjusts) */}
           &lt;LinearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%"&gt;
-            &lt;Stop offset="0%" stopColor={g1[0]} stopOpacity={isDarkMode ? 0.6 : 0.8} /&gt;
-            &lt;Stop offset="50%" stopColor={g1[1]} stopOpacity={isDarkMode ? 0.6 : 0.9} /&gt;
-            &lt;Stop offset="100%" stopColor={g1[2]} stopOpacity={isDarkMode ? 0.5 : 0.7} /&gt;
+            &lt;Stop offset="0%" stopColor={g1[0]} stopOpacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.6 </span>: 0.8} /&gt;
+            &lt;Stop offset="50%" stopColor={g1[1]} stopOpacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.6 </span>: 0.9} /&gt;
+            &lt;Stop offset="100%" stopColor={g1[2]} stopOpacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.5 </span>: 0.7} /&gt;
           &lt;/LinearGradient&gt;
           
           {/* Second gradient - bottom to top with lighter colors (dark adjusts) */}
           &lt;LinearGradient id="gradient2" x1="0%" y1="100%" x2="100%" y2="0%"&gt;
-            &lt;Stop offset="0%" stopColor={g2[0]} stopOpacity={isDarkMode ? 0.7 : 0.85} /&gt;
-            &lt;Stop offset="100%" stopColor={g2[1]} stopOpacity={isDarkMode ? 0.3 : 0.6} /&gt;
+            &lt;Stop offset="0%" stopColor={g2[0]} stopOpacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.7 </span>: 0.85} /&gt;
+            &lt;Stop offset="100%" stopColor={g2[1]} stopOpacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.3 </span>: 0.6} /&gt;
           &lt;/LinearGradient&gt;
           
           {/* Third gradient - reverse diagonal with subtle grays (dark adjusts) */}
           &lt;LinearGradient id="gradient3" x1="100%" y1="100%" x2="0%" y2="0%"&gt;
-            &lt;Stop offset="0%" stopColor={g3[0]} stopOpacity={isDarkMode ? 0.5 : 0.75} /&gt;
-            &lt;Stop offset="100%" stopColor={g3[1]} stopOpacity={isDarkMode ? 0.2 : 0.5} /&gt;
+            &lt;Stop offset="0%" stopColor={g3[0]} stopOpacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.5 </span>: 0.75} /&gt;
+            &lt;Stop offset="100%" stopColor={g3[1]} stopOpacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.2 </span>: 0.5} /&gt;
           &lt;/LinearGradient&gt;
         &lt;/Defs&gt;
 &nbsp;
@@ -454,7 +454,7 @@ const CurvedBackground: React.FC&lt;CurvedBackgroundProps&gt; = ({
               L ${screenWidth} ${screenHeight}
               L 0 ${screenHeight} Z`}
           fill="url(#gradient2)"
-          opacity={isDarkMode ? 0.85 : 0.95}
+          opacity={isDarkMode ? <span class="branch-0 cbranch-no" title="branch not covered" >0.85 </span>: 0.95}
         /&gt;
 &nbsp;
         {/* Lower curve - grounds the design at the bottom */}
@@ -490,7 +490,7 @@ export default CurvedBackground;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-18T04:45:48.588Z
+                at 2025-11-19T06:43:11.577Z
             </div>
         <script src="../prettify.js"></script>
         <script>

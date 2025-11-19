@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">33.33% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>4/12</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">33.33% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>4/12</span>
             </div>
         
             
@@ -92,18 +92,10 @@
 <a name='L27'></a><a href='#L27'>27</a>
 <a name='L28'></a><a href='#L28'>28</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -111,7 +103,15 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -119,10 +119,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Centralized application timezone configuration
 // Mountain Time (Canada - Calgary/Edmonton) with DST handling automatically
-export const APP_TIME_ZONE = <span class="cstat-no" title="statement not covered" >"America/Edmonton";</span> // MST/MDT
+export const APP_TIME_ZONE = "America/Edmonton"; // MST/MDT
 &nbsp;
 // Optional helpers if needed elsewhere
-export const formatTimeInTZ = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(</span></span>
+export const formatTimeInTZ = <span class="fstat-no" title="function not covered" >(</span>
   value: string | number | Date,
   options: Intl.DateTimeFormatOptions = <span class="branch-0 cbranch-no" title="branch not covered" >{ hour: "2-digit", minute: "2-digit" }</span>
 ) =&gt; {
@@ -130,7 +130,7 @@ export const formatTimeInTZ = <span class="cstat-no" title="statement not covere
 <span class="cstat-no" title="statement not covered" >  return d.toLocaleTimeString([], { timeZone: APP_TIME_ZONE, ...options });</span>
 };
 &nbsp;
-export const formatDateInTZ = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(</span></span>
+export const formatDateInTZ = <span class="fstat-no" title="function not covered" >(</span>
   value: string | number | Date,
   options: Intl.DateTimeFormatOptions = <span class="branch-0 cbranch-no" title="branch not covered" >{ month: "short", day: "numeric" }</span>
 ) =&gt; {
@@ -138,7 +138,7 @@ export const formatDateInTZ = <span class="cstat-no" title="statement not covere
 <span class="cstat-no" title="statement not covered" >  return d.toLocaleDateString([], { timeZone: APP_TIME_ZONE, ...options });</span>
 };
 &nbsp;
-export const isSameDayInTZ = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(a</span>: Date | string | number, b: Date | string | number) =&gt; {</span>
+export const isSameDayInTZ = <span class="fstat-no" title="function not covered" >(a</span>: Date | string | number, b: Date | string | number) =&gt; {
   const d1 = <span class="cstat-no" title="statement not covered" >new Date(a);</span>
   const d2 = <span class="cstat-no" title="statement not covered" >new Date(b);</span>
   const fmt: Intl.DateTimeFormatOptions = <span class="cstat-no" title="statement not covered" >{ year: "numeric", month: "2-digit", day: "2-digit", timeZone: APP_TIME_ZONE };</span>
@@ -151,7 +151,7 @@ export const isSameDayInTZ = <span class="cstat-no" title="statement not covered
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-18T04:45:48.588Z
+                at 2025-11-19T06:43:11.577Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">22.53% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/71</span>
+                <span class='fraction'>16/71</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">18.75% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/16</span>
+                <span class='fraction'>3/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">21.21% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/66</span>
+                <span class='fraction'>14/66</span>
             </div>
         
             
@@ -766,7 +766,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -779,24 +779,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">27x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -804,18 +804,18 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -1166,7 +1166,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1430,7 +1430,7 @@ interface CrisisResource {
   active?: boolean;
 }
 &nbsp;
-const { width } = <span class="cstat-no" title="statement not covered" >Dimensions.get("window");</span>
+const { width } = Dimensions.get("window");
 &nbsp;
 /**
  * CrisisScreen Component
@@ -1442,25 +1442,25 @@ const { width } = <span class="cstat-no" title="statement not covered" >Dimensio
  * - Quick access to professional help
  * Features an elegant curved background and urgent, clear interface design.
  */
-export default function <span class="fstat-no" title="function not covered" >CrisisScreen(</span>) {
-  const { theme, scaledFontSize } = <span class="cstat-no" title="statement not covered" >useTheme();</span>
+export default function CrisisScreen() {
+  const { theme, scaledFontSize } = useTheme();
   // State management
-  const [loading, setLoading] = <span class="cstat-no" title="statement not covered" >useState(false);</span>
-  const [initialLoading, setInitialLoading] = <span class="cstat-no" title="statement not covered" >useState(true);</span>
-  const [resources, setResources] = <span class="cstat-no" title="statement not covered" >useState&lt;CrisisResource[]&gt;([]);</span>
-  const [activeTab, setActiveTab] = <span class="cstat-no" title="statement not covered" >useState("crisis");</span>
-  const [modalVisible, setModalVisible] = <span class="cstat-no" title="statement not covered" >useState(false);</span>
-  const [modalConfig, setModalConfig] = <span class="cstat-no" title="statement not covered" >useState({</span>
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [resources, setResources] = useState&lt;CrisisResource[]&gt;([]);
+  const [activeTab, setActiveTab] = useState("crisis");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
     type: 'info' as 'success' | 'error' | 'info',
     title: '',
     message: '',
   });
 &nbsp;
   // Create styles dynamically based on text size
-  const styles = <span class="cstat-no" title="statement not covered" >useMemo(<span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >createStyles(scaledFontSize),</span> [scaledFontSize]);</span>
+  const styles = useMemo(() =&gt; createStyles(scaledFontSize), [scaledFontSize]);
 &nbsp;
   // Bottom navigation tabs configuration
-  const tabs = <span class="cstat-no" title="statement not covered" >[</span>
+  const tabs = [
     { id: "home", name: "Home", icon: "home" },
     { id: "community-forum", name: "Community", icon: "people" },
     { id: "appointments", name: "Appointments", icon: "calendar" },
@@ -1468,18 +1468,18 @@ export default function <span class="fstat-no" title="function not covered" >Cri
     { id: "profile", name: "Profile", icon: "person" },
   ];
 &nbsp;
-  const showModal = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(t</span>ype: 'success' | 'error' | 'info', title: string, message: string) =&gt; {</span>
+  const showModal = <span class="fstat-no" title="function not covered" >(t</span>ype: 'success' | 'error' | 'info', title: string, message: string) =&gt; {
 <span class="cstat-no" title="statement not covered" >    setModalConfig({ type, title, message });</span>
 <span class="cstat-no" title="statement not covered" >    setModalVisible(true);</span>
   };
 &nbsp;
-  const hideModal = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+  const hideModal = <span class="fstat-no" title="function not covered" >()</span> =&gt; {
 <span class="cstat-no" title="statement not covered" >    setModalVisible(false);</span>
   };
 &nbsp;
   // Live crisis resources from Convex
   // Convex live resources
-  const liveResources = <span class="cstat-no" title="statement not covered" >useQuery(api.crisis.listResources, { country: 'CA', activeOnly: true });</span>
+  const liveResources = useQuery(api.crisis.listResources, { country: 'CA', activeOnly: true });
 &nbsp;
   // Guaranteed fallback emergency resources (Canada + generic + US 988)
   const fallbackResources: CrisisResource[] = <span class="cstat-no" title="statement not covered" >[</span>
@@ -1830,7 +1830,7 @@ export default function <span class="fstat-no" title="function not covered" >Cri
 }
 &nbsp;
 // Styles function that accepts scaledFontSize for dynamic text sizing
-const createStyles = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(s</span>caledFontSize: (size: number) =&gt; number) =&gt; <span class="cstat-no" title="statement not covered" >StyleSheet.create({</span></span>
+const createStyles = (scaledFontSize: (size: number) =&gt; number) =&gt; StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
@@ -2062,7 +2062,7 @@ const createStyles = <span class="cstat-no" title="statement not covered" ><span
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-18T04:45:48.588Z
+                at 2025-11-19T06:43:11.577Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

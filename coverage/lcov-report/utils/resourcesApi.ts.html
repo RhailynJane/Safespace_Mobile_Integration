@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">3.97% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/151</span>
+                <span class='fraction'>6/151</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">4.37% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/137</span>
+                <span class='fraction'>6/137</span>
             </div>
         
             
@@ -818,7 +818,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -864,7 +864,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1156,7 +1156,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1238,8 +1238,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1357,7 +1357,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1548,7 +1548,7 @@ export interface Category {
   tags: string[];
 }
 &nbsp;
-export const CATEGORIES: Category[] = <span class="cstat-no" title="statement not covered" >[</span>
+export const CATEGORIES: Category[] = [
   {
     id: 'stress',
     name: 'Stress',
@@ -1594,7 +1594,7 @@ export const CATEGORIES: Category[] = <span class="cstat-no" title="statement no
 ];
 &nbsp;
 // Complete offline resource database
-const ALL_RESOURCES: Resource[] = <span class="cstat-no" title="statement not covered" >[</span>
+const ALL_RESOURCES: Resource[] = [
   // Stress Management Resources
   {
     id: 'stress-1',
@@ -1886,7 +1886,7 @@ const ALL_RESOURCES: Resource[] = <span class="cstat-no" title="statement not co
 ];
 &nbsp;
 // Simulate async delay for realistic feel
-const delay = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(m</span>s: number) =&gt; <span class="cstat-no" title="statement not covered" >new Promise(<span class="fstat-no" title="function not covered" >re</span>solve =&gt; <span class="cstat-no" title="statement not covered" >setTimeout(resolve, ms))</span>;</span></span>
+const delay = <span class="fstat-no" title="function not covered" >(m</span>s: number) =&gt; <span class="cstat-no" title="statement not covered" >new Promise(<span class="fstat-no" title="function not covered" >re</span>solve =&gt; <span class="cstat-no" title="statement not covered" >setTimeout(resolve, ms))</span>;</span>
 &nbsp;
 /**
  * Fetch all resources - No API calls, instant response
@@ -1968,8 +1968,8 @@ export async function <span class="fstat-no" title="function not covered" >getQu
 &nbsp;
 // External API service integration
 class ExternalApiService {
-  private zenQuotesUrl = <span class="cstat-no" title="statement not covered" >'https://zenquotes.io/api';</span>
-  private affirmationUrl = <span class="cstat-no" title="statement not covered" >'https://www.affirmations.dev';</span>
+  private zenQuotesUrl = 'https://zenquotes.io/api';
+  private affirmationUrl = 'https://www.affirmations.dev';
 &nbsp;
   // Get random inspirational quote from ZenQuotes
 <span class="fstat-no" title="function not covered" >  as</span>ync getRandomQuote(): Promise&lt;{ quote: string; author: string }&gt; {
@@ -2087,7 +2087,7 @@ class ExternalApiService {
   }
 }
 &nbsp;
-export const externalApiService = <span class="cstat-no" title="statement not covered" >new ExternalApiService();</span>
+export const externalApiService = new ExternalApiService();
 &nbsp;
 // Enhanced functions that combine local + external resources
 export async function <span class="fstat-no" title="function not covered" >fetchAllResourcesWithExternal(</span>): Promise&lt;Resource[]&gt; {
@@ -2260,7 +2260,7 @@ export async function <span class="fstat-no" title="function not covered" >initi
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-18T04:45:48.588Z
+                at 2025-11-19T06:43:11.577Z
             </div>
         <script src="../prettify.js"></script>
         <script>
