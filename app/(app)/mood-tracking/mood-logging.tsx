@@ -37,7 +37,7 @@ type MoodType = "very-happy" | "happy" | "neutral" | "sad" | "very-sad" | "ecsta
 const moodGrid = [
   { id: 'ecstatic', label: 'Ecstatic', emoji: '🤩', bg: '#CCE5FF' },
   { id: 'happy', label: 'Happy', emoji: '😃', bg: '#FFD1E0' },
-  { id: 'content', label: 'Content', emoji: '🙂', bg: '#D0E4FF' },
+  { id: 'content', label: 'Content', emoji: '😊', bg: '#D0E4FF' },
   { id: 'neutral', label: 'Neutral', emoji: '😐', bg: '#D5EFDB' },
   { id: 'displeased', label: 'Displeased', emoji: '😕', bg: '#FFEDD2' },
   { id: 'frustrated', label: 'Frustrated', emoji: '😖', bg: '#DFCFFF' },
@@ -49,12 +49,12 @@ const moodGrid = [
 // Configuration for different mood types with emojis and labels (kept for backward compatibility)
 const moodConfig: Record<MoodType, { emoji: string; label: string }> = {
   "very-happy": { emoji: "😄", label: "Very Happy" },
-  happy: { emoji: "�", label: "Happy" },
+  happy: { emoji: "😃", label: "Happy" },
   neutral: { emoji: "😐", label: "Neutral" },
   sad: { emoji: "🙁", label: "Sad" },
   "very-sad": { emoji: "😢", label: "Very Sad" },
   ecstatic: { emoji: "🤩", label: "Ecstatic" },
-  content: { emoji: "🙂", label: "Content" },
+  content: { emoji: "😊", label: "Content" },
   displeased: { emoji: "😕", label: "Displeased" },
   frustrated: { emoji: "😖", label: "Frustrated" },
   annoyed: { emoji: "😒", label: "Annoyed" },

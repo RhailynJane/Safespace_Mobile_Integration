@@ -137,7 +137,7 @@ const MoodTrackingScreen: React.FC = () => {
   const moodGrid = [
     { id: 'ecstatic', label: 'Ecstatic', emoji: '🤩', bg: '#CCE5FF', mapTo: 'ecstatic' as MoodType },
     { id: 'happy', label: 'Happy', emoji: '😃', bg: '#FFD1E0', mapTo: 'happy' as MoodType },
-    { id: 'content', label: 'Content', emoji: '🙂', bg: '#D0E4FF', mapTo: 'content' as MoodType },
+    { id: 'content', label: 'Content', emoji: '😊', bg: '#D0E4FF', mapTo: 'content' as MoodType },
     { id: 'neutral', label: 'Neutral', emoji: '😐', bg: '#D5EFDB', mapTo: 'neutral' as MoodType },
     { id: 'displeased', label: 'Displeased', emoji: '😕', bg: '#FFEDD2', mapTo: 'displeased' as MoodType },
     { id: 'frustrated', label: 'Frustrated', emoji: '😖', bg: '#DFCFFF', mapTo: 'frustrated' as MoodType },

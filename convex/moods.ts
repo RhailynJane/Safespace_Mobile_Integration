@@ -11,7 +11,8 @@ const moodMeta: Record<string, { emoji: string; label: string }> = {
 	"very-sad": { emoji: "😢", label: "Very Sad" },
 	// New 3x3 mood grid
 	ecstatic: { emoji: "🤩", label: "Ecstatic" },
-	content: { emoji: "🙂", label: "Content" },
+	// Use a distinct emoji for 'content' so it doesn't render as 'happy' in UIs doing emoji-based reverse mapping.
+	content: { emoji: "😊", label: "Content" },
 	displeased: { emoji: "😕", label: "Displeased" },
 	frustrated: { emoji: "😖", label: "Frustrated" },
 	annoyed: { emoji: "😒", label: "Annoyed" },
