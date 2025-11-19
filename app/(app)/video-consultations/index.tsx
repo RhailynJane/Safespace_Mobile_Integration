@@ -60,12 +60,15 @@ export default function VideoScreen() {
   const activeSession = useQuery(api.videoCallSessions.getActiveSession, {} as any) as any | null;
   const callStats = useQuery(api.videoCallSessions.getCallStats, {} as any) as any | null;
 
-  // Determine user's organization (prefer Convex users table, fallback to Clerk metadata)
+  // Determine user's organization (prioritize Clerk metadata as source of truth)
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
   const orgId = useMemo(() => {
-    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
     const meta = (user?.publicMetadata as any) || {};
-    return meta.orgId || 'cmha-calgary';
+    // Prioritize Clerk metadata
+    if (meta.orgId) return meta.orgId;
+    // Fall back to Convex if Clerk doesn't have it
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    return 'cmha-calgary';
   }, [myOrgFromConvex, user?.publicMetadata]);
   const isSAIT = orgId === 'sait';
   const roleLabel = isSAIT ? 'Peer Support' : 'Support Worker';

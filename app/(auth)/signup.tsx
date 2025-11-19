@@ -24,6 +24,7 @@ import { apiService } from "../../utils/api";
 import { useTheme } from "../../contexts/ThemeContext";
 import { completeConvexAuthFlow } from "../../utils/convexAuthSync";
 import { clerkDiagnostics } from "../../utils/clerkDiagnostics";
+import { getOrgIdFromEmail } from "../../utils/orgMapping";
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -325,13 +326,17 @@ export default function SignupScreen() {
             }
           }
 
-          // Sync user to Convex after successful signup (including org if selected)
+          // Determine org from email mapping or user selection
+          const detectedOrg = getOrgIdFromEmail(signupData.email);
+          const finalOrg = detectedOrg || signupData.organization || undefined;
+          
+          // Sync user to Convex after successful signup (including org)
           await completeConvexAuthFlow(getToken, {
             clerkUserId: signUpAttempt.createdUserId!,
             email: signupData.email,
             firstName: signupData.firstName,
             lastName: signupData.lastName,
-            orgId: signupData.organization,
+            orgId: finalOrg,
           });
 
           setCurrentStep("success");

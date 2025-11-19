@@ -34,10 +34,13 @@ const AnnouncementsScreen: React.FC = () => {
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
   // Read org from Clerk public metadata if present
   const orgFromClerk: unknown = (user?.publicMetadata as any)?.orgId;
-  // UI orgId: prefer Convex value, then Clerk metadata, finally a visual-only default
+  // UI orgId: prefer Clerk metadata (most up-to-date), then Convex value, finally fallback
   const orgId: OrgId = useMemo(() => {
-    if (isOrgId(myOrgFromConvex)) return myOrgFromConvex;
+    // Prioritize Clerk metadata as it's the source of truth
     if (isOrgId(orgFromClerk)) return orgFromClerk;
+    // Use Convex value if Clerk doesn't have it
+    if (isOrgId(myOrgFromConvex)) return myOrgFromConvex;
+    // Only use fallback if both are undefined (after loading)
     return "cmha-calgary";
   }, [myOrgFromConvex, orgFromClerk]);
 
@@ -80,12 +83,11 @@ const AnnouncementsScreen: React.FC = () => {
 
   const announcements = useMemo(() => data?.announcements || [], [data]);
 
-  // Only sync org to Convex when we have a trusted source (Clerk metadata),
-  // and avoid writing the visual fallback ("cmha-calgary") into the DB.
+  // Sync org to Convex when Clerk has a value (source of truth)
   useEffect(() => {
     if (!userId) return;
-    // If Clerk has a valid org and it differs from what's in Convex, update it.
-    if (isOrgId(orgFromClerk) && orgFromClerk !== myOrgFromConvex) {
+    // Only sync if Clerk has a valid org and Convex query has loaded
+    if (isOrgId(orgFromClerk) && myOrgFromConvex !== undefined && orgFromClerk !== myOrgFromConvex) {
       syncOrg({ orgId: orgFromClerk }).catch(() => {});
     }
   }, [userId, orgFromClerk, myOrgFromConvex, syncOrg]);
