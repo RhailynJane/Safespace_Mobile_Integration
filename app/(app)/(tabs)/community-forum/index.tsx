@@ -1134,7 +1134,7 @@ export default function CommunityMainScreen() {
           {/* Posts Section - Dynamic content based on current view */}
           <View style={styles.postsSection}>
             {loading ? (
-              <View style={styles.skeletonContainer}>
+              <View style={styles.skeletonContainer} testID="skeleton-container">
                 {[...Array(3)].map((_,i)=>(
                   <View key={i} style={[styles.skeletonCard,{backgroundColor:theme.isDark?'#1E1E1E':'#FFFFFF'}]}>
                     <View style={styles.skeletonHeader}>
