@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render } from '../test-utils';
 import { Text } from 'react-native';
 import CurvedBackground from '../../components/CurvedBackground';
 

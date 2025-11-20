@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { render, waitFor, fireEvent } from '@testing-library/react-native';
+import { render, waitFor, fireEvent } from '../test-utils';
 import OptimizedImage from '../../components/OptimizedImage';
 
 describe('OptimizedImage Component', () => {

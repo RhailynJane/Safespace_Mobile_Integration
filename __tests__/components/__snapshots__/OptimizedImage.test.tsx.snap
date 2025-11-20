@@ -1,72 +1,86 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`OptimizedImage Component should match snapshot 1`] = `
-<View
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
   style={
     [
       {
-        "position": "relative",
+        "flex": 1,
       },
-      {
-        "height": undefined,
-        "width": undefined,
-      },
+      undefined,
     ]
   }
 >
-  <ViewManagerAdapter_ExpoImage
-    cachePolicy="memory-disk"
-    containerViewRef={"[React.ref]"}
-    contentFit="cover"
-    contentPosition={
-      {
-        "left": "50%",
-        "top": "50%",
-      }
-    }
-    nativeViewRef={"[React.ref]"}
-    onError={[Function]}
-    onLoad={[Function]}
-    onLoadEnd={[Function]}
-    onLoadStart={[Function]}
-    onProgress={[Function]}
-    placeholder={[]}
-    source={
-      [
-        {
-          "uri": "https://example.com/image.jpg",
-        },
-      ]
-    }
-    style={{}}
-    transition={
-      {
-        "duration": 150,
-      }
-    }
-  />
   <View
     style={
       [
         {
-          "backgroundColor": "#F5F5F5",
-          "bottom": 0,
-          "left": 0,
-          "position": "absolute",
-          "right": 0,
-          "top": 0,
+          "position": "relative",
         },
         {
-          "alignItems": "center",
-          "justifyContent": "center",
+          "height": undefined,
+          "width": undefined,
         },
       ]
     }
   >
-    <ActivityIndicator
-      color="#2196F3"
-      size="small"
+    <ViewManagerAdapter_ExpoImage
+      cachePolicy="memory-disk"
+      containerViewRef={"[React.ref]"}
+      contentFit="cover"
+      contentPosition={
+        {
+          "left": "50%",
+          "top": "50%",
+        }
+      }
+      nativeViewRef={"[React.ref]"}
+      onError={[Function]}
+      onLoad={[Function]}
+      onLoadEnd={[Function]}
+      onLoadStart={[Function]}
+      onProgress={[Function]}
+      placeholder={[]}
+      source={
+        [
+          {
+            "uri": "https://example.com/image.jpg",
+          },
+        ]
+      }
+      style={{}}
+      testID="optimized-image"
+      transition={
+        {
+          "duration": 150,
+        }
+      }
     />
+    <View
+      style={
+        [
+          {
+            "backgroundColor": "#F5F5F5",
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          },
+          {
+            "alignItems": "center",
+            "justifyContent": "center",
+          },
+        ]
+      }
+      testID="image-loading-indicator"
+    >
+      <ActivityIndicator
+        color="#2196F3"
+        size="small"
+      />
+    </View>
   </View>
-</View>
+</RNCSafeAreaProvider>
 `;

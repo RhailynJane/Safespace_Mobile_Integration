@@ -363,6 +363,7 @@ export default function NotificationsScreen() {
             notifications.map((notification) => (
               <TouchableOpacity
                 key={notification.id}
+                testID={`notification-${notification.id}`}
                 style={[
                   styles.notificationItem,
                   { 

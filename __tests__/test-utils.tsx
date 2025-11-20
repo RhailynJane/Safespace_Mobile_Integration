@@ -15,11 +15,26 @@ const initialMetrics = {
 // Create a mock Convex client instance for all tests.
 const CONVEX_URL = process.env.EXPO_PUBLIC_CONVEX_URL || 'http://localhost:1';
 
-// Mock ConvexReactClient - create a simple object that satisfies the ConvexProvider
+// Mock Convex client implementing required surface for hooks
 const mockConvexClient = {
-  query: jest.fn(),
-  mutation: jest.fn(),
-  action: jest.fn(),
+  query: jest.fn().mockResolvedValue([]),
+  mutation: jest.fn().mockResolvedValue({}),
+  action: jest.fn().mockResolvedValue({}),
+  watchQuery: jest.fn(() => {
+    const unsubscribeFn = jest.fn();
+    return {
+      localQueryResult: () => undefined,
+      onUpdate: jest.fn(() => unsubscribeFn), // onUpdate returns the unsubscribe function
+      dispose: jest.fn(),
+      journal: jest.fn(() => undefined),
+    };
+  }),
+  subscribe: jest.fn(() => {
+    const unsubscribeMock = jest.fn();
+    return {
+      unsubscribe: unsubscribeMock,
+    };
+  }),
 } as any;
 
 function AllProviders({ children }: PropsWithChildren<{}>) {
