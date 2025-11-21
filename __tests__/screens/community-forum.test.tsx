@@ -2,6 +2,23 @@
  * Community Forum Screen Tests
  */
 
+// Mock avatarEvents before any other imports
+jest.mock('../../utils/avatarEvents', () => {
+  const mockSubscribe = jest.fn(() => jest.fn()); // returns unsubscribe function
+  const mockEmit = jest.fn();
+  
+  return {
+    avatarEvents: {
+      subscribe: mockSubscribe,
+      emit: mockEmit,
+    },
+    default: {
+      subscribe: mockSubscribe,
+      emit: mockEmit,
+    },
+  };
+});
+
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '../test-utils';
 import CommunityMainScreen from '../../app/(app)/(tabs)/community-forum/index';

@@ -5,33 +5,8 @@ import { render, screen, fireEvent, waitFor } from '../test-utils';
 // Mock Alert - just spy, don't mock implementation
 jest.spyOn(Alert, 'alert');
 
-// Mock Clerk with specific implementations
+// Use global Clerk mocks from jest.setup.cjs but extend with updatePassword
 const mockUpdatePassword = jest.fn();
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: jest.fn(() => ({
-    isSignedIn: true,
-    userId: 'test-user-id',
-    sessionId: 'test-session-id',
-    signOut: jest.fn()
-  })),
-  useUser: jest.fn(() => ({
-    user: {
-      id: 'test-user-id',
-      firstName: 'Test',
-      lastName: 'User',
-      emailAddresses: [{ emailAddress: 'test@example.com' }],
-      updatePassword: mockUpdatePassword,
-    },
-  })),
-  useSignIn: jest.fn(() => ({
-    isLoaded: true,
-    signIn: {
-      create: jest.fn(),
-      attemptFirstFactor: jest.fn(),
-    },
-    setActive: jest.fn(),
-  })),
-}));
 
 // NOW import the component
 import ChangePasswordScreen from '../../app/(app)/change-password';

@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">82.35% </span>
+                <span class="strong">79.41% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>56/68</span>
+                <span class='fraction'>54/68</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">79.31% </span>
+                <span class="strong">76.27% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>46/58</span>
+                <span class='fraction'>45/59</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">88.13% </span>
+                <span class="strong">84.74% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>52/59</span>
+                <span class='fraction'>50/59</span>
             </div>
         
             
@@ -364,7 +364,9 @@
 <a name='L299'></a><a href='#L299'>299</a>
 <a name='L300'></a><a href='#L300'>300</a>
 <a name='L301'></a><a href='#L301'>301</a>
-<a name='L302'></a><a href='#L302'>302</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -388,7 +390,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
@@ -402,15 +404,18 @@
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -447,12 +452,11 @@
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -701,10 +705,13 @@ const AnnouncementsScreen: React.FC = () =&gt; {
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
   // Read org from Clerk public metadata if present
   const orgFromClerk: unknown = (user?.publicMetadata as any)?.orgId;
-  // UI orgId: prefer Convex value, then Clerk metadata, finally a visual-only default
+  // UI orgId: prefer Clerk metadata (most up-to-date), then Convex value, finally fallback
   const orgId: OrgId = useMemo(() =&gt; {
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (isOrgId(myOrgFromConvex)) <span class="cstat-no" title="statement not covered" >return myOrgFromConvex;</span>
+    // Prioritize Clerk metadata as it's the source of truth
     <span class="missing-if-branch" title="else path not taken" >E</span>if (isOrgId(orgFromClerk)) return orgFromClerk;
+    // Use Convex value if Clerk doesn't have it
+<span class="cstat-no" title="statement not covered" >    if (isOrgId(myOrgFromConvex)) <span class="cstat-no" title="statement not covered" >return myOrgFromConvex;</span></span>
+    // Only use fallback if both are undefined (after loading)
 <span class="cstat-no" title="statement not covered" >    return "cmha-calgary";</span>
   }, [myOrgFromConvex, orgFromClerk]);
 &nbsp;
@@ -747,13 +754,12 @@ const AnnouncementsScreen: React.FC = () =&gt; {
 &nbsp;
   const announcements = useMemo(() =&gt; data?.announcements || <span class="branch-1 cbranch-no" title="branch not covered" >[],</span> [data]);
 &nbsp;
-  // Only sync org to Convex when we have a trusted source (Clerk metadata),
-  // and avoid writing the visual fallback ("cmha-calgary") into the DB.
+  // Sync org to Convex when Clerk has a value (source of truth)
   useEffect(() =&gt; {
     <span class="missing-if-branch" title="if path not taken" >I</span>if (!userId) <span class="cstat-no" title="statement not covered" >return;</span>
-    // If Clerk has a valid org and it differs from what's in Convex, update it.
-    <span class="missing-if-branch" title="else path not taken" >E</span>if (isOrgId(orgFromClerk) &amp;&amp; orgFromClerk !== myOrgFromConvex) {
-      syncOrg({ orgId: orgFromClerk }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});
+    // Only sync if Clerk has a valid org and Convex query has loaded
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (isOrgId(orgFromClerk) &amp;&amp; myOrgFromConvex !== undefined &amp;&amp; <span class="branch-2 cbranch-no" title="branch not covered" >orgFromClerk !== myOrgFromConvex)</span> {
+<span class="cstat-no" title="statement not covered" >      syncOrg({ orgId: orgFromClerk }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
     }
   }, [userId, orgFromClerk, myOrgFromConvex, syncOrg]);
 &nbsp;
@@ -973,7 +979,7 @@ export default AnnouncementsScreen;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-19T06:43:11.577Z
+                at 2025-11-21T15:23:38.246Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

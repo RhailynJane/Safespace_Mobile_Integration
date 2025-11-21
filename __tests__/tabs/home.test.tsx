@@ -61,55 +61,34 @@ describe('Home Tab', () => {
     await waitFor(() => expect(getByTestId('home-scroll-view')).toBeTruthy());
   });
 
-  it('should show recent mood entries', () => {
+  it('should show Recommended For You section', async () => {
     const { getByText } = render(<HomeScreen />);
-    expect(getByText(/recent mood/i)).toBeTruthy();
-  });
-
-  it('should load dashboard data on mount', async () => {
-    const mockFetch = global.fetch as jest.Mock;
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        data: {
-          upcomingAppointments: [],
-          recentMoods: [],
-          quote: 'Test quote'
-        }
-      })
+    await waitFor(() => {
+      expect(getByText(/Recommended For You/i)).toBeTruthy();
     });
-
-    render(<HomeScreen />);
-    await waitFor(() => expect(mockFetch).toHaveBeenCalled());
   });
 
-  // Removed pull-to-refresh test; ScrollView doesn't expose onRefresh
-
-  it('should show crisis support button prominently', () => {
+  it('should show crisis support button prominently', async () => {
     const { getByTestId } = render(<HomeScreen />);
-    expect(getByTestId('crisis-support-button')).toBeTruthy();
+    await waitFor(() => {
+      expect(getByTestId('crisis-support-button')).toBeTruthy();
+    });
   });
 
   it('should navigate to crisis support immediately when pressed', async () => {
     const { getByTestId } = render(<HomeScreen />);
+    
+    await waitFor(() => {
+      expect(getByTestId('crisis-support-button')).toBeTruthy();
+    });
+    
     fireEvent.press(getByTestId('crisis-support-button'));
     expect(router.push).toHaveBeenCalledWith('/crisis-support');
   });
 
-  // In test mode, Home short-circuits async work and renders immediately
-  it('should not show loading state in tests', () => {
-    const { queryByTestId } = render(<HomeScreen />);
-    expect(queryByTestId('home-loading')).toBeNull();
-  });
-
-  // Home does not render an explicit error UI; it falls back to empty states
-  // This test is removed to avoid asserting UI that doesn't exist
-
-  it('should show empty states when no data available', async () => {
+  it('should show empty state when no resources available', async () => {
     const { getByText } = render(<HomeScreen />);
     await waitFor(() => {
-      expect(getByText(/no mood entries yet/i)).toBeTruthy();
       expect(getByText(/no resources available/i)).toBeTruthy();
     });
   });

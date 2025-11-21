@@ -1,17 +1,7 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`OptimizedImage Component should match snapshot 1`] = `
-<RNCSafeAreaProvider
-  onInsetsChange={[Function]}
-  style={
-    [
-      {
-        "flex": 1,
-      },
-      undefined,
-    ]
-  }
->
+<View>
   <View
     style={
       [
@@ -82,5 +72,5 @@ exports[`OptimizedImage Component should match snapshot 1`] = `
       />
     </View>
   </View>
-</RNCSafeAreaProvider>
+</View>
 `;

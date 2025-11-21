@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/13</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -117,23 +117,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">72x</span>
+<span class="cline-any cline-yes">216x</span>
+<span class="cline-any cline-yes">216x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">24x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">export type CoreProfileInputs = {
   photoUrl?: string | null;
@@ -150,26 +150,26 @@ export type CompletionResult = {
 &nbsp;
 // Compute core profile completion across multiple candidate sources.
 // Any truthy value among candidates counts as completed for that field.
-export function <span class="fstat-no" title="function not covered" >computeCoreProfileCompletion(</span>
+export function computeCoreProfileCompletion(
   candidates: CoreProfileInputs[]
 ): CompletionResult {
-  const pick = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >(k</span>ey: keyof CoreProfileInputs) =&gt;</span>
-<span class="cstat-no" title="statement not covered" >    candidates.some(<span class="fstat-no" title="function not covered" >(c</span>) =&gt; {</span>
-      const v = <span class="cstat-no" title="statement not covered" >c?.[key];</span>
-<span class="cstat-no" title="statement not covered" >      return typeof v === 'string' ? v.trim().length &gt; 0 : Boolean(v);</span>
+  const pick = (key: keyof CoreProfileInputs) =&gt;
+    candidates.some((c) =&gt; {
+      const v = c?.[key];
+      return typeof v === 'string' ? v.trim().length &gt; 0 : Boolean(v);
     });
 &nbsp;
-  const photo = <span class="cstat-no" title="statement not covered" >pick('photoUrl');</span>
-  const location = <span class="cstat-no" title="statement not covered" >pick('location');</span>
-  const phone = <span class="cstat-no" title="statement not covered" >pick('phone');</span>
+  const photo = pick('photoUrl');
+  const location = pick('location');
+  const phone = pick('phone');
 &nbsp;
-  const flags = <span class="cstat-no" title="statement not covered" >{ photo, location, phone };</span>
-  const checks = <span class="cstat-no" title="statement not covered" >[photo, location, phone];</span>
-  const completed = <span class="cstat-no" title="statement not covered" >checks.filter(Boolean).length;</span>
-  const total = <span class="cstat-no" title="statement not covered" >checks.length;</span>
-  const percent = <span class="cstat-no" title="statement not covered" >Math.round((completed / total) * 100);</span>
+  const flags = { photo, location, phone };
+  const checks = [photo, location, phone];
+  const completed = checks.filter(Boolean).length;
+  const total = checks.length;
+  const percent = Math.round((completed / total) * 100);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return { completed, total, percent, flags };</span>
+  return { completed, total, percent, flags };
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -178,7 +178,7 @@ export function <span class="fstat-no" title="function not covered" >computeCore
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-19T06:43:11.577Z
+                at 2025-11-21T15:23:38.246Z
             </div>
         <script src="../prettify.js"></script>
         <script>

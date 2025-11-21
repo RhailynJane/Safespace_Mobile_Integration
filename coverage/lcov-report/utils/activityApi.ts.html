@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">6.06% </span>
+                <span class="strong">30.3% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>2/33</span>
+                <span class='fraction'>10/33</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">41.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/12</span>
+                <span class='fraction'>5/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">25% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>2/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">7.14% </span>
+                <span class="strong">32.14% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>2/28</span>
+                <span class='fraction'>9/28</span>
             </div>
         
             
@@ -161,26 +161,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -199,7 +199,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -245,27 +245,27 @@ export type UserStatus = {
   last_logout_at: string | null;
 };
 &nbsp;
-async function <span class="fstat-no" title="function not covered" >postJson&lt;</span>T&gt;(endpoint: string, body: any, retries = <span class="branch-0 cbranch-no" title="branch not covered" >3,</span> delay = <span class="branch-0 cbranch-no" title="branch not covered" >1000)</span>: Promise&lt;T&gt; {
-<span class="cstat-no" title="statement not covered" >  for (let attempt = <span class="cstat-no" title="statement not covered" >1;</span> attempt &lt;= retries; attempt++) {</span>
-<span class="cstat-no" title="statement not covered" >    try {</span>
-      const res = <span class="cstat-no" title="statement not covered" >await fetch(`${API_BASE_URL}${endpoint}`, {</span>
+async function postJson&lt;T&gt;(endpoint: string, body: any, retries = 3, delay = 1000): Promise&lt;T&gt; {
+  for (let attempt = 1; attempt &lt;= retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       
       // If user not found (404), retry after delay (user might be syncing)
-<span class="cstat-no" title="statement not covered" >      if (res.status === 404 &amp;&amp; attempt &lt; retries) {</span>
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (res.status === 404 &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >attempt &lt; retries)</span> {
 <span class="cstat-no" title="statement not covered" >        console.log(`⏳ User not found (attempt ${attempt}/${retries}), retrying in ${delay}ms...`);</span>
 <span class="cstat-no" title="statement not covered" >        await new Promise(<span class="fstat-no" title="function not covered" >re</span>solve =&gt; <span class="cstat-no" title="statement not covered" >setTimeout(resolve, delay))</span>;</span>
 <span class="cstat-no" title="statement not covered" >        continue;</span>
       }
       
-<span class="cstat-no" title="statement not covered" >      if (!res.ok) {</span>
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (!res.ok) {
         const text = <span class="cstat-no" title="statement not covered" >await res.text();</span>
 <span class="cstat-no" title="statement not covered" >        throw new Error(`${res.status} ${res.statusText}: ${text}`);</span>
       }
-<span class="cstat-no" title="statement not covered" >      return res.json();</span>
+      return res.json();
     } catch (error) {
 <span class="cstat-no" title="statement not covered" >      if (attempt === retries) <span class="cstat-no" title="statement not covered" >throw error;</span></span>
 <span class="cstat-no" title="statement not covered" >      console.log(`⏳ Request failed (attempt ${attempt}/${retries}), retrying...`);</span>
@@ -283,8 +283,8 @@ export const activityApi = {
     );
   },
 &nbsp;
-<span class="fstat-no" title="function not covered" >  as</span>ync recordLogout(clerkUserId: string) {
-<span class="cstat-no" title="statement not covered" >    return postJson&lt;{ success: boolean; data: any }&gt;(</span>
+  async recordLogout(clerkUserId: string) {
+    return postJson&lt;{ success: boolean; data: any }&gt;(
       '/api/users/logout-activity',
       { clerkUserId }
     );
@@ -325,7 +325,7 @@ export default activityApi;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-19T06:43:11.577Z
+                at 2025-11-21T15:23:38.246Z
             </div>
         <script src="../prettify.js"></script>
         <script>

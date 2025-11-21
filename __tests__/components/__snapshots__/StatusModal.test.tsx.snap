@@ -1,17 +1,7 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`StatusModal Component should match snapshot for each type: StatusModal-error 1`] = `
-<RNCSafeAreaProvider
-  onInsetsChange={[Function]}
-  style={
-    [
-      {
-        "flex": 1,
-      },
-      undefined,
-    ]
-  }
->
+<View>
   <Modal
     animationType="fade"
     onRequestClose={[MockFunction]}
@@ -172,21 +162,11 @@ exports[`StatusModal Component should match snapshot for each type: StatusModal-
       </View>
     </View>
   </Modal>
-</RNCSafeAreaProvider>
+</View>
 `;
 
 exports[`StatusModal Component should match snapshot for each type: StatusModal-info 1`] = `
-<RNCSafeAreaProvider
-  onInsetsChange={[Function]}
-  style={
-    [
-      {
-        "flex": 1,
-      },
-      undefined,
-    ]
-  }
->
+<View>
   <Modal
     animationType="fade"
     onRequestClose={[MockFunction]}
@@ -347,21 +327,11 @@ exports[`StatusModal Component should match snapshot for each type: StatusModal-
       </View>
     </View>
   </Modal>
-</RNCSafeAreaProvider>
+</View>
 `;
 
 exports[`StatusModal Component should match snapshot for each type: StatusModal-success 1`] = `
-<RNCSafeAreaProvider
-  onInsetsChange={[Function]}
-  style={
-    [
-      {
-        "flex": 1,
-      },
-      undefined,
-    ]
-  }
->
+<View>
   <Modal
     animationType="fade"
     onRequestClose={[MockFunction]}
@@ -522,5 +492,5 @@ exports[`StatusModal Component should match snapshot for each type: StatusModal-
       </View>
     </View>
   </Modal>
-</RNCSafeAreaProvider>
+</View>
 `;

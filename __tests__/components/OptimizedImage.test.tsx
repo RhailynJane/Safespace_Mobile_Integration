@@ -43,7 +43,8 @@ describe('OptimizedImage Component', () => {
     );
     
     const image = getByTestId('optimized-image');
-    fireEvent(image, 'onError');
+    // Fire onError with proper event structure for expo-image
+    fireEvent(image, 'onError', { nativeEvent: { error: 'Failed to load' } });
     
     await waitFor(() => {
       expect(getByTestId('image-error-placeholder')).toBeTruthy();
