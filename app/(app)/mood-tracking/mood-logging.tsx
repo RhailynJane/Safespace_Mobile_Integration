@@ -353,6 +353,7 @@ export default function MoodLoggingScreen() {
             ]}
             onPress={handleSubmit}
             disabled={isSubmitting}
+            testID="save-mood-entry-btn"
           >
             {isSubmitting ? (
               <ActivityIndicator color="#FFF" />
