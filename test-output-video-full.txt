@@ -1,0 +1,3674 @@
+
+> assignment2@1.0.0 test
+> jest __tests__/screens/video-consultations-full.test.tsx --verbose --no-coverage
+
+  console.warn
+    SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+
+      375 |   if (loading) {
+      376 |     return (
+    > 377 |       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+          |        ^
+      378 |         <CurvedBackground>
+      379 |           <View style={styles.loadingContainer}>
+      380 |             <ActivityIndicator size="large" color={theme.colors.primary} />
+
+      at warn (node_modules/react-native/Libraries/Utilities/warnOnce.js:27:11)
+      at Object.warnOnce [as SafeAreaView] (node_modules/react-native/index.js:92:5)
+      at SafeAreaView (/workspace/app/(app)../video-consultations/index.tsx:377:8)
+      at Object.react-stack-bottom-frame (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:13976:20)
+      at renderWithHooks (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:2866:22)
+      at updateFunctionComponent (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:6006:19)
+      at beginWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:7474:18)
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at performUnitOfWork (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10972:22)
+      at workLoopSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10816:41)
+      at renderRootSync (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10797:11)
+      at performWorkOnRoot (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10349:13)
+      at performWorkOnRootViaSchedulerTask (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:2094:7)
+      at flushActQueue (node_modules/react/cjs/react.development.js:566:34)
+      at process.env.NODE_ENV.exports.act (node_modules/react/cjs/react.development.js:859:10)
+      at actImplementation (node_modules/@testing-library/react-native/src/act.ts:30:25)
+      at renderWithAct (node_modules/@testing-library/react-native/src/render-act.ts:13:11)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:69:33)
+      at renderInternal (node_modules/@testing-library/react-native/src/render.tsx:44:10)
+      at render (__tests__/test-utils.tsx:59:19)
+      at Object.<anonymous> (__tests__/screens/video-consultations-full.test.tsx:81:37)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    Error checking assessment status: TypeError: Cannot read properties of null (reading 'isDue')
+        at isDue (/workspace/components/AppHeader.tsx:106:37)
+        at Generator.next (<anonymous>)
+        at asyncGeneratorStep (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+        at _next (/workspace/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+      106 |           setIsAssessmentDue(result.isDue);
+      107 |         } catch (error) {
+    > 108 |           console.error("Error checking assessment status:", error);
+          |                   ^
+      109 |         } finally {
+      110 |           setCheckingAssessment(false);
+      111 |         }
+
+      at error (components/AppHeader.tsx:108:19)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    Requesting camera permission...
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:262:15)
+
+  console.log
+    🎥 Requesting camera permission...
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:270:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.error
+    An update to VideoCallScreen inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      365 |       if (isUsingConvex && sessionIdParam) {
+      366 |         await reportQualityIssue(qualityIssueText.trim());
+    > 367 |         setQualityFeedback("Issue reported to support. Thank you!");
+          |         ^
+      368 |       } else {
+      369 |         setQualityFeedback("Issue captured locally (offline mode)");
+      370 |       }
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setQualityFeedback (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:367:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.error
+    An update to VideoCallScreen inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      373 |       setQualityFeedback("Failed to report issue");
+      374 |     } finally {
+    > 375 |       setQualitySubmitting(false);
+          |       ^
+      376 |     }
+      377 |   };
+      378 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setQualitySubmitting (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:375:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Skipping fetch - already in progress
+
+      at log (contexts/NotificationsContext.tsx:58:17)
+
+  console.log
+    🔔 Skipping fetch - already in progress
+
+      at log (contexts/NotificationsContext.tsx:58:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.error
+    An update to NotificationsProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      77 |           console.log(`🔔 Notifications updated: ${count} unread out of ${result.notifications.length} total`);
+      78 |         }
+    > 79 |         setLoading(false);
+         |         ^
+      80 |       } catch (error) {
+      81 |         console.error('❌ Error fetching notifications:', error);
+      82 |         setLoading(false);
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setLoading (contexts/NotificationsContext.tsx:79:9)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+  console.error
+    An update to ThemeProvider inside a test was not wrapped in act(...).
+    
+    When testing, code that causes React state updates should be wrapped into act(...):
+    
+    act(() => {
+      /* fire events that update state */
+    });
+    /* assert on the output */
+    
+    This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+      121 |       console.log('Error loading theme preference:', error);
+      122 |     } finally {
+    > 123 |       setIsLoaded(true);
+          |       ^
+      124 |     }
+      125 |   };
+      126 |
+
+      at node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11801:19
+      at runWithFiberInDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:1574:13)
+      at warnIfUpdatesNotWrappedWithActDEV (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:11800:9)
+      at scheduleUpdateOnFiber (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:10326:9)
+      at dispatchSetStateInternal (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4148:13)
+      at dispatchSetState (node_modules/react-test-renderer/cjs/react-test-renderer.development.js:4107:7)
+      at setIsLoaded (contexts/ThemeContext.tsx:123:7)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  console.log
+    ✅ Camera permission already granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:273:15)
+
+  console.log
+    Camera ready - permissions granted
+
+      at log (/workspace/app/(app)../video-consultations/video-call-meeting.tsx:282:15)
+
+  console.log
+    🔔 NotificationsProvider initialized - userId: test-user-id, hasClient: true
+
+      at log (contexts/NotificationsContext.tsx:35:15)
+
+  console.log
+    🔔 NotificationsProvider starting subscription for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:53:13)
+
+  console.log
+    🔔 Fetching notifications for userId: test-user-id
+
+      at log (contexts/NotificationsContext.tsx:64:17)
+
+  console.log
+    🔔 Notifications result: []
+
+      at log (contexts/NotificationsContext.tsx:70:17)
+
+  console.log
+    📱 Loading theme preference from AsyncStorage: null
+
+      at log (contexts/ThemeContext.tsx:105:15)
+
+FAIL __tests__/screens/video-consultations-full.test.tsx (54.906 s)
+  Video Consultations - Complete Test Suite
+    Screen Rendering and Loading - TC-VID-P01
+      ✓ renders video consultations screen correctly (1060 ms)
+      ✓ shows loading state initially (18 ms)
+      ✕ displays technical requirements section after loading (12805 ms)
+      ✓ transitions from loading to content view (31 ms)
+    Upcoming Appointments Display - TC-VID-P02
+      ✕ displays upcoming video consultation appointments (1047 ms)
+      ✓ shows "No upcoming video consultations" when empty (30 ms)
+      ✕ displays correct appointment time format (1019 ms)
+    Appointment Join Time Restrictions - TC-VID-P03
+      ✓ disables join button when too early (>10 min before) (52 ms)
+      ✕ enables join button within allowed window (1036 ms)
+    Technical Requirements Display - TC-VID-P04
+      ✓ displays technical requirements section with proper formatting (32 ms)
+      ✓ shows security and privacy information (32 ms)
+    Navigation to Video Call Meeting - TC-VID-P05
+      ✕ navigates to video call with correct parameters (1036 ms)
+    Error Handling for Connection Issues - TC-VID-P06
+      ✓ displays error message when appointments fail to load (32 ms)
+      ✓ shows technical requirements even during error state (33 ms)
+    Video Call Meeting Screen Initialization - TC-VID-P07
+      ✓ initializes with correct session parameters (327 ms)
+      ✓ sets initial audio state based on audioOption parameter (27 ms)
+      ✓ displays connecting status initially (28 ms)
+      ✓ renders all UI control elements (30 ms)
+    Camera Functionality and Permissions - TC-VID-P08
+      ✓ displays camera permission banner when permission denied (25 ms)
+      ✓ toggles camera on and off correctly (28 ms)
+    Audio Controls and Options - TC-VID-P09
+      ✓ initializes microphone based on audio option (27 ms)
+      ✓ toggles microphone on and off correctly (30 ms)
+    Interactive Features (Reactions, Hand Raise) - TC-VID-P10
+      ✓ toggles raise hand functionality (33 ms)
+      ✓ opens emoji reaction panel (34 ms)
+      ✓ sends emoji reactions (1605 ms)
+    Quality Issue Reporting - TC-VID-P11
+      ✓ opens quality issue modal (34 ms)
+      ✓ submits quality issue to Convex system (85 ms)
+      ✓ provides user feedback after submission (67 ms)
+    Call Duration and Session Tracking - TC-VID-P12
+      ✓ starts call duration timer (25 ms)
+      ✓ displays duration in correct format (41 ms)
+    Call Termination and Cleanup - TC-VID-P13
+      ✓ shows confirmation modal when leaving call (32 ms)
+      ✓ ends session properly in Convex when confirmed (42 ms)
+    Background/Foreground Handling - TC-VID-P14
+      ✓ handles app lifecycle correctly (18 ms)
+
+  ● Video Consultations - Complete Test Suite › Screen Rendering and Loading - TC-VID-P01 › displays technical requirements section after loading
+
+    thrown: "Exceeded timeout of 10000 ms for a test.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+      88 |     });
+      89 |
+    > 90 |     it('displays technical requirements section after loading', async () => {
+         |     ^
+      91 |       mockUseConvexAppointments.mockReturnValue({
+      92 |         appointments: [],
+      93 |         upcomingCount: 0,
+
+      at it (__tests__/screens/video-consultations-full.test.tsx:90:5)
+      at describe (__tests__/screens/video-consultations-full.test.tsx:61:3)
+      at Object.describe (__tests__/screens/video-consultations-full.test.tsx:56:1)
+
+  ● Video Consultations - Complete Test Suite › Upcoming Appointments Display - TC-VID-P02 › displays upcoming video consultation appointments
+
+    Unable to find an element with text: Dr. Smith
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33mtestID[39m=[32m"curved-background"[39m
+      [36m>[39m
+        [36m<View[39m
+          [33mtestID[39m=[32m"mock-svg"[39m
+        [36m>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-defs"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+        [36m</View>[39m
+        [36m<RCTSafeAreaView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"app-header"[39m
+          [36m>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+                [33mtestID[39m=[32m"back-button"[39m
+              [36m>[39m
+                [36m<View>[39m
+                  [36m<Text>[39m
+                    [0marrow-undo-sharp[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<Text>[39m
+                  [0mVideo Consultations[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mnotifications-outline[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mgrid[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<RCTScrollView>[39m
+            [36m<View>[39m
+              [36m<View>[39m
+                [36m<View>[39m
+                  [36m<View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mcalendar-outline[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<Text>[39m
+                      [0mNo upcoming video consultations[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<Text>[39m
+                    [0mTechnical Requirements[0m
+                  [36m</Text>[39m
+                  [36m<Text>[39m
+                    [0mSystem Requirements[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mStable internet connection (min 1 Mbps)[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSpeakers or headphones[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<Text>[39m
+                    [0mPrivacy & Security[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mEnd to end encrypted video calls[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mHIPAA/PIPEDA compliant platform[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mNo recordings without consent[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSecure data transmission[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</RCTScrollView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"bottom-navigation"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Home"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-home"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-home"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mhome[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Community"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-community-forum"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-community-forum"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mpeople[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Appointments"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-appointments"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-appointments"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mcalendar[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Messages"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-messages"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-messages"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mchatbubbles[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Profile"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-profile"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-profile"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mperson[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</RCTSafeAreaView>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      188 |       render(<VideoScreen />);
+      189 |       
+    > 190 |       await waitFor(() => {
+          |                    ^
+      191 |         expect(screen.getByText('Dr. Smith')).toBeTruthy();
+      192 |       });
+      193 |     });
+
+      at Object.<anonymous> (__tests__/screens/video-consultations-full.test.tsx:190:20)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● Video Consultations - Complete Test Suite › Upcoming Appointments Display - TC-VID-P02 › displays correct appointment time format
+
+    Unable to find an element with text: 14:30:00
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33mtestID[39m=[32m"curved-background"[39m
+      [36m>[39m
+        [36m<View[39m
+          [33mtestID[39m=[32m"mock-svg"[39m
+        [36m>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-defs"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+        [36m</View>[39m
+        [36m<RCTSafeAreaView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"app-header"[39m
+          [36m>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+                [33mtestID[39m=[32m"back-button"[39m
+              [36m>[39m
+                [36m<View>[39m
+                  [36m<Text>[39m
+                    [0marrow-undo-sharp[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<Text>[39m
+                  [0mVideo Consultations[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mnotifications-outline[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mgrid[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<RCTScrollView>[39m
+            [36m<View>[39m
+              [36m<View>[39m
+                [36m<View>[39m
+                  [36m<View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mcalendar-outline[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<Text>[39m
+                      [0mNo upcoming video consultations[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<Text>[39m
+                    [0mTechnical Requirements[0m
+                  [36m</Text>[39m
+                  [36m<Text>[39m
+                    [0mSystem Requirements[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mStable internet connection (min 1 Mbps)[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSpeakers or headphones[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<Text>[39m
+                    [0mPrivacy & Security[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mEnd to end encrypted video calls[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mHIPAA/PIPEDA compliant platform[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mNo recordings without consent[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSecure data transmission[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</RCTScrollView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"bottom-navigation"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Home"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-home"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-home"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mhome[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Community"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-community-forum"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-community-forum"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mpeople[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Appointments"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-appointments"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-appointments"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mcalendar[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Messages"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-messages"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-messages"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mchatbubbles[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Profile"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-profile"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-profile"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mperson[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</RCTSafeAreaView>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      234 |       render(<VideoScreen />);
+      235 |       
+    > 236 |       await waitFor(() => {
+          |                    ^
+      237 |         expect(screen.getByText('14:30:00')).toBeTruthy();
+      238 |       });
+      239 |     });
+
+      at Object.<anonymous> (__tests__/screens/video-consultations-full.test.tsx:236:20)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● Video Consultations - Complete Test Suite › Appointment Join Time Restrictions - TC-VID-P03 › enables join button within allowed window
+
+    Unable to find an element with text: Join Meeting
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33mtestID[39m=[32m"curved-background"[39m
+      [36m>[39m
+        [36m<View[39m
+          [33mtestID[39m=[32m"mock-svg"[39m
+        [36m>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-defs"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+        [36m</View>[39m
+        [36m<RCTSafeAreaView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"app-header"[39m
+          [36m>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+                [33mtestID[39m=[32m"back-button"[39m
+              [36m>[39m
+                [36m<View>[39m
+                  [36m<Text>[39m
+                    [0marrow-undo-sharp[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<Text>[39m
+                  [0mVideo Consultations[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mnotifications-outline[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mgrid[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<RCTScrollView>[39m
+            [36m<View>[39m
+              [36m<View>[39m
+                [36m<View>[39m
+                  [36m<View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mperson-circle[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mDr. Ready[0m
+                      [36m</Text>[39m
+                      [36m<Text>[39m
+                        [0mSunday, November 23, 2025[0m
+                      [36m</Text>[39m
+                      [36m<Text>[39m
+                        [0m04:18:53[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mUpcoming[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                  [36m</View>[39m
+                  [36m<View[39m
+                    [33maccessibilityState[39m=[32m{
+                      {
+                        "disabled": true,
+                      }
+                    }[39m
+                    [33maccessible[39m=[32m{true}[39m
+                  [36m>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mvideocam[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<Text>[39m
+                      [0mAvailable 10 min before[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View />[39m
+                  [36m<Text>[39m
+                    [0mTechnical Requirements[0m
+                  [36m</Text>[39m
+                  [36m<Text>[39m
+                    [0mSystem Requirements[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mStable internet connection (min 1 Mbps)[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSpeakers or headphones[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<Text>[39m
+                    [0mPrivacy & Security[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mEnd to end encrypted video calls[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mHIPAA/PIPEDA compliant platform[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mNo recordings without consent[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSecure data transmission[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</RCTScrollView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"bottom-navigation"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Home"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-home"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-home"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mhome[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Community"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-community-forum"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-community-forum"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mpeople[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Appointments"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-appointments"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-appointments"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mcalendar[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Messages"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-messages"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-messages"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mchatbubbles[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Profile"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-profile"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-profile"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mperson[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</RCTSafeAreaView>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      310 |       render(<VideoScreen />);
+      311 |       
+    > 312 |       await waitFor(() => {
+          |                    ^
+      313 |         expect(screen.getByText('Join Meeting')).toBeTruthy();
+      314 |       });
+      315 |     });
+
+      at Object.<anonymous> (__tests__/screens/video-consultations-full.test.tsx:312:20)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+  ● Video Consultations - Complete Test Suite › Navigation to Video Call Meeting - TC-VID-P05 › navigates to video call with correct parameters
+
+    Unable to find an element with text: Join Meeting
+
+    [36m<RNCSafeAreaProvider>[39m
+      [36m<View[39m
+        [33mtestID[39m=[32m"curved-background"[39m
+      [36m>[39m
+        [36m<View[39m
+          [33mtestID[39m=[32m"mock-svg"[39m
+        [36m>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-defs"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33mtestID[39m=[32m"mock-linear-gradient"[39m
+            [36m>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+              [36m<View[39m
+                [33mtestID[39m=[32m"mock-stop"[39m
+              [36m/>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"mock-path"[39m
+          [36m/>[39m
+        [36m</View>[39m
+        [36m<RCTSafeAreaView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"app-header"[39m
+          [36m>[39m
+            [36m<View>[39m
+              [36m<View[39m
+                [33maccessible[39m=[32m{true}[39m
+                [33mtestID[39m=[32m"back-button"[39m
+              [36m>[39m
+                [36m<View>[39m
+                  [36m<Text>[39m
+                    [0marrow-undo-sharp[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<Text>[39m
+                  [0mVideo Consultations[0m
+                [36m</Text>[39m
+              [36m</View>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mnotifications-outline[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+                [36m<View[39m
+                  [33maccessible[39m=[32m{true}[39m
+                [36m>[39m
+                  [36m<View>[39m
+                    [36m<Text>[39m
+                      [0mgrid[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+          [36m<RCTScrollView>[39m
+            [36m<View>[39m
+              [36m<View>[39m
+                [36m<View>[39m
+                  [36m<View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mperson-circle[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mDr. Navigate[0m
+                      [36m</Text>[39m
+                      [36m<Text>[39m
+                        [0mSunday, November 23, 2025[0m
+                      [36m</Text>[39m
+                      [36m<Text>[39m
+                        [0m04:18:54[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mUpcoming[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                  [36m</View>[39m
+                  [36m<View[39m
+                    [33maccessibilityState[39m=[32m{
+                      {
+                        "disabled": true,
+                      }
+                    }[39m
+                    [33maccessible[39m=[32m{true}[39m
+                  [36m>[39m
+                    [36m<View>[39m
+                      [36m<Text>[39m
+                        [0mvideocam[0m
+                      [36m</Text>[39m
+                    [36m</View>[39m
+                    [36m<Text>[39m
+                      [0mAvailable 10 min before[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View />[39m
+                  [36m<Text>[39m
+                    [0mTechnical Requirements[0m
+                  [36m</Text>[39m
+                  [36m<Text>[39m
+                    [0mSystem Requirements[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mStable internet connection (min 1 Mbps)[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSpeakers or headphones[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<Text>[39m
+                    [0mPrivacy & Security[0m
+                  [36m</Text>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mEnd to end encrypted video calls[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mHIPAA/PIPEDA compliant platform[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mNo recordings without consent[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                  [36m<View>[39m
+                    [36m<View />[39m
+                    [36m<Text>[39m
+                      [0mSecure data transmission[0m
+                    [36m</Text>[39m
+                  [36m</View>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</RCTScrollView>[39m
+          [36m<View[39m
+            [33mtestID[39m=[32m"bottom-navigation"[39m
+          [36m>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Home"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-home"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-home"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mhome[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Community"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-community-forum"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-community-forum"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mpeople[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Appointments"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-appointments"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-appointments"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mcalendar[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Messages"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-messages"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-messages"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mchatbubbles[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+            [36m<View[39m
+              [33maccessibilityLabel[39m=[32m"Navigate to Profile"[39m
+              [33maccessibilityRole[39m=[32m"button"[39m
+              [33maccessibilityState[39m=[32m{
+                {
+                  "selected": false,
+                }
+              }[39m
+              [33maccessible[39m=[32m{true}[39m
+              [33mtestID[39m=[32m"nav-tab-profile"[39m
+            [36m>[39m
+              [36m<View>[39m
+                [36m<View[39m
+                  [33mtestID[39m=[32m"nav-icon-profile"[39m
+                [36m>[39m
+                  [36m<Text>[39m
+                    [0mperson[0m
+                  [36m</Text>[39m
+                [36m</View>[39m
+              [36m</View>[39m
+            [36m</View>[39m
+          [36m</View>[39m
+        [36m</RCTSafeAreaView>[39m
+      [36m</View>[39m
+    [36m</RNCSafeAreaProvider>[39m
+
+      389 |       render(<VideoScreen />);
+      390 |       
+    > 391 |       await waitFor(() => {
+          |                    ^
+      392 |         const joinButton = screen.getByText('Join Meeting');
+      393 |         fireEvent.press(joinButton);
+      394 |       });
+
+      at Object.<anonymous> (__tests__/screens/video-consultations-full.test.tsx:391:20)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+      at node_modules/@babel/runtime/helpers/asyncToGenerator.js:22:7
+      at Object.<anonymous> (node_modules/@babel/runtime/helpers/asyncToGenerator.js:14:12)
+
+Snapshot Summary
+ › 2 snapshot files obsolete from 2 test suites. To remove them all, run `npm test -- -u`.
+   ↳   • __tests__/screens/__snapshots__/video-call-meeting.test.tsx.snap
+       • __tests__/screens/__snapshots__/video-consultations.test.tsx.snap
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 28 passed, 33 total
+Snapshots:   2 files obsolete, 0 total
+Time:        70.772 s
+Ran all test suites matching __tests__/screens/video-consultations-full.test.tsx.
+npm notice
+npm notice New major version of npm available! 10.9.4 -> 11.6.3
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.3
+npm notice To update run: npm install -g npm@11.6.3
+npm notice
