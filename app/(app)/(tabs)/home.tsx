@@ -68,7 +68,7 @@ function MoodChartSection({ userId }: { userId: string }) {
 
   const { currentStreak, longestStreak, chartData: moodPoints } = chartData;
   // Show all 30 days
-  const displayDays = moodPoints;
+  const displayDays = moodPoints || [];
   const daysWithMoods = displayDays.filter(d => d.averageScore !== null);
 
   console.log('[MoodChartSection] Chart data:', { 

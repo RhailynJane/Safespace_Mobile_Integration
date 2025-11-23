@@ -3,7 +3,11 @@ import { render as rtlRender, RenderOptions } from '@testing-library/react-nativ
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { NotificationsProvider } from '../contexts/NotificationsContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
+
+// Mock ConvexProvider for tests
+const MockConvexProvider = ({ children }: { children: React.ReactNode }) => {
+  return <>{children}</>;
+};
 
 // Memoize initialMetrics outside the provider to avoid re-creating the object each render
 const initialMetrics = {
@@ -39,7 +43,7 @@ const mockConvexClient = {
 
 function AllProviders({ children }: PropsWithChildren<{}>) {
   return (
-    <ConvexProvider client={mockConvexClient}>
+    <MockConvexProvider>
       <SafeAreaProvider initialMetrics={initialMetrics}>
         <ThemeProvider>
           <NotificationsProvider convexClient={mockConvexClient} userId="test-user-id">
@@ -47,7 +51,7 @@ function AllProviders({ children }: PropsWithChildren<{}>) {
           </NotificationsProvider>
         </ThemeProvider>
       </SafeAreaProvider>
-    </ConvexProvider>
+    </MockConvexProvider>
   );
 }
 

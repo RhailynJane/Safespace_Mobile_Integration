@@ -1,10 +1,191 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`CrisisScreen matches snapshot 1`] = `
-<View>
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
   <View
+    style={
+      [
+        {
+          "flex": 1,
+        },
+        {
+          "backgroundColor": "#E8E8E8",
+        },
+        false,
+        undefined,
+      ]
+    }
     testID="curved-background"
   >
+    <RNSVGSvgView
+      align="xMidYMid"
+      bbHeight={1334}
+      bbWidth={750}
+      focusable={false}
+      height={1334}
+      meetOrSlice={0}
+      minX={0}
+      minY={0}
+      style={
+        [
+          {
+            "backgroundColor": "transparent",
+            "borderWidth": 0,
+          },
+          {
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          },
+          {
+            "flex": 0,
+            "height": 1334,
+            "width": 750,
+          },
+        ]
+      }
+      vbHeight={1334}
+      vbWidth={750}
+      width={750}
+    >
+      <RNSVGGroup
+        fill={
+          {
+            "payload": 4278190080,
+            "type": 0,
+          }
+        }
+      >
+        <RNSVGDefs>
+          <RNSVGLinearGradient
+            gradient={
+              [
+                0,
+                -856098310,
+                0.5,
+                -420877073,
+                1,
+                -1277238554,
+              ]
+            }
+            gradientTransform={null}
+            gradientUnits={0}
+            name="gradient1"
+            x1="0%"
+            x2="100%"
+            y1="0%"
+            y2="100%"
+          />
+          <RNSVGLinearGradient
+            gradient={
+              [
+                0,
+                -638454796,
+                1,
+                -1711276033,
+              ]
+            }
+            gradientTransform={null}
+            gradientUnits={0}
+            name="gradient2"
+            x1="0%"
+            x2="100%"
+            y1="100%"
+            y2="0%"
+          />
+          <RNSVGLinearGradient
+            gradient={
+              [
+                0,
+                -1075188497,
+                1,
+                -2132876570,
+              ]
+            }
+            gradientTransform={null}
+            gradientUnits={0}
+            name="gradient3"
+            x1="100%"
+            x2="0%"
+            y1="100%"
+            y2="0%"
+          />
+        </RNSVGDefs>
+        <RNSVGPath
+          d="M 0 400.2 
+              Q 225 133.4 
+                525 533.6
+              Q 675 800.4 
+                750 266.8
+              L 750 1334
+              L 0 1334 Z"
+          fill={
+            {
+              "brushRef": "gradient1",
+              "type": 1,
+            }
+          }
+          propList={
+            [
+              "fill",
+            ]
+          }
+        />
+        <RNSVGPath
+          d="M 0 733.7
+              Q 187.5 600.3000000000001
+                375 800.4
+              Q 562.5 1000.5
+                750 867.1
+              L 750 1334
+              L 0 1334 Z"
+          fill={
+            {
+              "brushRef": "gradient2",
+              "type": 1,
+            }
+          }
+          opacity={0.95}
+          propList={
+            [
+              "fill",
+            ]
+          }
+        />
+        <RNSVGPath
+          d="M 0 1067.2
+              Q 150 933.8
+                300 1133.8999999999999
+              Q 450 1267.3
+                750 1200.6000000000001
+              L 750 1334
+              L 0 1334 Z"
+          fill={
+            {
+              "brushRef": "gradient2",
+              "type": 1,
+            }
+          }
+          propList={
+            [
+              "fill",
+            ]
+          }
+        />
+      </RNSVGGroup>
+    </RNSVGSvgView>
     <RCTSafeAreaView
       style={
         [
@@ -19,12 +200,217 @@ exports[`CrisisScreen matches snapshot 1`] = `
       }
     >
       <View
-        showBack={true}
+        style={
+          [
+            {
+              "backgroundColor": "transparent",
+            },
+            {
+              "backgroundColor": "transparent",
+              "paddingTop": 0,
+            },
+          ]
+        }
         testID="app-header"
       >
-        <Text>
-          Crisis Support
-        </Text>
+        <View
+          style={
+            [
+              {
+                "alignItems": "center",
+                "flexDirection": "row",
+                "height": 56,
+                "justifyContent": "space-between",
+                "paddingHorizontal": 20,
+                "paddingVertical": 12,
+              },
+              {
+                "backgroundColor": "transparent",
+              },
+            ]
+          }
+        >
+          <View
+            accessibilityState={
+              {
+                "busy": undefined,
+                "checked": undefined,
+                "disabled": undefined,
+                "expanded": undefined,
+                "selected": undefined,
+              }
+            }
+            accessibilityValue={
+              {
+                "max": undefined,
+                "min": undefined,
+                "now": undefined,
+                "text": undefined,
+              }
+            }
+            accessible={true}
+            collapsable={false}
+            focusable={true}
+            onClick={[Function]}
+            onResponderGrant={[Function]}
+            onResponderMove={[Function]}
+            onResponderRelease={[Function]}
+            onResponderTerminate={[Function]}
+            onResponderTerminationRequest={[Function]}
+            onStartShouldSetResponder={[Function]}
+            style={
+              {
+                "alignItems": "center",
+                "borderRadius": 20,
+                "height": 40,
+                "justifyContent": "center",
+                "opacity": 1,
+                "width": 40,
+              }
+            }
+            testID="back-button"
+          >
+            <View
+              color="#555"
+              size={24}
+            >
+              <Text>
+                arrow-undo-sharp
+              </Text>
+            </View>
+          </View>
+          <View
+            style={
+              {
+                "alignItems": "center",
+                "flex": 1,
+                "justifyContent": "center",
+                "marginTop": 8,
+                "paddingHorizontal": 10,
+              }
+            }
+          >
+            <Text
+              style={
+                [
+                  {
+                    "flex": 1,
+                    "fontSize": 17,
+                    "fontWeight": "500",
+                    "letterSpacing": 0.5,
+                    "marginLeft": 10,
+                    "textAlign": "left",
+                  },
+                  {
+                    "color": "#1A1A1A",
+                  },
+                ]
+              }
+            >
+              Crisis Support
+            </Text>
+          </View>
+          <View
+            style={
+              {
+                "alignItems": "center",
+                "flexDirection": "row",
+                "gap": 12,
+              }
+            }
+          >
+            <View
+              accessibilityState={
+                {
+                  "busy": undefined,
+                  "checked": undefined,
+                  "disabled": undefined,
+                  "expanded": undefined,
+                  "selected": undefined,
+                }
+              }
+              accessibilityValue={
+                {
+                  "max": undefined,
+                  "min": undefined,
+                  "now": undefined,
+                  "text": undefined,
+                }
+              }
+              accessible={true}
+              collapsable={false}
+              focusable={true}
+              onClick={[Function]}
+              onResponderGrant={[Function]}
+              onResponderMove={[Function]}
+              onResponderRelease={[Function]}
+              onResponderTerminate={[Function]}
+              onResponderTerminationRequest={[Function]}
+              onStartShouldSetResponder={[Function]}
+              style={
+                {
+                  "opacity": 1,
+                  "padding": 4,
+                  "position": "relative",
+                }
+              }
+            >
+              <View
+                color="#555"
+                size={24}
+              >
+                <Text>
+                  notifications-outline
+                </Text>
+              </View>
+            </View>
+            <View
+              accessibilityState={
+                {
+                  "busy": undefined,
+                  "checked": undefined,
+                  "disabled": undefined,
+                  "expanded": undefined,
+                  "selected": undefined,
+                }
+              }
+              accessibilityValue={
+                {
+                  "max": undefined,
+                  "min": undefined,
+                  "now": undefined,
+                  "text": undefined,
+                }
+              }
+              accessible={true}
+              collapsable={false}
+              focusable={true}
+              onClick={[Function]}
+              onResponderGrant={[Function]}
+              onResponderMove={[Function]}
+              onResponderRelease={[Function]}
+              onResponderTerminate={[Function]}
+              onResponderTerminationRequest={[Function]}
+              onStartShouldSetResponder={[Function]}
+              style={
+                {
+                  "opacity": 1,
+                  "padding": 4,
+                  "position": "relative",
+                }
+              }
+            >
+              <View
+                color="#555"
+                size={24}
+              >
+                <Text>
+                  grid
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </View>
       <RCTScrollView
         contentContainerStyle={
@@ -631,7 +1017,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                 {
                   "alignItems": "center",
                   "backgroundColor": "#FFFFFF",
-                  "borderColor": "#007AFF",
+                  "borderColor": "#4CAF50",
                   "borderRadius": 16,
                   "borderWidth": 2,
                   "elevation": 4,
@@ -667,7 +1053,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                 }
               >
                 <View
-                  color="#007AFF"
+                  color="#4CAF50"
                   size={24}
                 >
                   <Text>
@@ -692,7 +1078,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "marginBottom": 4,
                       },
                       {
-                        "color": "#007AFF",
+                        "color": "#4CAF50",
                       },
                     ]
                   }
@@ -708,7 +1094,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "opacity": 0.9,
                       },
                       {
-                        "color": "#007AFF",
+                        "color": "#4CAF50",
                         "opacity": 0.8,
                       },
                     ]
@@ -718,7 +1104,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                 </Text>
               </View>
               <View
-                color="#007AFF"
+                color="#4CAF50"
                 size={20}
                 style={
                   {
@@ -749,7 +1135,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
               }
             >
               <View
-                color="#007AFF"
+                color="#4CAF50"
                 size={24}
               >
                 <Text>
@@ -765,7 +1151,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                       "marginLeft": 12,
                     },
                     {
-                      "color": "#007AFF",
+                      "color": "#4CAF50",
                     },
                   ]
                 }
@@ -842,7 +1228,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "textAlign": "center",
                       },
                       {
-                        "color": "#000000",
+                        "color": "#1A1A1A",
                       },
                     ]
                   }
@@ -910,7 +1296,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "textAlign": "center",
                       },
                       {
-                        "color": "#000000",
+                        "color": "#1A1A1A",
                       },
                     ]
                   }
@@ -978,7 +1364,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "textAlign": "center",
                       },
                       {
-                        "color": "#000000",
+                        "color": "#1A1A1A",
                       },
                     ]
                   }
@@ -1046,7 +1432,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "textAlign": "center",
                       },
                       {
-                        "color": "#000000",
+                        "color": "#1A1A1A",
                       },
                     ]
                   }
@@ -1114,7 +1500,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "textAlign": "center",
                       },
                       {
-                        "color": "#000000",
+                        "color": "#1A1A1A",
                       },
                     ]
                   }
@@ -1182,7 +1568,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
                         "textAlign": "center",
                       },
                       {
-                        "color": "#000000",
+                        "color": "#1A1A1A",
                       },
                     ]
                   }
@@ -1711,6 +2097,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
             }
           >
             <View
+              color="#555"
               size={24}
               testID="nav-icon-home"
             >
@@ -1774,6 +2161,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
             }
           >
             <View
+              color="#555"
               size={24}
               testID="nav-icon-community-forum"
             >
@@ -1837,6 +2225,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
             }
           >
             <View
+              color="#555"
               size={24}
               testID="nav-icon-appointments"
             >
@@ -1900,6 +2289,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
             }
           >
             <View
+              color="#555"
               size={24}
               testID="nav-icon-messages"
             >
@@ -1963,6 +2353,7 @@ exports[`CrisisScreen matches snapshot 1`] = `
             }
           >
             <View
+              color="#555"
               size={24}
               testID="nav-icon-profile"
             >
@@ -1975,5 +2366,5 @@ exports[`CrisisScreen matches snapshot 1`] = `
       </View>
     </RCTSafeAreaView>
   </View>
-</View>
+</RNCSafeAreaProvider>
 `;

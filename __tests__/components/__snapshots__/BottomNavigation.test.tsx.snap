@@ -1,7 +1,17 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`BottomNavigation Component should match snapshot 1`] = `
-<View>
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
   <View
     style={
       [
@@ -154,6 +164,7 @@ exports[`BottomNavigation Component should match snapshot 1`] = `
         }
       >
         <View
+          color="#555"
           size={24}
           testID="nav-icon-appointments"
         >
@@ -217,6 +228,7 @@ exports[`BottomNavigation Component should match snapshot 1`] = `
         }
       >
         <View
+          color="#555"
           size={24}
           testID="nav-icon-community-forum"
         >
@@ -280,6 +292,7 @@ exports[`BottomNavigation Component should match snapshot 1`] = `
         }
       >
         <View
+          color="#555"
           size={24}
           testID="nav-icon-messages"
         >
@@ -343,6 +356,7 @@ exports[`BottomNavigation Component should match snapshot 1`] = `
         }
       >
         <View
+          color="#555"
           size={24}
           testID="nav-icon-profile"
         >
@@ -353,5 +367,5 @@ exports[`BottomNavigation Component should match snapshot 1`] = `
       </View>
     </View>
   </View>
-</View>
+</RNCSafeAreaProvider>
 `;

@@ -1,7 +1,17 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`VideoScreen matches snapshot 1`] = `
-<View>
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
   <RCTSafeAreaView
     style={
       [
@@ -10,14 +20,185 @@ exports[`VideoScreen matches snapshot 1`] = `
           "flex": 1,
         },
         {
-          "backgroundColor": "#F2F2F7",
+          "backgroundColor": "#E8E8E8",
         },
       ]
     }
   >
     <View
+      style={
+        [
+          {
+            "flex": 1,
+          },
+          {
+            "backgroundColor": "#E8E8E8",
+          },
+          false,
+          undefined,
+        ]
+      }
       testID="curved-background"
     >
+      <RNSVGSvgView
+        align="xMidYMid"
+        bbHeight={1334}
+        bbWidth={750}
+        focusable={false}
+        height={1334}
+        meetOrSlice={0}
+        minX={0}
+        minY={0}
+        style={
+          [
+            {
+              "backgroundColor": "transparent",
+              "borderWidth": 0,
+            },
+            {
+              "bottom": 0,
+              "left": 0,
+              "position": "absolute",
+              "right": 0,
+              "top": 0,
+            },
+            {
+              "flex": 0,
+              "height": 1334,
+              "width": 750,
+            },
+          ]
+        }
+        vbHeight={1334}
+        vbWidth={750}
+        width={750}
+      >
+        <RNSVGGroup
+          fill={
+            {
+              "payload": 4278190080,
+              "type": 0,
+            }
+          }
+        >
+          <RNSVGDefs>
+            <RNSVGLinearGradient
+              gradient={
+                [
+                  0,
+                  -856098310,
+                  0.5,
+                  -420877073,
+                  1,
+                  -1277238554,
+                ]
+              }
+              gradientTransform={null}
+              gradientUnits={0}
+              name="gradient1"
+              x1="0%"
+              x2="100%"
+              y1="0%"
+              y2="100%"
+            />
+            <RNSVGLinearGradient
+              gradient={
+                [
+                  0,
+                  -638454796,
+                  1,
+                  -1711276033,
+                ]
+              }
+              gradientTransform={null}
+              gradientUnits={0}
+              name="gradient2"
+              x1="0%"
+              x2="100%"
+              y1="100%"
+              y2="0%"
+            />
+            <RNSVGLinearGradient
+              gradient={
+                [
+                  0,
+                  -1075188497,
+                  1,
+                  -2132876570,
+                ]
+              }
+              gradientTransform={null}
+              gradientUnits={0}
+              name="gradient3"
+              x1="100%"
+              x2="0%"
+              y1="100%"
+              y2="0%"
+            />
+          </RNSVGDefs>
+          <RNSVGPath
+            d="M 0 400.2 
+              Q 225 133.4 
+                525 533.6
+              Q 675 800.4 
+                750 266.8
+              L 750 1334
+              L 0 1334 Z"
+            fill={
+              {
+                "brushRef": "gradient1",
+                "type": 1,
+              }
+            }
+            propList={
+              [
+                "fill",
+              ]
+            }
+          />
+          <RNSVGPath
+            d="M 0 733.7
+              Q 187.5 600.3000000000001
+                375 800.4
+              Q 562.5 1000.5
+                750 867.1
+              L 750 1334
+              L 0 1334 Z"
+            fill={
+              {
+                "brushRef": "gradient2",
+                "type": 1,
+              }
+            }
+            opacity={0.95}
+            propList={
+              [
+                "fill",
+              ]
+            }
+          />
+          <RNSVGPath
+            d="M 0 1067.2
+              Q 150 933.8
+                300 1133.8999999999999
+              Q 450 1267.3
+                750 1200.6000000000001
+              L 750 1334
+              L 0 1334 Z"
+            fill={
+              {
+                "brushRef": "gradient2",
+                "type": 1,
+              }
+            }
+            propList={
+              [
+                "fill",
+              ]
+            }
+          />
+        </RNSVGGroup>
+      </RNSVGSvgView>
       <View
         style={
           {
@@ -28,7 +209,7 @@ exports[`VideoScreen matches snapshot 1`] = `
         }
       >
         <ActivityIndicator
-          color="#007AFF"
+          color="#4CAF50"
           size="large"
         />
         <Text
@@ -40,7 +221,7 @@ exports[`VideoScreen matches snapshot 1`] = `
                 "textAlign": "center",
               },
               {
-                "color": "#8E8E93",
+                "color": "#555",
                 "marginTop": 16,
               },
             ]
@@ -51,5 +232,5 @@ exports[`VideoScreen matches snapshot 1`] = `
       </View>
     </View>
   </RCTSafeAreaView>
-</View>
+</RNCSafeAreaProvider>
 `;

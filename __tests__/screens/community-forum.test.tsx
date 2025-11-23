@@ -12,10 +12,6 @@ jest.mock('../../utils/avatarEvents', () => {
       subscribe: mockSubscribe,
       emit: mockEmit,
     },
-    default: {
-      subscribe: mockSubscribe,
-      emit: mockEmit,
-    },
   };
 });
 
@@ -48,17 +44,15 @@ jest.mock('@clerk/clerk-expo', () => ({
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
+const mockRouter = {
+  push: mockPush,
+  replace: mockReplace,
+  back: mockBack,
+};
+
 jest.mock('expo-router', () => ({
-  router: {
-    push: mockPush,
-    replace: mockReplace,
-    back: mockBack,
-  },
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-    back: mockBack,
-  }),
+  router: mockRouter,
+  useRouter: jest.fn(() => mockRouter),
   useLocalSearchParams: jest.fn(() => ({})),
   useFocusEffect: jest.fn((callback) => {
     callback();

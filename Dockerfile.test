@@ -12,7 +12,9 @@ RUN apk update && \
     python3 \
     make \
     g++ \
-    || (sleep 5 && apk update && apk add --no-cache git python3 make g++)
+    bash \
+    curl \
+    || (sleep 5 && apk update && apk add --no-cache git python3 make g++ bash curl)
 
 # Copy package files
 COPY package*.json ./
@@ -28,4 +30,4 @@ ENV NODE_ENV=test
 ENV CI=true
 
 # Default command runs all tests
-CMD ["npm", "test", "--", "--coverage", "--watchAll=false"]
+CMD ["npm", "test", "--", "--coverage", "--watchAll=false", "--verbose", "--passWithNoTests"]

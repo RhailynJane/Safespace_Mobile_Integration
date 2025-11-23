@@ -153,9 +153,12 @@ export default function ChangePasswordScreen() {
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handlePasswordChange}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Change Password"
+            accessibilityState={{ disabled: loading }}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="#FFFFFF" testID="activity-indicator" />
             ) : (
               <Text style={styles.buttonText}>Change Password</Text>
             )}
