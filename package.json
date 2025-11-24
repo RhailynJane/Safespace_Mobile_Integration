@@ -20,8 +20,9 @@
     "test:docker:watch": "docker-compose -f docker-compose.test.yml run --rm test npm run test:watch",
     "test:docker:debug": "docker-compose -f docker-compose.test.yml run --rm test npm test -- --watchAll=false --verbose --no-cache",
     "test:announcements": "jest __tests__/screens/announcements.test.tsx --runInBand",
-    "test:appointments": "jest __tests__/screens/appointments.test.tsx __tests__/screens/appointments-extended.test.tsx --runInBand",
-    "test:auth": "jest __tests__/auth/login.test.tsx __tests__/auth/signup.test.tsx __tests__/auth/forgot-password.test.tsx __tests__/auth/reset-password.test.tsx __tests__/screens/change-password.test.tsx --runInBand",
+    "test:appointments": "jest __tests__/screens/appointments.test.tsx __tests__/screens/appointments-extended.test.tsx --runInBand --logHeapUsage",
+    "test:appointments-core": "jest __tests__/screens/appointments-core.test.tsx --runInBand --logHeapUsage",
+    "test:auth": "jest __tests__/auth/login.test.tsx __tests__/auth/signup.test.tsx __tests__/auth/forgot-password.test.tsx __tests__/auth/reset-password.test.tsx --runInBand",
     "test:community": "jest __tests__/screens/community-forum-full.test.tsx --runInBand",
     "test:crisis": "jest __tests__/screens/crisis-support.test.tsx --runInBand",
     "test:home": "jest __tests__/tabs/home.test.tsx --runInBand",
@@ -48,6 +49,13 @@
     "convex:deploy": "convex deploy",
     "seed:resources": "npx tsx scripts/seedResources.ts",
     "test:apis": "npx tsx scripts/testExternalApis.ts"
+    ,"perf:artillery": "artillery run testing/performance/load-test-config.js --output testing/performance/report.json"
+    ,"perf:artillery:report": "artillery report testing/performance/report.json --output testing/performance/report.html"
+    ,"perf:k6:local": "k6 run testing/performance/k6/announcements-smoke.js"
+    ,"perf:k6:docker": "docker-compose -f docker-compose.test.yml run --rm k6-smoke"
+    ,"perf:all": "npm run perf:artillery && npm run perf:k6:docker && npm run perf:convex:announcements"
+    ,"perf:convex:announcements": "ts-node --esm testing/performance/convex/announcements-load.ts"
+    ,"perf:convex:docker": "docker-compose -f docker-compose.test.yml run --rm test-performance-convex"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
@@ -143,7 +151,9 @@
     "msw": "^2.11.6",
     "nodemon": "^3.1.10",
     "react-test-renderer": "^19.1.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "artillery": "^2.0.0-31",
+    "ts-node": "^10.9.2"
   },
   "private": true
 }

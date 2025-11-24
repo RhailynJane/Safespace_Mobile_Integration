@@ -80,7 +80,23 @@ services:
       - NODE_ENV=test
       - CI=true
       - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+      - NODE_OPTIONS=--max-old-space-size=8192 --expose-gc
     command: npm run test:appointments
+
+  test-appointments-core:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-appointments-core
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+      - NODE_OPTIONS=--max-old-space-size=4096 --expose-gc
+    command: npm run test:appointments-core
 
   test-auth:
     build:
@@ -263,3 +279,49 @@ services:
       - CI=true
       - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
     command: npm run test:all-features
+
+  # Performance (Artillery) - uses existing Node test image
+  test-performance-artillery:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-performance-artillery
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./testing/performance:/app/testing/performance
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - BASE_URL=http://host.docker.internal:3000
+    command: npm run perf:artillery
+
+  # Performance (k6) - official k6 image
+  k6-smoke:
+    image: grafana/k6:latest
+    container_name: safespace-k6-smoke
+    volumes:
+      - ./testing/performance/k6:/scripts
+    environment:
+      - BASE_URL=http://host.docker.internal:3000
+    command: run /scripts/announcements-smoke.js
+
+  test-performance-convex:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-performance-convex
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./testing/performance/convex:/app/testing/performance/convex
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=${EXPO_PUBLIC_CONVEX_URL}
+      - ORG_ID=cmha-calgary
+      - REQUESTS=100
+      - CONCURRENCY=10
+      - ACTIVE_ONLY=true
+      - LIMIT=50
+    command: npm run perf:convex:announcements
