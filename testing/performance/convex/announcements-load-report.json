@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-11-24T03:14:26.424Z",
+  "convexUrl": "https://formal-pigeon-483.convex.cloud",
+  "orgId": "cmha-calgary",
+  "requests": 100,
+  "concurrency": 10,
+  "activeOnly": true,
+  "limit": 50,
+  "metrics": {
+    "count": 100,
+    "errors": 0,
+    "min": 75.611511,
+    "max": 391.72679,
+    "avg": 119.64606478999994,
+    "p50": 90.2932,
+    "p90": 369.840746,
+    "p95": 370.841794,
+    "p99": 391.72679
+  },
+  "errorSamples": []
+}

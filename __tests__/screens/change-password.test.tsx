@@ -10,6 +10,7 @@ const mockUpdatePassword = jest.fn();
 const mockUser = {
   id: 'test-user-id',
   updatePassword: mockUpdatePassword,
+  publicMetadata: { orgId: 'cmha-calgary' }
 };
 
 jest.mock('@clerk/clerk-expo', () => ({
@@ -18,7 +19,8 @@ jest.mock('@clerk/clerk-expo', () => ({
   useAuth: jest.fn(() => ({ 
     signOut: jest.fn(),
     isSignedIn: true,
-    userId: 'test-user-id'
+    userId: 'test-user-id',
+    orgId: 'cmha-calgary'
   })),
 }));
 

@@ -76,13 +76,13 @@ describe('Announcements Screen', () => {
     mockMarkAsRead = jest.fn(() => Promise.resolve(undefined));
     
     // Setup shared state with defaults
-    orgValue = 'sait';
+    orgValue = 'cmha-calgary';
     announcementsValue = [];
     userIdValue = 'test-user-id';
     userValue = {
       id: 'test-user-id',
       firstName: 'Test',
-      publicMetadata: { orgId: 'sait' }
+      publicMetadata: { orgId: 'cmha-calgary' }
     };
     
     // Mock Clerk hooks using jest.spyOn
@@ -175,13 +175,13 @@ describe('Announcements Screen', () => {
       userValue = { 
         id: 'test-user-id', 
         firstName: 'Test',
-        publicMetadata: { orgId: 'sait' } 
+        publicMetadata: { orgId: 'cmha-calgary' } 
       };
 
       renderWithProviders(<AnnouncementsScreen />);
 
       await waitFor(() => {
-        const saitElements = screen.getAllByText('SAIT');
+        const saitElements = screen.getAllByText('cmha-calgary');
         expect(saitElements.length).toBeGreaterThan(0);
       });
     });
@@ -230,18 +230,18 @@ describe('Announcements Screen', () => {
       });
     });
 
-    it('TC-ANNOUNCE-P07: displays SAIT organization with blue badge', async () => {
-      orgValue = 'sait';
+    it('TC-ANNOUNCE-P07: displays cmha-calgary organization with blue badge', async () => {
+      orgValue = 'cmha-calgary';
       userValue = { 
         id: 'test-user-id',
         firstName: 'Test',
-        publicMetadata: { orgId: 'sait' } 
+        publicMetadata: { orgId: 'cmha-calgary' } 
       };
 
       renderWithProviders(<AnnouncementsScreen />);
 
       await waitFor(() => {
-        const saitElements = screen.getAllByText('SAIT');
+        const saitElements = screen.getAllByText('cmha-calgary');
         expect(saitElements.length).toBeGreaterThan(0);
         expect(screen.getByText('Southern Alberta Institute of Technology')).toBeTruthy();
       });
@@ -274,13 +274,13 @@ describe('Announcements Screen', () => {
       userValue = { 
         id: 'test-user-id',
         firstName: 'Test',
-        publicMetadata: { orgId: 'sait' } // Clerk has different org
+        publicMetadata: { orgId: 'cmha-calgary' } // Clerk has different org
       };
 
       renderWithProviders(<AnnouncementsScreen />);
 
       await waitFor(() => {
-        expect(mockSyncOrg).toHaveBeenCalledWith({ orgId: 'sait' });
+        expect(mockSyncOrg).toHaveBeenCalledWith({ orgId: 'cmha-calgary' });
       }, { timeout: 3000 });
     });
 
@@ -296,7 +296,7 @@ describe('Announcements Screen', () => {
       renderWithProviders(<AnnouncementsScreen />);
 
       await waitFor(() => {
-        const saitElements = screen.getAllByText('SAIT');
+        const saitElements = screen.getAllByText('cmha-calgary');
         expect(saitElements.length).toBeGreaterThan(0);
       });
     });
@@ -314,7 +314,7 @@ describe('Announcements Screen', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No announcements yet')).toBeTruthy();
-        expect(screen.getByText('Announcements from sait will appear here.')).toBeTruthy();
+        expect(screen.getByText('Announcements from cmha-calgary will appear here.')).toBeTruthy();
       });
     });
 
@@ -530,7 +530,7 @@ describe('Announcements Screen', () => {
       renderWithProviders(<AnnouncementsScreen />);
 
       await waitFor(() => {
-        expect(mockSeed).toHaveBeenCalledWith({ orgId: 'sait' });
+        expect(mockSeed).toHaveBeenCalledWith({ orgId: 'cmha-calgary' });
       }, { timeout: 3000 });
     });
 
@@ -543,7 +543,7 @@ describe('Announcements Screen', () => {
       renderWithProviders(<AnnouncementsScreen />);
 
       await waitFor(() => {
-        expect(mockClearAndReseed).toHaveBeenCalledWith({ orgId: 'sait' });
+        expect(mockClearAndReseed).toHaveBeenCalledWith({ orgId: 'cmha-calgary' });
       }, { timeout: 3000 });
     });
 
@@ -579,7 +579,7 @@ describe('Announcements Screen', () => {
       renderWithProviders(<AnnouncementsScreen />);
 
       await waitFor(() => {
-        const saitElements = screen.getAllByText('SAIT');
+        const saitElements = screen.getAllByText('cmha-calgary');
         expect(saitElements.length).toBeGreaterThan(0);
         expect(screen.getByText('Southern Alberta Institute of Technology')).toBeTruthy();
       });

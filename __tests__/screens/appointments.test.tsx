@@ -95,6 +95,12 @@ describe('Appointments - Comprehensive Test Suite', () => {
     (require('expo-router').router as any) = mockRouter;
   });
 
+  afterEach(() => {
+    // Clean up timers to prevent memory leaks
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
   // ========================================
   // PART 1: Main Screen Tests (TC-APPT-P01, P14, P15, P16, N05)
   // ========================================

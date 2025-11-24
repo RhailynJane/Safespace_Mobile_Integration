@@ -37,7 +37,7 @@ jest.mock('../../lib/sendbird-service', () => ({
   },
 }));
 jest.mock('@clerk/clerk-expo', () => ({
-  useUser: () => ({ user: { id: 'test-user-123', publicMetadata: { orgId: 'sait' } } }),
+  useUser: () => ({ user: { id: 'test-user-123', publicMetadata: { orgId: 'cmha-calgary' } } }),
   useAuth: () => ({ signOut: jest.fn(), isSignedIn: true }),
 }));
 jest.mock('convex/react', () => ({

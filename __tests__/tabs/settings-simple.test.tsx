@@ -14,7 +14,7 @@ import { useQuery, useMutation, useConvex } from 'convex/react';
 // Mock Clerk
 jest.mock('@clerk/clerk-expo', () => ({
   useUser: jest.fn(),
-  useAuth: () => ({ userId: 'user123', isSignedIn: true, signOut: jest.fn() }),
+  useAuth: () => ({ userId: 'user123', isSignedIn: true, signOut: jest.fn(), orgId: 'cmha-calgary' }),
   SignedIn: ({ children }: any) => children,
   SignedOut: ({ children }: any) => null,
 }));
@@ -31,7 +31,8 @@ describe('Settings Screen - Simple Tests', () => {
         firstName: 'John',
         lastName: 'Doe',
         emailAddresses: [{ emailAddress: 'john.doe@example.com' }],
-        imageUrl: 'https://test-image-url.com'
+        imageUrl: 'https://test-image-url.com',
+        publicMetadata: { orgId: 'cmha-calgary' }
       }
     });
     

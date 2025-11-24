@@ -35,6 +35,7 @@ const setSystemTime = (isoUtc: string) => {
 };
 
 afterEach(() => {
+  jest.clearAllTimers();
   jest.useRealTimers();
 });
 

@@ -288,16 +288,11 @@ export default function AppointmentsScreen({ disableFetch = false, mockUpcoming 
     }
   }, [user?.id, showStatusModal, convex, orgShortLabel, disableFetch, mockUpcoming, mockPast]);
 
-  // Run fetch on mount and when dependencies change
+  // Run fetch on mount and when user ID changes
   useEffect(() => {
-    if (disableFetch) {
-      fetchAppointments();
-      return;
-    }
-    if (user?.id) {
-      fetchAppointments();
-    }
-  }, [user?.id, fetchAppointments, disableFetch]);
+    fetchAppointments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
