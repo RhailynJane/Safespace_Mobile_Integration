@@ -1,6 +1,6 @@
 /**
  * Appointments Feature Core Test Suite - 25 Test Cases
- * TC-APPT-P01 through P18, P20 (19 tests)
+ * TC-APPT-P01 through P09, P11-P18 (18 tests)
  * TC-APPT-N01, N04, N05 (3 tests)
  * TC-APPT-INT-01, INT-02, INT-03 (3 tests)
  * TC-APPT-EDGE-01, EDGE-02, EDGE-06 (3 tests)
@@ -55,6 +55,9 @@ jest.mock('expo-router', () => ({
   useRouter: jest.fn(() => mockRouter),
   useLocalSearchParams: jest.fn(() => ({})),
 }));
+
+// Access useLocalSearchParams for mocking
+const { useLocalSearchParams } = require('expo-router');
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -176,8 +179,8 @@ describe('Appointments - Core Test Suite (25 Tests)', () => {
   });
 
   // ========================================
-  // PART 2: Booking Screen Tests (10 tests)
-  // TC-APPT-P03, P04, P05, P06, P07, P17, P18
+  // PART 2: Booking Screen Tests (11 tests)
+  // TC-APPT-P03, P04, P05, P06, P07, P08, P09, P17, P18
   // TC-APPT-N01, N04
   // ========================================
 
@@ -310,6 +313,23 @@ describe('Appointments - Core Test Suite (25 Tests)', () => {
         const continueButton = screen.getByText('Continue to Confirmation');
         fireEvent.press(continueButton);
         expect(mockPush).toHaveBeenCalled();
+      });
+    });
+
+    it('confirmation screen displays booking details (TC-APPT-P09)', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        selectedDate: '2025-12-01',
+        selectedDateDisplay: 'Monday, December 1, 2025',
+        selectedTime: '10:00 AM',
+        selectedType: 'video',
+        supportWorkerName: 'Auto-assigned by CMHA',
+      });
+      
+      render(<ConfirmAppointment />);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/10:00/)).toBeTruthy();
+        expect(screen.getByText(/Auto-assigned/)).toBeTruthy();
       });
     });
   });
