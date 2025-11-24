@@ -48,7 +48,13 @@ interface Appointment {
  * or view their scheduled appointments. Features an intuitive interface
  * with clear navigation options and an elegant curved background.
  */
-export default function AppointmentsScreen() {
+interface AppointmentsScreenProps {
+  disableFetch?: boolean;
+  mockUpcoming?: any[];
+  mockPast?: any[];
+}
+
+export default function AppointmentsScreen({ disableFetch = false, mockUpcoming = [], mockPast = [] }: AppointmentsScreenProps) {
   const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -105,6 +111,27 @@ export default function AppointmentsScreen() {
    * to keep Upcoming count and Next Session perfectly in sync.
    */
   const fetchAppointments = useCallback(async () => {
+    if (disableFetch) {
+      // Synchronous test-mode path: populate counts from provided mock arrays
+      const upcoming = Array.isArray(mockUpcoming) ? mockUpcoming : [];
+      const past = Array.isArray(mockPast) ? mockPast : [];
+      setUpcomingCount(upcoming.length);
+      setCompletedCount(past.length);
+      if (upcoming[0]) {
+        setNextAppointment({
+          id: 0 as any,
+          supportWorker: upcoming[0].supportWorker || 'Auto-assigned',
+          date: upcoming[0].date || 'Test Date',
+          time: upcoming[0].time || '',
+          type: (upcoming[0].type || 'video').toString().replace('_', ' '),
+          status: 'upcoming',
+        } as any);
+      } else {
+        setNextAppointment(null);
+      }
+      setLoading(false);
+      return;
+    }
     if (!user?.id) return;
     try {
       setLoading(true);
@@ -115,14 +142,19 @@ export default function AppointmentsScreen() {
         return name.startsWith('Auto-assigned by ') ? `Auto-assigned by ${orgShortLabel}` : name;
       };
 
-      const [upcoming, past] = await Promise.all([
+      // Fetch raw upcoming and past appointment lists. Backends may sometimes
+      // return null/undefined; defensively coerce to empty arrays to avoid
+      // downstream filter errors in tests or UI.
+      const [upcomingRaw, pastRaw] = await Promise.all([
         convex.query(api.appointments.getUpcomingAppointments, { userId: user.id }),
         convex.query(api.appointments.getPastAppointments, { userId: user.id }),
       ]);
+      const upcoming = Array.isArray(upcomingRaw) ? upcomingRaw : [];
+      const past = Array.isArray(pastRaw) ? pastRaw : [];
 
       // Build support worker enrichment map for items missing names
       const collectIds = (list: any[]) =>
-        list
+        (Array.isArray(list) ? list : [])
           .filter((apt) => !apt.supportWorker && apt.supportWorkerId)
           .map((apt) => String(apt.supportWorkerId));
 
@@ -254,14 +286,18 @@ export default function AppointmentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, showStatusModal, convex, orgShortLabel]);
+  }, [user?.id, showStatusModal, convex, orgShortLabel, disableFetch, mockUpcoming, mockPast]);
 
   // Run fetch on mount and when dependencies change
   useEffect(() => {
+    if (disableFetch) {
+      fetchAppointments();
+      return;
+    }
     if (user?.id) {
       fetchAppointments();
     }
-  }, [user?.id, fetchAppointments]);
+  }, [user?.id, fetchAppointments, disableFetch]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
