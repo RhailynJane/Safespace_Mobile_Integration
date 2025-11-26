@@ -119,7 +119,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - Preference management
 - Real-time updates
 
-## 🗄️ Database Architecture
+##  Database Architecture
 
 ### Core Tables
 - **Users** - User profiles and authentication
@@ -138,7 +138,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - Consent management tracking
 - Regular security backups
 
-## 🔌 API Documentation
+##  API Documentation
 
 ### Authentication Endpoints
 ```http
