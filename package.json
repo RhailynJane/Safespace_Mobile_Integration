@@ -14,6 +14,27 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:docker": "docker-compose -f docker-compose.test.yml run --rm test npm test -- --watchAll=false --verbose",
+    "test:docker:build": "docker-compose -f docker-compose.test.yml build test",
+    "test:docker:coverage": "docker-compose -f docker-compose.test.yml run --rm test npm run test:coverage",
+    "test:docker:watch": "docker-compose -f docker-compose.test.yml run --rm test npm run test:watch",
+    "test:docker:debug": "docker-compose -f docker-compose.test.yml run --rm test npm test -- --watchAll=false --verbose --no-cache",
+    "test:announcements": "jest __tests__/screens/announcements.test.tsx --runInBand",
+    "test:appointments": "jest __tests__/screens/appointments.test.tsx __tests__/screens/appointments-extended.test.tsx --runInBand --logHeapUsage",
+    "test:appointments-core": "jest __tests__/screens/appointments-core.test.tsx --runInBand --logHeapUsage",
+    "test:auth": "jest __tests__/auth/login.test.tsx __tests__/auth/signup.test.tsx __tests__/auth/forgot-password.test.tsx __tests__/auth/reset-password.test.tsx --runInBand",
+    "test:community": "jest __tests__/screens/community-forum-full.test.tsx --runInBand",
+    "test:crisis": "jest __tests__/screens/crisis-support.test.tsx --runInBand",
+    "test:home": "jest __tests__/tabs/home.test.tsx --runInBand",
+    "test:journal": "jest __tests__/screens/journal.test.tsx --runInBand",
+    "test:messages": "jest __tests__/tabs/messages.test.tsx --runInBand",
+    "test:moods": "jest __tests__/screens/mood-tracking.test.tsx --runInBand",
+    "test:profile": "jest __tests__/tabs/edit-profile.test.tsx __tests__/tabs/edit-profile-simple.test.tsx __tests__/tabs/profile.test.tsx --runInBand",
+    "test:settings": "jest __tests__/tabs/settings.test.tsx __tests__/tabs/settings-simple.test.tsx --runInBand",
+    "test:resources": "jest __tests__/screens/resources.test.tsx --runInBand",
+    "test:self-assessment": "jest __tests__/screens/self-assessment.test.tsx --runInBand",
+    "test:video": "jest __tests__/screens/video-consultations-full.test.tsx --runInBand",
+    "test:all-features": "npm run test:announcements && npm run test:appointments && npm run test:auth && npm run test:community && npm run test:crisis && npm run test:home && npm run test:journal && npm run test:messages && npm run test:moods && npm run test:profile && npm run test:settings && npm run test:resources && npm run test:self-assessment && npm run test:video",
     "test:e2e": "detox test",
     "test:e2e:build:ios": "detox build --configuration ios.sim.debug",
     "test:e2e:build:android": "detox build --configuration android.emu.debug",
@@ -28,6 +49,13 @@
     "convex:deploy": "convex deploy",
     "seed:resources": "npx tsx scripts/seedResources.ts",
     "test:apis": "npx tsx scripts/testExternalApis.ts"
+    ,"perf:artillery": "artillery run testing/performance/load-test-config.js --output testing/performance/report.json"
+    ,"perf:artillery:report": "artillery report testing/performance/report.json --output testing/performance/report.html"
+    ,"perf:k6:local": "k6 run testing/performance/k6/announcements-smoke.js"
+    ,"perf:k6:docker": "docker-compose -f docker-compose.test.yml run --rm k6-smoke"
+    ,"perf:all": "npm run perf:artillery && npm run perf:k6:docker && npm run perf:convex:announcements"
+    ,"perf:convex:announcements": "ts-node --esm testing/performance/convex/announcements-load.ts"
+    ,"perf:convex:docker": "docker-compose -f docker-compose.test.yml run --rm test-performance-convex"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
@@ -123,7 +151,9 @@
     "msw": "^2.11.6",
     "nodemon": "^3.1.10",
     "react-test-renderer": "^19.1.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "artillery": "^2.0.0-31",
+    "ts-node": "^10.9.2"
   },
   "private": true
 }

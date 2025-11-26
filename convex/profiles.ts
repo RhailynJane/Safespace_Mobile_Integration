@@ -200,16 +200,40 @@ export const updatePreferences = mutation({
 
 /**
  * Simple user search across users/profiles by name or email substring.
- * NOTE: For small datasets this full scan is acceptable; for production add lowercased fields + indexes.
+ * NOTE: Filters to current user's organization only.
  */
 export const searchUsers = query({
 	args: { term: v.string(), limit: v.optional(v.number()) },
 	handler: async (ctx, { term, limit }) => {
+		const identity = await ctx.auth.getUserIdentity();
+		if (!identity) return [];
+
+		// Get current user's organization
+		const currentUser = await ctx.db
+			.query("users")
+			.withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+			.first();
+
+		if (!currentUser) return [];
+
+		const currentUserOrgId = currentUser.orgId;
 		const q = term.trim().toLowerCase();
 		const max = limit ?? 20;
 
-		// Load users and optionally augment with profile image
-		const allUsers = await ctx.db.query("users").collect();
+		// Load users from same organization only
+		let allUsers: any[];
+		if (currentUserOrgId) {
+			// Filter by orgId if user has one
+			allUsers = await ctx.db
+				.query("users")
+				.withIndex("by_orgId", (q) => q.eq("orgId", currentUserOrgId))
+				.collect();
+		} else {
+			// If current user has no orgId, only show users without orgId
+			const all = await ctx.db.query("users").collect();
+			allUsers = all.filter((u: any) => !u.orgId);
+		}
+
 		const matches = allUsers.filter((u: any) => {
 			const name = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
 			const email = (u.email || '').toLowerCase();

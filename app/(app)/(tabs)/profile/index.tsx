@@ -158,23 +158,25 @@ export default function ProfileScreen() {
     setModalVisible(false);
   };
 
-  // Sync profile data when component mounts or user changes
+  // Sync profile data in test environment only once
   useEffect(() => {
-    // In tests, avoid async network/storage work and hydrate from Clerk mock
-    if (IS_TEST_ENV) {
-      if (user) {
-        setProfileData(prev => ({
-          ...prev,
-          firstName: user.firstName || prev.firstName || 'User',
-          lastName: user.lastName || prev.lastName || '',
-          email: user.emailAddresses[0]?.emailAddress || prev.email || '',
-          profileImageUrl: user.imageUrl || prev.profileImageUrl,
-        }));
-      }
-      setLoading(false);
-      return;
+    if (!IS_TEST_ENV) return;
+    if (user) {
+      setProfileData(prev => ({
+        ...prev,
+        firstName: user.firstName || prev.firstName || 'User',
+        lastName: user.lastName || prev.lastName || '',
+        email: user.emailAddresses[0]?.emailAddress || prev.email || '',
+        profileImageUrl: user.imageUrl || prev.profileImageUrl,
+      }));
     }
-    
+    setLoading(false);
+  }, [IS_TEST_ENV, user]);
+
+  // Sync profile data in non-test environments
+  useEffect(() => {
+    if (IS_TEST_ENV) return;
+
     // ✅ Primary: Use Convex profile with real-time updates
     if (convexProfile && user) {
       console.log('✅ Using Convex profile data (real-time)');
@@ -189,7 +191,7 @@ export default function ProfileScreen() {
       setLoading(false);
       return;
     }
-    
+
     // ✅ Final fallback: Load from AsyncStorage and sync with Convex
     const loadProfileData = async () => {
       if (!user?.id) {
@@ -263,7 +265,7 @@ export default function ProfileScreen() {
     };
 
     loadProfileData();
-  }, [IS_TEST_ENV, user, convexProfile, convex]);
+  }, [user, convexProfile, convex, IS_TEST_ENV]);
 
   const handleChangePhoto = useCallback(async () => {
     try {

@@ -4,9 +4,11 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render } from '../test-utils';
 import { Text } from 'react-native';
 import CurvedBackground from '../../components/CurvedBackground';
+
+// The test-utils already provides ThemeProvider through AllProviders wrapper
 
 describe('CurvedBackground Component', () => {
   it('should render without crashing', () => {
@@ -34,11 +36,10 @@ describe('CurvedBackground Component', () => {
       </CurvedBackground>
     );
     const background = getByTestId('curved-background');
-    expect(background.props.style).toMatchObject(
-      expect.objectContaining({
-        backgroundColor: expect.any(String)
-      })
-    );
+    // The component applies styles as an array, so we need to check if backgroundColor exists in any of the style objects
+    const styles = Array.isArray(background.props.style) ? background.props.style : [background.props.style];
+    const hasBackgroundColor = styles.some(style => style && typeof style === 'object' && 'backgroundColor' in style);
+    expect(hasBackgroundColor).toBeTruthy();
   });
 
   it('should render with different curve heights', () => {

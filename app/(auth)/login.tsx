@@ -19,6 +19,7 @@ import activityApi from "../../utils/activityApi";
 import SafeSpaceLogo from "../../components/SafeSpaceLogo";
 import { useTheme } from "../../contexts/ThemeContext";
 import { completeConvexAuthFlow } from "../../utils/convexAuthSync";
+import { getOrgIdFromEmail } from "../../utils/orgMapping";
 
 export default function LoginScreen() {
   const { theme } = useTheme();
@@ -64,13 +65,18 @@ export default function LoginScreen() {
           try { 
             await activityApi.recordLogin(clerkUserId);
             
+            // Determine org from email
+            const userEmail = user?.primaryEmailAddress?.emailAddress || email;
+            const orgId = getOrgIdFromEmail(userEmail);
+            
             // Sync user to Convex after successful login
             await completeConvexAuthFlow(getToken, {
               clerkUserId,
-              email: user?.primaryEmailAddress?.emailAddress,
+              email: userEmail,
               firstName: user?.firstName ?? undefined,
               lastName: user?.lastName ?? undefined,
               imageUrl: user?.imageUrl ?? undefined,
+              orgId,
             });
           } catch (_e) { 
             console.warn('Non-blocking error during post-login sync:', _e);

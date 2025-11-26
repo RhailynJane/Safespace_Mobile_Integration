@@ -24,6 +24,7 @@ import { apiService } from "../../utils/api";
 import { useTheme } from "../../contexts/ThemeContext";
 import { completeConvexAuthFlow } from "../../utils/convexAuthSync";
 import { clerkDiagnostics } from "../../utils/clerkDiagnostics";
+import { getOrgIdFromEmail } from "../../utils/orgMapping";
 
 // Define the steps and data structure for the signup process
 export type SignupStep = "personal" | "password" | "verification" | "success";
@@ -136,8 +137,7 @@ export default function SignupScreen() {
         "Age Requirement",
         "You must be 18 years or older to use SafeSpace. If you're under 18 and need support, please reach out to a trusted adult, school counselor, or contact Kids Help Phone at 1-800-668-6868 (available 24/7) or text CONNECT to 686868."
       );
-      // Reset age field
-      updateSignupData({ age: "" });
+      // Don't proceed if under 18
       return;
     }
 
@@ -234,6 +234,17 @@ export default function SignupScreen() {
           return;
         }
         
+        // Handle duplicate email error
+        if (clerkError.code === "form_identifier_exists" || 
+            clerkError.message?.toLowerCase().includes("already exists") ||
+            clerkError.message?.toLowerCase().includes("already in use")) {
+          showErrorModal(
+            "Email Already Registered",
+            "This email address is already associated with an account. Please use a different email or try signing in instead."
+          );
+          return;
+        }
+        
         // Handle other Clerk errors
         if (clerkError.message) {
           setErrorMessage(clerkError.message);
@@ -315,13 +326,17 @@ export default function SignupScreen() {
             }
           }
 
-          // Sync user to Convex after successful signup (including org if selected)
+          // Determine org from email mapping or user selection
+          const detectedOrg = getOrgIdFromEmail(signupData.email);
+          const finalOrg = detectedOrg || signupData.organization || undefined;
+          
+          // Sync user to Convex after successful signup (including org)
           await completeConvexAuthFlow(getToken, {
             clerkUserId: signUpAttempt.createdUserId!,
             email: signupData.email,
             firstName: signupData.firstName,
             lastName: signupData.lastName,
-            orgId: signupData.organization,
+            orgId: finalOrg,
           });
 
           setCurrentStep("success");

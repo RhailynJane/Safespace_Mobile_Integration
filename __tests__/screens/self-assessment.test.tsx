@@ -1,38 +1,127 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '../test-utils';
-import SelfAssessmentScreen from '../../app/(app)/self-assessment/index';
-import { assessmentTracker } from '../../utils/assessmentTracker';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import PreSurveyScreen from '../../app/(app)/self-assessment/index';
 import { Alert } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// Mock assessment tracker
-jest.mock('../../utils/assessmentTracker', () => ({
-  assessmentTracker: {
-    submitAssessment: jest.fn(),
-    isDueForAssessment: jest.fn(),
-    getLastAssessmentDate: jest.fn(),
+// Mock Convex
+const mockSubmitAssessment = jest.fn().mockResolvedValue({ success: true });
+const mockUseQuery = jest.fn().mockReturnValue(undefined);
+const mockUseMutation = jest.fn().mockReturnValue(mockSubmitAssessment);
+
+jest.mock('convex/react', () => {
+  const actual = jest.requireActual('convex/react');
+  return {
+    ...actual,
+    useQuery: (...args: any[]) => mockUseQuery(...args),
+    useMutation: (...args: any[]) => mockUseMutation(...args),
+  };
+});
+
+// Mock useTheme
+jest.mock('../../contexts/ThemeContext', () => ({
+  useTheme: () => ({
+    theme: {
+      colors: {
+        background: '#ffffff',
+        text: '#000000',
+        primary: '#007AFF',
+        surface: '#f5f5f5',
+        border: '#e0e0e0',
+        textSecondary: '#666666',
+        textDisabled: '#999999',
+        borderLight: '#f0f0f0',
+      },
+      isDark: false,
+    },
+    scaledFontSize: (size: number) => size,
+  }),
+}));
+
+// Mock Clerk
+jest.mock('@clerk/clerk-expo', () => ({
+  useUser: () => ({ user: { id: 'test-user-id' } }),
+}));
+
+// Mock components
+jest.mock('../../components/BottomNavigation', () => {
+  return function MockBottomNavigation() {
+    return null;
+  };
+});
+
+jest.mock('../../components/CurvedBackground', () => {
+  const React = require('react');
+  return function MockCurvedBackground({ children }: { children?: React.ReactNode }) {
+    return React.createElement(React.Fragment, null, children);
+  };
+});
+
+jest.mock('../../components/AppHeader', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  return {
+    AppHeader: function MockAppHeader({ title }: { title?: string }) {
+      return React.createElement(Text, null, title ?? '');
+    },
+  };
+});
+
+jest.mock('expo-blur', () => {
+  const React = require('react');
+  return {
+    BlurView: function MockBlurView({ children }: { children?: React.ReactNode }) {
+      return React.createElement(React.Fragment, null, children);
+    },
+  };
+});
+
+jest.mock('expo-router', () => ({
+  router: {
+    push: jest.fn(),
+    replace: jest.fn(),
   },
 }));
 
 // Mock Alert
 jest.spyOn(Alert, 'alert');
 
-describe('SelfAssessmentScreen', () => {
+// Test wrapper with providers
+const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+  const initialMetrics = {
+    frame: { x: 0, y: 0, width: 360, height: 640 },
+    insets: { top: 0, left: 0, right: 0, bottom: 0 },
+  };
+
+  return (
+    <SafeAreaProvider initialMetrics={initialMetrics}>
+      {children}
+    </SafeAreaProvider>
+  );
+};
+
+// Custom render function
+const customRender = (ui: React.ReactElement) => {
+  return render(ui, { wrapper: TestWrapper });
+};
+
+describe('PreSurveyScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (assessmentTracker.submitAssessment as jest.Mock).mockResolvedValue({
-      success: true,
-    });
+    mockSubmitAssessment.mockResolvedValue({ success: true });
+    mockUseQuery.mockReturnValue(undefined);
+    mockUseMutation.mockReturnValue(mockSubmitAssessment);
   });
 
   it('renders self assessment screen correctly', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     expect(screen.getByText('Self Assessment')).toBeTruthy();
     expect(screen.getByText('Short Warwick-Edinburgh Mental Wellbeing Scale')).toBeTruthy();
   });
 
   it('displays all survey questions', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     expect(screen.getByText(/feeling optimistic about the future/i)).toBeTruthy();
     expect(screen.getByText(/feeling useful/i)).toBeTruthy();
@@ -44,7 +133,7 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('displays response options for each question', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Should have 7 questions × 5 options each = 35 total options
     const noneOptions = screen.getAllByText('None of the time');
@@ -55,7 +144,7 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('allows selecting responses for questions', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Find and select "Often" for first question
     const oftenOptions = screen.getAllByText('Often');
@@ -66,7 +155,7 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('shows alert when submitting incomplete survey', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Find button showing progress (0/7 Answered)
     const incompleteButton = screen.getByText(/0\/7 Answered/i);
@@ -79,56 +168,77 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('successfully submits completed survey', async () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Answer all 7 questions with "Often" (value 4)
     const oftenOptions = screen.getAllByText('Often');
-    oftenOptions.forEach(option => {
-      fireEvent.press(option);
-    });
+    
+    // Answer questions one by one to allow state updates
+    for (let i = 0; i < 7; i++) {
+      fireEvent.press(oftenOptions[i]);
+      // Small delay to allow state updates
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
     
     // After answering all, button changes to "Submit Survey"
+    await waitFor(() => {
+      expect(screen.getByText('Submit Survey')).toBeTruthy();
+    }, { timeout: 3000 });
+    
     const submitButton = screen.getByText('Submit Survey');
     fireEvent.press(submitButton);
     
     await waitFor(() => {
-      expect(assessmentTracker.submitAssessment).toHaveBeenCalledWith(
-        'test-user-id', // Matches mocked user.id from jest.setup.cjs
-        expect.any(Object),
-        expect.any(Number)
-      );
-    });
+      expect(mockSubmitAssessment).toHaveBeenCalledWith({
+        userId: 'test-user-id',
+        assessmentType: 'SWEMWBS',
+        responses: expect.any(Array),
+        totalScore: 28, // 7 questions × 4 points = 28
+      });
+    }, { timeout: 3000 });
   });
 
   it('calculates correct score', async () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Select specific values: all "All of the time" (5 points each)
     const allTheTimeOptions = screen.getAllByText('All of the time');
-    allTheTimeOptions.slice(0, 7).forEach(option => {
-      fireEvent.press(option);
-    });
+    
+    // Answer questions one by one
+    for (let i = 0; i < 7; i++) {
+      fireEvent.press(allTheTimeOptions[i]);
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    await waitFor(() => {
+      expect(screen.getByText('Submit Survey')).toBeTruthy();
+    }, { timeout: 3000 });
     
     const submitButton = screen.getByText('Submit Survey');
     fireEvent.press(submitButton);
     
     await waitFor(() => {
       // 7 questions × 5 points = 35 total
-      expect(assessmentTracker.submitAssessment).toHaveBeenCalledWith(
-        'test-user-id', // Matches mocked user.id
-        expect.any(Object),
-        35
-      );
-    });
+      expect(mockSubmitAssessment).toHaveBeenCalledWith({
+        userId: 'test-user-id',
+        assessmentType: 'SWEMWBS',
+        responses: expect.any(Array),
+        totalScore: 35,
+      });
+    }, { timeout: 3000 });
   });
 
   it('shows success modal after submission', async () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Answer all questions
     const oftenOptions = screen.getAllByText('Often');
     oftenOptions.slice(0, 7).forEach(option => {
       fireEvent.press(option);
+    });
+    
+    await waitFor(() => {
+      expect(screen.getByText('Submit Survey')).toBeTruthy();
     });
     
     const submitButton = screen.getByText('Submit Survey');
@@ -141,27 +251,31 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('shows error alert on submission failure', async () => {
-    (assessmentTracker.submitAssessment as jest.Mock).mockRejectedValue(
-      new Error('Network error')
-    );
+    mockSubmitAssessment.mockRejectedValue(new Error('Network error'));
 
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Answer all questions
     const oftenOptions = screen.getAllByText('Often');
-    oftenOptions.slice(0, 7).forEach(option => {
-      fireEvent.press(option);
-    });
     
-    const submitButton = screen.getByText(/Submit|Complete/i);
+    for (let i = 0; i < 7; i++) {
+      fireEvent.press(oftenOptions[i]);
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    await waitFor(() => {
+      expect(screen.getByText('Submit Survey')).toBeTruthy();
+    }, { timeout: 3000 });
+    
+    const submitButton = screen.getByText('Submit Survey');
     fireEvent.press(submitButton);
     
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
         'Submission Error',
-        expect.stringContaining('Failed to submit')
+        'Failed to submit assessment. Please try again.'
       );
-    });
+    }, { timeout: 3000 });
   });
 
   it('shows error when user is not logged in', async () => {
@@ -171,13 +285,13 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('displays instructions clearly', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     expect(screen.getByText(/rate how you've been feeling over the last 2 weeks/i)).toBeTruthy();
   });
 
   it('allows changing answers before submission', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Select "Often" first
     const oftenOptions = screen.getAllByText('Often');
@@ -192,7 +306,7 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('enables submit button only when all questions answered', () => {
-    render(<SelfAssessmentScreen />);
+    customRender(<PreSurveyScreen />);
     
     // Initially shows progress text (0/7)
     expect(screen.getByText(/0\/7 Answered/i)).toBeTruthy();
@@ -204,7 +318,7 @@ describe('SelfAssessmentScreen', () => {
   });
 
   it('matches snapshot', () => {
-    const tree = render(<SelfAssessmentScreen />).toJSON();
+    const tree = customRender(<PreSurveyScreen />).toJSON();
     expect(tree).toMatchSnapshot();
   });
 });

@@ -115,10 +115,10 @@ export default function JournalScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView testID="journal-screen" style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Journal" showBack={true} showMenu={true} />
 
-  <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 140 }]}>
+  <ScrollView testID="journal-scroll-view" contentContainerStyle={[styles.scrollContainer, { paddingBottom: 140 }]}>
           <View style={styles.content}>
             <WeekStrip />
 

@@ -244,32 +244,53 @@ export default function CommunityMainScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Use refs for stable callback functions
+  const showErrorRef = useRef<(title: string, message: string) => void>();
+  const showSuccessRef = useRef<(message: string) => void>();
+  const showConfirmationRef = useRef<(title: string, message: string, callback: () => void) => void>();
+  
+  // Use refs to prevent concurrent loading
+  const isLoadingPostsRef = useRef(false);
+  const isLoadingMyPostsRef = useRef(false);
+
   /**
    * Show error modal with custom title and message
    */
-  const showError = useCallback((title: string, message: string) => {
+  showErrorRef.current = useCallback((title: string, message: string) => {
     setErrorTitle(title);
     setErrorMessage(message);
     setShowErrorModal(true);
-  }, [setErrorTitle, setErrorMessage, setShowErrorModal]);
+  }, []);
+
+  const showError = useCallback((title: string, message: string) => {
+    showErrorRef.current?.(title, message);
+  }, []);
 
   /**
    * Show success modal with custom message
    */
-  const showSuccess = useCallback((message: string) => {
+  showSuccessRef.current = useCallback((message: string) => {
     setSuccessMessage(message);
     setShowSuccessModal(true);
-  }, [setSuccessMessage, setShowSuccessModal]);
+  }, []);
+
+  const showSuccess = useCallback((message: string) => {
+    showSuccessRef.current?.(message);
+  }, []);
 
   /**
    * Show confirmation modal for destructive actions
    */
-  const showConfirmation = useCallback((title: string, message: string, callback: () => void) => {
+  showConfirmationRef.current = useCallback((title: string, message: string, callback: () => void) => {
     setConfirmTitle(title);
     setConfirmMessage(message);
     setConfirmCallback(() => callback);
     setShowConfirmModal(true);
-  }, [setConfirmTitle, setConfirmMessage, setConfirmCallback, setShowConfirmModal]);
+  }, []);
+
+  const showConfirmation = useCallback((title: string, message: string, callback: () => void) => {
+    showConfirmationRef.current?.(title, message, callback);
+  }, []);
 
   /**
    * Fetch available categories from Convex
@@ -282,51 +303,21 @@ export default function CommunityMainScreen() {
     } catch (error) {
       console.error("Error loading categories:", error);
     }
-  }, [convex, setCategories]);
-
-  /**
-   * Fetch user's reactions for multiple posts
-   * Used to display user's current reaction state
-   */
-  const loadUserReactions = useCallback(async (clerkUserId: string, posts: any[]) => {
-    try {
-      const userReactions: { [postId: string]: string } = {};
-      for (const post of posts) {
-        const reaction = await convex.query(api.posts.getUserReaction, { 
-          postId: post.id 
-        });
-        if (reaction) {
-          userReactions[post.id] = reaction;
-        }
-      }
-      return userReactions;
-    } catch (error) {
-      console.error("Error loading user reactions:", error);
-      return {};
-    }
   }, [convex]);
-
-  /**
-   * Load user's bookmarked posts for visual indication
-   */
-  const loadUserBookmarks = useCallback(async (clerkUserId: string) => {
-    try {
-      const bookmarked = await convex.query(api.posts.bookmarkedPosts, { limit: 100 });
-      const bookmarkedIds = new Set<string>(
-        (bookmarked || []).map((post: any) => post._id)
-      );
-      setBookmarkedPosts(bookmarkedIds as any);
-    } catch (error) {
-      console.error("Error loading bookmarks:", error);
-    }
-  }, [convex, setBookmarkedPosts]);
 
   /**
    * Load posts based on current category selection
    * Uses Convex for all data fetching
    */
   const loadPosts = useCallback(async () => {
+    // Prevent concurrent calls
+    if (isLoadingPostsRef.current) {
+      console.log('⏭️ Skipping loadPosts - already loading');
+      return;
+    }
+    
     try {
+      isLoadingPostsRef.current = true;
       setLoading(true);
       
       // Special handling for bookmark category
@@ -394,10 +385,11 @@ export default function CommunityMainScreen() {
 
       // Load user-specific data if authenticated
       if (user?.id && selectedCategory !== "Bookmarks") {
-        await Promise.all([
-          loadUserBookmarks(user.id),
-          loadUserReactions(user.id, mapped),
-        ]);
+        const bookmarked = await convex.query(api.posts.bookmarkedPosts, { limit: 100 });
+        const bookmarkedIds = new Set<string>(
+          (bookmarked || []).map((post: any) => post._id)
+        );
+        setBookmarkedPosts(bookmarkedIds as any);
       }
     } catch (error) {
       console.error("Error loading posts:", error);
@@ -406,14 +398,23 @@ export default function CommunityMainScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isLoadingPostsRef.current = false;
     }
-  }, [selectedCategory, user?.id, convex, showError, setPosts, setLoading, setRefreshing, setErrorMessage, loadUserBookmarks, loadUserReactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, user?.id, convex]);
+
 
   /**
    * Load user's personal posts including drafts
    * Uses Convex for data fetching
    */
   const loadMyPosts = useCallback(async () => {
+    // Prevent concurrent calls
+    if (isLoadingMyPostsRef.current) {
+      console.log('⏭️ Skipping loadMyPosts - already loading');
+      return;
+    }
+    
     if (!user?.id) {
       showError("Sign In Required", "Please sign in to view your posts");
       setMyPosts([]);
@@ -422,6 +423,7 @@ export default function CommunityMainScreen() {
     }
 
     try {
+      isLoadingMyPostsRef.current = true;
       setLoading(true);
       
       console.log('📤 Loading my posts via Convex...');
@@ -455,8 +457,10 @@ export default function CommunityMainScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isLoadingMyPostsRef.current = false;
     }
-  }, [user?.id, convex, showError, setMyPosts, setLoading, setRefreshing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, convex]);
 
   /**
    * Initial data loading sequence
@@ -471,7 +475,7 @@ export default function CommunityMainScreen() {
       setErrorMessage("Error loading posts");
       setPosts([]);
     }
-  }, [loadCategories, loadPosts, setErrorMessage, setPosts]);
+  }, [loadCategories, loadPosts]);
 
   /**
    * Load profile image from various sources in priority order
@@ -498,7 +502,7 @@ export default function CommunityMainScreen() {
     } catch (error) {
       console.error("Error loading profile image:", error);
     }
-  }, [user?.imageUrl, setProfileImage]);
+  }, [user?.imageUrl]);
 
   /**
    * Load initial data when component mounts
@@ -506,7 +510,8 @@ export default function CommunityMainScreen() {
    */
   useEffect(() => {
     loadInitialData();
-  }, [loadInitialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Load appropriate data when view or category changes
@@ -519,14 +524,16 @@ export default function CommunityMainScreen() {
     } else if (activeView === "my-posts") {
       loadMyPosts();
     }
-  }, [selectedCategory, activeView, loadPosts, loadMyPosts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, activeView]);
 
   /**
    * Load profile image on mount and subscribe to avatar events
    */
   useEffect(() => {
     loadProfileImage();
-  }, [loadProfileImage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.imageUrl]);
 
   /**
    * Update profile image when user changes
@@ -537,7 +544,7 @@ export default function CommunityMainScreen() {
       setProfileImage(user.imageUrl);
       AsyncStorage.setItem("profileImage", user.imageUrl).catch(console.error);
     }
-  }, [user?.imageUrl, setProfileImage]);
+  }, [user?.imageUrl]);
 
   /**
    * Subscribe to avatar change events
@@ -558,7 +565,7 @@ export default function CommunityMainScreen() {
     return () => {
       unsubscribe();
     };
-  }, [setProfileImage]);
+  }, []);
 
   // Lightweight onFocus refresh: when returning to this screen, reload the current view
   const hasFocusedOnceRef = useRef(false);
@@ -575,7 +582,8 @@ export default function CommunityMainScreen() {
       } else {
         loadMyPosts();
       }
-      }, [activeView, loadMyPosts, loadPosts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [activeView])
   );
 
   /**
@@ -1126,7 +1134,7 @@ export default function CommunityMainScreen() {
           {/* Posts Section - Dynamic content based on current view */}
           <View style={styles.postsSection}>
             {loading ? (
-              <View style={styles.skeletonContainer}>
+              <View style={styles.skeletonContainer} testID="skeleton-container">
                 {[...Array(3)].map((_,i)=>(
                   <View key={i} style={[styles.skeletonCard,{backgroundColor:theme.isDark?'#1E1E1E':'#FFFFFF'}]}>
                     <View style={styles.skeletonHeader}>

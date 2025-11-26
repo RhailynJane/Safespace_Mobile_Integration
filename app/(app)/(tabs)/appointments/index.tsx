@@ -48,7 +48,13 @@ interface Appointment {
  * or view their scheduled appointments. Features an intuitive interface
  * with clear navigation options and an elegant curved background.
  */
-export default function AppointmentsScreen() {
+interface AppointmentsScreenProps {
+  disableFetch?: boolean;
+  mockUpcoming?: any[];
+  mockPast?: any[];
+}
+
+export default function AppointmentsScreen({ disableFetch = false, mockUpcoming = [], mockPast = [] }: AppointmentsScreenProps) {
   const { theme, scaledFontSize } = useTheme();
   // State management
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -73,12 +79,15 @@ export default function AppointmentsScreen() {
 
   const convex = useConvex();
 
-  // Determine user's organization (prefer Convex users table, fallback to Clerk metadata)
+  // Determine user's organization (prioritize Clerk metadata as source of truth)
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
   const orgId = useMemo(() => {
-    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
     const meta = (user?.publicMetadata as any) || {};
-    return meta.orgId || 'cmha-calgary';
+    // Prioritize Clerk metadata
+    if (meta.orgId) return meta.orgId;
+    // Fall back to Convex if Clerk doesn't have it
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    return 'cmha-calgary';
   }, [myOrgFromConvex, user?.publicMetadata]);
   const isSAIT = orgId === 'sait';
   const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';
@@ -102,6 +111,27 @@ export default function AppointmentsScreen() {
    * to keep Upcoming count and Next Session perfectly in sync.
    */
   const fetchAppointments = useCallback(async () => {
+    if (disableFetch) {
+      // Synchronous test-mode path: populate counts from provided mock arrays
+      const upcoming = Array.isArray(mockUpcoming) ? mockUpcoming : [];
+      const past = Array.isArray(mockPast) ? mockPast : [];
+      setUpcomingCount(upcoming.length);
+      setCompletedCount(past.length);
+      if (upcoming[0]) {
+        setNextAppointment({
+          id: 0 as any,
+          supportWorker: upcoming[0].supportWorker || 'Auto-assigned',
+          date: upcoming[0].date || 'Test Date',
+          time: upcoming[0].time || '',
+          type: (upcoming[0].type || 'video').toString().replace('_', ' '),
+          status: 'upcoming',
+        } as any);
+      } else {
+        setNextAppointment(null);
+      }
+      setLoading(false);
+      return;
+    }
     if (!user?.id) return;
     try {
       setLoading(true);
@@ -112,14 +142,19 @@ export default function AppointmentsScreen() {
         return name.startsWith('Auto-assigned by ') ? `Auto-assigned by ${orgShortLabel}` : name;
       };
 
-      const [upcoming, past] = await Promise.all([
+      // Fetch raw upcoming and past appointment lists. Backends may sometimes
+      // return null/undefined; defensively coerce to empty arrays to avoid
+      // downstream filter errors in tests or UI.
+      const [upcomingRaw, pastRaw] = await Promise.all([
         convex.query(api.appointments.getUpcomingAppointments, { userId: user.id }),
         convex.query(api.appointments.getPastAppointments, { userId: user.id }),
       ]);
+      const upcoming = Array.isArray(upcomingRaw) ? upcomingRaw : [];
+      const past = Array.isArray(pastRaw) ? pastRaw : [];
 
       // Build support worker enrichment map for items missing names
       const collectIds = (list: any[]) =>
-        list
+        (Array.isArray(list) ? list : [])
           .filter((apt) => !apt.supportWorker && apt.supportWorkerId)
           .map((apt) => String(apt.supportWorkerId));
 
@@ -251,14 +286,13 @@ export default function AppointmentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, showStatusModal, convex, orgShortLabel]);
+  }, [user?.id, showStatusModal, convex, orgShortLabel, disableFetch, mockUpcoming, mockPast]);
 
-  // Run fetch on mount and when dependencies change
+  // Run fetch on mount and when user ID changes
   useEffect(() => {
-    if (user?.id) {
-      fetchAppointments();
-    }
-  }, [user?.id, fetchAppointments]);
+    fetchAppointments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const getDisplayName = () => {
     if (user?.firstName) return user.firstName;
@@ -455,10 +489,11 @@ export default function AppointmentsScreen() {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView testID="appointments-screen" style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointments" showBack={true} />
 
         <ScrollView 
+          testID="appointments-scroll-view"
           style={styles.scrollContainer} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}

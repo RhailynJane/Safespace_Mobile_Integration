@@ -1,0 +1,327 @@
+version: '3.8'
+
+services:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test
+    volumes:
+      # Mount source code for live updates during development
+      - .:/app
+      # Prevent node_modules from being overwritten
+      - /app/node_modules
+      # Mount test results and coverage
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    # Override default command for different test scenarios
+    # Use docker-compose run test npm test -- <args>
+    stdin_open: true
+    tty: true
+
+  # Service for running tests in watch mode
+  test-watch:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-watch
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:watch
+
+  # Service for running tests with coverage
+  test-coverage:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-coverage
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:coverage
+  
+  # Feature-specific test runners
+  test-announcements:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-announcements
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:announcements
+
+  test-appointments:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-appointments
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+      - NODE_OPTIONS=--max-old-space-size=8192 --expose-gc
+    command: npm run test:appointments
+
+  test-appointments-core:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-appointments-core
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+      - NODE_OPTIONS=--max-old-space-size=4096 --expose-gc
+    command: npm run test:appointments-core
+
+  test-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-auth
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:auth
+
+  test-community:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-community
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:community
+
+  test-crisis:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-crisis
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:crisis
+
+  test-home:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-home
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:home
+
+  test-journal:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-journal
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:journal
+
+  test-messages:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-messages
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:messages
+
+  test-moods:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-moods
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:moods
+
+  test-profile:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-profile
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:profile
+
+  test-settings:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-settings
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:settings
+
+  test-resources:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-resources
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:resources
+
+  test-self-assessment:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-self-assessment
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:self-assessment
+
+  test-video:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-video
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:video
+
+  test-all-features:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-all-features
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=http://host.docker.internal:1
+    command: npm run test:all-features
+
+  # Performance (Artillery) - uses existing Node test image
+  test-performance-artillery:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-performance-artillery
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./testing/performance:/app/testing/performance
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - BASE_URL=http://host.docker.internal:3000
+    command: npm run perf:artillery
+
+  # Performance (k6) - official k6 image
+  k6-smoke:
+    image: grafana/k6:latest
+    container_name: safespace-k6-smoke
+    volumes:
+      - ./testing/performance/k6:/scripts
+    environment:
+      - BASE_URL=http://host.docker.internal:3000
+    command: run /scripts/announcements-smoke.js
+
+  test-performance-convex:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: safespace-test-performance-convex
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./testing/performance/convex:/app/testing/performance/convex
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - EXPO_PUBLIC_CONVEX_URL=${EXPO_PUBLIC_CONVEX_URL}
+      - ORG_ID=cmha-calgary
+      - REQUESTS=100
+      - CONCURRENCY=10
+      - ACTIVE_ONLY=true
+      - LIMIT=50
+    command: npm run perf:convex:announcements

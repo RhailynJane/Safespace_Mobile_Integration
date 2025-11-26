@@ -11,11 +11,17 @@ export function convexEnabled(): boolean {
 export async function getConvexApi(): Promise<any | null> {
   if (!convexEnabled()) return null;
   try {
-    // Relative to app/ files usage "../convex/_generated/api". Here from utils, use root path
-    const mod = await import("../convex/_generated/api");
-    return mod.api;
+    // Try explicit .js (generated file) first for Node ESM resolution
+    const mod = await import("../convex/_generated/api.js");
+    return (mod as any).api;
   } catch (e) {
-    return null; // Not generated yet
+    try {
+      // Fallback legacy path without extension (in case loader permits)
+      const mod2 = await import("../convex/_generated/api");
+      return (mod2 as any).api;
+    } catch (_) {
+      return null; // Not generated yet or resolution failed
+    }
   }
 }
 
@@ -41,12 +47,11 @@ export async function safeQuery(convex: any, fn: any, args: any): Promise<any | 
 export function createConvexClientNoAuth(): any | null {
   if (!convexEnabled()) return null;
   try {
-    // Import at runtime to avoid issues if convex isn't generated yet
-    const { ConvexReactClient } = require("convex/react");
+    // Prefer generic ConvexClient (works outside React environment)
+    const { ConvexClient } = require("convex/browser");
     const url = process.env.EXPO_PUBLIC_CONVEX_URL;
     if (!url) return null;
-    const client = new ConvexReactClient(url);
-    // No auth needed for public queries/mutations guarded server-side
+    const client = new ConvexClient(url);
     return client;
   } catch (_) {
     return null;

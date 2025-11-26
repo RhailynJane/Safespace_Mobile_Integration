@@ -43,12 +43,15 @@ export default function AppointmentList() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
   
-  // Determine user's organization
+  // Determine user's organization (prioritize Clerk metadata as source of truth)
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
   const orgId = useMemo(() => {
-    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
     const meta = (user?.publicMetadata as any) || {};
-    return meta.orgId || 'cmha-calgary';
+    // Prioritize Clerk metadata
+    if (meta.orgId) return meta.orgId;
+    // Fall back to Convex if Clerk doesn't have it
+    if (typeof myOrgFromConvex === 'string' && myOrgFromConvex.length > 0) return myOrgFromConvex;
+    return 'cmha-calgary';
   }, [myOrgFromConvex, user?.publicMetadata]);
   const isSAIT = orgId === 'sait';
   const orgShortLabel = isSAIT ? 'SAIT' : 'CMHA';

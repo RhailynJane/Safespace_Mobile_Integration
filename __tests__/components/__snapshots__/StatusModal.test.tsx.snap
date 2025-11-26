@@ -1,0 +1,526 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`StatusModal Component should match snapshot for each type: StatusModal-error 1`] = `
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
+  <Modal
+    animationType="fade"
+    onRequestClose={[MockFunction]}
+    transparent={true}
+    visible={true}
+  >
+    <View
+      style={
+        [
+          {
+            "alignItems": "center",
+            "flex": 1,
+            "justifyContent": "center",
+            "padding": 20,
+          },
+          {
+            "backgroundColor": "rgba(0, 0, 0, 0.6)",
+          },
+        ]
+      }
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 24,
+              "elevation": 12,
+              "maxWidth": 400,
+              "padding": 32,
+              "shadowColor": "#000",
+              "shadowOffset": {
+                "height": 8,
+                "width": 0,
+              },
+              "shadowOpacity": 0.25,
+              "shadowRadius": 16,
+              "width": "90%",
+            },
+            {
+              "backgroundColor": "#FFFFFF",
+            },
+          ]
+        }
+      >
+        <View
+          style={
+            {
+              "marginBottom": 20,
+            }
+          }
+        >
+          <View
+            color="#FF3B30"
+            size={64}
+          >
+            <Text>
+              close-circle
+            </Text>
+          </View>
+        </View>
+        <Text
+          style={
+            [
+              {
+                "fontSize": 28,
+                "fontWeight": "700",
+                "letterSpacing": 0.3,
+                "marginBottom": 12,
+                "textAlign": "center",
+              },
+              {
+                "color": "#1F2937",
+              },
+            ]
+          }
+        >
+          ERROR
+        </Text>
+        <Text
+          style={
+            [
+              {
+                "fontSize": 16,
+                "lineHeight": 24,
+                "marginBottom": 28,
+                "paddingHorizontal": 8,
+                "textAlign": "center",
+              },
+              {
+                "color": "#6B7280",
+              },
+            ]
+          }
+        >
+          error message
+        </Text>
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": undefined,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#FF3B30",
+              "borderRadius": 16,
+              "elevation": 6,
+              "minWidth": 140,
+              "opacity": 1,
+              "paddingHorizontal": 48,
+              "paddingVertical": 16,
+              "shadowOffset": {
+                "height": 4,
+                "width": 0,
+              },
+              "shadowOpacity": 0.3,
+              "shadowRadius": 8,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#FFFFFF",
+                "fontSize": 17,
+                "fontWeight": "600",
+                "letterSpacing": 0.5,
+              }
+            }
+          >
+            OK
+          </Text>
+        </View>
+      </View>
+    </View>
+  </Modal>
+</RNCSafeAreaProvider>
+`;
+
+exports[`StatusModal Component should match snapshot for each type: StatusModal-info 1`] = `
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
+  <Modal
+    animationType="fade"
+    onRequestClose={[MockFunction]}
+    transparent={true}
+    visible={true}
+  >
+    <View
+      style={
+        [
+          {
+            "alignItems": "center",
+            "flex": 1,
+            "justifyContent": "center",
+            "padding": 20,
+          },
+          {
+            "backgroundColor": "rgba(0, 0, 0, 0.6)",
+          },
+        ]
+      }
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 24,
+              "elevation": 12,
+              "maxWidth": 400,
+              "padding": 32,
+              "shadowColor": "#000",
+              "shadowOffset": {
+                "height": 8,
+                "width": 0,
+              },
+              "shadowOpacity": 0.25,
+              "shadowRadius": 16,
+              "width": "90%",
+            },
+            {
+              "backgroundColor": "#FFFFFF",
+            },
+          ]
+        }
+      >
+        <View
+          style={
+            {
+              "marginBottom": 20,
+            }
+          }
+        >
+          <View
+            color="#007AFF"
+            size={64}
+          >
+            <Text>
+              information-circle
+            </Text>
+          </View>
+        </View>
+        <Text
+          style={
+            [
+              {
+                "fontSize": 28,
+                "fontWeight": "700",
+                "letterSpacing": 0.3,
+                "marginBottom": 12,
+                "textAlign": "center",
+              },
+              {
+                "color": "#1F2937",
+              },
+            ]
+          }
+        >
+          INFO
+        </Text>
+        <Text
+          style={
+            [
+              {
+                "fontSize": 16,
+                "lineHeight": 24,
+                "marginBottom": 28,
+                "paddingHorizontal": 8,
+                "textAlign": "center",
+              },
+              {
+                "color": "#6B7280",
+              },
+            ]
+          }
+        >
+          info message
+        </Text>
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": undefined,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#007AFF",
+              "borderRadius": 16,
+              "elevation": 6,
+              "minWidth": 140,
+              "opacity": 1,
+              "paddingHorizontal": 48,
+              "paddingVertical": 16,
+              "shadowOffset": {
+                "height": 4,
+                "width": 0,
+              },
+              "shadowOpacity": 0.3,
+              "shadowRadius": 8,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#FFFFFF",
+                "fontSize": 17,
+                "fontWeight": "600",
+                "letterSpacing": 0.5,
+              }
+            }
+          >
+            OK
+          </Text>
+        </View>
+      </View>
+    </View>
+  </Modal>
+</RNCSafeAreaProvider>
+`;
+
+exports[`StatusModal Component should match snapshot for each type: StatusModal-success 1`] = `
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
+  <Modal
+    animationType="fade"
+    onRequestClose={[MockFunction]}
+    transparent={true}
+    visible={true}
+  >
+    <View
+      style={
+        [
+          {
+            "alignItems": "center",
+            "flex": 1,
+            "justifyContent": "center",
+            "padding": 20,
+          },
+          {
+            "backgroundColor": "rgba(0, 0, 0, 0.6)",
+          },
+        ]
+      }
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 24,
+              "elevation": 12,
+              "maxWidth": 400,
+              "padding": 32,
+              "shadowColor": "#000",
+              "shadowOffset": {
+                "height": 8,
+                "width": 0,
+              },
+              "shadowOpacity": 0.25,
+              "shadowRadius": 16,
+              "width": "90%",
+            },
+            {
+              "backgroundColor": "#FFFFFF",
+            },
+          ]
+        }
+      >
+        <View
+          style={
+            {
+              "marginBottom": 20,
+            }
+          }
+        >
+          <View
+            color="#4CAF50"
+            size={64}
+          >
+            <Text>
+              checkmark-circle
+            </Text>
+          </View>
+        </View>
+        <Text
+          style={
+            [
+              {
+                "fontSize": 28,
+                "fontWeight": "700",
+                "letterSpacing": 0.3,
+                "marginBottom": 12,
+                "textAlign": "center",
+              },
+              {
+                "color": "#1F2937",
+              },
+            ]
+          }
+        >
+          SUCCESS
+        </Text>
+        <Text
+          style={
+            [
+              {
+                "fontSize": 16,
+                "lineHeight": 24,
+                "marginBottom": 28,
+                "paddingHorizontal": 8,
+                "textAlign": "center",
+              },
+              {
+                "color": "#6B7280",
+              },
+            ]
+          }
+        >
+          success message
+        </Text>
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": undefined,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#4CAF50",
+              "borderRadius": 16,
+              "elevation": 6,
+              "minWidth": 140,
+              "opacity": 1,
+              "paddingHorizontal": 48,
+              "paddingVertical": 16,
+              "shadowOffset": {
+                "height": 4,
+                "width": 0,
+              },
+              "shadowOpacity": 0.3,
+              "shadowRadius": 8,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#FFFFFF",
+                "fontSize": 17,
+                "fontWeight": "600",
+                "letterSpacing": 0.5,
+              }
+            }
+          >
+            OK
+          </Text>
+        </View>
+      </View>
+    </View>
+  </Modal>
+</RNCSafeAreaProvider>
+`;

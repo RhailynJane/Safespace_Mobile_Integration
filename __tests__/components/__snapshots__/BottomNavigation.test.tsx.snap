@@ -1,0 +1,371 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`BottomNavigation Component should match snapshot 1`] = `
+<RNCSafeAreaProvider
+  onInsetsChange={[Function]}
+  style={
+    [
+      {
+        "flex": 1,
+      },
+      undefined,
+    ]
+  }
+>
+  <View
+    style={
+      [
+        {
+          "alignItems": "center",
+          "borderTopLeftRadius": 40,
+          "borderTopRightRadius": 40,
+          "bottom": 0,
+          "elevation": 8,
+          "flexDirection": "row",
+          "justifyContent": "space-around",
+          "left": 0,
+          "paddingTop": 8,
+          "paddingVertical": 4,
+          "position": "absolute",
+          "right": 0,
+          "shadowColor": "#000",
+          "shadowOffset": {
+            "height": -2,
+            "width": 0,
+          },
+          "shadowOpacity": 0.1,
+          "shadowRadius": 8,
+        },
+        {
+          "backgroundColor": "#FFFFFF",
+          "paddingBottom": 8,
+        },
+      ]
+    }
+    testID="bottom-navigation"
+  >
+    <View
+      accessibilityLabel="Navigate to Home"
+      accessibilityRole="button"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": true,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "opacity": 1,
+          "padding": 8,
+        }
+      }
+      testID="nav-tab-home"
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 20,
+              "height": 40,
+              "justifyContent": "center",
+              "width": 40,
+            },
+            {
+              "backgroundColor": "#B6D5CF61",
+            },
+          ]
+        }
+      >
+        <View
+          color="#2EA78F"
+          size={24}
+          testID="nav-icon-home"
+        >
+          <Text>
+            home
+          </Text>
+        </View>
+      </View>
+    </View>
+    <View
+      accessibilityLabel="Navigate to Appointments"
+      accessibilityRole="button"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": false,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "opacity": 1,
+          "padding": 8,
+        }
+      }
+      testID="nav-tab-appointments"
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 20,
+              "height": 40,
+              "justifyContent": "center",
+              "width": 40,
+            },
+            false,
+          ]
+        }
+      >
+        <View
+          color="#555"
+          size={24}
+          testID="nav-icon-appointments"
+        >
+          <Text>
+            calendar
+          </Text>
+        </View>
+      </View>
+    </View>
+    <View
+      accessibilityLabel="Navigate to Community"
+      accessibilityRole="button"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": false,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "opacity": 1,
+          "padding": 8,
+        }
+      }
+      testID="nav-tab-community-forum"
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 20,
+              "height": 40,
+              "justifyContent": "center",
+              "width": 40,
+            },
+            false,
+          ]
+        }
+      >
+        <View
+          color="#555"
+          size={24}
+          testID="nav-icon-community-forum"
+        >
+          <Text>
+            people
+          </Text>
+        </View>
+      </View>
+    </View>
+    <View
+      accessibilityLabel="Navigate to Messages"
+      accessibilityRole="button"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": false,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "opacity": 1,
+          "padding": 8,
+        }
+      }
+      testID="nav-tab-messages"
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 20,
+              "height": 40,
+              "justifyContent": "center",
+              "width": 40,
+            },
+            false,
+          ]
+        }
+      >
+        <View
+          color="#555"
+          size={24}
+          testID="nav-icon-messages"
+        >
+          <Text>
+            chatbubbles
+          </Text>
+        </View>
+      </View>
+    </View>
+    <View
+      accessibilityLabel="Navigate to Profile"
+      accessibilityRole="button"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": false,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "opacity": 1,
+          "padding": 8,
+        }
+      }
+      testID="nav-tab-profile"
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderRadius": 20,
+              "height": 40,
+              "justifyContent": "center",
+              "width": 40,
+            },
+            false,
+          ]
+        }
+      >
+        <View
+          color="#555"
+          size={24}
+          testID="nav-icon-profile"
+        >
+          <Text>
+            person
+          </Text>
+        </View>
+      </View>
+    </View>
+  </View>
+</RNCSafeAreaProvider>
+`;

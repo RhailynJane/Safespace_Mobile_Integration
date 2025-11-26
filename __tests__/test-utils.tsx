@@ -1,7 +1,13 @@
 import React, { PropsWithChildren } from 'react';
 import { render as rtlRender, RenderOptions } from '@testing-library/react-native';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { NotificationsProvider } from '../contexts/NotificationsContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+// Mock ConvexProvider for tests
+const MockConvexProvider = ({ children }: { children: React.ReactNode }) => {
+  return <>{children}</>;
+};
 
 // Memoize initialMetrics outside the provider to avoid re-creating the object each render
 const initialMetrics = {
@@ -10,11 +16,42 @@ const initialMetrics = {
 } as const;
 
 // Global providers wrapper for tests
+// Create a mock Convex client instance for all tests.
+const CONVEX_URL = process.env.EXPO_PUBLIC_CONVEX_URL || 'http://localhost:1';
+
+// Mock Convex client implementing required surface for hooks
+const mockConvexClient = {
+  query: jest.fn().mockResolvedValue([]),
+  mutation: jest.fn().mockResolvedValue({}),
+  action: jest.fn().mockResolvedValue({}),
+  watchQuery: jest.fn(() => {
+    const unsubscribeFn = jest.fn();
+    return {
+      localQueryResult: () => undefined,
+      onUpdate: jest.fn(() => unsubscribeFn), // onUpdate returns the unsubscribe function
+      dispose: jest.fn(),
+      journal: jest.fn(() => undefined),
+    };
+  }),
+  subscribe: jest.fn(() => {
+    const unsubscribeMock = jest.fn();
+    return {
+      unsubscribe: unsubscribeMock,
+    };
+  }),
+} as any;
+
 function AllProviders({ children }: PropsWithChildren<{}>) {
   return (
-    <SafeAreaProvider initialMetrics={initialMetrics}>
-      <ThemeProvider>{children}</ThemeProvider>
-    </SafeAreaProvider>
+    <MockConvexProvider>
+      <SafeAreaProvider initialMetrics={initialMetrics}>
+        <ThemeProvider>
+          <NotificationsProvider convexClient={mockConvexClient} userId="test-user-id">
+            {children}
+          </NotificationsProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </MockConvexProvider>
   );
 }
 

@@ -32,15 +32,17 @@ const AnnouncementsScreen: React.FC = () => {
 
   // Prefer Convex users table org; fall back to Clerk publicMetadata
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  // Read org from Clerk public metadata if present
+  const orgFromClerk: unknown = (user?.publicMetadata as any)?.orgId;
+  // UI orgId: prefer Clerk metadata (most up-to-date), then Convex value, finally fallback
   const orgId: OrgId = useMemo(() => {
-    let candidate: unknown = undefined;
-    if (typeof myOrgFromConvex === "string" && myOrgFromConvex.length > 0) candidate = myOrgFromConvex;
-    if (candidate === undefined) {
-      const meta = (user?.publicMetadata as any) || {};
-      candidate = meta.orgId;
-    }
-    return isOrgId(candidate) ? candidate : "cmha-calgary";
-  }, [myOrgFromConvex, user?.publicMetadata]);
+    // Prioritize Clerk metadata as it's the source of truth
+    if (isOrgId(orgFromClerk)) return orgFromClerk;
+    // Use Convex value if Clerk doesn't have it
+    if (isOrgId(myOrgFromConvex)) return myOrgFromConvex;
+    // Only use fallback if both are undefined (after loading)
+    return "cmha-calgary";
+  }, [myOrgFromConvex, orgFromClerk]);
 
   // Organization meta - colors and subtitles for small org banners
   const orgMeta = useMemo<Record<OrgId, { label: string; color: string; subtitle: string }>>(
@@ -81,11 +83,14 @@ const AnnouncementsScreen: React.FC = () => {
 
   const announcements = useMemo(() => data?.announcements || [], [data]);
 
+  // Sync org to Convex when Clerk has a value (source of truth)
   useEffect(() => {
-    if (userId && orgId) {
-      syncOrg({ orgId }).catch(() => {});
+    if (!userId) return;
+    // Only sync if Clerk has a valid org and Convex query has loaded
+    if (isOrgId(orgFromClerk) && myOrgFromConvex !== undefined && orgFromClerk !== myOrgFromConvex) {
+      syncOrg({ orgId: orgFromClerk }).catch(() => {});
     }
-  }, [userId, orgId, syncOrg]);
+  }, [userId, orgFromClerk, myOrgFromConvex, syncOrg]);
 
   useEffect(() => {
     if (userId && orgId && !seeded && data && announcements.length === 0) {

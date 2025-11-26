@@ -30,5 +30,8 @@ module.exports = {
     '^@utils/(.*)$': '<rootDir>/utils/$1',
     '^@constants/(.*)$': '<rootDir>/constants/$1',
     '^@contexts/(.*)$': '<rootDir>/contexts/$1'
-  }
+  },
+  // Memory optimization
+  maxWorkers: '50%',
+  workerIdleMemoryLimit: '512MB'
 };

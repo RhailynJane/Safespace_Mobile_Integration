@@ -57,8 +57,7 @@
       }
     },
     "android": {
-      "package": "com.safespacedev.SafeSpace",
-      "googleServicesFile": "./android/app/google-services.json",
+      "package": "com.safespace",
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
