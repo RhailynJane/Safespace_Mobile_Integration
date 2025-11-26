@@ -16,7 +16,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - **Personalized Resources** - Curated mental health content
 - **Self-Assessment Tools** - Clinical screening instruments (PHQ-9, GAD-7)
 
-## 🏗️ Technical Architecture
+## Technical Architecture
 
 ### Frontend Stack
 - **Framework**: React Native with TypeScript
@@ -34,7 +34,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - **File Storage**: AWS S3 or similar
 - **Video**: WebRTC for consultations
 
-## 📱 Module Documentation
+## Module Documentation
 
 ### 1. **Authentication & Onboarding**
 - Multi-step signup process with email verification
