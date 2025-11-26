@@ -24,7 +24,6 @@
     },
     "production": {
       "autoIncrement": true,
-      "prebuildCommand": "npm install",
       "android": {
         "buildType": "apk"
       },
