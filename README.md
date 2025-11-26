@@ -1,13 +1,13 @@
 # SafeSpace Mental Health App - Project Documentation
 
-## 📋 Project Overview
+## Project Overview
 
 **SafeSpace** is a comprehensive mental health and wellness application designed to provide users with tools for mental health management, professional support, and community connection. The app combines evidence-based therapeutic techniques with modern technology to create a supportive ecosystem for mental wellbeing.
 
-### 🎯 Core Mission
+### Core Mission
 To make mental health support accessible, personalized, and stigma-free through technology-enabled care solutions.
 
-### ✨ Key Features
+### Key Features
 - **Mood Tracking & Analytics** - Daily mood monitoring with insights
 - **AI-Powered Journaling** - Intelligent reflection and pattern recognition
 - **Professional Consultations** - Secure video therapy sessions
