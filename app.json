@@ -33,7 +33,8 @@
         }
       ],
       "expo-audio",
-      "expo-av"
+      "expo-av",
+      "expo-build-properties"
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"

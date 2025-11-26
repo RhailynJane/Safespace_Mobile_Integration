@@ -48,14 +48,14 @@
     "convex:reseed-announcements": "node scripts/reseed-announcements.js",
     "convex:deploy": "convex deploy",
     "seed:resources": "npx tsx scripts/seedResources.ts",
-    "test:apis": "npx tsx scripts/testExternalApis.ts"
-    ,"perf:artillery": "artillery run testing/performance/load-test-config.js --output testing/performance/report.json"
-    ,"perf:artillery:report": "artillery report testing/performance/report.json --output testing/performance/report.html"
-    ,"perf:k6:local": "k6 run testing/performance/k6/announcements-smoke.js"
-    ,"perf:k6:docker": "docker-compose -f docker-compose.test.yml run --rm k6-smoke"
-    ,"perf:all": "npm run perf:artillery && npm run perf:k6:docker && npm run perf:convex:announcements"
-    ,"perf:convex:announcements": "ts-node --esm testing/performance/convex/announcements-load.ts"
-    ,"perf:convex:docker": "docker-compose -f docker-compose.test.yml run --rm test-performance-convex"
+    "test:apis": "npx tsx scripts/testExternalApis.ts",
+    "perf:artillery": "artillery run testing/performance/load-test-config.js --output testing/performance/report.json",
+    "perf:artillery:report": "artillery report testing/performance/report.json --output testing/performance/report.html",
+    "perf:k6:local": "k6 run testing/performance/k6/announcements-smoke.js",
+    "perf:k6:docker": "docker-compose -f docker-compose.test.yml run --rm k6-smoke",
+    "perf:all": "npm run perf:artillery && npm run perf:k6:docker && npm run perf:convex:announcements",
+    "perf:convex:announcements": "ts-node --esm testing/performance/convex/announcements-load.ts",
+    "perf:convex:docker": "docker-compose -f docker-compose.test.yml run --rm test-performance-convex"
   },
   "dependencies": {
     "@clerk/backend": "^2.15.0",
@@ -66,7 +66,6 @@
     "@prisma/client": "^5.22.0",
     "@react-native-async-storage/async-storage": "1.24.0",
     "@react-native-community/datetimepicker": "8.4.4",
-    "@react-native-community/slider": "5.0.1",
     "@react-native-picker/picker": "2.11.1",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/native": "^7.1.6",
@@ -74,7 +73,7 @@
     "@supabase/supabase-js": "^2.54.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
-    "convex": "^1.17.4",
+    "convex": "^1.29.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "expo": "~54.0.21",
@@ -82,6 +81,7 @@
     "expo-auth-session": "~7.0.8",
     "expo-av": "~16.0.7",
     "expo-blur": "~15.0.7",
+    "expo-build-properties": "~1.0.9",
     "expo-camera": "~17.0.9",
     "expo-constants": "~18.0.10",
     "expo-dev-client": "~6.0.16",
@@ -138,6 +138,7 @@
     "@types/react-native-vector-icons": "^6.4.18",
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
+    "artillery": "^2.0.0-31",
     "detox": "^20.45.1",
     "detox-expo-helpers": "^0.6.0",
     "eslint": "^9.35.0",
@@ -151,9 +152,8 @@
     "msw": "^2.11.6",
     "nodemon": "^3.1.10",
     "react-test-renderer": "^19.1.0",
-    "typescript": "~5.9.2",
-    "artillery": "^2.0.0-31",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "~5.9.2"
   },
   "private": true
 }
