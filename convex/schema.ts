@@ -10,6 +10,12 @@ export default defineSchema({
 		lastName: v.optional(v.string()),
 		imageUrl: v.optional(v.string()),
 		orgId: v.optional(v.string()), // Organization identifier for scoping
+		// Additional optional fields to match existing documents
+		phoneNumber: v.optional(v.string()),
+		roleId: v.optional(v.string()), // e.g., 'admin' | 'superadmin' | 'user'
+		status: v.optional(v.string()), // e.g., 'active' | 'inactive'
+		lastLogin: v.optional(v.number()), // timestamp of last login
+		profileImageUrl: v.optional(v.string()), // duplicate of imageUrl used in some legacy docs
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	}).index("by_clerkId", ["clerkId"]).index("by_orgId", ["orgId"]).index("by_email", ["email"]),
@@ -442,6 +448,7 @@ export default defineSchema({
 		visibility: v.optional(v.string()), // 'org' | 'public' (future use)
 		priority: v.optional(v.string()), // Deprecated but kept for backward compatibility
 		active: v.boolean(),
+		images: v.optional(v.array(v.string())), // optional image URLs for announcement cards
 		createdAt: v.number(),
 		updatedAt: v.optional(v.number()),
 		authorId: v.optional(v.string()), // Clerk user ID of creator (admin)

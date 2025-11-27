@@ -34,7 +34,14 @@
       ],
       "expo-audio",
       "expo-av",
-      "expo-build-properties"
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
     ],
     "assetBundlePatterns": [
       "assets/fonts/*"

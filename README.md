@@ -19,20 +19,24 @@ To make mental health support accessible, personalized, and stigma-free through 
 ## Technical Architecture
 
 ### Frontend Stack
-- **Framework**: React Native with TypeScript
-- **Navigation**: Expo Router
-- **UI Components**: Custom design system
-- **State Management**: React Context API + useState
+- **Framework**: React Native 0.81.5 with TypeScript 5.9
+- **Platform**: Expo 54.0.21 with Expo Router 6.0
+- **UI Components**: Custom design system with Expo Vector Icons
+- **State Management**: React Context API + Convex Real-time Backend
 - **Animation**: React Native Animated API
-- **Icons**: Ionicons
+- **Icons**: Ionicons (@expo/vector-icons)
+- **Camera/Media**: Expo Camera, Audio, AV, Image Picker
+- **Navigation**: React Navigation 7.x
 
 ### Backend Stack
-- **Database**: PostgreSQL
-- **API**: RESTful APIs with Node.js/Express
-- **Real-time**: WebSocket connections
-- **Authentication**: JWT tokens
-- **File Storage**: AWS S3 or similar
-- **Video**: WebRTC for consultations
+- **Primary Database**: Convex Real-time Backend
+- **Secondary Database**: PostgreSQL with Prisma ORM
+- **Authentication**: Clerk with JWT tokens
+- **Real-time**: Convex real-time queries and mutations
+- **API**: RESTful APIs with Express (fallback)
+- **File Storage**: Expo Media Library, File System
+- **Video Calls**: Sendbird Calls React Native
+- **Push Notifications**: Expo Notifications
 
 ## Module Documentation
 
@@ -121,13 +125,21 @@ To make mental health support accessible, personalized, and stigma-free through 
 
 ##  Database Architecture
 
-### Core Tables
-- **Users** - User profiles and authentication
-- **Sessions** - Authentication sessions
-- **Mood Entries** - Daily mood tracking
+### Database Architecture (Dual Backend)
+
+#### Convex Tables (Real-time)
+- **moods** - Daily mood tracking with real-time sync
+- **appointments** - Therapy sessions with live status updates
+- **profiles** - Extended user profiles and preferences
+- **conversations** - Real-time messaging and chat
+- **posts** - Community forum posts with reactions
+- **activities** - User activity tracking and analytics
+- **announcements** - Organization-specific announcements
+
+#### PostgreSQL Tables (Prisma ORM)
+- **Users** - User profiles and authentication (legacy)
+- **Sessions** - Authentication sessions (legacy)
 - **Journal Entries** - User journal content
-- **Appointments** - Therapy sessions scheduling
-- **Messages** - Real-time communication
 - **Resources** - Mental health content library
 - **Assessments** - Screening tool results
 
@@ -140,49 +152,59 @@ To make mental health support accessible, personalized, and stigma-free through 
 
 ##  API Documentation
 
-### Authentication Endpoints
-```http
-POST /api/auth/login
-POST /api/auth/register
-POST /api/auth/verify-email
-POST /api/auth/forgot-password
-POST /api/auth/reset-password
+### Authentication (Clerk)
+- **Multi-factor Authentication**: Email, SMS, Social providers
+- **JWT Tokens**: Secure session management
+- **Organization Support**: CMHA Calgary, Edmonton, SAIT affiliations
+- **Development**: Clerk Dashboard integration
+
+### Convex Functions (Real-time)
+```typescript
+// Mood Tracking
+api.moods.getRecentMoods(userId, limit)
+api.moods.getMoodStats(userId, days)
+api.moods.recordMood(mood, intensity, factors)
+
+// Appointments
+api.appointments.getUserAppointments(userId)
+api.appointments.createAppointment(details)
+api.appointments.updateAppointmentStatus(id, status)
+
+// Messaging
+api.conversations.listForUser()
+api.conversations.sendMessage(conversationId, body)
+api.conversations.markRead(conversationId)
+
+// Profile Management
+api.profiles.getProfile(clerkId)
+api.profiles.syncProfile(clerkData)
+api.profiles.updatePreferences(clerkId, preferences)
+
+// Community
+api.posts.list(category?, limit?)
+api.posts.getById(postId)
+api.announcements.getForOrg(orgId)
 ```
 
-### Core Service Endpoints
+### REST API Endpoints (Fallback)
 ```http
-# User Management
-GET/PUT /api/users/me
-GET/PUT /api/users/me/settings
-
-# Mood Tracking
+# Legacy endpoints maintained for compatibility
 GET/POST /api/mood/entries
-GET /api/mood/analytics
-
-# Journaling
-GET/POST /api/journal/entries
-GET/PUT /api/journal/entries/:id
-
-# Appointments
-GET/POST /api/appointments
-PUT /api/appointments/:id/reschedule
-PUT /api/appointments/:id/cancel
-
-# Messaging
+GET/POST /api/appointments  
 GET/POST /api/conversations
-GET/POST /api/conversations/:id/messages
-
-# Resources
 GET /api/resources
-GET /api/resources/recommended
-POST /api/resources/interactions
+GET/POST /api/journal/entries
 ```
 
-### Real-time Features
-- WebSocket connections for live messaging
-- Push notifications for important updates
-- Live video consultation streaming
-- Real-time community post updates
+### Real-time Features (Convex-Powered)
+- **Live Messaging**: Instant message delivery and read receipts
+- **Mood Sync**: Real-time mood tracking across devices
+- **Appointment Updates**: Live status changes and notifications
+- **Community Feed**: Real-time post updates and reactions
+- **Push Notifications**: Expo Notifications with proper scheduling
+- **Video Consultations**: Sendbird integration for HIPAA-compliant calls
+- **Presence System**: Online/offline status tracking
+- **Announcements**: Organization-specific real-time updates
 
 ## 🎨 Design System
 
@@ -232,20 +254,45 @@ POST /api/resources/interactions
 - Outcome measurement
 - Treatment progress tracking
 
-## 🤝 Contributing Guidelines
+## 🧪 Testing & Quality Assurance
 
-### Code Standards
-- TypeScript for type safety
-- Component documentation required
-- Accessibility testing mandatory
-- Performance optimization expected
+### Testing Framework
+- **Unit Testing**: Jest 30.2.0 with React Native Testing Library
+- **Component Testing**: React Test Renderer for snapshot testing
+- **E2E Testing**: Detox for end-to-end automation
+- **Performance Testing**: Artillery and K6 load testing
+- **Coverage**: 70%+ code coverage requirement
 
-### Development Process
-1. Feature specification and design review
-2. Development with peer programming
-3. Comprehensive testing (unit, integration, E2E)
-4. Security and privacy review
-5. Deployment and monitoring
+### Test Categories
+```bash
+# Feature-specific tests
+npm run test:auth          # Authentication flows
+npm run test:moods         # Mood tracking
+npm run test:appointments  # Appointment system
+npm run test:community     # Community forum
+npm run test:crisis        # Crisis support
+npm run test:messages      # Messaging system
+
+# Comprehensive testing
+npm run test:coverage      # Full coverage report
+npm run test:docker        # Containerized testing
+npm run test:e2e          # End-to-end testing
+```
+
+### Code Quality
+- **TypeScript**: Strict mode enabled
+- **ESLint**: React Native and TypeScript rules
+- **Prettier**: Consistent code formatting
+- **Husky**: Pre-commit hooks for quality gates
+- **SonarQube**: Code quality and security analysis
+
+### Development Workflow
+1. **Feature Branch**: Create from `dev` branch
+2. **Implementation**: TDD approach with tests first
+3. **Testing**: Run feature-specific and integration tests
+4. **Code Review**: Peer review with quality checklist
+5. **CI/CD**: Automated testing and deployment
+6. **Monitoring**: Performance and error tracking
 
 
 ---
@@ -255,6 +302,7 @@ POST /api/resources/interactions
 ### Project Leadership
 - **Product Manager**: Rhailyn Jane Cona - rhailynjane.cona@edu.sait.ca
 - **Technical Lead**: Rhailyn Jane Cona - rhailynjane.cona@edu.sait.ca
+- **Mobile Lead Developer**: Anne Marie Ala - AnneMarie.Ala@edu.sait.ca
 - **Project Coordinator**: Rhailyn Jane Cona - rhailynjane.cona@edu.sait.ca
 
 ### Development Team Structure
@@ -356,8 +404,57 @@ SafeSpace Development Team
 
 ---
 
-**Last Updated**: September 22 2026
-**Version**: 1.0.0  
+## 🚀 Getting Started
+
+### Prerequisites
+- **Node.js**: 18+ required
+- **Expo CLI**: Latest version
+- **iOS Simulator** or **Android Emulator**
+- **Clerk Account**: For authentication
+- **Convex Account**: For real-time backend
+
+### Installation
+```bash
+# Clone repository
+git clone https://github.com/annieala/SafeSpace-prototype.git
+cd SafeSpace-prototype
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Configure EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
+# Configure EXPO_PUBLIC_CONVEX_URL
+
+# Start Convex development server
+npm run convex:dev
+
+# Start Expo development server
+npm start
+```
+
+### Testing
+```bash
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run specific feature tests
+npm run test:auth
+npm run test:moods
+
+# Docker testing
+npm run test:docker
+```
+
+---
+
+**Last Updated**: November 26, 2024
+**Version**: 1.2.0
+**Current Branch**: mobile-testing-docker  
 **Documentation Maintainer**: Rhailyn Jane Cona
 
 *For technical support or questions about this documentation, please contact the development team.*
