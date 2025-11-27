@@ -7,7 +7,8 @@ export const heartbeat = mutation({
   handler: async (ctx: any, args: { status?: string }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Unauthenticated");
+      // Gracefully skip instead of throwing to avoid noisy server logs
+      return { ok: false, skipped: true, reason: "unauthenticated" } as const;
     }
 
     const userId = identity.subject; // Clerk user id
