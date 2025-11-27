@@ -31,7 +31,7 @@ import { ConvexReactClient, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 
 const { width, height } = Dimensions.get("window");
-const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 0 : StatusBar.currentHeight || 0;
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? -5: StatusBar.currentHeight || 0;
 
 // Responsive sizing based on screen height
 const isSmallDevice = height < 700;
