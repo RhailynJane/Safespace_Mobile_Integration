@@ -4883,14 +4883,14 @@ app.patch(
 
       const result = await pool.query(query, updateValues);
 
-      console.log('✅ Category settings updated successfully');
+      console.log('✅ Category settings updated successfully!');
       res.json({
         success: true,
         message: `${category} settings updated successfully`,
         settings: result.rows[0],
       });
     } catch (error: any) {
-      console.error("❌ Error updating category settings:", error.message);
+      console.error("❌ Error updating category settings sorry:", error.message);
       res.status(500).json({
         success: false,
         error: "Failed to update settings",
@@ -5072,7 +5072,7 @@ app.get("/api/appointments", async (req: Request, res: Response) => {
     const notesCol = pickCol('notes', ['note', 'description']);
 
     if (!userIdCol) {
-      console.warn('⚠️ appointments user reference column missing; returning empty list for compatibility');
+      console.warn('! appointments user reference column missing; returning empty list for compatibility');
       return res.json({ success: true, appointments: [], count: 0 });
     }
 

@@ -140,8 +140,8 @@ export default function SettingsScreen() {
     // If category is enabled, ensure per-reminder toggle is also enabled
     const shouldEnableMoodReminder = (prefs.moodReminderEnabled ?? false) || (prefs.notifMoodTracking ?? false);
     const shouldEnableJournalReminder = (prefs.journalReminderEnabled ?? false) || (prefs.notifJournaling ?? false);
-    console.log(`🆕✨ Mood reminder auto-enable: ${shouldEnableMoodReminder} (saved: ${prefs.moodReminderEnabled}, category: ${prefs.notifMoodTracking})`);
-    console.log(`🆕✨ Journal reminder auto-enable: ${shouldEnableJournalReminder} (saved: ${prefs.journalReminderEnabled}, category: ${prefs.notifJournaling})`);
+    console.log(`✨ Mood reminder auto-enable: ${shouldEnableMoodReminder} (saved: ${prefs.moodReminderEnabled}, category: ${prefs.notifMoodTracking})`);
+    console.log(`✨ Journal reminder auto-enable: ${shouldEnableJournalReminder} (saved: ${prefs.journalReminderEnabled}, category: ${prefs.notifJournaling})`);
     setMoodReminderEnabled(shouldEnableMoodReminder);
     setMoodReminderTime(prefs.moodReminderTime ?? '09:00');
     setMoodReminderFrequency(prefs.moodReminderFrequency ?? 'Daily');
