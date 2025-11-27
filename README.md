@@ -1,13 +1,13 @@
 # SafeSpace Mental Health App - Project Documentation
 
-## 📋 Project Overview
+## Project Overview
 
 **SafeSpace** is a comprehensive mental health and wellness application designed to provide users with tools for mental health management, professional support, and community connection. The app combines evidence-based therapeutic techniques with modern technology to create a supportive ecosystem for mental wellbeing.
 
-### 🎯 Core Mission
+### Core Mission
 To make mental health support accessible, personalized, and stigma-free through technology-enabled care solutions.
 
-### ✨ Key Features
+### Key Features
 - **Mood Tracking & Analytics** - Daily mood monitoring with insights
 - **AI-Powered Journaling** - Intelligent reflection and pattern recognition
 - **Professional Consultations** - Secure video therapy sessions
@@ -16,7 +16,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - **Personalized Resources** - Curated mental health content
 - **Self-Assessment Tools** - Clinical screening instruments (PHQ-9, GAD-7)
 
-## 🏗️ Technical Architecture
+## Technical Architecture
 
 ### Frontend Stack
 - **Framework**: React Native with TypeScript
@@ -34,7 +34,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - **File Storage**: AWS S3 or similar
 - **Video**: WebRTC for consultations
 
-## 📱 Module Documentation
+## Module Documentation
 
 ### 1. **Authentication & Onboarding**
 - Multi-step signup process with email verification
@@ -119,7 +119,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - Preference management
 - Real-time updates
 
-## 🗄️ Database Architecture
+##  Database Architecture
 
 ### Core Tables
 - **Users** - User profiles and authentication
@@ -138,7 +138,7 @@ To make mental health support accessible, personalized, and stigma-free through 
 - Consent management tracking
 - Regular security backups
 
-## 🔌 API Documentation
+##  API Documentation
 
 ### Authentication Endpoints
 ```http
