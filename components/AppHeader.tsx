@@ -483,7 +483,7 @@ export const AppHeader = ({
   }
 
   return (
-    <View style={[styles.safeArea, { backgroundColor: "transparent", paddingTop: insets.top }]} testID="app-header"> 
+    <View style={[styles.safeArea, { backgroundColor: "transparent" }]} testID="app-header"> 
       <View style={[styles.header, { backgroundColor: "transparent" }]}>
         {showBack ? (
           <TouchableOpacity
@@ -685,7 +685,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 12,
     height: 56,
     // backgroundColor removed - now uses theme.colors.surface
   },
@@ -731,7 +730,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 10,
-    marginTop: 8,
   },
   headerIcons: {
     flexDirection: "row",
