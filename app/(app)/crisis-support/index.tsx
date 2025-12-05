@@ -1,6 +1,12 @@
+/**
+ * Icon Attribution:
+ * Breathe icon created by pojok d - Flaticon
+ * https://www.flaticon.com/free-icons/breathe
+ */
+
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useMemo, useEffect } from "react";
-import { Linking } from "react-native";
+import { Linking, Platform, Modal, Image } from "react-native";
 import {
   View,
   Text,
@@ -11,6 +17,9 @@ import {
   ActivityIndicator,
   Dimensions,
 } from "react-native";
+
+// Custom images
+const breatheImage = require('../../../assets/images/breathe.png');
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import BottomNavigation from "../../../components/BottomNavigation";
@@ -62,6 +71,8 @@ export default function CrisisScreen() {
     title: '',
     message: '',
   });
+  const [mapsModalVisible, setMapsModalVisible] = useState(false);
+  const [crisisSupportModalVisible, setCrisisSupportModalVisible] = useState(false);
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
@@ -84,12 +95,56 @@ export default function CrisisScreen() {
     setModalVisible(false);
   };
 
+  /**
+   * Opens maps app to search for safe public places nearby
+   */
+  const openMaps = async (mapType: 'google' | 'apple') => {
+    setMapsModalVisible(false);
+    const searchQuery = 'safe public places near me';
+
+    try {
+      let url: string;
+
+      if (mapType === 'apple') {
+        // Apple Maps URL scheme
+        url = `maps://?q=${encodeURIComponent(searchQuery)}`;
+      } else {
+        // Google Maps URL - works on both iOS and Android
+        if (Platform.OS === 'ios') {
+          url = `comgooglemaps://?q=${encodeURIComponent(searchQuery)}`;
+        } else {
+          url = `geo:0,0?q=${encodeURIComponent(searchQuery)}`;
+        }
+      }
+
+      const canOpen = await Linking.canOpenURL(url);
+
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        // Fallback to web version
+        if (mapType === 'google') {
+          await Linking.openURL(`https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`);
+        } else {
+          await Linking.openURL(`https://maps.apple.com/?q=${encodeURIComponent(searchQuery)}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error opening maps:', error);
+      showModal('error', 'Maps Error', 'Unable to open maps application. Please try again.');
+    }
+  };
+
   // Live crisis resources from Convex
   // Convex live resources
   const liveResources = useQuery(api.crisis.listResources, { country: 'CA', activeOnly: true });
 
   // Guaranteed fallback emergency resources (Canada + generic + US 988)
   const fallbackResources: CrisisResource[] = [
+    {
+      id: 'distress-centre-main', slug: 'distress-centre-main', title: 'Distress Centre (403-266-4357)', subtitle: '24/7 crisis support line',
+      type: 'phone', value: '403-266-4357', icon: 'call', color: '#1565C0', region: 'national', country: 'CA', priority: 'critical', sort_order: 0, active: true
+    },
     {
       id: '911', slug: 'emergency-services', title: 'Emergency Services (911)', subtitle: 'Life-threatening emergencies',
       type: 'phone', value: '911', icon: 'call', color: '#D32F2F', region: 'national', country: 'CA', priority: 'critical', sort_order: 1, active: true
@@ -107,8 +162,8 @@ export default function CrisisScreen() {
       type: 'phone', value: '1-800-668-6868', icon: 'call', color: '#388E3C', region: 'national', country: 'CA', priority: 'high', sort_order: 4, active: true
     },
     {
-      id: 'distress-centre', slug: 'distress-centre', title: 'Distress Centre Website', subtitle: 'Find local crisis lines',
-      type: 'website', value: 'https://www.distresscentre.com/', icon: 'globe', color: '#1565C0', region: 'national', country: 'CA', priority: 'medium', sort_order: 5, active: true
+      id: 'distress-centre', slug: 'distress-centre', title: 'Distress Centre (403-266-4357)', subtitle: '24/7 crisis support line',
+      type: 'phone', value: '403-266-4357', icon: 'call', color: '#1565C0', region: 'national', country: 'CA', priority: 'medium', sort_order: 5, active: true
     },
   ];
 
@@ -297,47 +352,85 @@ export default function CrisisScreen() {
               <Text style={[styles.sectionTitle, { color: theme.colors.primary }]}>Immediate Coping Strategies</Text>
             </View>
             <View style={styles.strategiesGrid}>
-              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
-                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#FFCDD2' : '#FFEBEE' }]}>
-                  <Ionicons name="water" size={20} color="#E53935" />
+              <TouchableOpacity
+                style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}
+                onPress={() => router.push('/(app)/crisis-support/breathing-screen')}
+              >
+                <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#FFCDD2' : '#FFEBEE', justifyContent: 'center', alignItems: 'center' }]}>
+                  <Image
+                    source={breatheImage}
+                    style={{ width: 26, height: 26, tintColor: '#E53935BF' }}
+                    resizeMode="contain"
+                  />
                 </View>
                 <Text style={[styles.strategyText, { color: theme.colors.text }]}>Take slow, deep breaths</Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+              <TouchableOpacity
+                style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}
+                onPress={() => setMapsModalVisible(true)}
+              >
                 <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#C8E6C9' : '#E8F5E8' }]}>
-                  <Ionicons name="shield-checkmark" size={20} color="#4CAF50" />
+                  <Ionicons name="shield-checkmark" size={20} color="#4CAF50BF" />
                 </View>
                 <Text style={[styles.strategyText, { color: theme.colors.text }]}>Go to a safe public place</Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+              <TouchableOpacity
+                style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}
+                onPress={() => router.push('/(app)/crisis-support/focus-timer-screen')}
+              >
                 <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#BBDEFB' : '#E3F2FD' }]}>
-                  <Ionicons name="time" size={20} color="#2196F3" />
+                  <Ionicons name="time" size={20} color="#2196F3BF" />
                 </View>
                 <Text style={[styles.strategyText, { color: theme.colors.text }]}>Focus on the next hour only</Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+              <TouchableOpacity
+                style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}
+                onPress={async () => {
+                  // Open phone dialer
+                  // Using telprompt: on iOS shows dialer without immediately calling
+                  // Using tel: on Android opens dialer
+                  const url = Platform.OS === 'ios' ? 'telprompt:' : 'tel:';
+                  try {
+                    const supported = await Linking.canOpenURL(url);
+                    if (supported) {
+                      await Linking.openURL(url);
+                    } else {
+                      // Fallback: try standard tel:
+                      await Linking.openURL('tel:');
+                    }
+                  } catch (error) {
+                    console.log('Could not open phone dialer:', error);
+                  }
+                }}
+              >
                 <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#FFE0B2' : '#FFF3E0' }]}>
-                  <Ionicons name="people" size={20} color="#FF9800" />
+                  <Ionicons name="people" size={20} color="#FF9800BF" />
                 </View>
                 <Text style={[styles.strategyText, { color: theme.colors.text }]}>Reach out to someone you trust</Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+              <TouchableOpacity
+                style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}
+                onPress={() => setCrisisSupportModalVisible(true)}
+              >
                 <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#E1BEE7' : '#F3E5F5' }]}>
-                  <Ionicons name="remove-circle" size={20} color="#9C27B0" />
+                  <Ionicons name="remove-circle" size={20} color="#9C27B0BF" />
                 </View>
                 <Text style={[styles.strategyText, { color: theme.colors.text }]}>Remove means of self-harm</Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}>
+              <TouchableOpacity
+                style={[styles.strategyCard, { backgroundColor: theme.colors.surface }]}
+                onPress={() => router.push('/(app)/crisis-support/grounding-screen')}
+              >
                 <View style={[styles.strategyIcon, { backgroundColor: theme.isDark ? '#B2DFDB' : '#E0F2F1' }]}>
-                  <Ionicons name="leaf" size={20} color="#009688" />
+                  <Ionicons name="leaf" size={20} color="#009688BF" />
                 </View>
                 <Text style={[styles.strategyText, { color: theme.colors.text }]}>Use grounding techniques</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -431,6 +524,120 @@ export default function CrisisScreen() {
           onClose={hideModal}
           buttonText="OK"
         />
+
+        {/* Maps Selection Modal */}
+        <Modal
+          visible={mapsModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMapsModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.mapsModalOverlay}
+            activeOpacity={1}
+            onPress={() => setMapsModalVisible(false)}
+          >
+            <View style={[styles.mapsModalContent, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.mapsModalHeader}>
+                <Ionicons name="location" size={32} color={theme.colors.primary} />
+                <Text style={[styles.mapsModalTitle, { color: theme.colors.text }]}>
+                  Find Safe Places Nearby
+                </Text>
+              </View>
+              <Text style={[styles.mapsModalSubtitle, { color: theme.colors.textSecondary }]}>
+                Choose your preferred maps app
+              </Text>
+
+              {/* Show Apple Maps button only on iOS */}
+              {Platform.OS === 'ios' && (
+                <TouchableOpacity
+                  style={[styles.mapsButton, { backgroundColor: '#000000' }]}
+                  onPress={() => openMaps('apple')}
+                >
+                  <Ionicons name="map" size={24} color="#FFFFFF" />
+                  <Text style={styles.mapsButtonText}>Open Apple Maps</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.mapsButton, { backgroundColor: '#4285F4' }]}
+                onPress={() => openMaps('google')}
+              >
+                <Ionicons name="logo-google" size={24} color="#FFFFFF" />
+                <Text style={styles.mapsButtonText}>Open Google Maps</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.mapsCancelButton, { borderColor: theme.colors.border }]}
+                onPress={() => setMapsModalVisible(false)}
+              >
+                <Text style={[styles.mapsCancelText, { color: theme.colors.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Crisis Support Modal */}
+        <Modal
+          visible={crisisSupportModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCrisisSupportModalVisible(false)}
+        >
+          <View style={styles.mapsModalOverlay}>
+            <View style={[styles.mapsModalContent, { backgroundColor: theme.colors.surface }]}>
+              <View style={styles.mapsModalHeader}>
+                <Ionicons name="heart" size={48} color="#E53935" />
+                <Text style={[styles.mapsModalTitle, { color: theme.colors.text }]}>
+                  Would you like to call crisis support?
+                </Text>
+              </View>
+              <Text style={[styles.mapsModalSubtitle, { color: theme.colors.textSecondary }]}>
+                Talking to someone can help. Support is available 24/7.
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.mapsButton, { backgroundColor: '#E53935' }]}
+                onPress={() => {
+                  setCrisisSupportModalVisible(false);
+                  handleEmergencyCall('988', 'Crisis Hotline');
+                }}
+              >
+                <Ionicons name="call" size={24} color="#FFFFFF" />
+                <Text style={styles.mapsButtonText}>Call Crisis Hotline (988)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.mapsButton, { backgroundColor: '#1565C0' }]}
+                onPress={() => {
+                  setCrisisSupportModalVisible(false);
+                  handleEmergencyCall('403-266-4357', 'Distress Centre');
+                }}
+              >
+                <Ionicons name="call" size={24} color="#FFFFFF" />
+                <Text style={styles.mapsButtonText}>Call Distress Centre (403-266-4357)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.mapsButton, { backgroundColor: '#4CAF50' }]}
+                onPress={() => {
+                  setCrisisSupportModalVisible(false);
+                  handleEmergencyCall('911', 'Emergency Services');
+                }}
+              >
+                <Ionicons name="call" size={24} color="#FFFFFF" />
+                <Text style={styles.mapsButtonText}>Call 911</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.mapsCancelButton, { borderColor: theme.colors.border }]}
+                onPress={() => setCrisisSupportModalVisible(false)}
+              >
+                <Text style={[styles.mapsCancelText, { color: theme.colors.textSecondary }]}>Not right now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </CurvedBackground>
   );
@@ -661,5 +868,60 @@ const createStyles = (scaledFontSize: (size: number) => number) => StyleSheet.cr
     lineHeight: 22,
     textAlign: "center",
     opacity: 0.9,
+  },
+  // Maps Modal Styles
+  mapsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mapsModalContent: {
+    borderRadius: 20,
+    padding: 24,
+    width: width * 0.85,
+    alignItems: 'center',
+  },
+  mapsModalHeader: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  mapsModalTitle: {
+    fontSize: scaledFontSize(20),
+    fontWeight: '600',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  mapsModalSubtitle: {
+    fontSize: scaledFontSize(14),
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  mapsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  mapsButtonText: {
+    color: '#FFFFFF',
+    fontSize: scaledFontSize(16),
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  mapsCancelButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  mapsCancelText: {
+    fontSize: scaledFontSize(16),
+    fontWeight: '500',
   },
 });
