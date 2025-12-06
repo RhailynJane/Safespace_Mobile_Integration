@@ -204,6 +204,17 @@ export default function SignupScreen() {
         console.log("✅ Verification email sent successfully");
         console.log("📬 Please check your email (including spam folder) for the 6-digit code");
         clerkDiagnostics.logEmailVerification(signupData.email, true);
+        
+        // Show success message to user
+        showErrorModal(
+          "Verification Code Sent",
+          `A 6-digit verification code has been sent to ${signupData.email}.\n\n` +
+          `Please check:\n` +
+          `• Your inbox\n` +
+          `• Spam/junk folder\n` +
+          `• Promotions tab (Gmail)\n\n` +
+          `The email may take 1-2 minutes to arrive. You can resend the code if needed.`
+        );
       } catch (emailError: any) {
         console.error("❌ Failed to send verification email:", emailError);
         clerkDiagnostics.logEmailVerification(signupData.email, false, emailError);
@@ -323,14 +334,21 @@ export default function SignupScreen() {
               console.log("Client record created successfully");
             } catch (clientError) {
               console.error("Failed to create client record:", clientError);
+              // Continue even if client record fails
             }
           }
+        } catch (restApiError) {
+          console.warn("Warning: REST API sync failed (non-critical):", restApiError);
+          // Continue with Convex sync even if REST API fails
+        }
 
-          // Determine org from email mapping or user selection
-          const detectedOrg = getOrgIdFromEmail(signupData.email);
-          const finalOrg = detectedOrg || signupData.organization || undefined;
-          
-          // Sync user to Convex after successful signup (including org)
+        // Determine org from email mapping or user selection
+        const detectedOrg = getOrgIdFromEmail(signupData.email);
+        const finalOrg = detectedOrg || signupData.organization || undefined;
+        
+        // Sync user to Convex after successful signup (including org)
+        try {
+          console.log("Syncing user to Convex...");
           await completeConvexAuthFlow(getToken, {
             clerkUserId: signUpAttempt.createdUserId!,
             email: signupData.email,
@@ -338,12 +356,16 @@ export default function SignupScreen() {
             lastName: signupData.lastName,
             orgId: finalOrg,
           });
-
-          setCurrentStep("success");
-        } catch (syncError) {
-          console.error("Failed to sync user with database:", syncError);
-          setCurrentStep("success");
+          console.log("✅ User successfully synced to Convex");
+        } catch (convexError) {
+          console.error("❌ Failed to sync to Convex:", convexError);
+          showErrorModal(
+            "Sync Warning",
+            "Your account was created but we encountered an issue syncing your profile. Please try logging out and back in to ensure your profile is properly set up."
+          );
         }
+
+        setCurrentStep("success");
       } else {
         setErrorMessage("Verification incomplete. Please try again.");
         console.log("Verification status:", signUpAttempt.status);
@@ -374,13 +396,17 @@ export default function SignupScreen() {
       console.log("✅ Verification code resent successfully");
       showErrorModal(
         "Code Sent",
-        `A new verification code has been sent to ${signupData.email}. Please check your email (including spam folder).`
+        `A new 6-digit verification code has been sent to ${signupData.email}.\n\n` +
+        `Please check:\n` +
+        `• Your inbox\n` +
+        `• Spam/junk folder\n` +
+        `• Promotions tab (Gmail)\n\n` +
+        `The email may take 1-2 minutes to arrive.`
       );
     } catch (err: any) {
       console.error("❌ Failed to resend code:", err);
-      setErrorMessage(
-        err?.errors?.[0]?.message || "Failed to resend code. Please try again."
-      );
+      const errorMsg = err?.errors?.[0]?.message || "Failed to resend code. Please try again.";
+      showErrorModal("Resend Failed", errorMsg);
     }
   };
 

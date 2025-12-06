@@ -35,29 +35,21 @@ const CATEGORIES = [
   "Awareness",
 ];
 
+// Image sources mapped to categories
+const CATEGORY_IMAGES: Record<string, any> = {
+  "Self-Care": require('../../../../../assets/images/self-care.png'),
+  "Mindfulness": require('../../../../../assets/images/mindfulness.png'),
+  "Stories": require('../../../../../assets/images/stories.png'),
+  "Support": require('../../../../../assets/images/support.png'),
+  "Creative": require('../../../../../assets/images/creative.png'),
+  "Therapy": require('../../../../../assets/images/therapy.png'),
+  "Stress": require('../../../../../assets/images/stressed.png'),
+  "Affirmation": require('../../../../../assets/images/affirmation.png'),
+  "Awareness": require('../../../../../assets/images/awareness.png'),
+};
+
 const getCategoryIcon = (category: string) => {
-  switch (category) {
-    case "Self-Care":
-      return require('../../../../../assets/images/self-care.png');
-    case "Mindfulness":
-      return require('../../../../../assets/images/mindfulness.png');
-    case "Stories":
-      return require('../../../../../assets/images/stories.png');
-    case "Support":
-      return require('../../../../../assets/images/support.png');
-    case "Creative":
-      return require('../../../../../assets/images/creative.png');
-    case "Therapy":
-      return require('../../../../../assets/images/therapy.png');
-    case "Stress":
-      return require('../../../../../assets/images/stressed.png');
-    case "Affirmation":
-      return require('../../../../../assets/images/affirmation.png');
-    case "Awareness":
-      return require('../../../../../assets/images/awareness.png');
-    default:
-      return "help-outline";
-  }
+  return CATEGORY_IMAGES[category] || null;
 };
 
 export default function SelectCategoryScreen() {

@@ -483,7 +483,7 @@ export const AppHeader = ({
   }
 
   return (
-    <View style={[styles.safeArea, { backgroundColor: "transparent" }]} testID="app-header"> 
+    <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: theme.colors.background }]} testID="app-header"> 
       <View style={[styles.header, { backgroundColor: "transparent" }]}>
         {showBack ? (
           <TouchableOpacity
@@ -675,7 +675,7 @@ export const AppHeader = ({
           </Animated.View>
         </Animated.View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -694,10 +694,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontWeight: "500",
     fontSize: 17,
-    textAlign: "left",
+    textAlign: "center",
     letterSpacing: 0.5,
-    marginLeft: 10,
-    flex: 1,
     // color removed - now uses theme.colors.text
   },
   backButton: {

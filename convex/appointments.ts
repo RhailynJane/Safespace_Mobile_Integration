@@ -68,7 +68,7 @@ export const getUserAppointments = query({
 	handler: async (ctx, { userId, includeStatus, limit }) => {
 		let appointments = await ctx.db
 			.query("appointments")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.take(limit ?? 100);
 
 		// Filter by status if provided
@@ -163,7 +163,7 @@ export const getPastAppointments = query({
 		// Get appointments with completed/cancelled/no_show status (regardless of date)
 		const completedStatuses = await ctx.db
 			.query("appointments")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.filter((q) => 
 				q.or(
 					q.eq(q.field("status"), "completed"),
@@ -199,7 +199,7 @@ export const getAppointmentStats = query({
 	handler: async (ctx, { userId }) => {
 		const appointments = await ctx.db
 			.query("appointments")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.collect();
 
 		const today = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
@@ -288,7 +288,7 @@ export const createAppointment = mutation({
 			try {
 				const settings = await ctx.db
 					.query("settings")
-					.withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+					.withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
 					.first();
 				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
 				if (enabled) {
@@ -340,7 +340,7 @@ export const rescheduleAppointment = mutation({
 			try {
 				const settings = await ctx.db
 					.query("settings")
-					.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+					.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
 					.first();
 				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
 				if (enabled) {
@@ -385,7 +385,7 @@ export const cancelAppointment = mutation({
 			try {
 				const settings = await ctx.db
 					.query("settings")
-					.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+					.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
 					.first();
 				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
 				if (enabled) {
@@ -426,7 +426,7 @@ export const updateAppointmentStatus = mutation({
 				if (appointment) {
 					const settings = await ctx.db
 						.query("settings")
-						.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+						.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
 						.first();
 					const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
 					if (enabled && (status === 'confirmed' || status === 'completed')) {

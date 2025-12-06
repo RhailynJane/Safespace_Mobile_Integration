@@ -293,17 +293,18 @@ export const clearAndReseed = mutation({
 });
 
 export const markAsRead = mutation({
-  args: { announcementId: v.id("announcements") },
+  args: { announcementId: v.string() },
   handler: async (ctx, { announcementId }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
 
-    const announcement = await ctx.db.get(announcementId);
+    const id = announcementId as any;
+    const announcement = await ctx.db.get(id);
     if (!announcement) throw new Error("Announcement not found");
 
     const readBy = announcement.readBy ?? [];
     if (!readBy.includes(identity.subject)) {
-      await ctx.db.patch(announcementId, {
+      await ctx.db.patch(id, {
         readBy: [...readBy, identity.subject],
         updatedAt: Date.now(),
       });

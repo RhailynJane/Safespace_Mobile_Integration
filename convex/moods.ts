@@ -39,7 +39,7 @@ export const getRecentMoods = query({
 	handler: async (ctx, { userId, limit = 10 }) => {
 		const moods = await ctx.db
 			.query("moods")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.order("desc")
 			.take(limit);
 		return moods.map(toClient);
@@ -167,7 +167,7 @@ export const getMoodHistory = query({
 					.withIndex("by_user_and_date", (q) => q.eq("userId", userId).gte("createdAt", startTs).lte("createdAt", endTs))
 			: ctx.db
 					.query("moods")
-					.withIndex("by_user", (q) => q.eq("userId", userId));
+					.withIndex("by_userId", (q) => q.eq("userId", userId));
 
 		const collected = await queryBase.order("desc").collect();
 		const filtered = collected.filter((m) => {
@@ -189,7 +189,7 @@ export const getFactors = query({
 	handler: async (ctx, { userId }) => {
 		const moods = await ctx.db
 			.query("moods")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.collect();
 		const set = new Set<string>();
 		moods.forEach((m) => (m.factors || []).forEach((f: string) => set.add(f)));
@@ -204,7 +204,7 @@ export const getMoodChartData = query({
 		// Get all moods for the user
 		const allMoods = await ctx.db
 			.query("moods")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.order("desc")
 			.collect();
 
