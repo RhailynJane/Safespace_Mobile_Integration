@@ -8,9 +8,12 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { AppHeader } from '../../../components/AppHeader';
+import CurvedBackground from '../../../components/CurvedBackground';
 
 // Types
 interface BreathingMethod {
@@ -59,7 +62,7 @@ const TOTAL_BREATHS = 5;
 
 export default function BreathingScreen() {
   // State
-  const [selectedMethod, setSelectedMethod] = useState<BreathingMethod>(BREATHING_METHODS[0]);
+  const [selectedMethod, setSelectedMethod] = useState<BreathingMethod>(BREATHING_METHODS[0]!);
   const [currentPhase, setCurrentPhase] = useState<BreathingPhase>('idle');
   const [isRunning, setIsRunning] = useState(false);
   const [currentBreath, setCurrentBreath] = useState(0);
@@ -100,7 +103,7 @@ export default function BreathingScreen() {
     glowAnimation.start();
 
     return () => glowAnimation.stop();
-  }, []);
+  }, [glowOpacity]);
 
   // Gradient rotation animation (continuous)
   useEffect(() => {
@@ -114,7 +117,7 @@ export default function BreathingScreen() {
     rotationAnimation.start();
 
     return () => rotationAnimation.stop();
-  }, []);
+  }, [gradientRotation]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -279,17 +282,12 @@ export default function BreathingScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.brownText} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Breathe</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <CurvedBackground>
+      <View style={styles.container}>
+        {/* Use AppHeader component */}
+        <AppHeader title="Breathe" showBack={true} showMenu={false} showNotifications={false} />
 
-      {/* Method Picker */}
+        {/* Method Picker */}
       <TouchableOpacity
         style={styles.methodPicker}
         onPress={() => !isRunning && setShowMethodPicker(true)}
@@ -435,32 +433,15 @@ export default function BreathingScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.offWhiteBackground,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '300',
-    color: COLORS.brownText,
-  },
-  headerSpacer: {
-    width: 40,
+    backgroundColor: 'transparent',
   },
   methodPicker: {
     flexDirection: 'row',
