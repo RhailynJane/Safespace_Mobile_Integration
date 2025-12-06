@@ -142,28 +142,24 @@ export default function CrisisScreen() {
   // Guaranteed fallback emergency resources (Canada + generic + US 988)
   const fallbackResources: CrisisResource[] = [
     {
-      id: 'distress-centre-main', slug: 'distress-centre-main', title: 'Distress Centre (403-266-4357)', subtitle: '24/7 crisis support line',
-      type: 'phone', value: '403-266-4357', icon: 'call', color: '#1565C0', region: 'national', country: 'CA', priority: 'critical', sort_order: 0, active: true
-    },
-    {
       id: '911', slug: 'emergency-services', title: 'Emergency Services (911)', subtitle: 'Life-threatening emergencies',
-      type: 'phone', value: '911', icon: 'call', color: '#D32F2F', region: 'national', country: 'CA', priority: 'critical', sort_order: 1, active: true
+      type: 'phone', value: '911', icon: 'call', color: '#D32F2F', region: 'national', country: 'CA', priority: 'critical', sort_order: 0, active: true
     },
     {
       id: '112', slug: 'international-emergency', title: 'International Emergency (112)', subtitle: 'Alternate universal number',
-      type: 'phone', value: '112', icon: 'call', color: '#C62828', region: 'global', country: 'INT', priority: 'high', sort_order: 2, active: true
+      type: 'phone', value: '112', icon: 'call', color: '#C62828', region: 'global', country: 'INT', priority: 'high', sort_order: 1, active: true
     },
     {
       id: '988', slug: 'suicide-crisis-hotline', title: 'Suicide & Crisis Hotline (988)', subtitle: 'Mental health emergencies',
-      type: 'phone', value: '988', icon: 'call', color: '#1976D2', region: 'national', country: 'US', priority: 'critical', sort_order: 3, active: true
+      type: 'phone', value: '988', icon: 'call', color: '#1976D2', region: 'national', country: 'US', priority: 'critical', sort_order: 2, active: true
+    },
+    {
+      id: 'distress-centre', slug: 'distress-centre', title: 'Distress Centre', subtitle: 'Online crisis support',
+      type: 'website', value: 'https://teams.microsoft.com/l/message/19:b78bfd7c374a4077a73ae2dde4a6ee5d@thread.v2/1764983249510?context=%7B%22contextType%22%3A%22chat%22%7D', icon: 'globe', color: '#1565C0', region: 'national', country: 'CA', priority: 'high', sort_order: 3, active: true
     },
     {
       id: 'kids-help', slug: 'kids-help-phone', title: 'Kids Help Phone (1-800-668-6868)', subtitle: 'Youth support 24/7',
       type: 'phone', value: '1-800-668-6868', icon: 'call', color: '#388E3C', region: 'national', country: 'CA', priority: 'high', sort_order: 4, active: true
-    },
-    {
-      id: 'distress-centre', slug: 'distress-centre', title: 'Distress Centre (403-266-4357)', subtitle: '24/7 crisis support line',
-      type: 'phone', value: '403-266-4357', icon: 'call', color: '#1565C0', region: 'national', country: 'CA', priority: 'medium', sort_order: 5, active: true
     },
   ];
 
