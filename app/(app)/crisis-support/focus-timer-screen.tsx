@@ -10,10 +10,13 @@ import {
   Modal,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { AppHeader } from '../../../components/AppHeader';
+import CurvedBackground from '../../../components/CurvedBackground';
 
 const { width } = Dimensions.get('window');
 
@@ -67,7 +70,7 @@ export default function FocusTimerScreen() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isTimerRunning]);
+  }, [isTimerRunning, timerSeconds]);
 
   // Check for dangerous words
   const checkForDangerousWords = (text: string): boolean => {
@@ -162,17 +165,12 @@ export default function FocusTimerScreen() {
   const styles = createStyles(scaledFontSize, theme);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Focus Timer</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <CurvedBackground>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+        {/* Use AppHeader component */}
+        <AppHeader title="Focus Timer" showBack={true} showMenu={false} showNotifications={false} />
 
-      {/* Timer Display */}
+        {/* Timer Display */}
       {activeTaskId && (
         <View style={[styles.timerContainer, { backgroundColor: theme.colors.primary }]}>
           <Text style={styles.timerText}>{formatTime(timerSeconds)}</Text>
@@ -331,7 +329,7 @@ export default function FocusTimerScreen() {
         <View style={[styles.encouragement, { backgroundColor: theme.isDark ? '#1B5E20' : '#E8F5E9' }]}>
           <Ionicons name="heart" size={24} color={theme.isDark ? '#81C784' : '#2E7D32'} />
           <Text style={[styles.encouragementText, { color: theme.isDark ? '#E8F5E9' : '#2E7D32' }]}>
-            Remember: Focus on just the next hour. Small steps lead to big progress. You're doing great by taking this moment for yourself.
+            Remember: Focus on just the next hour. Small steps lead to big progress. You&apos;re doing great by taking this moment for yourself.
           </Text>
         </View>
       </ScrollView>
@@ -371,36 +369,21 @@ export default function FocusTimerScreen() {
               }}
             >
               <Text style={[styles.modalSecondaryText, { color: theme.colors.textSecondary }]}>
-                I'm okay, continue
+                I&apos;m okay, continue
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
+    </CurvedBackground>
   );
 }
 
 const createStyles = (scaledFontSize: (size: number) => number, theme: any) => StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: scaledFontSize(20),
-    fontWeight: '600',
-  },
-  headerSpacer: {
-    width: 40,
+    backgroundColor: 'transparent',
   },
   timerContainer: {
     margin: 20,

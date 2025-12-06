@@ -18,11 +18,14 @@ import {
   Modal,
   Dimensions,
   Alert,
+  Platform,
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Audio } from 'expo-av';
+import { AppHeader } from '../../../components/AppHeader';
+import CurvedBackground from '../../../components/CurvedBackground';
 
 const { width } = Dimensions.get('window');
 
@@ -285,17 +288,12 @@ export default function GroundingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>5-4-3-2-1 Grounding</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <CurvedBackground>
+      <View style={styles.container}>
+        {/* Use AppHeader component */}
+        <AppHeader title="5-4-3-2-1 Grounding" showBack={true} showMenu={false} showNotifications={false} />
 
-      {/* Progress Bar */}
+        {/* Progress Bar */}
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
           <View
@@ -464,7 +462,7 @@ export default function GroundingScreen() {
               Well Done!
             </Text>
             <Text style={styles.modalMessage}>
-              You've completed the 5-4-3-2-1 grounding exercise. Take a moment to notice how you feel now compared to before.
+              You&apos;ve completed the 5-4-3-2-1 grounding exercise. Take a moment to notice how you feel now compared to before.
             </Text>
 
             <TouchableOpacity
@@ -488,32 +486,15 @@ export default function GroundingScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
+    </CurvedBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  backButton: {
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  headerSpacer: {
-    width: 40,
+    backgroundColor: 'transparent',
   },
   progressContainer: {
     paddingHorizontal: 20,
