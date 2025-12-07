@@ -53,6 +53,10 @@ export const getFeatures = query({
       .collect();
 
     console.log('[getFeatures] Found', permissions.length, 'feature permissions for org:', orgSlug);
+    console.log('[getFeatures] Raw permissions from DB:', JSON.stringify(permissions.map(p => ({ 
+      key: p.featureKey, 
+      enabled: p.enabled 
+    }))));
 
     // If no permissions found, return all features (default allow)
     if (permissions.length === 0) {

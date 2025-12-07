@@ -24,6 +24,7 @@ import type * as journal from "../journal.js";
 import type * as migrations_syncSettingsToTable from "../migrations/syncSettingsToTable.js";
 import type * as moods from "../moods.js";
 import type * as notifications from "../notifications.js";
+import type * as organizations from "../organizations.js";
 import type * as posts from "../posts.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/syncSettingsToTable": typeof migrations_syncSettingsToTable;
   moods: typeof moods;
   notifications: typeof notifications;
+  organizations: typeof organizations;
   posts: typeof posts;
   presence: typeof presence;
   profiles: typeof profiles;
