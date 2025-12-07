@@ -29,6 +29,7 @@ import { useNotifications } from "../contexts/NotificationsContext";
 import { useConvexActivity } from "../utils/hooks/useConvexActivity";
 import { ConvexReactClient, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
+import { useFeatureAccess } from "../contexts/FeatureAccessContext";
 
 const { width, height } = Dimensions.get("window");
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? -5: StatusBar.currentHeight || 0;
@@ -72,6 +73,9 @@ export const AppHeader = ({
 
   const { signOut, isSignedIn } = useAuth();
   const { user } = useUser();
+  
+  // Feature access control
+  const { hasFeature } = useFeatureAccess();
   
   // Use shared notification context instead of duplicate polling
   const { unreadCount, refreshNotifications } = useNotifications();
@@ -337,7 +341,7 @@ export const AppHeader = ({
     return () => { unsubscribe(); };
   }, [refreshNotifications]);
 
-  // Base menu items
+  // Base menu items with feature flags
   const baseMenuItems = [
     {
       icon: "home",
@@ -368,7 +372,7 @@ export const AppHeader = ({
         router.push("../../self-assessment");
       },
       disabled: false,
-      show: isAssessmentDue,
+      show: isAssessmentDue && hasFeature("assessments"),
     },
     {
       icon: "happy",
@@ -378,7 +382,7 @@ export const AppHeader = ({
         router.push("/mood-tracking");
       },
       disabled: false,
-      show: true,
+      show: hasFeature("mood_tracking"),
     },
     {
       icon: "journal",
@@ -388,7 +392,7 @@ export const AppHeader = ({
         router.push("/journal");
       },
       disabled: false,
-      show: true,
+      show: true, // Journaling not part of feature control
     },
     {
       icon: "library",
@@ -398,7 +402,7 @@ export const AppHeader = ({
         router.push("/resources");
       },
       disabled: false,
-      show: true,
+      show: hasFeature("resources"),
     },
     {
       icon: "megaphone",
@@ -408,7 +412,7 @@ export const AppHeader = ({
         router.push("/announcements");
       },
       disabled: false,
-      show: true,
+      show: true, // Announcements always visible
     },
     {
       icon: "help-circle",
@@ -418,7 +422,7 @@ export const AppHeader = ({
         router.push("/crisis-support");
       },
       disabled: false,
-      show: true,
+      show: hasFeature("crisis_support"),
     },
     {
       icon: "chatbubble",
@@ -428,7 +432,7 @@ export const AppHeader = ({
         router.push("/(tabs)/messages");
       },
       disabled: false,
-      show: true,
+      show: hasFeature("messaging"),
     },
     {
       icon: "calendar",
@@ -438,7 +442,7 @@ export const AppHeader = ({
         router.push("/(tabs)/appointments");
       },
       disabled: false,
-      show: true,
+      show: hasFeature("appointments"),
     },
     {
       icon: "people",
@@ -448,7 +452,7 @@ export const AppHeader = ({
         router.push("/community-forum");
       },
       disabled: false,
-      show: true,
+      show: hasFeature("community"),
     },
     {
       icon: "videocam",
@@ -458,7 +462,7 @@ export const AppHeader = ({
         router.push("/video-consultations");
       },
       disabled: false,
-      show: true,
+      show: hasFeature("video_consultation"),
     },
     {
       icon: "log-out",

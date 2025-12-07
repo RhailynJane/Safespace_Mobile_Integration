@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useEffect } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../convex/_generated/api';
 import { useUser } from '@clerk/clerk-expo';
@@ -20,8 +20,14 @@ export function FeatureAccessProvider({ children }: { children: ReactNode }) {
     clerkId ? { clerkId } : 'skip'
   );
 
-  console.log('[FeatureAccessProvider] Features from Convex:', features);
-  console.log('[FeatureAccessProvider] ClerkId:', clerkId);
+  useEffect(() => {
+    console.log('=== FEATURE ACCESS DEBUG ===');
+    console.log('[FeatureAccessProvider] ClerkId:', clerkId);
+    console.log('[FeatureAccessProvider] Features from Convex:', features);
+    console.log('[FeatureAccessProvider] Features type:', typeof features);
+    console.log('[FeatureAccessProvider] Features array:', JSON.stringify(features));
+    console.log('============================');
+  }, [features, clerkId]);
 
   const hasFeature = (feature: string) => {
     // If query is still loading, return true to avoid hiding UI prematurely
@@ -32,12 +38,12 @@ export function FeatureAccessProvider({ children }: { children: ReactNode }) {
 
     // If features array is empty, it means no features are enabled - hide all
     if (!features || features.length === 0) {
-      console.log('[FeatureAccessProvider] No features enabled, blocking:', feature);
+      console.log(`[FeatureAccessProvider] ⛔ No features enabled, blocking: ${feature}`);
       return false;
     }
 
     const hasAccess = features.includes(feature);
-    console.log(`[FeatureAccessProvider] Feature "${feature}":`, hasAccess ? 'ALLOWED' : 'BLOCKED');
+    console.log(`[FeatureAccessProvider] Feature "${feature}":`, hasAccess ? '✅ ALLOWED' : '⛔ BLOCKED');
     return hasAccess;
   };
 
