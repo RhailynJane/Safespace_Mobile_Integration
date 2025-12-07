@@ -6,9 +6,24 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 
+// Map web admin feature keys to mobile app feature keys
+const FEATURE_KEY_MAP: Record<string, string> = {
+  'selfAssessment': 'assessments',
+  'moodTracking': 'mood_tracking',
+  'journaling': 'journaling', // Not part of feature control, but included for completeness
+  'resources': 'resources',
+  'announcements': 'announcements', // Not part of feature control
+  'crisisSupport': 'crisis_support',
+  'messages': 'messaging',
+  'appointments': 'appointments',
+  'communityForum': 'community',
+  'videoConsultations': 'video_consultation',
+};
+
 /**
  * Get organization features for a user (mobile app access control)
  * Returns the list of enabled features for the user's organization
+ * Reads from featurePermissions table (managed by web admin)
  */
 export const getFeatures = query({
   args: {
@@ -29,31 +44,40 @@ export const getFeatures = query({
       return [];
     }
 
-    const org = await ctx.db
-      .query("organizations")
-      .withIndex("by_slug", (q) => q.eq("slug", user.orgId as string))
-      .first();
+    const orgSlug = user.orgId as string;
 
-    console.log('[getFeatures] Organization found:', org ? `${org.name} (features: ${JSON.stringify(org.settings?.features)})` : 'null');
+    // Query featurePermissions table for this organization
+    const permissions = await ctx.db
+      .query("featurePermissions")
+      .withIndex("by_org", (q) => q.eq("orgId", orgSlug))
+      .collect();
 
-    if (!org) {
-      console.log('[getFeatures] No organization found, returning empty array');
-      return [];
+    console.log('[getFeatures] Found', permissions.length, 'feature permissions for org:', orgSlug);
+
+    // If no permissions found, return all features (default allow)
+    if (permissions.length === 0) {
+      console.log('[getFeatures] No permissions found, returning all features (default allow)');
+      return [
+        'appointments',
+        'video_consultation',
+        'mood_tracking',
+        'crisis_support',
+        'resources',
+        'community',
+        'messaging',
+        'assessments',
+      ];
     }
 
-    // Return enabled features or all features by default (for backward compatibility)
-    const features = org.settings?.features || [
-      'appointments',
-      'video_consultation',
-      'mood_tracking',
-      'crisis_support',
-      'resources',
-      'community',
-      'messaging',
-      'assessments',
-    ];
+    // Map enabled features from web keys to mobile keys
+    const enabledFeatures = permissions
+      .filter(p => p.enabled)
+      .map(p => FEATURE_KEY_MAP[p.featureKey])
+      .filter(Boolean); // Remove any undefined mappings
 
-    console.log('[getFeatures] Returning features:', features);
-    return features;
+    console.log('[getFeatures] Enabled web features:', permissions.filter(p => p.enabled).map(p => p.featureKey));
+    console.log('[getFeatures] Mapped mobile features:', enabledFeatures);
+
+    return enabledFeatures;
   },
 });
