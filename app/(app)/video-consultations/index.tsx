@@ -22,6 +22,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 import { useUser } from "@clerk/clerk-expo";
 import { useConvexAppointments } from "../../../utils/hooks/useConvexAppointments";
 import { useConvex, useMutation, useQuery } from "convex/react";
@@ -104,13 +105,7 @@ export default function VideoScreen() {
   }, [pruneStale]);
 
   // Navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   /**
    * Handles navigation tab presses

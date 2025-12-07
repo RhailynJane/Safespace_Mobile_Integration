@@ -28,6 +28,7 @@ import { AppHeader } from '../../../../components/AppHeader';
 import BottomNavigation from '../../../../components/BottomNavigation';
 import OptimizedImage from '../../../../components/OptimizedImage';
 import StatusModal from '../../../../components/StatusModal';
+import { useBottomNavTabs } from '../../../../utils/hooks/useBottomNavTabs';
 
 // Context and utilities
 import { useTheme } from '../../../../contexts/ThemeContext';
@@ -856,13 +857,7 @@ export default function CommunityMainScreen() {
   /**
    * Bottom navigation tabs configuration
    */
-  const tabs = useMemo(() => [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ], []);
+  const tabs = useBottomNavTabs();
 
   /**
    * Handle bottom navigation tab press

@@ -36,6 +36,7 @@ import { useRef } from "react";
 import { getApiBaseUrl } from "../../../../utils/apiBaseUrl";
 import { APP_TIME_ZONE } from "../../../../utils/timezone";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useBottomNavTabs } from "../../../../utils/hooks/useBottomNavTabs";
 // Removed hybrid Convex client + hook; using direct Convex queries/mutations
 
 export default function MessagesScreen() {
@@ -94,13 +95,7 @@ export default function MessagesScreen() {
     }
   };
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [fontScale]);

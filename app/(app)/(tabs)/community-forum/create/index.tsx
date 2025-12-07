@@ -20,8 +20,8 @@ import Svg, { Path } from 'react-native-svg';
 import CurvedBackground from "../../../../../components/CurvedBackground";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
+import { useBottomNavTabs } from "../../../../../utils/hooks/useBottomNavTabs";
 import { useAuth } from "@clerk/clerk-expo";
-// Removed local Convex client; use shared provider elsewhere when needed
 
 const CATEGORIES = [
   "Self-Care",
@@ -85,13 +85,7 @@ export default function SelectCategoryScreen() {
     setShowErrorModal(true);
   };
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

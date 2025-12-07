@@ -26,6 +26,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 // Character limit for notes
 const NOTES_MAX_LENGTH = 200;
@@ -80,13 +81,7 @@ const moodFactors = [
 ];
 
 // Navigation tabs configuration
-const tabs = [
-  { id: "home", name: "Home", icon: "home" },
-  { id: "community-forum", name: "Community", icon: "people" },
-  { id: "appointments", name: "Appointments", icon: "calendar" },
-  { id: "messages", name: "Messages", icon: "chatbubbles" },
-  { id: "profile", name: "Profile", icon: "person" },
-];
+const tabs = useBottomNavTabs();
 
 export default function MoodLoggingScreen() {
   const { theme, scaledFontSize } = useTheme();

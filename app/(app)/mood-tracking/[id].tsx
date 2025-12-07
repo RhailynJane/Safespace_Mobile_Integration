@@ -22,6 +22,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import StatusModal from "../../../components/StatusModal";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 interface MoodEntry {
   id: string;
@@ -59,13 +60,7 @@ const MoodEntryDetailsScreen: React.FC = () => {
   const deleteMood = useMutation(api.moods.deleteMood);
 
   // Navigation tabs
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

@@ -14,6 +14,7 @@ import CurvedBackground from "../../../../../components/CurvedBackground";
 import { AppHeader } from "../../../../../components/AppHeader";
 import { useTheme } from "../../../../../contexts/ThemeContext";
 import StatusModal from "../../../../../components/StatusModal";
+import { useBottomNavTabs } from "../../../../../utils/hooks/useBottomNavTabs";
 
 export default function PostSuccessScreen() {
   const params = useLocalSearchParams();
@@ -42,13 +43,7 @@ export default function PostSuccessScreen() {
   };
 
   // Bottom navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   /**
    * Handles bottom tab navigation

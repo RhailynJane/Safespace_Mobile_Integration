@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { router } from "expo-router";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 const { width } = Dimensions.get("window");
 
@@ -65,13 +66,7 @@ const AnnouncementsScreen: React.FC = () => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState("home");
 
-  const tabs = useMemo(() => [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ], []);
+  const tabs = useBottomNavTabs();
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

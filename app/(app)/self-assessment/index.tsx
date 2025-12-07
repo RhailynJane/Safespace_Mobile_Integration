@@ -24,6 +24,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useUser } from "@clerk/clerk-expo";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 const { width } = Dimensions.get("window");
 
 // Survey questions based on Short Warwick-Edinburgh Mental Wellbeing Scale
@@ -80,13 +81,7 @@ export default function PreSurveyScreen() {
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
   // Bottom navigation configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
