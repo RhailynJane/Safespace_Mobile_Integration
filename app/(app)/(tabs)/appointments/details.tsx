@@ -28,6 +28,7 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
 import { useConvex } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { useBottomNavTabs } from "../../../../utils/hooks/useBottomNavTabs";
 
 /**
  * BookAppointment Component
@@ -201,15 +202,8 @@ export default function BookAppointment() {
       "No email available"
     );
   };
-
-  // Bottom navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  // Bottom navigation tabs with feature access filtering
+  const tabs = useBottomNavTabs();
 
   /**
    * Handles bottom tab navigation

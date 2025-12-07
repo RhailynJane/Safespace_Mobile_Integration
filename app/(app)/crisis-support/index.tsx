@@ -29,6 +29,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 interface CrisisResource {
   id: string;
@@ -76,15 +77,8 @@ export default function CrisisScreen() {
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
-
-  // Bottom navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  // Bottom navigation tabs with feature access filtering
+  const tabs = useBottomNavTabs();
 
   const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setModalConfig({ type, title, message });

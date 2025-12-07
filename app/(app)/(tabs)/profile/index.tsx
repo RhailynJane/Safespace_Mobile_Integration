@@ -29,6 +29,7 @@ import StatusModal from "../../../../components/StatusModal";
 import { useConvex, useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { computeCoreProfileCompletion } from "../../../../utils/profileCompletion";
+import { useBottomNavTabs } from "../../../../utils/hooks/useBottomNavTabs";
 
 const IS_TEST_ENV = process.env.NODE_ENV === 'test';
 
@@ -142,13 +143,7 @@ export default function ProfileScreen() {
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setModalConfig({ type, title, message });

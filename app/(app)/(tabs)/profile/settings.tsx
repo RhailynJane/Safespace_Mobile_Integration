@@ -29,6 +29,7 @@ import { useAuth, useUser } from '@clerk/clerk-expo';
 import TimePickerModal from "../../../../components/TimePickerModal";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { useBottomNavTabs } from "../../../../utils/hooks/useBottomNavTabs";
 // (Optional) expo-notifications was used for debug "Test" buttons; removed to avoid accidental fires on Save
 
 /**
@@ -113,13 +114,7 @@ export default function SettingsScreen() {
   const saveSettingsMutation = useMutation(api.profiles.saveSettings);
   const upsertSettingsMutation = useMutation(api.settings.upsertSettings);
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
     // Hydrate settings from Convex profile when it loads
   useEffect(() => {
