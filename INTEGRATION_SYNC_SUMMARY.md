@@ -66,10 +66,10 @@ CONVEX_DEPLOYMENT=dev:wandering-partridge-43
 NEXT_PUBLIC_CONVEX_URL=https://wandering-partridge-43.convex.cloud
 
 # Other Services
-NEXT_PUBLIC_MAPBOX_TOKEN=pk.eyJ1IjoiamFuZWNvbmEiLCJhIjoiY21nenNoeHp0MDlncG84bzk1ZWxjZ2djMCJ9.b8JeDGu7Abnp2Kcxp78ztQ
-GEMINI_API_KEY=AIzaSyCMIKMD7hcOxq6NAzESoAUUq9BHhAmGsgA
-NEXT_PUBLIC_GEMINI_API_KEY=AIzaSyCMIKMD7hcOxq6NAzESoAUUq9BHhAmGsgA
-AUTH_BREVO_KEY=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
+NEXT_PUBLIC_MAPBOX_TOKEN=<your_mapbox_token>
+GEMINI_API_KEY=<your_gemini_api_key>
+NEXT_PUBLIC_GEMINI_API_KEY=<your_gemini_api_key>
+AUTH_BREVO_KEY=<your_brevo_api_key>
 
 # Site URL
 SITE_URL=http://localhost:3001
@@ -84,18 +84,18 @@ NEXT_PUBLIC_MOBILE_DEEP_LINK_URL="safespace://invite"
 
 **Mobile App (.env.local):**
 ```env
-EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_bGl2ZS1zYXdmbHktMTcuY2xlcmsuYWNjb3VudHMuZGV2JA
-CLERK_SECRET_KEY=sk_test_NoTH1c6YN0yUGZBr1R8ySA1wGGUtSBTFLw9fgqOCxA
-CLERK_JWT_ISSUER_DOMAIN=https://live-sawfly-17.clerk.accounts.dev
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=<your_clerk_publishable_key>
+CLERK_SECRET_KEY=<your_clerk_secret_key>
+CLERK_JWT_ISSUER_DOMAIN=<your_clerk_domain>
 DATABASE_URL=postgresql://postgres:password@localhost:5432/safespace
 
 # Sendbird
-EXPO_PUBLIC_SENDBIRD_APP_ID=E30F2BDE-F34E-464F-9689-7D5C443231A3
-EXPO_PUBLIC_SENDBIRD_API_TOKEN=25425a601e47017a00b63cef73915a5488f94cd4
-EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN=28070714114d0c737f5dfc7524dedeff9af154c6
+EXPO_PUBLIC_SENDBIRD_APP_ID=<your_sendbird_app_id>
+EXPO_PUBLIC_SENDBIRD_API_TOKEN=<your_sendbird_api_token>
+EXPO_PUBLIC_SENDBIRD_ACCESS_TOKEN=<your_sendbird_access_token>
 
 # Mapbox
-EXPO_PUBLIC_MAPBOX_TOKEN=pk.eyJ1IjoiamFuZWNvbmEiLCJhIjoiY21nenNoeHp0MDlncG84bzk1ZWxjZ2djMCJ9.b8JeDGu7Abnp2Kcxp78ztQ
+EXPO_PUBLIC_MAPBOX_TOKEN=<your_mapbox_token>
 
 # Convex - SAME DEPLOYMENT AS WEB
 CONVEX_DEPLOYMENT=dev:wandering-partridge-43
@@ -103,11 +103,11 @@ EXPO_PUBLIC_CONVEX_URL=https://wandering-partridge-43.convex.cloud
 EXPO_PUBLIC_CONVEX_DEPLOYMENT=dev:wandering-partridge-43
 
 # Gemini AI
-GEMINI_API_KEY=AIzaSyCMIKMD7hcOxq6NAzESoAUUq9BHhAmGsgA
-EXPO_PUBLIC_GEMINI_API_KEY=AIzaSyCMIKMD7hcOxq6NAzESoAUUq9BHhAmGsgA
+GEMINI_API_KEY=<your_gemini_api_key>
+EXPO_PUBLIC_GEMINI_API_KEY=<your_gemini_api_key>
 
 # Brevo Email
-AUTH_BREVO_KEY=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
+AUTH_BREVO_KEY=<your_brevo_api_key>
 
 # Site URL
 SITE_URL=https://wandering-partridge-43.convex.cloud
