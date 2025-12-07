@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { api } from '../convex/_generated/api';
 import { useUser } from '@clerk/clerk-expo';
 
 interface FeatureAccessContextType {
@@ -18,14 +18,27 @@ export function FeatureAccessProvider({ children }: { children: ReactNode }) {
   const features = useQuery(
     api.organizations.getFeatures,
     clerkId ? { clerkId } : 'skip'
-  ) || [];
+  );
+
+  console.log('[FeatureAccessProvider] Features from Convex:', features);
+  console.log('[FeatureAccessProvider] ClerkId:', clerkId);
 
   const hasFeature = (feature: string) => {
-    // If features array is empty (backward compatibility), allow all features
-    if (!features || features.length === 0) {
+    // If query is still loading, return true to avoid hiding UI prematurely
+    if (features === undefined) {
+      console.log('[FeatureAccessProvider] Features still loading, allowing all features');
       return true;
     }
-    return features.includes(feature);
+
+    // If features array is empty, it means no features are enabled - hide all
+    if (!features || features.length === 0) {
+      console.log('[FeatureAccessProvider] No features enabled, blocking:', feature);
+      return false;
+    }
+
+    const hasAccess = features.includes(feature);
+    console.log(`[FeatureAccessProvider] Feature "${feature}":`, hasAccess ? 'ALLOWED' : 'BLOCKED');
+    return hasAccess;
   };
 
   return (
