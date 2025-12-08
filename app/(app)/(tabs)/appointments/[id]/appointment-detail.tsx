@@ -98,11 +98,15 @@ const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: 
 }, []);
 
 const fetchAppointment = useCallback(async () => {
-  if (!id) return;
+  if (!id || id === "undefined") {
+    console.warn('⚠️ Appointment ID is missing or undefined:', id);
+    showStatusModal('error', 'Invalid ID', 'Appointment ID is missing. Please go back and try again.');
+    return;
+  }
   try {
     setLoading(true);
-    console.log('📅 Fetching single appointment via Convex. ID:', id);
-    const result = await convex.query(api.appointments.getAppointment, { appointmentId: id as any });
+    console.log('📅 Fetching single appointment via Convex. ID:', id, 'Type:', typeof id);
+    const result = await convex.query(api.appointments.getAppointment, { appointmentId: String(id) });
     if (!result) {
       showStatusModal('error', 'Not Found', 'Appointment not found.');
       setAppointment(null);
@@ -541,7 +545,7 @@ const fetchAppointment = useCallback(async () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointment Details" showBack={true} />
 
           <ScrollView 

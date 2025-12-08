@@ -123,6 +123,9 @@ export default defineSchema({
 			enabled: v.boolean(),
 		}))),
 		
+		// === CLIENT ASSIGNMENT (Web - for support workers) ===
+		assignedUserId: v.optional(v.string()), // Legacy field for backward compatibility
+		
 		// === TIMESTAMPS ===
 		lastLogin: v.optional(v.number()),
 		createdAt: v.number(),
@@ -226,7 +229,7 @@ export default defineSchema({
 	appointments: defineTable({
 		// === CLIENT/USER REFERENCE ===
 		userId: v.optional(v.string()), // Clerk ID (mobile user or web client user)
-		clientId: v.optional(v.id("clients")), // Web client record
+		clientId: v.optional(v.string()), // Clerk ID or clients table ID (flexible for cross-platform sync)
 		
 		// === SUPPORT WORKER ===
 		supportWorkerId: v.optional(v.string()), // Clerk ID of support worker

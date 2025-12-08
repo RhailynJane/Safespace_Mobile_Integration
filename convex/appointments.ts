@@ -228,14 +228,23 @@ export const getAppointmentStats = query({
 });
 
 /**
- * Get single appointment by ID
+ * Get single appointment by ID (accepts both Convex IDs and string IDs)
  */
 export const getAppointment = query({
-	args: { appointmentId: v.id("appointments") },
+	args: { appointmentId: v.optional(v.string()) },
 	handler: async (ctx, { appointmentId }) => {
-		const appointment = await ctx.db.get(appointmentId);
-		if (!appointment) return null;
-		return toClient(appointment);
+		if (!appointmentId || appointmentId === "undefined") return null;
+		try {
+			// Try to fetch using the ID directly - Convex handles both _id and string ID formats
+			const appointment = await ctx.db.get(appointmentId as any);
+			if (appointment) {
+				return toClient(appointment);
+			}
+			return null;
+		} catch (e) {
+			console.log("Could not fetch appointment by ID:", appointmentId, e);
+			return null;
+		}
 	},
 });
 

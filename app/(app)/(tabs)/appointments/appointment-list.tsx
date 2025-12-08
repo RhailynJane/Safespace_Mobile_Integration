@@ -257,34 +257,44 @@ const fetchAppointments = useCallback(async () => {
           return true;
         }
       })
-      .map((apt: any) => ({
-        id: String(apt.id),
-        supportWorker: normalizeAutoAssigned(apt.supportWorker) || nameMap[String(apt.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
-        supportWorkerId: apt.supportWorkerId,
-        date: formatDate(apt.date),
-        time: apt.time || '',
-        type: (apt.type || 'video').toString().replace('_', ' '),
-        status: 'upcoming',
-        meetingLink: apt.meetingLink,
-        notes: apt.notes,
-      }));
+      .map((apt: any) => {
+        const appointmentId = apt.id || apt._id;
+        if (!appointmentId || appointmentId === "undefined") {
+          console.warn('⚠️ Appointment missing ID:', apt);
+        }
+        return {
+          id: String(appointmentId || ''),
+          supportWorker: normalizeAutoAssigned(apt.supportWorker) || nameMap[String(apt.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
+          supportWorkerId: apt.supportWorkerId,
+          date: formatDate(apt.date),
+          time: apt.time || '',
+          type: (apt.type || 'video').toString().replace('_', ' '),
+          status: 'upcoming',
+          meetingLink: apt.meetingLink,
+          notes: apt.notes,
+        };
+      });
 
-    // Past: completed/no_show, or scheduled/confirmed with date/time in past
-    // DO NOT include cancelled appointments
     const mappedPast: Appointment[] = ([...upcoming, ...past] as any[])
       .filter(isPastAppointment)
       .filter((apt: any) => apt.status !== 'cancelled') // Exclude cancelled
-      .map((apt: any) => ({
-        id: String(apt.id),
-        supportWorker: normalizeAutoAssigned(apt.supportWorker) || nameMap[String(apt.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
-        supportWorkerId: apt.supportWorkerId,
-        date: formatDate(apt.date),
-        time: apt.time || '',
-        type: (apt.type || 'video').toString().replace('_', ' '),
-        status: 'past',
-        meetingLink: apt.meetingLink,
-        notes: apt.notes,
-      }));
+      .map((apt: any) => {
+        const appointmentId = apt.id || apt._id;
+        if (!appointmentId || appointmentId === "undefined") {
+          console.warn('⚠️ Appointment missing ID:', apt);
+        }
+        return {
+          id: String(appointmentId || ''),
+          supportWorker: normalizeAutoAssigned(apt.supportWorker) || nameMap[String(apt.supportWorkerId)] || `Auto-assigned by ${orgShortLabel}`,
+          supportWorkerId: apt.supportWorkerId,
+          date: formatDate(apt.date),
+          time: apt.time || '',
+          type: (apt.type || 'video').toString().replace('_', ' '),
+          status: 'past',
+          meetingLink: apt.meetingLink,
+          notes: apt.notes,
+        };
+      });
 
     const combined = [...mappedUpcoming, ...mappedPast];
     setAppointments(combined);
