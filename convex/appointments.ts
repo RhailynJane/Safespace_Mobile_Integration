@@ -107,10 +107,11 @@ export const getUpcomingAppointments = query({
 		console.log(`🔍 getUpcomingAppointments - Today in MST: ${today}, userId: ${userId}`);
 		
 		// Get appointments with upcoming statuses (today or future dates)
+		// Note: Query by appointmentDate (not date) since that's what's in the index
 		const appointments = await ctx.db
 			.query("appointments")
 			.withIndex("by_user_and_date", (q) => 
-				q.eq("userId", userId).gte("date", today)
+				q.eq("userId", userId).gte("appointmentDate", today)
 			)
 			.filter((q) => 
 				q.or(
@@ -122,13 +123,13 @@ export const getUpcomingAppointments = query({
 
 		// Sort by date then time (ascending)
 		const sorted = appointments.sort((a, b) => {
-			const dateCompare = a.date.localeCompare(b.date);
+			const dateCompare = (a.appointmentDate || a.date || '').localeCompare(b.appointmentDate || b.date || '');
 			if (dateCompare !== 0) return dateCompare;
-			return a.time.localeCompare(b.time);
+			return (a.appointmentTime || a.time || '').localeCompare(b.appointmentTime || b.time || '');
 		});
 
 		console.log(`📊 getUpcomingAppointments - Found ${sorted.length} appointments`);
-		sorted.forEach(apt => console.log(`  - ${apt.date} ${apt.time} (${apt.status})`));
+		sorted.forEach(apt => console.log(`  - ${apt.appointmentDate || apt.date} ${apt.appointmentTime || apt.time} (${apt.status})`));
 
 		return sorted.slice(0, limit).map(toClient);
 	},
@@ -153,10 +154,11 @@ export const getPastAppointments = query({
 		const today = `${year}-${month}-${day}`; // YYYY-MM-DD in Mountain Time
 		
 		// Get appointments with past dates (before today)
+		// Note: Query by appointmentDate (not date) since that's what's in the index
 		const pastDates = await ctx.db
 			.query("appointments")
 			.withIndex("by_user_and_date", (q) => 
-				q.eq("userId", userId).lt("date", today)
+				q.eq("userId", userId).lt("appointmentDate", today)
 			)
 			.collect();
 		
@@ -181,9 +183,9 @@ export const getPastAppointments = query({
 		// Sort by date then time (descending)
 		const sorted = unique
 			.sort((a, b) => {
-				const dateCompare = b.date.localeCompare(a.date);
+				const dateCompare = (b.appointmentDate || b.date || '').localeCompare(a.appointmentDate || a.date || '');
 				if (dateCompare !== 0) return dateCompare;
-				return b.time.localeCompare(a.time);
+				return (b.appointmentTime || b.time || '').localeCompare(a.appointmentTime || a.time || '');
 			})
 			.slice(0, limit);
 
@@ -306,6 +308,23 @@ export const createAppointment = mutation({
 			} catch (e) {
 				console.log("Could not check worker availability:", e);
 			}
+		}
+
+		// Prevent duplicate bookings for the same client at the same date/time
+		const sameDay = await ctx.db
+			.query("appointments")
+			.withIndex("by_user_and_date", (q: any) => q.eq("userId", args.userId).eq("appointmentDate", args.date))
+			.collect();
+
+		const conflict = sameDay.find((a: any) =>
+			(a.appointmentTime || a.time) === args.time &&
+			a.status !== "cancelled" &&
+			a.status !== "completed"
+		);
+
+		if (conflict) {
+			// Keep error generic for clients
+			throw new Error("This time slot is unavailable. Please choose another.");
 		}
 		
 		const appointmentId = await ctx.db.insert("appointments", {

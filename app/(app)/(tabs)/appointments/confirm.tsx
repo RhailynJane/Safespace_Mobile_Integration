@@ -70,6 +70,10 @@ export default function ConfirmAppointment() {
 
   // Determine user's organization (prioritize Clerk metadata as source of truth)
   const myOrgFromConvex = useQuery(api.users.getMyOrg, {});
+  
+  // Get the client's assigned support worker
+  const assignedWorkerData = useQuery(api.users.getMyAssignedWorker, {});
+  
   const orgId = useMemo(() => {
     const meta = (user?.publicMetadata as any) || {};
     // Prioritize Clerk metadata
@@ -284,21 +288,38 @@ export default function ConfirmAppointment() {
       const chosenIdRaw = backendWorkerIdParam || supportWorkerId;
       const workerIdInt = chosenIdRaw ? parseInt(chosenIdRaw) : NaN;
       const normalizedTime = toHHMMSS(selectedTime); // HH:MM:SS
+      
+      // Determine support worker name - prioritize in this order:
+      // 1. Explicitly selected worker from navigation
+      // 2. Assigned support worker from database
+      // 3. Fall back to "Auto-assigned by {org}"
+      let workerName = supportWorkerName;
+      
+      if (!workerName && assignedWorkerData?.name) {
+        // Use the assigned support worker's name
+        workerName = assignedWorkerData.name;
+      }
+      
+      if (!workerName) {
+        workerName = `Auto-assigned by ${orgShortLabel}`;
+      }
+      
       try {
         const result = await convex.mutation(api.appointments.createAppointment, {
           userId: user.id,
-          supportWorker: supportWorkerName || `Auto-assigned by ${orgShortLabel}`,
+          supportWorker: workerName,
           supportWorkerId: Number.isFinite(workerIdInt) ? workerIdInt : undefined,
           date: selectedDate,
           time: normalizedTime.slice(0,5), // HH:MM
           type: sessionType,
           notes: 'Booked via mobile app',
+          orgId: orgId, // Include orgId so appointments show up on web
         });
         console.log('✅ Convex appointment created:', result);
         setAppointmentCreated(true);
         setAppointmentId(workerIdInt);
         try {
-          await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName || `Auto-assigned by ${orgShortLabel}`);
+          await scheduleAppointmentReminder(selectedDate, selectedTime, workerName);
         } catch (reminderError) {
           console.warn('⚠️ Failed to schedule appointment reminder:', reminderError);
         }
@@ -312,7 +333,7 @@ export default function ConfirmAppointment() {
     } finally {
       setLoading(false);
     }
-    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, convex, orgShortLabel]);
+    }, [user?.id, supportWorkerId, supportWorkerName, backendWorkerIdParam, appointmentCreated, selectedType, selectedDate, selectedTime, showStatusModal, toHHMMSS, scheduleAppointmentReminder, convex, orgShortLabel, assignedWorkerData]);
 
     /**
      * Reschedule an existing appointment
@@ -322,6 +343,16 @@ export default function ConfirmAppointment() {
       try {
         setLoading(true);
         const normalizedTime = toHHMMSS(selectedTime);
+        
+        // Determine worker name for reminder (same priority as appointment creation)
+        let workerName = supportWorkerName;
+        if (!workerName && assignedWorkerData?.name) {
+          workerName = assignedWorkerData.name;
+        }
+        if (!workerName) {
+          workerName = `Auto-assigned by ${orgShortLabel}`;
+        }
+        
         try {
           await convex.mutation(api.appointments.rescheduleAppointment, {
             appointmentId: rescheduleAppointmentId as any,
@@ -332,7 +363,7 @@ export default function ConfirmAppointment() {
           setAppointmentCreated(true);
           setAppointmentId(parseInt(rescheduleAppointmentId));
           try {
-            await scheduleAppointmentReminder(selectedDate, selectedTime, supportWorkerName);
+            await scheduleAppointmentReminder(selectedDate, selectedTime, workerName);
           } catch (e) {
             console.warn('⚠️ Failed to schedule reminder after reschedule:', e);
           }
@@ -345,7 +376,7 @@ export default function ConfirmAppointment() {
       } finally {
         setLoading(false);
       }
-    }, [user?.id, rescheduleAppointmentId, selectedDate, selectedTime, toHHMMSS, scheduleAppointmentReminder, supportWorkerName, showStatusModal, convex]);
+    }, [user?.id, rescheduleAppointmentId, selectedDate, selectedTime, toHHMMSS, scheduleAppointmentReminder, supportWorkerName, showStatusModal, convex, orgShortLabel, assignedWorkerData]);
 
   // Create appointment when page loads
   useEffect(() => {

@@ -119,7 +119,10 @@
     "react-native-timer-picker": "^2.2.3",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-vector-icons": "^10.3.0",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "react-native-webrtc": "^124.0.7",
+    "twilio": "^5.10.7",
+    "twilio-video": "^2.33.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

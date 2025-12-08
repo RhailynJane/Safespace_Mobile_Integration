@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Modal, Pressable, Text, View, ScrollView, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, Pressable, Text, View, ScrollView } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface TimePickerModalProps {
@@ -13,83 +13,32 @@ interface TimePickerModalProps {
 export default function TimePickerModal({
   visible,
   value,
-  onSelect,
   onCancel,
   title = 'Select Time',
+  onSelect,
 }: TimePickerModalProps) {
   const { theme } = useTheme();
-  const hourScrollRef = useRef<ScrollView>(null);
-  const minuteScrollRef = useRef<ScrollView>(null);
 
-  // Parse HH:MM to hours and minutes (24-hour input)
-  const [hh, mm] = useMemo(() => value.split(":").map(Number) as [number, number], [value]);
+  // Parse HH:MM to hours (24-hour input)
+  const [hh] = useMemo(() => value.split(":").map(Number) as [number, number], [value]);
 
   // Local temp state while the modal is open
   const [selectedHour, setSelectedHour] = useState<number>(hh);
-  const [selectedMinute, setSelectedMinute] = useState<number>(isNaN(mm) ? 0 : mm);
 
   // Update state when modal opens or when value changes
   useEffect(() => {
     setSelectedHour(hh);
-    setSelectedMinute(isNaN(mm) ? 0 : mm);
-  }, [visible, hh, mm]);
-
-  // Constants for item height and top/bottom spacer height
-  const ITEM_HEIGHT = 44;
-  const SPACER_HEIGHT = ITEM_HEIGHT * 2; // 88
-  const HIGHLIGHT_TOP = 100; // must match the styled highlight top
-  const HIGHLIGHT_CENTER = HIGHLIGHT_TOP + ITEM_HEIGHT / 2; // 122
-
-  // Scroll to selected position ONLY when modal opens (align row center with highlight center)
-  useEffect(() => {
-    if (visible && hourScrollRef.current) {
-      setTimeout(() => {
-        const h = isNaN(hh) ? 0 : hh;
-        const offsetY = Math.max(0, SPACER_HEIGHT + h * ITEM_HEIGHT + ITEM_HEIGHT / 2 - HIGHLIGHT_CENTER);
-        hourScrollRef.current?.scrollTo({ y: offsetY, animated: false });
-      }, 50);
-    }
-  }, [visible, hh, SPACER_HEIGHT, ITEM_HEIGHT, HIGHLIGHT_CENTER]);
-
-  useEffect(() => {
-    if (visible && minuteScrollRef.current) {
-      setTimeout(() => {
-        const m = isNaN(mm) ? 0 : mm;
-        const offsetY = Math.max(0, SPACER_HEIGHT + m * ITEM_HEIGHT + ITEM_HEIGHT / 2 - HIGHLIGHT_CENTER);
-        minuteScrollRef.current?.scrollTo({ y: offsetY, animated: false });
-      }, 50);
-    }
-  }, [visible, mm, SPACER_HEIGHT, ITEM_HEIGHT, HIGHLIGHT_CENTER]);
+  }, [visible, hh]);
 
   const handleConfirm = useCallback(() => {
-    console.log('Confirm called - hours:', selectedHour, 'minutes:', selectedMinute);
     const h24 = String(selectedHour).padStart(2, '0');
-    const m24 = String(selectedMinute).padStart(2, '0');
-    const timeString = `${h24}:${m24}`;
-    console.log('Final time string:', timeString);
+    const timeString = `${h24}:00`;
     onSelect(timeString);
     onCancel();
-  }, [selectedHour, selectedMinute, onSelect, onCancel]);
+  }, [selectedHour, onSelect, onCancel]);
 
-  // Generate hour and minute arrays
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = Array.from({ length: 60 }, (_, i) => i);
-
-  const handleHourScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = event.nativeEvent.contentOffset.y;
-    // Align to highlight center: add center offset and subtract top spacer + half item
-    const adjusted = y + HIGHLIGHT_CENTER - SPACER_HEIGHT - ITEM_HEIGHT / 2; // effectively y + 12
-    const index = Math.round(adjusted / ITEM_HEIGHT);
-    setSelectedHour(Math.max(0, Math.min(23, index)));
-  };
-
-  const handleMinuteScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = event.nativeEvent.contentOffset.y;
-    // Align to highlight center like hours
-    const adjusted = y + HIGHLIGHT_CENTER - SPACER_HEIGHT - ITEM_HEIGHT / 2;
-    const index = Math.round(adjusted / ITEM_HEIGHT);
-    setSelectedMinute(Math.max(0, Math.min(59, index)));
-  };
+  // Generate hour slots for every hour (09:00 to 20:00)
+  const hours = Array.from({ length: 12 }, (_, i) => 9 + i);
 
   return (
     <Modal
@@ -101,7 +50,7 @@ export default function TimePickerModal({
       <View testID="time-picker-modal" style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
         <View
           style={{
-            width: 280,
+            width: '85%',
             borderRadius: 16,
             backgroundColor: theme.colors.surface,
             overflow: 'hidden',
@@ -112,98 +61,35 @@ export default function TimePickerModal({
             <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, textAlign: 'center' }}>{title}</Text>
           </View>
 
-          {/* Picker area with ScrollView for hour and minute selection */}
-          <View style={{ paddingHorizontal: 4, paddingVertical: 8, alignItems: 'center', height: 220, position: 'relative', overflow: 'hidden' }}>
-            {/* Green highlight background for center - displays in the middle */}
-            <View style={{
-              position: 'absolute',
-              top: 100,
-              left: 20,
-              right: 20,
-              height: 44,
-              backgroundColor: theme.colors.primary,
-              borderRadius: 8,
-              zIndex: 0,
-              pointerEvents: 'none',
-            }} />
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flex: 1, width: '100%', zIndex: 1, paddingTop: 7 }}>
-              {/* Hour picker */}
-              <View style={{ width: 70, flex: 1 }}>
-                <ScrollView
-                  ref={hourScrollRef}
-                  showsVerticalScrollIndicator={false}
-                  scrollEventThrottle={16}
-                  snapToInterval={44}
-                  decelerationRate="fast"
-                  onMomentumScrollEnd={handleHourScroll}
-                  nestedScrollEnabled={true}
-                  testID="hour-picker"
+          {/* Time slots grid - 4 columns */}
+          <View style={{ paddingHorizontal: 12, paddingVertical: 16 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 }}>
+              {hours.map((h) => (
+                <Pressable
+                  key={`hour-${h}`}
+                  onPress={() => setSelectedHour(h)}
+                  android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
+                  style={({ pressed }) => ({
+                    flex: 0.22,
+                    aspectRatio: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    borderRadius: 8,
+                    backgroundColor: h === selectedHour ? theme.colors.primary : theme.colors.background,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
                 >
-                  <View style={{ height: SPACER_HEIGHT }} />
-                  {hours.map((h) => (
-                    <View
-                      key={`hour-${h}`}
-                      style={{
-                        height: 44,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 18,
-                          fontWeight: h === selectedHour ? '700' : '500',
-                          color: h === selectedHour ? '#FFFFFF' : theme.colors.text,
-                        }}
-                      >
-                        {String(h).padStart(2, '0')}
-                      </Text>
-                    </View>
-                  ))}
-                  <View style={{ height: SPACER_HEIGHT }} />
-                </ScrollView>
-              </View>
-
-              {/* Colon separator */}
-              <Text style={{ fontSize: 25, fontWeight: '700', color: theme.colors.text, marginHorizontal: 7, zIndex: 3, paddingTop: 10 }}>:</Text>
-
-              {/* Minute picker */}
-              <View style={{ width: 70, flex: 1 }}>
-                <ScrollView
-                  ref={minuteScrollRef}
-                  showsVerticalScrollIndicator={false}
-                  scrollEventThrottle={16}
-                  snapToInterval={44}
-                  decelerationRate="fast"
-                  onMomentumScrollEnd={handleMinuteScroll}
-                  nestedScrollEnabled={true}
-                  testID="minute-picker"
-                >
-                  <View style={{ height: SPACER_HEIGHT }} />
-                  {minutes.map((m) => (
-                    <View
-                      key={`minute-${m}`}
-                      style={{
-                        height: 44,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 18,
-                          fontWeight: m === selectedMinute ? '700' : '500',
-                          color: m === selectedMinute ? '#FFFFFF' : theme.colors.text,
-                        }}
-                      >
-                        {String(m).padStart(2, '0')}
-                      </Text>
-                    </View>
-                  ))}
-                  <View style={{ height: SPACER_HEIGHT }} />
-                </ScrollView>
-              </View>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: h === selectedHour ? '700' : '600',
+                      color: h === selectedHour ? theme.colors.surface : theme.colors.text,
+                    }}
+                  >
+                    {String(h).padStart(2, '0')}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 

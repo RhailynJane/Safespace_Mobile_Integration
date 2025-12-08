@@ -263,7 +263,7 @@ describe('Video Consultations - Complete Test Suite', () => {
       
       await waitFor(() => {
         // Should show disabled button text
-        expect(screen.getByText('Available 10 min before')).toBeTruthy();
+        expect(screen.getByText('Available 1 hour before')).toBeTruthy();
       });
 
       // Verify router.push was not called

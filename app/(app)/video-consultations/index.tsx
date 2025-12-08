@@ -279,7 +279,7 @@ export default function VideoScreen() {
       const nowMinutes = nowYear * 525600 + nowMonth * 43800 + nowDay * 1440 + nowHour * 60 + nowMinute;
       
       const minutesUntilAppointment = aptMinutes - nowMinutes;
-      return minutesUntilAppointment >= -60 && minutesUntilAppointment <= 10;
+      return minutesUntilAppointment >= -60 && minutesUntilAppointment <= 60;
     } catch {
       return false;
     }
@@ -318,8 +318,8 @@ export default function VideoScreen() {
     const aptMinutes = y * 525600 + m * 43800 + d * 1440 + hh * 60 + mm;
     const nowMinutes = ny * 525600 + nm * 43800 + nd * 1440 + nh * 60 + nmin;
     const minutesUntilAppointment = aptMinutes - nowMinutes;
-    if (minutesUntilAppointment > 10) {
-      setJoinRestrictionMsg(`The session is scheduled. You can join 10 mins before the appointment time.`);
+    if (minutesUntilAppointment > 60) {
+      setJoinRestrictionMsg(`The session is scheduled. You can join 1 hour before the appointment time.`);
       return;
     }
     setJoinRestrictionMsg(null);
@@ -461,7 +461,7 @@ export default function VideoScreen() {
                   >
                     <Ionicons name="videocam" size={20} color="#FFFFFF" />
                     <Text style={styles.joinButtonText}>
-                      {canJoinAppointment(upcoming) ? 'Join Meeting' : 'Available 10 min before'}
+                      {canJoinAppointment(upcoming) ? 'Join Meeting' : 'Available 1 hour before'}
                     </Text>
                   </TouchableOpacity>
 
