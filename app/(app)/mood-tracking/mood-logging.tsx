@@ -80,12 +80,11 @@ const moodFactors = [
   "Sleep",
 ];
 
-// Navigation tabs configuration
-const tabs = useBottomNavTabs();
-
 export default function MoodLoggingScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
+  // Navigation tabs configuration - moved inside component
+  const tabs = useBottomNavTabs();
   // Extended params include original selection metadata
   const { selectedMood, selectedId, selectedLabel, selectedEmoji } = useLocalSearchParams<{
     selectedMood: MoodType;
@@ -108,6 +107,7 @@ export default function MoodLoggingScreen() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
+  const [moodId, setMoodId] = useState<string | null>(null);
   const [modalConfig, setModalConfig] = useState({
     type: 'info' as 'success' | 'error' | 'info',
     title: '',
@@ -156,7 +156,20 @@ export default function MoodLoggingScreen() {
   // Handle success modal close
   const handleSuccessClose = () => {
     setShowSuccessModal(false);
-    router.replace("../mood-tracking/mood-history");
+    // Navigate to mood entry detail page with the mood ID
+    // Add a small delay to ensure Convex has updated the mood history
+    if (moodId) {
+      console.log('[mood-logging] Navigating to mood detail with ID:', moodId);
+      setTimeout(() => {
+        const navigationPath = `../mood-tracking/${moodId}`;
+        console.log('[mood-logging] Navigation path:', navigationPath);
+        router.replace(navigationPath);
+      }, 500);
+    } else {
+      // Fallback to history if ID is not available
+      console.log('[mood-logging] No moodId available, navigating to history');
+      router.replace("../mood-tracking/mood-history");
+    }
   };
 
   // Reload on screen focus to refresh recent moods
@@ -178,8 +191,8 @@ export default function MoodLoggingScreen() {
     setIsSubmitting(true);
 
     try {
-      // Create mood entry via Convex
-      await recordMood({
+      // Create mood entry via Convex and capture the returned ID
+      const result = await recordMood({
         userId: user.id,
         moodType: moodData.type,
         intensity: moodData.intensity,
@@ -187,6 +200,11 @@ export default function MoodLoggingScreen() {
         factors: moodData.factors,
         shareWithSupportWorker: moodData.shareWithSupportWorker,
       });
+
+      // Store the mood ID for navigation after modal closes
+      if (result && result.id) {
+        setMoodId(result.id);
+      }
 
       // Set success message based on sharing status
       if (moodData.shareWithSupportWorker) {

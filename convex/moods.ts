@@ -95,6 +95,8 @@ export const recordMood = mutation({
 			updatedAt: now,
 		});
 
+		console.log("[recordMood] Created mood:", { moodId, userId: args.userId, moodType: args.moodType });
+
 		await ctx.db.insert("activities", {
 			userId: args.userId,
 			activityType: "mood_entry",
@@ -170,6 +172,11 @@ export const getMoodHistory = query({
 					.withIndex("by_userId", (q) => q.eq("userId", userId));
 
 		const collected = await queryBase.order("desc").collect();
+		console.log("[getMoodHistory] Retrieved moods for userId:", userId, "Count:", collected.length);
+		if (collected.length > 0) {
+			console.log("[getMoodHistory] First mood ID:", collected[0]._id);
+		}
+		
 		const filtered = collected.filter((m) => {
 			if (moodType && m.moodType !== moodType) return false;
 			if (factors && factors.length > 0) {

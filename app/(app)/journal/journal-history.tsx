@@ -30,8 +30,6 @@ import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 type FilterType = "all" | "week" | "month" | "custom";
 
-const tabs = useBottomNavTabs();
-
 interface JournalEntry {
   id: string;
   title: string;
@@ -48,6 +46,9 @@ interface JournalEntry {
 export default function JournalHistoryScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
+
+  // Navigation tabs configuration - moved inside component
+  const tabs = useBottomNavTabs();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);

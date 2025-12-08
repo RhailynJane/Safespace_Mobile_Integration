@@ -244,9 +244,9 @@ export const getAppointment = query({
  */
 export const createAppointment = mutation({
 	args: {
-		userId: v.string(),
+		userId: v.string(), // Client's Clerk ID
 		supportWorker: v.string(),
-		supportWorkerId: v.optional(v.number()),
+		supportWorkerId: v.optional(v.string()), // Now Clerk ID string (for web sync)
 		date: v.string(), // YYYY-MM-DD
 		time: v.string(), // HH:mm
 		duration: v.optional(v.number()), // Duration in minutes
@@ -255,23 +255,71 @@ export const createAppointment = mutation({
 		meetingLink: v.optional(v.string()),
 		specialization: v.optional(v.string()),
 		avatarUrl: v.optional(v.string()),
+		orgId: v.optional(v.string()), // Organization ID for sync with web
 	},
 	handler: async (ctx, args) => {
 		const now = Date.now();
 		
+		// Resolve support worker Clerk ID if not provided
+		let supportWorkerClerkId = args.supportWorkerId;
+		let supportWorkerAvatar = args.avatarUrl;
+		
+		if (!supportWorkerClerkId) {
+			// Look up support worker by name
+			const workers = await ctx.db
+				.query("users")
+				.withIndex("by_firstName", (q: any) => q.eq("firstName", args.supportWorker))
+				.collect();
+			if (workers.length > 0) {
+				supportWorkerClerkId = workers[0].clerkId;
+				supportWorkerAvatar = supportWorkerAvatar || workers[0].profileImageUrl;
+			}
+		}
+
+		// Check support worker availability if we have their record
+		if (supportWorkerClerkId) {
+			try {
+				const worker = await ctx.db
+					.query("users")
+					.withIndex("by_clerkId", (q: any) => q.eq("clerkId", supportWorkerClerkId))
+					.first();
+				
+				if (worker && worker.availability) {
+					const appointmentDate = new Date(args.date);
+					const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'lowercase' });
+					const daySlot = worker.availability.find((slot: any) => slot.day.toLowerCase() === dayOfWeek);
+					
+					if (!daySlot?.enabled) {
+						console.warn(`Support worker ${supportWorkerClerkId} is not available on ${dayOfWeek}`);
+						// Could throw error or set status to "pending_approval" based on policy
+					}
+				}
+			} catch (e) {
+				console.log("Could not check worker availability:", e);
+			}
+		}
+		
 		const appointmentId = await ctx.db.insert("appointments", {
+			// Client linking - store both userId and for web compatibility
 			userId: args.userId,
+			clientId: args.userId, // Also store as clientId for web compatibility
+			// Support worker linking
 			supportWorker: args.supportWorker,
-			supportWorkerId: args.supportWorkerId,
+			supportWorkerId: supportWorkerClerkId,
+			avatarUrl: supportWorkerAvatar,
+			// Date/time in both formats for cross-platform compatibility
 			date: args.date,
 			time: args.time,
+			appointmentDate: args.date,
+			appointmentTime: args.time,
+			// Other details
 			duration: args.duration || 60,
 			type: args.type,
 			status: "scheduled",
 			notes: args.notes,
 			meetingLink: args.meetingLink,
 			specialization: args.specialization,
-			avatarUrl: args.avatarUrl,
+			orgId: args.orgId, // For web sync
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -284,26 +332,26 @@ export const createAppointment = mutation({
 			createdAt: now,
 		});
 
-			// Create notification if user settings allow
-			try {
-				const settings = await ctx.db
-					.query("settings")
-					.withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
-					.first();
-				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
-				if (enabled) {
-					await ctx.db.insert("notifications", {
-						userId: args.userId,
-						type: "appointment",
-						title: "Appointment Scheduled",
-						message: `${args.supportWorker} on ${args.date} at ${args.time}`,
-						isRead: false,
-						createdAt: Date.now(),
-					});
-				}
-			} catch (_e) {
-				// non-blocking
+		// Create notification if user settings allow
+		try {
+			const settings = await ctx.db
+				.query("settings")
+				.withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
+				.first();
+			const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+			if (enabled) {
+				await ctx.db.insert("notifications", {
+					userId: args.userId,
+					type: "appointment",
+					title: "Appointment Scheduled",
+					message: `${args.supportWorker} on ${args.date} at ${args.time}`,
+					isRead: false,
+					createdAt: Date.now(),
+				});
 			}
+		} catch (_e) {
+			// non-blocking
+		}
 
 		return { id: appointmentId };
 	},

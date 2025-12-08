@@ -31,8 +31,6 @@ interface MoodEntry {
   created_at: string; // ISO date
 }
 
-const tabs = useBottomNavTabs();
-
 const truncate = (v?: string, max = 120) => {
   if (!v) return "";
   return v.length <= max ? v : v.slice(0, max - 1) + "…";
@@ -190,6 +188,9 @@ const MoodHistoryScreen: React.FC = () => {
   const { theme } = useTheme();
   const { user } = useUser();
   const userId = user?.id;
+
+  // Navigation tabs configuration - moved inside component
+  const tabs = useBottomNavTabs();
 
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0); // simple pagination

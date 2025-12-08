@@ -21,18 +21,19 @@ export function FeatureAccessProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    console.log('=== FEATURE ACCESS DEBUG ===');
-    console.log('[FeatureAccessProvider] ClerkId:', clerkId);
-    console.log('[FeatureAccessProvider] Features from Convex:', features);
-    console.log('[FeatureAccessProvider] Features type:', typeof features);
-    console.log('[FeatureAccessProvider] Features array:', JSON.stringify(features));
-    console.log('============================');
+    if (clerkId) {
+      console.log('=== FEATURE ACCESS DEBUG ===');
+      console.log('[FeatureAccessProvider] ClerkId:', clerkId);
+      console.log('[FeatureAccessProvider] Features from Convex:', features);
+      console.log('[FeatureAccessProvider] Features type:', typeof features);
+      console.log('[FeatureAccessProvider] Features array:', JSON.stringify(features));
+      console.log('============================');
+    }
   }, [features, clerkId]);
 
   const hasFeature = (feature: string) => {
     // If query is still loading, return true to avoid hiding UI prematurely
     if (features === undefined) {
-      console.log('[FeatureAccessProvider] Features still loading, allowing all features');
       return true;
     }
 
@@ -43,7 +44,6 @@ export function FeatureAccessProvider({ children }: { children: ReactNode }) {
     }
 
     const hasAccess = features.includes(feature);
-    console.log(`[FeatureAccessProvider] Feature "${feature}":`, hasAccess ? '✅ ALLOWED' : '⛔ BLOCKED');
     return hasAccess;
   };
 

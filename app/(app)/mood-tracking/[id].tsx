@@ -11,6 +11,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -40,6 +41,11 @@ const MoodEntryDetailsScreen: React.FC = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = user?.id;
 
+  console.log('[mood-detail] Screen loaded with ID:', id, 'userId:', userId);
+
+  // Navigation tabs configuration - moved inside component
+  const tabs = useBottomNavTabs();
+
   const [activeTab, setActiveTab] = useState("home");
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
@@ -58,9 +64,6 @@ const MoodEntryDetailsScreen: React.FC = () => {
   const entry = history?.moods.find((m) => m.id === id);
   const updateMood = useMutation(api.moods.updateMood);
   const deleteMood = useMutation(api.moods.deleteMood);
-
-  // Navigation tabs
-  const tabs = useBottomNavTabs();
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -137,6 +140,25 @@ const MoodEntryDetailsScreen: React.FC = () => {
   };
 
   if (!entry) {
+    // Show loading state while history is being fetched
+    if (history === undefined) {
+      return (
+        <CurvedBackground>
+          <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <AppHeader title="Mood Entry" showBack={true} />
+            <View style={styles.centerContent}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={[styles.notFoundText, { color: theme.colors.text }]}>
+                Loading mood entry...
+              </Text>
+            </View>
+            <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
+          </SafeAreaView>
+        </CurvedBackground>
+      );
+    }
+
+    // Show not found error after history has loaded
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
