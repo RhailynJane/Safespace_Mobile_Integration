@@ -371,50 +371,58 @@ export const createAppointment = mutation({
  */
 export const rescheduleAppointment = mutation({
 	args: {
-		appointmentId: v.id("appointments"),
+		appointmentId: v.string(),
 		newDate: v.string(),
 		newTime: v.string(),
 		reason: v.optional(v.string()),
 	},
 	handler: async (ctx, { appointmentId, newDate, newTime, reason }) => {
-		const appointment = await ctx.db.get(appointmentId);
-		if (!appointment) {
-			throw new Error("Appointment not found");
-		}
-		
-		const noteUpdate = reason 
-			? `${appointment.notes || ''}\n\nRescheduled: ${reason}`.trim()
-			: appointment.notes;
-		
-		await ctx.db.patch(appointmentId, {
-			date: newDate,
-			time: newTime,
-			notes: noteUpdate,
-			updatedAt: Date.now(),
-		});
-
-			// Notify user about reschedule if enabled
-			try {
-				const settings = await ctx.db
-					.query("settings")
-					.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
-					.first();
-				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
-				if (enabled) {
-					await ctx.db.insert("notifications", {
-						userId: appointment.userId,
-						type: "appointment",
-						title: "Appointment Rescheduled",
-						message: `New time: ${newDate} ${newTime}`,
-						isRead: false,
-						createdAt: Date.now(),
-					});
-				}
-			} catch (_e) {
-				// non-blocking
+		try {
+			const appointment = await ctx.db.get(appointmentId as any);
+			if (!appointment) {
+				throw new Error("Appointment not found");
 			}
-		
-		return { success: true };
+			
+			const existingNotes = (appointment as any).notes || '';
+			const noteUpdate = reason 
+				? `${existingNotes}\n\nRescheduled: ${reason}`.trim()
+				: existingNotes;
+			
+			await ctx.db.patch(appointmentId as any, {
+				date: newDate,
+				time: newTime,
+				appointmentDate: newDate,
+				appointmentTime: newTime,
+				notes: noteUpdate,
+				updatedAt: Date.now(),
+			});
+
+				// Notify user about reschedule if enabled
+				try {
+					const settings = await ctx.db
+						.query("settings")
+						.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
+						.first();
+					const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+					if (enabled) {
+						await ctx.db.insert("notifications", {
+							userId: appointment.userId,
+							type: "appointment",
+							title: "Appointment Rescheduled",
+							message: `New time: ${newDate} ${newTime}`,
+							isRead: false,
+							createdAt: Date.now(),
+						});
+					}
+				} catch (_e) {
+					// non-blocking
+				}
+			
+			return { success: true };
+		} catch (err) {
+			console.error('[rescheduleAppointment] Error:', err);
+			throw err;
+		}
 	},
 });
 
@@ -423,26 +431,27 @@ export const rescheduleAppointment = mutation({
  */
 export const cancelAppointment = mutation({
 	args: {
-		appointmentId: v.id("appointments"),
+		appointmentId: v.string(),
 		cancellationReason: v.optional(v.string()),
 	},
 	handler: async (ctx, { appointmentId, cancellationReason }) => {
-		const appointment = await ctx.db.get(appointmentId);
-		if (!appointment) {
-			throw new Error("Appointment not found");
-		}
-		
-		await ctx.db.patch(appointmentId, {
-			status: "cancelled",
-			cancellationReason,
-			updatedAt: Date.now(),
-		});
+		try {
+			const appointment = await ctx.db.get(appointmentId as any);
+			if (!appointment) {
+				throw new Error("Appointment not found");
+			}
+			
+			await ctx.db.patch(appointmentId as any, {
+				status: "cancelled",
+				cancellationReason,
+				updatedAt: Date.now(),
+			});
 
-			// Notify user about cancellation if enabled
-			try {
-				const settings = await ctx.db
-					.query("settings")
-					.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
+				// Notify user about cancellation if enabled
+				try {
+					const settings = await ctx.db
+						.query("settings")
+						.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
 					.first();
 				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
 				if (enabled) {
@@ -459,7 +468,11 @@ export const cancelAppointment = mutation({
 				// non-blocking
 			}
 		
-		return { success: true };
+			return { success: true };
+		} catch (err) {
+			console.error('[cancelAppointment] Error:', err);
+			throw err;
+		}
 	},
 });
 
