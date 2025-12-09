@@ -936,4 +936,28 @@ export default defineSchema({
 		.index("by_org_active", ["orgId", "active"])
 		.index("by_active", ["active"])
 		.index("by_createdAt", ["createdAt"]),
+
+	// ============================================
+	// RESOURCES (Mobile Wellness Content)
+	// ============================================
+	
+	resources: defineTable({
+		title: v.string(),
+		type: v.string(), // 'affirmation' | 'quote' | 'article' | 'exercise'
+		duration: v.optional(v.string()),
+		category: v.string(), // 'stress' | 'anxiety' | 'depression' | 'sleep' | 'motivation' | 'mindfulness'
+		content: v.string(),
+		author: v.optional(v.string()),
+		imageEmoji: v.optional(v.string()),
+		backgroundColor: v.optional(v.string()),
+		tags: v.optional(v.array(v.string())),
+		isExternal: v.optional(v.boolean()),
+		active: v.boolean(),
+		
+		createdAt: v.number(),
+		updatedAt: v.optional(v.number()),
+	})
+		.index("by_active", ["active"])
+		.index("by_category", ["category"])
+		.index("by_type", ["type"]),
 });
