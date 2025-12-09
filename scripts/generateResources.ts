@@ -97,7 +97,7 @@ Do not include any markdown formatting, code blocks, or explanatory text. Return
     
     // Find duration for this type
     const typeConfig = RESOURCE_TYPES.find(rt => rt.type === type);
-    const duration = typeConfig?.duration || '5 mins';
+    const duration: string = typeConfig?.duration || '5 mins';
     
     return {
       title: generatedData.title,
@@ -127,10 +127,10 @@ async function generateResourcesForCategory(
   const resources: any[] = [];
   
   // Distribute across different types
-  const types = ['article', 'exercise', 'affirmation', 'quote'];
+  const types: string[] = ['article', 'exercise', 'affirmation', 'quote'];
   
   for (let i = 0; i < count; i++) {
-    const type = types[i % types.length];
+    const type: string = types[i % types.length]!;
     console.log(`   ⏳ Generating ${type} ${i + 1}/${count}...`);
     
     try {
@@ -172,8 +172,8 @@ async function saveResources(resources: any[]): Promise<void> {
  */
 async function main() {
   const args = process.argv.slice(2);
-  const categoryArg = args[0] || 'all';
-  const countArg = parseInt(args[1]) || 3;
+  const categoryArg: string = args[0] || 'all';
+  const countArg = parseInt(args[1] ?? '3', 10) || 3; // ensure string input for parseInt
   
   console.log('🤖 Gemini Resource Generator');
   console.log('============================');
