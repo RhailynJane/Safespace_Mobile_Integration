@@ -336,7 +336,7 @@ export const listBookmarkedIds = query({
 	handler: async (ctx, { userId }) => {
 		const bookmarks = await ctx.db
 			.query("resourceBookmarks")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.collect();
 		return { ids: bookmarks.map((b) => b.resourceId) };
 	},

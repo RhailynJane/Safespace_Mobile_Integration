@@ -20,7 +20,7 @@ export const listForUser = query({
 
     const memberships = await ctx.db
       .query("conversationParticipants")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .collect();
 
     const convIds = memberships.map((m: any) => m.conversationId);
@@ -49,7 +49,7 @@ export const create = mutation({
     for (const userId of fullSet) {
       const memberships = await ctx.db
         .query("conversationParticipants")
-        .withIndex("by_user", (q: any) => q.eq("userId", userId))
+        .withIndex("by_userId", (q: any) => q.eq("userId", userId))
         .collect();
       for (const m of memberships) {
         candidateIdCounts[m.conversationId] = (candidateIdCounts[m.conversationId] || 0) + 1;
@@ -232,7 +232,7 @@ export const sendMessage = mutation({
         // Check settings gate
         const settings = await ctx.db
           .query("settings")
-          .withIndex("by_user", (q: any) => q.eq("userId", uid))
+          .withIndex("by_userId", (q: any) => q.eq("userId", uid))
           .first();
         const enabled = settings?.notificationsEnabled !== false && settings?.notifMessages !== false;
         if (!enabled) continue;
@@ -533,7 +533,7 @@ export const listForUserEnriched = query({
 
     const memberships = await ctx.db
       .query("conversationParticipants")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .collect();
 
     const convIds = memberships.map((m: any) => m.conversationId);

@@ -47,7 +47,7 @@ export const getNotifications = query({
 	handler: async (ctx, { userId, limit = 200 }) => {
 		const notifications = await ctx.db
 			.query("notifications")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.order("desc")
 			.take(limit);
 
@@ -158,7 +158,7 @@ export const clearAll = mutation({
 	handler: async (ctx, { userId }) => {
 		const userNotifications = await ctx.db
 			.query("notifications")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.collect();
 
 		// Delete all notifications

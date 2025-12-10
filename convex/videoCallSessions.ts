@@ -523,7 +523,7 @@ export const getUserSessions = query({
 
     const sessions = await ctx.db
       .query("videoCallSessions")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .order("desc")
       .take(limit);
 
@@ -543,7 +543,7 @@ export const getCallStats = query({
 
     const sessions = await ctx.db
       .query("videoCallSessions")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .collect();
 
     const completedSessions = sessions.filter((s: any) => s.sessionStatus === "ended" && s.duration);
@@ -581,7 +581,7 @@ export const getActiveSession = query({
     // Find the most recent session that's not ended
     const activeSessions = await ctx.db
       .query("videoCallSessions")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .order("desc")
       .take(5);
 
@@ -614,7 +614,7 @@ export const pruneStaleSessions = mutation({
 
     const recent = await ctx.db
       .query("videoCallSessions")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .order("desc")
       .take(50);
 

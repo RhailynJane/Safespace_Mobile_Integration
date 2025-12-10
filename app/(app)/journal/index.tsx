@@ -21,26 +21,12 @@ import CurvedBackground from "../../../components/CurvedBackground";
  import StatusModal from "../../../components/StatusModal";
  import { LinearGradient } from "expo-linear-gradient";
  import OptimizedImage from "../../../components/OptimizedImage";
-const tabs = [
-  { id: "home", name: "Home", icon: "home" },
-  { id: "community-forum", name: "Community", icon: "people" },
-  { id: "appointments", name: "Appointments", icon: "calendar" },
-  { id: "messages", name: "Messages", icon: "chatbubbles" },
-  { id: "profile", name: "Profile", icon: "person" },
-];
-
-// Template type from Convex listTemplates
-type JournalTemplate = {
-  id: number;
-  name: string;
-  description: string;
-  icon: string;
-  prompts?: string[];
-};
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 export default function JournalScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
+  const tabs = useBottomNavTabs();
   const [activeTab, setActiveTab] = useState("journal");
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({

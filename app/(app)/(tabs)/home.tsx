@@ -32,6 +32,7 @@ import { useConvexMoods } from "../../../utils/hooks/useConvexMoods";
 import { LiveMoodStats } from "../../../components/LiveMoodStats";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useFeatureAccess } from "../../../contexts/FeatureAccessContext";
 
 type MoodEntry = {
   id: string;
@@ -257,17 +258,26 @@ export default function HomeScreen() {
     isUsingConvex,
   } = useConvexMoods(user?.id, convexClient);
 
+  // Feature access control
+  const { hasFeature } = useFeatureAccess();
+
   // Create styles with scaled font sizes
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  // Bottom navigation configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
+  // Bottom navigation configuration - filter based on enabled features
+  const allTabs = [
+    { id: "home", name: "Home", icon: "home", feature: null }, // Always visible
+    { id: "community-forum", name: "Community", icon: "people", feature: "community" },
+    { id: "appointments", name: "Appointments", icon: "calendar", feature: "appointments" },
+    { id: "messages", name: "Messages", icon: "chatbubbles", feature: "messaging" },
+    { id: "profile", name: "Profile", icon: "person", feature: null }, // Always visible
   ];
+
+  // Filter tabs based on feature access
+  const tabs = useMemo(
+    () => allTabs.filter(tab => !tab.feature || hasFeature(tab.feature)),
+    [hasFeature]
+  );
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -278,7 +288,8 @@ export default function HomeScreen() {
     }
   };
 
-  const quickActions = [
+  // Quick actions with feature flags
+  const allQuickActions = [
     {
       id: "mood",
       title: "Track Mood",
@@ -287,6 +298,7 @@ export default function HomeScreen() {
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/mood-tracking"),
+      feature: "mood_tracking",
     },
     {
       id: "journal",
@@ -296,6 +308,7 @@ export default function HomeScreen() {
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/journal"),
+      feature: null, // Not part of feature control
     },
     {
       id: "resources",
@@ -305,6 +318,7 @@ export default function HomeScreen() {
       color: "#EDE7EC",
       borderColor: "#EDE7EC",
       onPress: () => router.push("/resources"),
+      feature: "resources",
     },
     {
       id: "crisis",
@@ -314,8 +328,15 @@ export default function HomeScreen() {
       color: "#EDE7EC",
       borderColor: "#bab5b9ff",
       onPress: () => router.push("/crisis-support"),
+      feature: "crisis_support",
     },
   ];
+
+  // Filter quick actions based on feature access
+  const quickActions = useMemo(
+    () => allQuickActions.filter(action => !action.feature || hasFeature(action.feature)),
+    [hasFeature]
+  );
 
   /**
    * Check if user needs to complete assessment

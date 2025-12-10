@@ -26,9 +26,10 @@ import { useTheme } from "../../../../contexts/ThemeContext";
 import activityApi from "../../../../utils/activityApi";
 import OptimizedImage from "../../../../components/OptimizedImage";
 import StatusModal from "../../../../components/StatusModal";
-import { useConvex, useQuery } from "convex/react";
+import { useConvex, useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { computeCoreProfileCompletion } from "../../../../utils/profileCompletion";
+import { useBottomNavTabs } from "../../../../utils/hooks/useBottomNavTabs";
 
 const IS_TEST_ENV = process.env.NODE_ENV === 'test';
 
@@ -73,6 +74,7 @@ export default function ProfileScreen() {
     api.profiles.getFullProfile as any,
     user?.id ? { clerkId: user.id } : (undefined as any)
   ) as any;
+  const recordLogoutMutation = useMutation(api.activities.recordLogout);
 
   // Week range for activity summary
   const { weekStartISO, weekEndISO } = useMemo(() => {
@@ -141,13 +143,7 @@ export default function ProfileScreen() {
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setModalConfig({ type, title, message });
@@ -363,7 +359,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     if (!user) {
-      router.navigate("/(auth)/login");
+      router.replace("/(auth)/login");
       return;
     }
 
@@ -371,17 +367,14 @@ export default function ProfileScreen() {
       setIsLoggingOut(true);
       console.log('Signout initiated...');
       
-      // Get current user info before signing out
-      const clerkUserId = user.id;
-    
-      // Record logout activity
-      if (clerkUserId) {
+      // Record logout activity using Convex
+      if (user.id) {
         try {
-          await activityApi.recordLogout(clerkUserId);
+          await recordLogoutMutation({ userId: user.id });
           console.log('Logout activity recorded');
         } catch (dbError) {
-          console.error('Failed to record logout activity:', dbError);
-          // Continue with logout even if tracking fails
+          // Non-critical: Continue with logout even if tracking fails
+          console.warn('Could not record logout activity (non-critical):', dbError?.message || dbError);
         }
       }
     
@@ -392,13 +385,9 @@ export default function ProfileScreen() {
         await signOut();
         console.log('Clerk signout successful');
       }
-    
-      showModal('success', 'Signed Out', 'You have been successfully signed out.');
-      
-      // Navigate after a brief delay to show success message
-      setTimeout(() => {
-        router.navigate("/(auth)/login");
-      }, 1500);
+
+      // Use replace instead of navigate to clear navigation stack
+      router.replace("/(auth)/login");
     
     } catch (error) {
       console.error("Signout error:", error);

@@ -58,6 +58,7 @@ import CurvedBackground from "../../../components/CurvedBackground";
 import { AppHeader } from "../../../components/AppHeader";
 import StatusModal from "../../../components/StatusModal";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 import { useQuery, useAction, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
@@ -187,13 +188,7 @@ export default function ResourcesScreen() {
    * Bottom navigation tabs configuration
    * Provides navigation between main app sections
    */
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   /**
    * Show modal with specified configuration

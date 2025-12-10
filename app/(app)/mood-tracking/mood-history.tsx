@@ -18,6 +18,7 @@ import StatusModal from "../../../components/StatusModal";
 import { AppHeader } from "../../../components/AppHeader";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 const LIMIT = 40;
 
@@ -29,14 +30,6 @@ interface MoodEntry {
   notes?: string;
   created_at: string; // ISO date
 }
-
-const tabs = [
-  { route: "/(tabs)/home", label: "Home", icon: "home", id: "home", name: "Home" },
-  { route: "/(tabs)/community-forum", label: "Forum", icon: "people", id: "community-forum", name: "Forum" },
-  { route: "/(tabs)/appointments", label: "Appointments", icon: "calendar", id: "appointments", name: "Appointments" },
-  { route: "/(tabs)/messages", label: "Messages", icon: "chatbubbles", id: "messages", name: "Messages" },
-  { route: "/(tabs)/profile", label: "Profile", icon: "person", id: "profile", name: "Profile" },
-];
 
 const truncate = (v?: string, max = 120) => {
   if (!v) return "";
@@ -195,6 +188,9 @@ const MoodHistoryScreen: React.FC = () => {
   const { theme } = useTheme();
   const { user } = useUser();
   const userId = user?.id;
+
+  // Navigation tabs configuration - moved inside component
+  const tabs = useBottomNavTabs();
 
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0); // simple pagination

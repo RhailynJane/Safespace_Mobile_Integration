@@ -68,7 +68,7 @@ export const getUserAppointments = query({
 	handler: async (ctx, { userId, includeStatus, limit }) => {
 		let appointments = await ctx.db
 			.query("appointments")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.take(limit ?? 100);
 
 		// Filter by status if provided
@@ -107,10 +107,11 @@ export const getUpcomingAppointments = query({
 		console.log(`🔍 getUpcomingAppointments - Today in MST: ${today}, userId: ${userId}`);
 		
 		// Get appointments with upcoming statuses (today or future dates)
+		// Note: Query by appointmentDate (not date) since that's what's in the index
 		const appointments = await ctx.db
 			.query("appointments")
 			.withIndex("by_user_and_date", (q) => 
-				q.eq("userId", userId).gte("date", today)
+				q.eq("userId", userId).gte("appointmentDate", today)
 			)
 			.filter((q) => 
 				q.or(
@@ -122,13 +123,13 @@ export const getUpcomingAppointments = query({
 
 		// Sort by date then time (ascending)
 		const sorted = appointments.sort((a, b) => {
-			const dateCompare = a.date.localeCompare(b.date);
+			const dateCompare = (a.appointmentDate || a.date || '').localeCompare(b.appointmentDate || b.date || '');
 			if (dateCompare !== 0) return dateCompare;
-			return a.time.localeCompare(b.time);
+			return (a.appointmentTime || a.time || '').localeCompare(b.appointmentTime || b.time || '');
 		});
 
 		console.log(`📊 getUpcomingAppointments - Found ${sorted.length} appointments`);
-		sorted.forEach(apt => console.log(`  - ${apt.date} ${apt.time} (${apt.status})`));
+		sorted.forEach(apt => console.log(`  - ${apt.appointmentDate || apt.date} ${apt.appointmentTime || apt.time} (${apt.status})`));
 
 		return sorted.slice(0, limit).map(toClient);
 	},
@@ -153,17 +154,18 @@ export const getPastAppointments = query({
 		const today = `${year}-${month}-${day}`; // YYYY-MM-DD in Mountain Time
 		
 		// Get appointments with past dates (before today)
+		// Note: Query by appointmentDate (not date) since that's what's in the index
 		const pastDates = await ctx.db
 			.query("appointments")
 			.withIndex("by_user_and_date", (q) => 
-				q.eq("userId", userId).lt("date", today)
+				q.eq("userId", userId).lt("appointmentDate", today)
 			)
 			.collect();
 		
 		// Get appointments with completed/cancelled/no_show status (regardless of date)
 		const completedStatuses = await ctx.db
 			.query("appointments")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.filter((q) => 
 				q.or(
 					q.eq(q.field("status"), "completed"),
@@ -181,9 +183,9 @@ export const getPastAppointments = query({
 		// Sort by date then time (descending)
 		const sorted = unique
 			.sort((a, b) => {
-				const dateCompare = b.date.localeCompare(a.date);
+				const dateCompare = (b.appointmentDate || b.date || '').localeCompare(a.appointmentDate || a.date || '');
 				if (dateCompare !== 0) return dateCompare;
-				return b.time.localeCompare(a.time);
+				return (b.appointmentTime || b.time || '').localeCompare(a.appointmentTime || a.time || '');
 			})
 			.slice(0, limit);
 
@@ -199,7 +201,7 @@ export const getAppointmentStats = query({
 	handler: async (ctx, { userId }) => {
 		const appointments = await ctx.db
 			.query("appointments")
-			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
 			.collect();
 
 		const today = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
@@ -228,14 +230,23 @@ export const getAppointmentStats = query({
 });
 
 /**
- * Get single appointment by ID
+ * Get single appointment by ID (accepts both Convex IDs and string IDs)
  */
 export const getAppointment = query({
-	args: { appointmentId: v.id("appointments") },
+	args: { appointmentId: v.optional(v.string()) },
 	handler: async (ctx, { appointmentId }) => {
-		const appointment = await ctx.db.get(appointmentId);
-		if (!appointment) return null;
-		return toClient(appointment);
+		if (!appointmentId || appointmentId === "undefined") return null;
+		try {
+			// Try to fetch using the ID directly - Convex handles both _id and string ID formats
+			const appointment = await ctx.db.get(appointmentId as any);
+			if (appointment) {
+				return toClient(appointment);
+			}
+			return null;
+		} catch (e) {
+			console.log("Could not fetch appointment by ID:", appointmentId, e);
+			return null;
+		}
 	},
 });
 
@@ -244,9 +255,9 @@ export const getAppointment = query({
  */
 export const createAppointment = mutation({
 	args: {
-		userId: v.string(),
+		userId: v.string(), // Client's Clerk ID
 		supportWorker: v.string(),
-		supportWorkerId: v.optional(v.number()),
+		supportWorkerId: v.optional(v.string()), // Now Clerk ID string (for web sync)
 		date: v.string(), // YYYY-MM-DD
 		time: v.string(), // HH:mm
 		duration: v.optional(v.number()), // Duration in minutes
@@ -255,23 +266,88 @@ export const createAppointment = mutation({
 		meetingLink: v.optional(v.string()),
 		specialization: v.optional(v.string()),
 		avatarUrl: v.optional(v.string()),
+		orgId: v.optional(v.string()), // Organization ID for sync with web
 	},
 	handler: async (ctx, args) => {
 		const now = Date.now();
 		
+		// Resolve support worker Clerk ID if not provided
+		let supportWorkerClerkId = args.supportWorkerId;
+		let supportWorkerAvatar = args.avatarUrl;
+		
+		if (!supportWorkerClerkId) {
+			// Look up support worker by name
+			const workers = await ctx.db
+				.query("users")
+				.withIndex("by_firstName", (q: any) => q.eq("firstName", args.supportWorker))
+				.collect();
+			if (workers.length > 0) {
+				supportWorkerClerkId = workers[0].clerkId;
+				supportWorkerAvatar = supportWorkerAvatar || workers[0].profileImageUrl;
+			}
+		}
+
+		// Check support worker availability if we have their record
+		if (supportWorkerClerkId) {
+			try {
+				const worker = await ctx.db
+					.query("users")
+					.withIndex("by_clerkId", (q: any) => q.eq("clerkId", supportWorkerClerkId))
+					.first();
+				
+				if (worker && worker.availability) {
+					const appointmentDate = new Date(args.date);
+					const dayOfWeek = appointmentDate.toLocaleDateString('en-US', { weekday: 'lowercase' });
+					const daySlot = worker.availability.find((slot: any) => slot.day.toLowerCase() === dayOfWeek);
+					
+					if (!daySlot?.enabled) {
+						console.warn(`Support worker ${supportWorkerClerkId} is not available on ${dayOfWeek}`);
+						// Could throw error or set status to "pending_approval" based on policy
+					}
+				}
+			} catch (e) {
+				console.log("Could not check worker availability:", e);
+			}
+		}
+
+		// Prevent duplicate bookings for the same client at the same date/time
+		const sameDay = await ctx.db
+			.query("appointments")
+			.withIndex("by_user_and_date", (q: any) => q.eq("userId", args.userId).eq("appointmentDate", args.date))
+			.collect();
+
+		const conflict = sameDay.find((a: any) =>
+			(a.appointmentTime || a.time) === args.time &&
+			a.status !== "cancelled" &&
+			a.status !== "completed"
+		);
+
+		if (conflict) {
+			// Keep error generic for clients
+			throw new Error("This time slot is unavailable. Please choose another.");
+		}
+		
 		const appointmentId = await ctx.db.insert("appointments", {
+			// Client linking - store both userId and for web compatibility
 			userId: args.userId,
+			clientId: args.userId, // Also store as clientId for web compatibility
+			// Support worker linking
 			supportWorker: args.supportWorker,
-			supportWorkerId: args.supportWorkerId,
+			supportWorkerId: supportWorkerClerkId,
+			avatarUrl: supportWorkerAvatar,
+			// Date/time in both formats for cross-platform compatibility
 			date: args.date,
 			time: args.time,
+			appointmentDate: args.date,
+			appointmentTime: args.time,
+			// Other details
 			duration: args.duration || 60,
 			type: args.type,
 			status: "scheduled",
 			notes: args.notes,
 			meetingLink: args.meetingLink,
 			specialization: args.specialization,
-			avatarUrl: args.avatarUrl,
+			orgId: args.orgId, // For web sync
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -284,26 +360,26 @@ export const createAppointment = mutation({
 			createdAt: now,
 		});
 
-			// Create notification if user settings allow
-			try {
-				const settings = await ctx.db
-					.query("settings")
-					.withIndex("by_user", (q: any) => q.eq("userId", args.userId))
-					.first();
-				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
-				if (enabled) {
-					await ctx.db.insert("notifications", {
-						userId: args.userId,
-						type: "appointment",
-						title: "Appointment Scheduled",
-						message: `${args.supportWorker} on ${args.date} at ${args.time}`,
-						isRead: false,
-						createdAt: Date.now(),
-					});
-				}
-			} catch (_e) {
-				// non-blocking
+		// Create notification if user settings allow
+		try {
+			const settings = await ctx.db
+				.query("settings")
+				.withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
+				.first();
+			const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+			if (enabled) {
+				await ctx.db.insert("notifications", {
+					userId: args.userId,
+					type: "appointment",
+					title: "Appointment Scheduled",
+					message: `${args.supportWorker} on ${args.date} at ${args.time}`,
+					isRead: false,
+					createdAt: Date.now(),
+				});
 			}
+		} catch (_e) {
+			// non-blocking
+		}
 
 		return { id: appointmentId };
 	},
@@ -314,50 +390,58 @@ export const createAppointment = mutation({
  */
 export const rescheduleAppointment = mutation({
 	args: {
-		appointmentId: v.id("appointments"),
+		appointmentId: v.string(),
 		newDate: v.string(),
 		newTime: v.string(),
 		reason: v.optional(v.string()),
 	},
 	handler: async (ctx, { appointmentId, newDate, newTime, reason }) => {
-		const appointment = await ctx.db.get(appointmentId);
-		if (!appointment) {
-			throw new Error("Appointment not found");
-		}
-		
-		const noteUpdate = reason 
-			? `${appointment.notes || ''}\n\nRescheduled: ${reason}`.trim()
-			: appointment.notes;
-		
-		await ctx.db.patch(appointmentId, {
-			date: newDate,
-			time: newTime,
-			notes: noteUpdate,
-			updatedAt: Date.now(),
-		});
-
-			// Notify user about reschedule if enabled
-			try {
-				const settings = await ctx.db
-					.query("settings")
-					.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
-					.first();
-				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
-				if (enabled) {
-					await ctx.db.insert("notifications", {
-						userId: appointment.userId,
-						type: "appointment",
-						title: "Appointment Rescheduled",
-						message: `New time: ${newDate} ${newTime}`,
-						isRead: false,
-						createdAt: Date.now(),
-					});
-				}
-			} catch (_e) {
-				// non-blocking
+		try {
+			const appointment = await ctx.db.get(appointmentId as any);
+			if (!appointment) {
+				throw new Error("Appointment not found");
 			}
-		
-		return { success: true };
+			
+			const existingNotes = (appointment as any).notes || '';
+			const noteUpdate = reason 
+				? `${existingNotes}\n\nRescheduled: ${reason}`.trim()
+				: existingNotes;
+			
+			await ctx.db.patch(appointmentId as any, {
+				date: newDate,
+				time: newTime,
+				appointmentDate: newDate,
+				appointmentTime: newTime,
+				notes: noteUpdate,
+				updatedAt: Date.now(),
+			});
+
+				// Notify user about reschedule if enabled
+				try {
+					const settings = await ctx.db
+						.query("settings")
+						.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
+						.first();
+					const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
+					if (enabled) {
+						await ctx.db.insert("notifications", {
+							userId: appointment.userId,
+							type: "appointment",
+							title: "Appointment Rescheduled",
+							message: `New time: ${newDate} ${newTime}`,
+							isRead: false,
+							createdAt: Date.now(),
+						});
+					}
+				} catch (_e) {
+					// non-blocking
+				}
+			
+			return { success: true };
+		} catch (err) {
+			console.error('[rescheduleAppointment] Error:', err);
+			throw err;
+		}
 	},
 });
 
@@ -366,26 +450,27 @@ export const rescheduleAppointment = mutation({
  */
 export const cancelAppointment = mutation({
 	args: {
-		appointmentId: v.id("appointments"),
+		appointmentId: v.string(),
 		cancellationReason: v.optional(v.string()),
 	},
 	handler: async (ctx, { appointmentId, cancellationReason }) => {
-		const appointment = await ctx.db.get(appointmentId);
-		if (!appointment) {
-			throw new Error("Appointment not found");
-		}
-		
-		await ctx.db.patch(appointmentId, {
-			status: "cancelled",
-			cancellationReason,
-			updatedAt: Date.now(),
-		});
+		try {
+			const appointment = await ctx.db.get(appointmentId as any);
+			if (!appointment) {
+				throw new Error("Appointment not found");
+			}
+			
+			await ctx.db.patch(appointmentId as any, {
+				status: "cancelled",
+				cancellationReason,
+				updatedAt: Date.now(),
+			});
 
-			// Notify user about cancellation if enabled
-			try {
-				const settings = await ctx.db
-					.query("settings")
-					.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+				// Notify user about cancellation if enabled
+				try {
+					const settings = await ctx.db
+						.query("settings")
+						.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
 					.first();
 				const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
 				if (enabled) {
@@ -402,7 +487,11 @@ export const cancelAppointment = mutation({
 				// non-blocking
 			}
 		
-		return { success: true };
+			return { success: true };
+		} catch (err) {
+			console.error('[cancelAppointment] Error:', err);
+			throw err;
+		}
 	},
 });
 
@@ -426,7 +515,7 @@ export const updateAppointmentStatus = mutation({
 				if (appointment) {
 					const settings = await ctx.db
 						.query("settings")
-						.withIndex("by_user", (q: any) => q.eq("userId", appointment.userId))
+						.withIndex("by_userId", (q: any) => q.eq("userId", appointment.userId))
 						.first();
 					const enabled = settings?.notificationsEnabled !== false && settings?.notifAppointments !== false;
 					if (enabled && (status === 'confirmed' || status === 'completed')) {

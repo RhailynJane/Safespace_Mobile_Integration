@@ -31,9 +31,8 @@
         "buildConfiguration": "Release"
       },
       "env": {
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Y2F1c2FsLWJyZWFtLTYwLmNsZXJrLmFjY291bnRzLmRldiQ",
-        "EXPO_PUBLIC_CONVEX_URL": "https://formal-pigeon-483.convex.cloud",
-        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDFNq8nwf-ovbRkkpyPGv-pVa4CWYcA_SQ"
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_bGl2ZS1zYXdmbHktMTcuY2xlcmsuYWNjb3VudHMuZGV2JA",
+        "EXPO_PUBLIC_CONVEX_URL": "https://wandering-partridge-43.convex.cloud",
       }
     }
   },

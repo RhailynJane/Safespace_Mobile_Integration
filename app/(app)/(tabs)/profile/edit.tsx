@@ -35,6 +35,7 @@ import OptimizedImage from "../../../../components/OptimizedImage";
 import { useConvex, useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { computeCoreProfileCompletion } from "../../../../utils/profileCompletion";
+import { useBottomNavTabs } from "../../../../utils/hooks/useBottomNavTabs";
 
 // Gender options for the form
 const GENDER_OPTIONS = [
@@ -212,13 +213,7 @@ export default function EditProfileScreen() {
     dateCameToCanada: "",
   });
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);

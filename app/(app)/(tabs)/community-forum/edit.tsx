@@ -62,7 +62,7 @@ import { AppHeader } from "../../../../components/AppHeader";
 import BottomNavigation from "../../../../components/BottomNavigation";
 import { useTheme } from "../../../../contexts/ThemeContext";
 import StatusModal from "../../../../components/StatusModal";
-// Removed legacy REST + hybrid Convex hook usage; now using direct Convex client via provider
+import { useBottomNavTabs } from "../../../../utils/hooks/useBottomNavTabs";
 
 // Available categories for post organization and filtering
 const CATEGORIES = [
@@ -311,13 +311,7 @@ export default function EditPostScreen() {
   };
 
   // Bottom navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   // State for images and mood
   const [selectedImages, setSelectedImages] = useState<string[]>([]);

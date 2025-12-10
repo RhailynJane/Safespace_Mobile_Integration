@@ -8,7 +8,7 @@ export const getSettings = query({
   handler: async (ctx, { clerkId }) => {
     const row = await ctx.db
       .query("settings")
-      .withIndex("by_user", (q: any) => q.eq("userId", clerkId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", clerkId))
       .first();
     return row ?? null;
   },
@@ -44,7 +44,7 @@ export const upsertSettings = mutation({
     const now = Date.now();
     const existing = await ctx.db
       .query("settings")
-      .withIndex("by_user", (q: any) => q.eq("userId", clerkId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", clerkId))
       .first();
     if (existing) {
       await ctx.db.patch(existing._id, { ...settings, updatedAt: now });

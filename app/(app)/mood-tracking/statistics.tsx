@@ -26,6 +26,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useAuth } from "@clerk/clerk-expo";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 const { width } = Dimensions.get("window");
 
@@ -82,13 +83,7 @@ const StatisticsScreen: React.FC = () => {
   });
 
   // Navigation tabs
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);

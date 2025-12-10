@@ -71,21 +71,28 @@ export async function syncUserToConvex(
   }
 
   try {
+    console.log('📤 Syncing user to Convex:', {
+      clerkUserId: options.clerkUserId,
+      email: options.email,
+      firstName: options.firstName,
+      lastName: options.lastName,
+    });
+    
     // Dynamic import to avoid compile-time errors before convex dev runs
     const { api } = await import("../convex/_generated/api");
     
-    await client.mutation(api.auth.syncUser, {
+    const result = await client.mutation(api.auth.syncUser, {
       email: options.email,
       firstName: options.firstName,
       lastName: options.lastName,
       imageUrl: options.imageUrl,
     });
 
-    console.log('✅ User synced to Convex successfully');
+    console.log('✅ User synced to Convex successfully:', result);
     return true;
   } catch (error) {
-    console.warn('⚠️ Failed to sync user to Convex (non-blocking):', error);
-    return false;
+    console.error('❌ Failed to sync user to Convex:', error);
+    throw error; // Re-throw to surface the error
   }
 }
 
@@ -125,15 +132,22 @@ export async function completeConvexAuthFlow(
 
   const client = createConvexClient(getToken);
   if (!client) {
-    console.log('⚠️ Could not create Convex client');
-    return;
+    console.error('❌ Could not create Convex client');
+    throw new Error('Failed to create Convex client');
   }
+
+  console.log('📡 Starting Convex auth flow for user:', options.clerkUserId);
 
   // Give Clerk a moment to fully initialize the session
   await new Promise(resolve => setTimeout(resolve, 500));
 
   // Sync user data
-  await syncUserToConvex(client, options);
+  try {
+    await syncUserToConvex(client, options);
+  } catch (error) {
+    console.error('❌ Failed to sync user to Convex:', error);
+    throw error;
+  }
 
   // Optionally sync the organization to Convex users table
   if (options.orgId) {
@@ -147,7 +161,11 @@ export async function completeConvexAuthFlow(
   }
 
   // Send initial presence heartbeat
-  await sendConvexHeartbeat(client, 'online');
+  try {
+    await sendConvexHeartbeat(client, 'online');
+  } catch (e) {
+    console.warn('⚠️ Failed to send heartbeat (non-blocking):', e);
+  }
 
-  console.log('✅ Convex auth flow completed');
+  console.log('✅ Convex auth flow completed for user:', options.clerkUserId);
 }

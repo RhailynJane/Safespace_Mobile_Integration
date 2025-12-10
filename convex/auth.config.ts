@@ -8,7 +8,7 @@ import type { AuthConfig } from "convex/server";
 const config: AuthConfig = {
   providers: [
     {
-      domain: "https://causal-bream-60.clerk.accounts.dev",
+      domain: "https://live-sawfly-17.clerk.accounts.dev",
       applicationID: "convex",
     },
   ],

@@ -24,6 +24,7 @@ import type * as journal from "../journal.js";
 import type * as migrations_syncSettingsToTable from "../migrations/syncSettingsToTable.js";
 import type * as moods from "../moods.js";
 import type * as notifications from "../notifications.js";
+import type * as organizations from "../organizations.js";
 import type * as posts from "../posts.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
@@ -40,14 +41,6 @@ import type {
   FunctionReference,
 } from "convex/server";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
   announcementActions: typeof announcementActions;
@@ -65,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/syncSettingsToTable": typeof migrations_syncSettingsToTable;
   moods: typeof moods;
   notifications: typeof notifications;
+  organizations: typeof organizations;
   posts: typeof posts;
   presence: typeof presence;
   profiles: typeof profiles;
@@ -75,14 +69,30 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   videoCallSessions: typeof videoCallSessions;
 }>;
-declare const fullApiWithMounts: typeof fullApi;
 
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "internal">
 >;
 

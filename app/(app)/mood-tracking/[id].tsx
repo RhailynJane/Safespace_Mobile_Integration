@@ -11,6 +11,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +23,7 @@ import BottomNavigation from "../../../components/BottomNavigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import StatusModal from "../../../components/StatusModal";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 interface MoodEntry {
   id: string;
@@ -38,6 +40,11 @@ const MoodEntryDetailsScreen: React.FC = () => {
   const { user } = useUser();
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = user?.id;
+
+  console.log('[mood-detail] Screen loaded with ID:', id, 'userId:', userId);
+
+  // Navigation tabs configuration - moved inside component
+  const tabs = useBottomNavTabs();
 
   const [activeTab, setActiveTab] = useState("home");
   const [isEditing, setIsEditing] = useState(false);
@@ -57,15 +64,6 @@ const MoodEntryDetailsScreen: React.FC = () => {
   const entry = history?.moods.find((m) => m.id === id);
   const updateMood = useMutation(api.moods.updateMood);
   const deleteMood = useMutation(api.moods.deleteMood);
-
-  // Navigation tabs
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -142,6 +140,25 @@ const MoodEntryDetailsScreen: React.FC = () => {
   };
 
   if (!entry) {
+    // Show loading state while history is being fetched
+    if (history === undefined) {
+      return (
+        <CurvedBackground>
+          <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+            <AppHeader title="Mood Entry" showBack={true} />
+            <View style={styles.centerContent}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={[styles.notFoundText, { color: theme.colors.text }]}>
+                Loading mood entry...
+              </Text>
+            </View>
+            <BottomNavigation tabs={tabs} activeTab={activeTab} onTabPress={handleTabPress} />
+          </SafeAreaView>
+        </CurvedBackground>
+      );
+    }
+
+    // Show not found error after history has loaded
     return (
       <CurvedBackground>
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>

@@ -11,6 +11,7 @@ import { syncUserWithDatabase } from "../utils/userSync";
 import { ActivityIndicator, View, LogBox, Text } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeProvider } from "../contexts/ThemeContext";
+import { FeatureAccessProvider } from "../contexts/FeatureAccessContext";
 import * as Notifications from "expo-notifications";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -364,7 +365,9 @@ export default function RootLayout() {
       <ConvexProviderWithClerk client={convexClient!} useAuth={useAuth}>
         <ConvexUserSync />
         <ConvexHeartbeat />
-        {children}
+        <FeatureAccessProvider>
+          {children}
+        </FeatureAccessProvider>
       </ConvexProviderWithClerk>
     );
   }

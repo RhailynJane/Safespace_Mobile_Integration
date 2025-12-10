@@ -29,6 +29,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 interface CrisisResource {
   id: string;
@@ -54,7 +55,7 @@ const { width } = Dimensions.get("window");
  * Emergency support screen providing immediate crisis resources including:
  * - Emergency contact numbers (911, crisis hotlines) with direct calling
  * - Immediate coping strategies
- * - Grounding techniques (5-4-3-2-1 method)
+ * - Grounding techniques
  * - Quick access to professional help
  * Features an elegant curved background and urgent, clear interface design.
  */
@@ -76,15 +77,8 @@ export default function CrisisScreen() {
 
   // Create styles dynamically based on text size
   const styles = useMemo(() => createStyles(scaledFontSize), [scaledFontSize]);
-
-  // Bottom navigation tabs configuration
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  // Bottom navigation tabs with feature access filtering
+  const tabs = useBottomNavTabs();
 
   const showModal = (type: 'success' | 'error' | 'info', title: string, message: string) => {
     setModalConfig({ type, title, message });
@@ -155,7 +149,7 @@ export default function CrisisScreen() {
     },
     {
       id: 'distress-centre', slug: 'distress-centre', title: 'Distress Centre', subtitle: 'Online crisis support',
-      type: 'website', value: 'https://teams.microsoft.com/l/message/19:b78bfd7c374a4077a73ae2dde4a6ee5d@thread.v2/1764983249510?context=%7B%22contextType%22%3A%22chat%22%7D', icon: 'globe', color: '#1565C0', region: 'national', country: 'CA', priority: 'high', sort_order: 3, active: true
+      type: 'website', value: 'https://distresscentre.com/24-hour-crisis-support/', icon: 'globe', color: '#1565C0', region: 'national', country: 'CA', priority: 'high', sort_order: 3, active: true
     },
     {
       id: 'kids-help', slug: 'kids-help-phone', title: 'Kids Help Phone (1-800-668-6868)', subtitle: 'Youth support 24/7',
@@ -427,65 +421,6 @@ export default function CrisisScreen() {
                 </View>
                 <Text style={[styles.strategyText, { color: theme.colors.text }]}>Use grounding techniques</Text>
               </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Grounding Technique Section */}
-          <View style={[styles.groundingSection, { 
-            backgroundColor: theme.isDark ? '#1B5E20' : '#E8F5E9' 
-          }]}>
-            <View style={styles.groundingHeader}>
-              <Ionicons name="compass" size={24} color={theme.isDark ? '#81C784' : '#2E7D32'} />
-              <Text style={[styles.groundingTitle, { color: theme.isDark ? '#81C784' : '#2E7D32' }]}>
-                5-4-3-2-1 Grounding Technique
-              </Text>
-            </View>
-            <Text style={[styles.groundingDescription, { 
-              color: theme.isDark ? '#E8F5E9' : '#5D4037' 
-            }]}>
-              When feeling overwhelmed, use your senses to ground yourself in the present moment.
-            </Text>
-            <View style={styles.groundingSteps}>
-              <View style={styles.groundingStep}>
-                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
-                  <Text style={styles.stepNumberText}>5</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
-                  things you can see around you
-                </Text>
-              </View>
-              <View style={styles.groundingStep}>
-                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
-                  <Text style={styles.stepNumberText}>4</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
-                  things you can touch and feel
-                </Text>
-              </View>
-              <View style={styles.groundingStep}>
-                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
-                  <Text style={styles.stepNumberText}>3</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
-                  things you can hear right now
-                </Text>
-              </View>
-              <View style={styles.groundingStep}>
-                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
-                  <Text style={styles.stepNumberText}>2</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
-                  things you can smell nearby
-                </Text>
-              </View>
-              <View style={styles.groundingStep}>
-                <View style={[styles.stepNumber, { backgroundColor: theme.isDark ? '#4CAF50' : '#2E7D32' }]}>
-                  <Text style={styles.stepNumberText}>1</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.isDark ? '#E8F5E9' : '#5D4037' }]}>
-                  thing you can taste or would like to taste
-                </Text>
-              </View>
             </View>
           </View>
 

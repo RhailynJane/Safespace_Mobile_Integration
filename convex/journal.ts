@@ -29,7 +29,7 @@ export const listRecent = query({
     const userId = resolveUserId(args.clerkUserId, identity);
     if (!userId) return [] as any[];
 
-    let q = ctx.db.query("journalEntries").withIndex("by_user", (qq: any) => qq.eq("clerkId", userId));
+    let q = ctx.db.query("journalEntries").withIndex("by_userId", (qq: any) => qq.eq("clerkId", userId));
     // Collect and sort desc by createdAt
     const all = await q.collect();
     all.sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
@@ -153,7 +153,7 @@ export const getHistory = query({
 
     let entries = await ctx.db
       .query("journalEntries")
-      .withIndex("by_user", (q: any) => q.eq("clerkId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("clerkId", userId))
       .collect();
 
     // Filter by date range if provided (using createdAt numeric timestamps)

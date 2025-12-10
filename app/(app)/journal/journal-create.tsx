@@ -26,6 +26,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { LinearGradient } from "expo-linear-gradient";
 import OptimizedImage from "../../../components/OptimizedImage";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 type EmotionType = "ecstatic" | "happy" | "content" | "neutral" | "displeased" | "frustrated" | "annoyed" | "angry" | "furious";
 type CreateStep = "create" | "success";
@@ -78,6 +79,7 @@ export default function JournalCreateScreen() {
   const [currentStep, setCurrentStep] = useState<CreateStep>("create");
   interface JournalTemplate { id: number; name: string; description: string; prompts: string[]; icon: string; }
   const [templates, setTemplates] = useState<JournalTemplate[]>([]);
+  const tabs = useBottomNavTabs();
   const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [journalData, setJournalData] = useState<JournalData>({
     title: "",

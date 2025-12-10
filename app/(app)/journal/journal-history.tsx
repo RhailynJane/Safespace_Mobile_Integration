@@ -26,16 +26,9 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import StatusModal from "../../../components/StatusModal";
 import { LinearGradient } from "expo-linear-gradient";
 import OptimizedImage from "../../../components/OptimizedImage";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 type FilterType = "all" | "week" | "month" | "custom";
-
-const tabs = [
-  { id: "home", name: "Home", icon: "home" },
-  { id: "community-forum", name: "Community", icon: "people" },
-  { id: "appointments", name: "Appointments", icon: "calendar" },
-  { id: "messages", name: "Messages", icon: "chatbubbles" },
-  { id: "profile", name: "Profile", icon: "person" },
-];
 
 interface JournalEntry {
   id: string;
@@ -53,6 +46,9 @@ interface JournalEntry {
 export default function JournalHistoryScreen() {
   const { theme, scaledFontSize } = useTheme();
   const { user } = useUser();
+
+  // Navigation tabs configuration - moved inside component
+  const tabs = useBottomNavTabs();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);

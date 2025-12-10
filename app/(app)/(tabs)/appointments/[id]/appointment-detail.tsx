@@ -98,11 +98,15 @@ const showStatusModal = useCallback((type: 'success' | 'error' | 'info', title: 
 }, []);
 
 const fetchAppointment = useCallback(async () => {
-  if (!id) return;
+  if (!id || id === "undefined") {
+    console.warn('⚠️ Appointment ID is missing or undefined:', id);
+    showStatusModal('error', 'Invalid ID', 'Appointment ID is missing. Please go back and try again.');
+    return;
+  }
   try {
     setLoading(true);
-    console.log('📅 Fetching single appointment via Convex. ID:', id);
-    const result = await convex.query(api.appointments.getAppointment, { appointmentId: id as any });
+    console.log('📅 Fetching single appointment via Convex. ID:', id, 'Type:', typeof id);
+    const result = await convex.query(api.appointments.getAppointment, { appointmentId: String(id) });
     if (!result) {
       showStatusModal('error', 'Not Found', 'Appointment not found.');
       setAppointment(null);
@@ -120,7 +124,10 @@ const fetchAppointment = useCallback(async () => {
     }
     // Adapt status labels via utility
     const mappedStatus = mapAppointmentStatus(result.status as any, result.date, result.time);
-    const readableDate = new Date(result.date).toLocaleDateString('en-US', {
+    // Parse the date string (YYYY-MM-DD) without timezone conversion
+    const [year, month, day] = result.date.split('-').map(Number);
+    const localDate = new Date(year, month - 1, day);
+    const readableDate = localDate.toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     });
     setAppointment({
@@ -247,11 +254,11 @@ const fetchAppointment = useCallback(async () => {
     const now = new Date();
     const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
     console.log('Join restriction check:', { minutesUntilAppointment, aptDateTime: aptDateTime.toISOString(), now: now.toISOString() });
-    if (minutesUntilAppointment > 10) {
+    if (minutesUntilAppointment > 60) {
       // Format date/time as MM-DD-YYYY HH:SS
       const formatted = `${String(aptDateTime.getMonth()+1).padStart(2,'0')}-${String(aptDateTime.getDate()).padStart(2,'0')}-${aptDateTime.getFullYear()} ${String(aptDateTime.getHours()).padStart(2,'0')}:${String(aptDateTime.getMinutes()).padStart(2,'0')}`;
       console.log('Join too early, showing restriction message');
-      setJoinRestrictionMsg(`The date is in ${formatted}. You can join 10 mins before the scheduled appt.`);
+      setJoinRestrictionMsg(`The date is in ${formatted}. You can join 1 hour before the scheduled appt.`);
       return;
     }
     setJoinRestrictionMsg(null);
@@ -541,7 +548,7 @@ const fetchAppointment = useCallback(async () => {
 
   return (
     <CurvedBackground>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <SafeAreaView edges={["top", "left", "right"]} style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <AppHeader title="Appointment Details" showBack={true} />
 
           <ScrollView 

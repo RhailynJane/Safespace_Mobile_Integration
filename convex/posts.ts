@@ -159,7 +159,7 @@ export const bookmarkedPosts = query({
     // Get user's bookmarks
     const bookmarks = await ctx.db
       .query("postBookmarks")
-      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
       .order("desc")
       .take(limit);
 
@@ -398,7 +398,7 @@ export const react = mutation({
       if (authorId && authorId !== userId) {
         const settings = await ctx.db
           .query("settings")
-          .withIndex("by_user", (q: any) => q.eq("userId", authorId))
+          .withIndex("by_userId", (q: any) => q.eq("userId", authorId))
           .first();
         const enabled = settings?.notificationsEnabled !== false && settings?.notifPostReactions !== false;
         if (enabled) {

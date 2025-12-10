@@ -70,7 +70,7 @@ export default function VideoCallScreen() {
     // Check if appointment is too early or in the future
     const joinCheck = canJoinMeeting(date, time);
     if (joinCheck === 'too-early') {
-      Alert.alert('Too Early', 'You can only join the meeting starting 10 minutes before the scheduled time.');
+      Alert.alert('Too Early', 'You can only join the meeting starting 1 hour before the scheduled time.');
       return;
     }
     if (joinCheck === 'too-late') {
@@ -110,7 +110,7 @@ export default function VideoCallScreen() {
   };
 
   // Determine if user can join the meeting
-  // Returns: 'allowed' | 'too-early' (>10 min before) | 'too-late' (significantly past, needs confirmation)
+  // Returns: 'allowed' | 'too-early' (>60 min before) | 'too-late' (significantly past, needs confirmation)
   const canJoinMeeting = (dateStr?: string, timeStr?: string): 'allowed' | 'too-early' | 'too-late' => {
     if (!dateStr || !timeStr) return 'allowed'; // No restrictions if date/time missing
     
@@ -122,13 +122,13 @@ export default function VideoCallScreen() {
       const now = new Date();
       const minutesUntilAppointment = (aptDateTime.getTime() - now.getTime()) / (1000 * 60);
       
-      // Too early: more than 10 minutes before scheduled time
-      if (minutesUntilAppointment > 10) return 'too-early';
+      // Too early: more than 60 minutes before scheduled time
+      if (minutesUntilAppointment > 60) return 'too-early';
       
       // Too late: more than 60 minutes after scheduled time (show confirmation)
       if (minutesUntilAppointment < -60) return 'too-late';
       
-      // Within acceptable range: 10 minutes before to 60 minutes after
+      // Within acceptable range: 60 minutes before to 60 minutes after
       return 'allowed';
     } catch {
       return 'allowed'; // On error, allow joining

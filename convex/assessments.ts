@@ -139,7 +139,7 @@ export const getAssessmentStats = query({
   handler: async (ctx, { userId }) => {
     const assessments = await ctx.db
       .query("assessments")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .collect();
     
     if (assessments.length === 0) {
@@ -213,7 +213,7 @@ export const submitAssessment = mutation({
     try {
       const settings = await ctx.db
         .query("settings")
-        .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+        .withIndex("by_userId", (q: any) => q.eq("userId", args.userId))
         .first();
       const enabled = settings?.notificationsEnabled !== false && settings?.notifSelfAssessment !== false;
       if (enabled) {
@@ -281,7 +281,7 @@ export const getUpcomingDueAssessments = query({
     
     const assessments = await ctx.db
       .query("assessments")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .filter((q) => 
         q.and(
           q.gte(q.field("nextDueDate"), now),

@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import CurvedBackground from "../../../components/CurvedBackground";
 import BottomNavigation from "../../../components/BottomNavigation";
 import { router } from "expo-router";
+import { useBottomNavTabs } from "../../../utils/hooks/useBottomNavTabs";
 
 const { width } = Dimensions.get("window");
 
@@ -59,18 +60,13 @@ const AnnouncementsScreen: React.FC = () => {
   const seed = useMutation(api.announcements.seedSampleAnnouncements);
   const clearAndReseed = useMutation(api.announcements.clearAndReseed);
   const syncOrg = useMutation(api.users.syncCurrentUserOrg);
-  const markRead = useMutation(api.announcements.markAsRead);
+  const markReadMutation = useMutation(api.announcements.markAsRead);
+
   const [seeded, setSeeded] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState("home");
 
-  const tabs = [
-    { id: "home", name: "Home", icon: "home" },
-    { id: "community-forum", name: "Community", icon: "people" },
-    { id: "appointments", name: "Appointments", icon: "calendar" },
-    { id: "messages", name: "Messages", icon: "chatbubbles" },
-    { id: "profile", name: "Profile", icon: "person" },
-  ];
+  const tabs = useBottomNavTabs();
 
   const handleTabPress = (tabId: string) => {
     setActiveTab(tabId);
@@ -105,11 +101,28 @@ const AnnouncementsScreen: React.FC = () => {
   }, [userId, orgId, data, announcements.length, seed, clearAndReseed, seeded]);
 
   const toggleExpand = useCallback((id: string, isRead: boolean) => {
+    console.log("🔵 [toggleExpand] Called with id:", id, "type:", typeof id, "isRead:", isRead);
+    
+    if (!id) {
+      console.error("❌ [toggleExpand] ID is falsy:", id);
+      return;
+    }
+    
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
     if (!isRead) {
-      markRead({ announcementId: id as any }).catch(() => {});
+      console.log("🔵 [toggleExpand] About to call markReadMutation");
+      const payload = { announcementId: String(id) };
+      console.log("🔵 [toggleExpand] Payload:", JSON.stringify(payload));
+      
+      try {
+        markReadMutation(payload).catch((err) => {
+          console.error("❌ Failed to mark announcement as read:", err?.message || err);
+        });
+      } catch (e) {
+        console.error("❌ Exception calling markReadMutation:", e);
+      }
     }
-  }, [markRead]);
+  }, [markReadMutation]);
 
   const unreadCount = useMemo(() => {
     if (!userId) return 0;
@@ -117,11 +130,11 @@ const AnnouncementsScreen: React.FC = () => {
   }, [announcements, userId]);
 
   const renderItem = ({ item }: { item: any }) => {
-    const isExpanded = !!expanded[item.id];
+    const isExpanded = !!expanded[item._id];
     const isRead = item.readBy?.includes(userId) || false;
 
     return (
-      <Pressable onPress={() => toggleExpand(item.id, isRead)}>
+      <Pressable onPress={() => toggleExpand(item._id, isRead)}>
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderLeftColor: isRead ? theme.colors.borderLight : "#4CAF50", borderLeftWidth: 4 }]}> 
           <View style={styles.cardHeader}>
             <View style={styles.titleRow}>
@@ -142,7 +155,7 @@ const AnnouncementsScreen: React.FC = () => {
           <Text style={[styles.message, { color: theme.colors.text }]} numberOfLines={isExpanded ? undefined : 3}>
             {item.body}
           </Text>
-          <Pressable onPress={() => toggleExpand(item.id, isRead)}>
+          <Pressable onPress={() => toggleExpand(item._id, isRead)}>
             <Text style={[styles.expand, { color: "#4CAF50" }]}>
               {isExpanded ? "Show less ▲" : "Read more ▼"}
             </Text>
@@ -222,10 +235,11 @@ const AnnouncementsScreen: React.FC = () => {
         ) : (
           <FlatList
             data={announcements}
-            keyExtractor={(item: any) => item.id}
+            keyExtractor={(item: any, index: number) => item?._id || `announcement-${index}`}
             contentContainerStyle={{ padding: 16, paddingBottom: 200 }}
             renderItem={renderItem}
             showsVerticalScrollIndicator={false}
+            removeClippedSubviews={true}
           />
         )}
       </View>

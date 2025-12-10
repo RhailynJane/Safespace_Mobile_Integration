@@ -190,20 +190,66 @@ export const getPresenceStatusBatch = query({
 });
 
 /**
- * Get user's recent activities
+ * Get user's recent activities with optional date range filtering
  */
 export const getUserActivities = query({
   args: {
     userId: v.string(),
     limit: v.optional(v.number()),
+    startDate: v.optional(v.number()), // Unix timestamp (ms)
+    endDate: v.optional(v.number()),   // Unix timestamp (ms)
   },
-  handler: async (ctx, { userId, limit = 50 }) => {
-    const activities = await ctx.db
+  handler: async (ctx, { userId, limit = 50, startDate, endDate }) => {
+    let query = ctx.db
       .query("activities")
       .withIndex("by_user_and_date", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(limit);
+      .order("desc");
 
-    return activities;
+    // Apply date range filter if provided
+    let activities = await query.collect();
+
+    if (startDate !== undefined || endDate !== undefined) {
+      activities = activities.filter((activity) => {
+        const activityTime = activity.createdAt;
+        
+        // Filter by start date if provided
+        if (startDate !== undefined && activityTime < startDate) {
+          return false;
+        }
+        
+        // Filter by end date if provided
+        if (endDate !== undefined && activityTime > endDate) {
+          return false;
+        }
+        
+        return true;
+      });
+    }
+
+    // Apply limit after filtering
+    return activities.slice(0, limit);
+  },
+});
+
+/**
+ * Record a generic activity (e.g., appointment_created, appointment_cancelled, etc.)
+ */
+export const recordActivity = mutation({
+  args: {
+    userId: v.string(),
+    activityType: v.string(),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, { userId, activityType, metadata }) => {
+    const now = Date.now();
+
+    await ctx.db.insert("activities", {
+      userId,
+      activityType,
+      metadata: metadata || { timestamp: now },
+      createdAt: now,
+    });
+
+    return { success: true, timestamp: now };
   },
 });
